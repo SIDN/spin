@@ -1,0 +1,83 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <script src="./vis-4.18.0/dist/vis.js"></script>
+    <link href="./vis-4.18.0/dist/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
+
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+    <meta content="utf-8" http-equiv="encoding">
+    <title>Websocket client</title>
+</head>
+<body>
+
+<h2>WebSocket test</h2>
+
+<div id="output"></div>
+
+<script language="javascript" type="text/javascript">
+
+
+    //
+    // WEBSOCKET CODE
+    //
+    var wsUri = "ws://localhost:12345/";
+    var output;
+    var running = true;
+
+    function init()
+    {
+        output = document.getElementById("output");
+        testWebSocket();
+    }
+
+    function testWebSocket()
+    {
+        websocket = new WebSocket(wsUri, "dumb-increment-protocol");
+        websocket.onopen = function(evt) { onOpen(evt) };
+        websocket.onclose = function(evt) { onClose(evt) };
+        websocket.onmessage = function(evt) { onMessage(evt) };
+        websocket.onerror = function(evt) { onError(evt) };
+    }
+
+    function onOpen(evt)
+    {
+        writeToScreen("CONNECTED");
+        //doSend("WebSocket rocks");
+    }
+
+    function onClose(evt)
+    {
+        writeToScreen("DISCONNECTED");
+    }
+
+    function onMessage(evt)
+    {
+        if (running) {
+            writeToScreen('<span style="color: blue;">RESPONSE: .' + evt.data+'.</span>');
+        }
+    }
+
+    function onError(evt)
+    {
+        writeToScreen('<span style="color: red;">ERROR:</span> ' + evt.data);
+    }
+
+    function doSend(message)
+    {
+        writeToScreen("SENT: " + message);
+        websocket.send(message);
+    }
+
+    function writeToScreen(message)
+    {
+        var pre = document.createElement("p");
+        pre.style.wordWrap = "break-word";
+        pre.innerHTML = message;
+        output.appendChild(pre);
+    }
+
+    window.addEventListener("load", init, false);
+
+</script>
+</body>
+</html>
