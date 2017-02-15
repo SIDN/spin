@@ -1,13 +1,16 @@
 #!/usr/bin/env lua
 --- lua websocket equivalent to test-server.c from libwebsockets.
 -- using copas as server framework
+
 package.path = '../src/?.lua;../src/?/?.lua;'..package.path
 local copas = require'copas'
 local socket = require'socket'
+local P = require'posix'
 
 local inc_clients = {}
 
 local websocket = require'websocket'
+
 local server = websocket.server.copas.listen
 {
   protocols = {
@@ -43,28 +46,14 @@ local server = websocket.server.copas.listen
   port = 12345
 }
 
--- this fairly complex mechanism is required due to the
--- lack of copas timers...
--- sends periodically the 'dumb-increment-protocol' count
--- to the respective client.
---copas.addthread(
---  function()
---    local last = socket.gettime()
---    while true do
---      copas.step(0.1)
---      local now = socket.gettime()
---      if (now - last) >= 0.1 then
---        last = now
---        for ws,number in pairs(inc_clients) do
---          ws:send(tostring(number))
---          inc_clients[ws] = number + 1
---        end
---      end
---    end
---  end)
+local pid_file_name = "/tmp/TESTPIDFILE.pid"
+function remove_pidfile()
+    print("yo")
+    --os.remove(pid_file_name)
+    os.exit()
+end
 
 -- TODO: move what we can to the module
-local P = require 'posix'
 
 function test_print(msg)
   print(msg)
@@ -83,7 +72,7 @@ end
 function send_number_loop()
     local last = socket.gettime()                    
     while true do                             
-      copas.step(0.1)                         
+      copas.step(0.1)
       local now = socket.gettime()            
       if (now - last) >= 0.1 then             
         last = now                            
@@ -109,8 +98,12 @@ function collector_loop()
 end
 
 local collector = require'collect'
+
+print("add thread")
 copas.addthread(
 collector_loop
 )
+print("add thread done")
+
 
 copas.loop()

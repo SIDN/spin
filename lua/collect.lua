@@ -1,10 +1,12 @@
 require 'posix'
+local util = require 'util'
 local P = require 'posix'
 
-local filter_list = {
-  ["127.0.0.1"] = true,
-  ["::1"] = true
-}
+--local filter_list = {
+--  ["127.0.0.1"] = true,
+--  ["::1"] = true
+--}
+local filter_list = util.get_all_bound_ip_addresses()
 
 --
 -- flow information
