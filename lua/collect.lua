@@ -127,7 +127,6 @@ function add_flow(timestamp, from, to, count, size, callback)
       end
       cur_aggr = Aggregator:create(timestamp)
     else
-      print("[XX] adding flow")
       cur_aggr:add_flow(from, to, count, size)
     end
     --print("ts: " .. timestamp .. " from: " .. from .. " to: " .. to .. " count: " .. count .. " size: " .. size)
@@ -144,7 +143,6 @@ function handle_line(line, callback)
   local to
   local count
   local size
-  print("[XX] handling line: " .. line)
   for token in string.gmatch(line, "[^%s]+") do
     if not timestamp and startswith(line, "[") then
       timestamp = token:match("%d+")
@@ -188,18 +186,14 @@ function read_line_from_fd(fd)
       end
     end
   end
-  print("[XX] READ LINE: " .. result)
   return result
 end
 
 function handle_pipe_output(fd, callback)
-  print("[XX] polling")
   local pr = P.rpoll(fd,10)
-  print("[XX] polling done " .. pr)
   if pr == 0 then
     return
   end
-  print("[XX] event at fd " .. fd)
   str = read_line_from_fd(fd)
   while str do
     handle_line(str, callback)

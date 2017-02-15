@@ -5,9 +5,6 @@ package.path = '../src/?.lua;../src/?/?.lua;'..package.path
 local copas = require'copas'
 local socket = require'socket'
 
-print('Open browser:')
-print('file://'..io.popen('pwd'):read()..'/index.html')
-
 local inc_clients = {}
 
 local websocket = require'websocket'
@@ -75,11 +72,8 @@ end
 
 function create_callback(ic)
   return function(msg)
-    print("callback called")
-    print(ic)
     for ws,number in pairs(ic) do
       --ws:send(msg)
-      print("[XX] sending: " .. msg)
       ws:send(msg)
       ic[ws] = number + 1
     end
@@ -102,17 +96,11 @@ function send_number_loop()
 end
 
 function collector_loop()
-    print("Starting collector loop 1")
     local fd1 = P.open("/tmp/spin_pipe", bit.bor(P.O_RDONLY, P.O_NONBLOCK))
     --local fd2 = P.open(arg[2], P.O_RDONLY)
-    print("Starting collector loop 2")
                                             
-    print("Starting collector loop 3")
-    print("Starting collector loop 4")
-                                                         
     cb = create_callback(inc_clients)     
     --cb = test_print
-    print("Starting collector loop 5")
     while true do                           
         --print("collector loop")           
         copas.step(0.1)                         
