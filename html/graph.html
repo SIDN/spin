@@ -26,7 +26,7 @@
 </head>
 <body>
 
-<h2>WebSocket test</h2>
+<h2>SPIN traffic data prototype</h2>
 
 <div id="visualization"></div>
 
@@ -100,7 +100,22 @@
                     //running = false;
                 }
 
+                //
                 // update network view
+                //
+
+                // clean out old nodes, and reset color
+                for (ip in nodeIds) {
+                    var nodeId = getNodeId(ip)
+
+                    node = nodes.get(nodeId);
+                    if (node["color"] == 'red') {
+                        node["color"] = 'lightblue';
+                        nodes.update(node);
+                    }
+                }
+
+                // Add the new flows
                 var arr = data['flows'];
                 for (var i = 0, len = arr.length; i < len; i++) {
                     var f = arr[i];
@@ -276,13 +291,46 @@
         }
     }
 
-    function addNode(ip) {
+    function alertWithObject(o) {
+        str = "Object:\n";
+        for(var propertyName in o) {
+           // propertyName is what you want
+           // you can get the value like this: myObject[propertyName]
+           str += propertyName + ": " + o[propertyName] + "\n";
+        }
+        alert(str);
+    }
+
+    function addNode(ip, scale) {
         existing = getNodeId(ip);
-        if (haveNode(ip)) {
-            // er, do nothing?
+        if (existing) {
+            if (scale) {
+                node = nodes.get(existing)
+                //alert("node: " + node + " color: " + node['color'] + " size: " + node.size);
+                node["color"] = 'red';
+                node["value"] = node["value"] + 1;
+                //alertWithObject(node);
+                nodes.update(node);
+            }
         } else {
+            var c;
+            if (scale) {
+                c = 'red';
+            } else {
+                c = 'gray';
+            }
             nodeIds[ip] = curNodeId;
-            nodes.add({id:curNodeId, label:ip});
+            nodes.add({id:curNodeId,
+                       label: ip,
+                       color: c,
+                       value: 1,
+                       scaling:{
+                           min: 1,
+                           label: {
+                               enabled: true
+                           }
+                       }
+                    });
             curNodeId += 1;
         }
     }
@@ -298,14 +346,14 @@
             edgeIds[from + "-" + to] = curEdgeId;
             fromNodeId = nodeIds[from];
             toNodeId = nodeIds[to];
-            edges.add({id: curEdgeId, from: fromNodeId, to: toNodeId});
+            edges.add({id: curEdgeId, from: fromNodeId, to: toNodeId, color: 'blue'});
             curEdgeId += 1;
         }
     }
 
     function addFlow(from, to) {
-        addNode(from);
-        addNode(to);
+        addNode(from, false);
+        addNode(to, true);
         addEdge(from, to);
     }
 
