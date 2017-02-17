@@ -84,15 +84,15 @@
         if (running) {
             //writeToScreen('<span style="color: blue;">RESPONSE: .' + evt.data+'.</span>');
             try {
-                data = JSON.parse(evt.data);
-
+                var data = JSON.parse(evt.data);
+                var timestamp = data['timestamp']
                 // update traffic view
-                d = new Date(data['timestamp']*1000);
+                d = new Date(timestamp*1000);
                 traffic_dataset.add({x: d, y: data['total_size'], group: 0});
                 traffic_dataset.add({x: d, y: data['total_count'], group: 1});
 
                 var options = {
-                    start: new Date((data['timestamp']*1000)-600000),
+                    start: new Date((timestamp*1000)-600000),
                     end: d,
                     height: '140px',
                     drawPoints: false,
@@ -109,11 +109,17 @@
                 //
 
                 // clean out old nodes, and reset color
+                var now = Math.floor(Date.now() / 1000);
+                var delete_before = now - 600;
+                var unhighlight_before = now - 10;
                 for (ip in nodeIds) {
                     var nodeId = getNodeId(ip)
-
                     node = nodes.get(nodeId);
-                    if (node["color"] == 'red') {
+                    if (node.lastseen < delete_before) {
+                        // does this remove the edges as well?
+                        delete nodeIds[ip];
+                        nodes.remove(nodeId);
+                    } else if (node.lastseen < unhighlight_before  && node["color"] == 'red') {
                         node["color"] = 'lightblue';
                         nodes.update(node);
                     }
@@ -123,7 +129,7 @@
                 var arr = data['flows'];
                 for (var i = 0, len = arr.length; i < len; i++) {
                     var f = arr[i];
-                    addFlow(f['from'], f['to'], f['count'], f['size']);
+                    addFlow(timestamp, f['from'], f['to'], f['count'], f['size']);
                 }
             } catch (error) {
                 alert(error + ": " + evt.data);
@@ -295,15 +301,16 @@
         alert(str);
     }
 
-    function addNode(ip, scale, count, size) {
-        existing = getNodeId(ip);
+    function addNode(timestamp, ip, scale, count, size) {
+        var existing = getNodeId(ip);
         if (existing) {
-            node = nodes.get(existing)
+            var node = nodes.get(existing)
             //alert("node: " + node + " color: " + node['color'] + " size: " + node.size);
             // Set the color to mark 'recent'
 
-            node["size"] += size
-            node["count"] += size
+            node["size"] += size;
+            node["count"] += size;
+            node["lastseen"] = timestamp;
 
             if (scale) {
                 node["color"] = 'red';
@@ -324,6 +331,7 @@
                        value: size,
                        count: count,
                        size: size,
+                       lastseen: timestamp,
                        scaling:{
                            min: 1,
                            label: {
@@ -352,9 +360,9 @@
         }
     }
 
-    function addFlow(from, to, count, size) {
-        addNode(from, false, count, size);
-        addNode(to, true, count, size);
+    function addFlow(timestamp, from, to, count, size) {
+        addNode(timestamp, from, false, count, size);
+        addNode(timestamp, to, true, count, size);
         addEdge(from, to);
     }
 
