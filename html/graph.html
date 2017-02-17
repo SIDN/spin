@@ -22,6 +22,9 @@
         h4 {
             margin-bottom:3px;
         }
+        #infobar {
+            border: 1px solid lightgray;
+        }
     </style>
 </head>
 <body>
@@ -29,10 +32,13 @@
 <h2>SPIN traffic data prototype</h2>
 
 <div id="visualization"></div>
-
+<div id="infobar">
+    <div id="ipaddress">IP Address:</div>
+    <div id="trafficcount">Connections seen:</div>
+    <div id="trafficsize">Traffic size:</div>
+    <div id="macaddress"/>
+</div>
 <div id="mynetwork"></div>
-
-<div>datalog:</div>
 
 <div id="output"></div>
 
@@ -40,18 +46,17 @@
 
     var traffic_dataset = new vis.DataSet([]);
     var graph2d_1;
+    var selectedNodeId;
     showGraph(traffic_dataset);
 
     //
     // WEBSOCKET CODE
     //
-    var wsUri = "ws://localhost:12345/";
-    var output;
+    var wsUri = "ws://192.168.1.1:12345/";
     var running = true;
 
     function init()
     {
-        output = document.getElementById("output");
         testWebSocket();
     }
 
@@ -66,13 +71,12 @@
 
     function onOpen(evt)
     {
-        writeToScreen("CONNECTED");
-        //doSend("WebSocket rocks");
+        //show connected status somewhere
     }
 
     function onClose(evt)
     {
-        writeToScreen("DISCONNECTED");
+        //show disconnected status somewhere
     }
 
     function onMessage(evt)
@@ -119,7 +123,7 @@
                 var arr = data['flows'];
                 for (var i = 0, len = arr.length; i < len; i++) {
                     var f = arr[i];
-                    addFlow(f['from'], f['to']);
+                    addFlow(f['from'], f['to'], f['count'], f['size']);
                 }
             } catch (error) {
                 alert(error + ": " + evt.data);
@@ -139,12 +143,10 @@
         websocket.send(message);
     }
 
-    function writeToScreen(message)
+    function writeToScreen(element, message)
     {
-        var pre = document.createElement("p");
-        pre.style.wordWrap = "break-word";
-        pre.innerHTML = message;
-        output.appendChild(pre);
+        var el = document.getElementById(element);
+        el.innerHTML = message;
     }
 
     window.addEventListener("load", init, false);
@@ -227,30 +229,22 @@
         };
         var options = {};
         network = new vis.Network(container, data, options);
+        network.on("selectNode", nodeSelected);
     }
 
-    //function addNode() {
-    //    var newId = (Math.random() * 1e7).toString(32);
-    //    nodes.add({id:newId, label:"I'm new!"});
-    //    nodeIds.push(newId);
-    //}
-
-    function changeNode1() {
-        var newColor = '#' + Math.floor((Math.random() * 255 * 255 * 255)).toString(16);
-        nodes.update([{id:1, color:{background:newColor}}]);
+    function updateNodeInfo(nodeId) {
+        node = nodes.get(nodeId);
+        writeToScreen("ipaddress", "IP Address: " + node.label);
+        writeToScreen("trafficsize", "Connections seen: " + node.count);
+        writeToScreen("trafficcount", "Traffic size: " + node.size);
+        selectedNodeId = nodeId;
     }
 
-    function removeRandomNode() {
-        var randomNodeId = nodeIds[Math.floor(Math.random() * nodeIds.length)];
-        nodes.remove({id:randomNodeId});
-
-        var index = nodeIds.indexOf(randomNodeId);
-        nodeIds.splice(index,1);
-    }
-
-    function changeOptions() {
-        shadowState = !shadowState;
-        network.setOptions({nodes:{shadow:shadowState},edges:{shadow:shadowState}});
+    function nodeSelected(event) {
+        var nodeId = event.nodes[0];
+        if (typeof(nodeId) == 'number') {
+            updateNodeInfo(nodeId);
+        }
     }
 
     function resetAllNodes() {
@@ -301,17 +295,21 @@
         alert(str);
     }
 
-    function addNode(ip, scale) {
+    function addNode(ip, scale, count, size) {
         existing = getNodeId(ip);
         if (existing) {
+            node = nodes.get(existing)
+            //alert("node: " + node + " color: " + node['color'] + " size: " + node.size);
+            // Set the color to mark 'recent'
+
+            node["size"] += size
+            node["count"] += size
+
             if (scale) {
-                node = nodes.get(existing)
-                //alert("node: " + node + " color: " + node['color'] + " size: " + node.size);
                 node["color"] = 'red';
-                node["value"] = node["value"] + 1;
-                //alertWithObject(node);
-                nodes.update(node);
+                node["value"] = node["value"] + size;
             }
+            nodes.update(node);
         } else {
             var c;
             if (scale) {
@@ -323,7 +321,9 @@
             nodes.add({id:curNodeId,
                        label: ip,
                        color: c,
-                       value: 1,
+                       value: size,
+                       count: count,
+                       size: size,
                        scaling:{
                            min: 1,
                            label: {
@@ -333,6 +333,9 @@
                     });
             curNodeId += 1;
         }
+        if (selectedNodeId && selectedNodeId == existing) {
+            updateNodeInfo(selectedNodeId);
+        }
     }
 
     function haveEdge(from, to) {
@@ -340,9 +343,7 @@
     }
 
     function addEdge(from, to) {
-        if (haveEdge(from, to)) {
-            // do nothing
-        } else {
+        if (!haveEdge(from, to)) {
             edgeIds[from + "-" + to] = curEdgeId;
             fromNodeId = nodeIds[from];
             toNodeId = nodeIds[to];
@@ -351,9 +352,9 @@
         }
     }
 
-    function addFlow(from, to) {
-        addNode(from, false);
-        addNode(to, true);
+    function addFlow(from, to, count, size) {
+        addNode(from, false, count, size);
+        addNode(to, true, count, size);
         addEdge(from, to);
     }
 
