@@ -1,6 +1,7 @@
-require 'posix'
 local util = require 'util'
 local P = require 'posix'
+local arp = require 'arp'
+
 
 --local filter_list = {
 --  ["127.0.0.1"] = true,
@@ -26,7 +27,11 @@ function Aggregator:same_timestamp(timestamp)
   return self.data.timestamp == timestamp
 end
 
-function Aggregator:add_flow(from, to, count, size)
+function Aggregator:add_flow(from_ip, to, count, size)
+  local from = arp:get_hw_address(from_ip)
+  if not from then
+    from = from_ip
+  end
   local fdata = self.data.flows[from .. "," .. to]
   if not fdata then
     fdata = {}

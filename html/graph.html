@@ -33,7 +33,7 @@
 
 <div id="visualization"></div>
 <div id="infobar">
-    <div id="ipaddress">IP Address:</div>
+    <div id="selected">Selected:</div>
     <div id="trafficcount">Connections seen:</div>
     <div id="trafficsize">Traffic size:</div>
     <div id="macaddress"/>
@@ -62,7 +62,7 @@
 
     function testWebSocket()
     {
-        websocket = new WebSocket(wsUri, "dumb-increment-protocol");
+        websocket = new WebSocket(wsUri, "traffic-data-protocol");
         websocket.onopen = function(evt) { onOpen(evt) };
         websocket.onclose = function(evt) { onClose(evt) };
         websocket.onmessage = function(evt) { onMessage(evt) };
@@ -240,7 +240,7 @@
 
     function updateNodeInfo(nodeId) {
         node = nodes.get(nodeId);
-        writeToScreen("ipaddress", "IP Address: " + node.label);
+        writeToScreen("selected", "Selected: " + node.label);
         writeToScreen("trafficsize", "Connections seen: " + node.count);
         writeToScreen("trafficcount", "Traffic size: " + node.size);
         selectedNodeId = nodeId;
