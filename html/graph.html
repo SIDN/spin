@@ -34,7 +34,7 @@
 <div id="visualization"></div>
 <div id="infobar">
     <div id="selected">Selected:</div>
-    <div id="ipaddress">IP Address:</div>
+    <div id="ipaddress"></div>
     <div id="trafficcount">Connections seen:</div>
     <div id="trafficsize">Traffic size:</div>
     <div id="macaddress"/>
@@ -259,6 +259,7 @@
         writeToScreen("selected", "Selected: " + node.label);
         writeToScreen("trafficsize", "Connections seen: " + node.count);
         writeToScreen("trafficcount", "Traffic size: " + node.size);
+        writeToScreen("ipaddress", "");
         // TODO: mark that this is hw not ip
         info_ws.send("arp2ip " + node.label);
         selectedNodeId = nodeId;
