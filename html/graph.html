@@ -34,6 +34,7 @@
 <div id="visualization"></div>
 <div id="infobar">
     <div id="selected">Selected:</div>
+    <div id="ipaddress">IP Address:</div>
     <div id="trafficcount">Connections seen:</div>
     <div id="trafficsize">Traffic size:</div>
     <div id="macaddress"/>
@@ -47,39 +48,59 @@
     var traffic_dataset = new vis.DataSet([]);
     var graph2d_1;
     var selectedNodeId;
+    var traffic_ws;
+    var info_ws;
     showGraph(traffic_dataset);
 
     //
     // WEBSOCKET CODE
     //
-    var wsUri = "ws://localhost:12345/";
+    var wsUri = "ws://192.168.1.1:12345/";
     var running = true;
 
     function init()
     {
-        testWebSocket();
+        startWebSockets();
     }
 
-    function testWebSocket()
+    function startWebSockets()
     {
-        websocket = new WebSocket(wsUri, "traffic-data-protocol");
-        websocket.onopen = function(evt) { onOpen(evt) };
-        websocket.onclose = function(evt) { onClose(evt) };
-        websocket.onmessage = function(evt) { onMessage(evt) };
-        websocket.onerror = function(evt) { onError(evt) };
+        traffic_ws = new WebSocket(wsUri, "traffic-data-protocol");
+        traffic_ws.onopen = function(evt) { onTrafficOpen(evt) };
+        traffic_ws.onclose = function(evt) { onTrafficClose(evt) };
+        traffic_ws.onmessage = function(evt) { onTrafficMessage(evt) };
+        traffic_ws.onerror = function(evt) { onTrafficError(evt) };
+
+        info_ws = new WebSocket(wsUri, "info-protocol");
+        info_ws.onmessage = function(evt) { onInfoMessage(evt) };
     }
 
-    function onOpen(evt)
+    function onInfoMessage(evt) {
+        var data_parts = evt.data.split(/\s+/);
+        var type = data_parts[0];
+        var request = data_parts[1];
+        var response = data_parts.slice(2).join(" ");
+        switch (type) {
+            case 'arp2ip':
+              var node = nodes.get(selectedNodeId);
+              if (node && node.label == request) {
+                writeToScreen("ipaddress", "IP(s): " + response);
+              }
+              break;
+        }
+    }
+
+    function onTrafficOpen(evt)
     {
         //show connected status somewhere
     }
 
-    function onClose(evt)
+    function onTrafficClose(evt)
     {
         //show disconnected status somewhere
     }
 
-    function onMessage(evt)
+    function onTrafficMessage(evt)
     {
         if (running) {
             //writeToScreen('<span style="color: blue;">RESPONSE: .' + evt.data+'.</span>');
@@ -134,19 +155,14 @@
             } catch (error) {
                 alert(error + ": " + evt.data);
             }
-            //websocket.close();
+            //traffic_ws.close();
         }
     }
 
-    function onError(evt)
+    function onTrafficError(evt)
     {
+        // todo: not here
         writeToScreen('<span style="color: red;">ERROR:</span> ' + evt.data);
-    }
-
-    function doSend(message)
-    {
-        writeToScreen("SENT: " + message);
-        websocket.send(message);
     }
 
     function writeToScreen(element, message)
@@ -243,6 +259,8 @@
         writeToScreen("selected", "Selected: " + node.label);
         writeToScreen("trafficsize", "Connections seen: " + node.count);
         writeToScreen("trafficcount", "Traffic size: " + node.size);
+        // TODO: mark that this is hw not ip
+        info_ws.send("arp2ip " + node.label);
         selectedNodeId = nodeId;
     }
 

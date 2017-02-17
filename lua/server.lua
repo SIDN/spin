@@ -6,6 +6,8 @@ package.path = '../src/?.lua;../src/?/?.lua;'..package.path
 local copas = require'copas'
 local socket = require'socket'
 local P = require'posix'
+local arp = require'arp'
+local util = require'util'
 
 local traffic_clients = {}
 local info_clients = {}
@@ -21,8 +23,10 @@ local websocket = require'websocket'
 -- and responses in the form
 -- <type> <request data> <response data>
 -- example:
--- Request: arp 192.168.1.1
--- Response: arp 192.168.1.1 aa:bb:cc:dd:ee:ff
+-- Request: arp2ip aa:bb:cc:dd:ee:ff
+-- Response: arp2ip aa:bb:cc:dd:ee:ff 192.168.1.1
+-- note: if this turns out to need more granular data, we'll need
+-- to jsonify it
 
 
 local server = websocket.server.copas.listen
@@ -51,8 +55,25 @@ local server = websocket.server.copas.listen
           ws:close()
           return
         else
-          response = msg .. " bar"
-          ws:send(resposne)
+          print("[XX] GOT MESSAGE: " .. msg)
+          local response = nil
+          tokens = util:line_to_tokens(msg)
+          print("[XX] TOKENS[1]: '" .. tokens[1] .. "'")
+          if (tokens[1] == "arp2ip") then
+            local hw = tokens[2]
+            local ips = arp:get_ip_addresses(hw)
+            if #ips > 0 then
+              response = "arp2ip " .. hw .. " " .. table.concat(ips, ", ")
+            else
+              print("[XX] ip for arp entry '" .. hw .. "' not found")
+              arp:print_table()
+            end
+          end
+
+          if response then
+            print("[XX] SENDING RESPONSE: " .. response)
+            ws:send(response)
+          end
         end
         --if opcode == websocket.TEXT then
         --  request
