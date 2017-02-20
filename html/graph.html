@@ -137,8 +137,8 @@
 
                 // clean out old nodes, and reset color
                 var now = Math.floor(Date.now() / 1000);
-                var delete_before = now - 15;
-                var unhighlight_before = now - 600;
+                var delete_before = now - 600;
+                var unhighlight_before = now - 10;
                 for (ip in nodeIds) {
                     var nodeId = getNodeId(ip)
                     node = nodes.get(nodeId);
