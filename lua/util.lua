@@ -46,6 +46,23 @@ function util:get_arp_table()
   return result
 end
 
+-- reads the dhcp config file (if it exists)
+-- returns a table of mac->name (nil if not set)
+-- returns nil if file not found
+function util:read_dhcp_config_hosts(filename)
+  local result = {}
+  print("[XX] OPEN FILE: " .. filename)
+  local f = io.open(filename, "r")
+  if not f then return nil end
+  s = f:read("*all")
+  f:close()
+  -- err, we probably need a somewhat decent parser here; the order is not fixed
+  for name,hw in string.gmatch(s, "config host%s+option name '(%S+)'%s+option mac '(%S+)'") do
+    result[hw] = name
+  end
+  return result
+end
+
 --
 -- Assorted basic utility functions
 --

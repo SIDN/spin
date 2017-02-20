@@ -68,6 +68,13 @@ local server = websocket.server.copas.listen
               print("[XX] ip for arp entry '" .. hw .. "' not found")
               arp:print_table()
             end
+          elseif (tokens[1] == "arp2dhcpname") then
+            local dhcpdb = util:read_dhcp_config_hosts("/etc/config/dhcp")
+            if dhcpdb then
+              if dhcpdb[tokens[2]] then
+                response = "arp2dhcpname " .. tokens[2] .. " " .. dhcpdb[tokens[2]]
+              end
+            end
           end
 
           if response then

@@ -37,7 +37,8 @@
     <div id="ipaddress"></div>
     <div id="trafficcount">Connections seen:</div>
     <div id="trafficsize">Traffic size:</div>
-    <div id="macaddress"/>
+    <div id="lastseen">Last seen:</div>
+    <div id="lastwith">Last with:</div>
 </div>
 <div id="mynetwork"></div>
 
@@ -55,7 +56,7 @@
     //
     // WEBSOCKET CODE
     //
-    var wsUri = "ws://192.168.1.1:12345/";
+    var wsUri = "ws://localhost:12345/";
     var running = true;
 
     function init()
@@ -83,10 +84,15 @@
         switch (type) {
             case 'arp2ip':
               var node = nodes.get(selectedNodeId);
-              if (node && node.label == request) {
+              if (node && node.address == request) {
                 writeToScreen("ipaddress", "IP(s): " + response);
               }
               break;
+            case 'arp2dhcpname':
+              var node = nodes.get(getNodeId(request));
+              node.label = response;
+              nodes.update(node);
+              break
         }
     }
 
@@ -131,7 +137,7 @@
 
                 // clean out old nodes, and reset color
                 var now = Math.floor(Date.now() / 1000);
-                var delete_before = now - 600;
+                var delete_before = now - 15;
                 var unhighlight_before = now - 10;
                 for (ip in nodeIds) {
                     var nodeId = getNodeId(ip)
@@ -140,6 +146,7 @@
                         // does this remove the edges as well?
                         delete nodeIds[ip];
                         nodes.remove(nodeId);
+                        deleteEdges(nodeId);
                     } else if (node.lastseen < unhighlight_before  && node["color"] == 'red') {
                         node["color"] = 'lightblue';
                         nodes.update(node);
@@ -224,8 +231,6 @@
     function startNetwork() {
         // mapping from ip to nodeId
         nodeIds = {};
-        // mapping from ip+ip to edgeId
-        edgeIds = {};
 
         shadowState = false;
 
@@ -260,15 +265,17 @@
         writeToScreen("trafficsize", "Connections seen: " + node.count);
         writeToScreen("trafficcount", "Traffic size: " + node.size);
         writeToScreen("ipaddress", "");
+        writeToScreen("lastseen", "Last seen: " + new Date(node.lastseen*1000));
+        writeToScreen("lastwith", "With: " + node.lastwith);
         // TODO: mark that this is hw not ip
-        info_ws.send("arp2ip " + node.label);
-        selectedNodeId = nodeId;
+        info_ws.send("arp2ip " + node.address);
     }
 
     function nodeSelected(event) {
         var nodeId = event.nodes[0];
-        if (typeof(nodeId) == 'number') {
+        if (typeof(nodeId) == 'number' && selectedNodeId != nodeId) {
             updateNodeInfo(nodeId);
+            selectedNodeId = nodeId;
         }
     }
 
@@ -310,8 +317,8 @@
         }
     }
 
-    function alertWithObject(o) {
-        str = "Object:\n";
+    function alertWithObject(m, o) {
+        str = m + "\n";
         for(var propertyName in o) {
            // propertyName is what you want
            // you can get the value like this: myObject[propertyName]
@@ -320,7 +327,7 @@
         alert(str);
     }
 
-    function addNode(timestamp, ip, scale, count, size) {
+    function addNode(timestamp, ip, scale, count, size, lwith) {
         var existing = getNodeId(ip);
         if (existing) {
             var node = nodes.get(existing)
@@ -330,6 +337,7 @@
             node["size"] += size;
             node["count"] += size;
             node["lastseen"] = timestamp;
+            node["lastwith"] = lwith;
 
             if (scale) {
                 node["color"] = 'red';
@@ -345,12 +353,14 @@
             }
             nodeIds[ip] = curNodeId;
             nodes.add({id:curNodeId,
+                       address: ip, // (note: this can also be mac addr)
                        label: ip,
                        color: c,
                        value: size,
                        count: count,
                        size: size,
                        lastseen: timestamp,
+                       lastwith: lwith,
                        scaling:{
                            min: 1,
                            label: {
@@ -359,29 +369,43 @@
                        }
                     });
             curNodeId += 1;
+            info_ws.send("arp2dhcpname " + ip)
         }
         if (selectedNodeId && selectedNodeId == existing) {
             updateNodeInfo(selectedNodeId);
         }
     }
 
-    function haveEdge(from, to) {
-        return (from + "-" + to in edgeIds) || (to + "-" + from in edgeIds);
-    }
-
     function addEdge(from, to) {
-        if (!haveEdge(from, to)) {
-            edgeIds[from + "-" + to] = curEdgeId;
-            fromNodeId = nodeIds[from];
-            toNodeId = nodeIds[to];
+        var fromNodeId = nodeIds[from];
+        var toNodeId = nodeIds[to];
+        var existing = edges.get({
+            filter: function(item) {
+                return (item.from == fromNodeId && item.to == toNodeId);
+            }
+        });
+        if (existing.length == 0) {
             edges.add({id: curEdgeId, from: fromNodeId, to: toNodeId, color: 'blue'});
             curEdgeId += 1;
         }
     }
 
+    function deleteEdges(nodeId) {
+        var toDelete = edges.get({
+            filter: function (item) {
+                return (item.from == nodeId || item.to == nodeId);
+            }
+        });
+        for (var i=0; i < toDelete.length; i++) {
+            var edge = toDelete[i];
+            var e = edges.get(edge);
+            edges.remove(edge.id);
+        }
+    }
+
     function addFlow(timestamp, from, to, count, size) {
-        addNode(timestamp, from, false, count, size);
-        addNode(timestamp, to, true, count, size);
+        addNode(timestamp, from, false, count, size, "to " + to);
+        addNode(timestamp, to, true, count, size, "from " + from);
         addEdge(from, to);
     }
 
