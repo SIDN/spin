@@ -38,7 +38,6 @@
     <div id="trafficcount">Connections seen:</div>
     <div id="trafficsize">Traffic size:</div>
     <div id="lastseen">Last seen:</div>
-    <div id="lastwith">Last with:</div>
 </div>
 <div id="mynetwork"></div>
 
@@ -266,7 +265,6 @@
         writeToScreen("trafficcount", "Traffic size: " + node.size);
         writeToScreen("ipaddress", "");
         writeToScreen("lastseen", "Last seen: " + new Date(node.lastseen*1000));
-        writeToScreen("lastwith", "With: " + node.lastwith);
         // TODO: mark that this is hw not ip
         info_ws.send("arp2ip " + node.address);
     }
@@ -337,7 +335,6 @@
             node["size"] += size;
             node["count"] += size;
             node["lastseen"] = timestamp;
-            node["lastwith"] = lwith;
 
             if (scale) {
                 node["color"] = 'red';
@@ -360,7 +357,6 @@
                        count: count,
                        size: size,
                        lastseen: timestamp,
-                       lastwith: lwith,
                        scaling:{
                            min: 1,
                            label: {
@@ -407,6 +403,7 @@
         addNode(timestamp, from, false, count, size, "to " + to);
         addNode(timestamp, to, true, count, size, "from " + from);
         addEdge(from, to);
+        network.fit({ duration: 500 } );
     }
 
     startNetwork();
