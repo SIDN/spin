@@ -63,6 +63,26 @@ function util:read_dhcp_config_hosts(filename)
   return result
 end
 
+-- Calls unbound-host to do a reverse lookup
+-- returns the domain name if found, or nil if not
+-- (TODO: also try host, bind-host and knot-host?)
+function util:reverse_lookup(address)
+  local s = util:capture("unbound-host " .. address, true)
+  for token in string.gmatch(s, "domain name pointer (%S+)") do
+    return token
+  end
+  return "No reverse name found"
+end
+
+-- calls the whois command and returns the *first* descr: line value
+function util:whois_desc(address)
+  local s = util:capture("whois " .. address, true)
+  for token in string.gmatch(s, "descr:%s+([^\r\n]+)") do
+    return token
+  end
+  return "Not found"
+end
+
 --
 -- Assorted basic utility functions
 --

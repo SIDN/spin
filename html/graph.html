@@ -39,11 +39,36 @@
 
 <div id="visualization"></div>
 <div id="infobar">
-    <div id="selected">Selected:</div>
-    <div id="ipaddress"></div>
-    <div id="trafficcount">Connections seen:</div>
-    <div id="trafficsize">Traffic size:</div>
-    <div id="lastseen">Last seen:</div>
+    <table>
+        <tr>
+            <td>
+                <div id="selected">Selected:</div>
+            </td>
+            <td>
+                <div id="trafficcount">Connections seen:</div>
+            </td>
+            <td>
+                <div id="trafficsize">Traffic size:</div>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <div id="lastseen">Last seen:</div>
+            </td>
+            <td>
+                <div colspan="2" id="ipaddress"></div>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <div id="reversedns"></div>
+            </td>
+            <td></td>
+            <td>
+                <div id="netowner"></div>
+            </td>
+        </tr>
+    </table>
 </div>
 <div id="mynetwork"></div>
 
@@ -98,11 +123,23 @@
                 writeToScreen("ipaddress", "IP(s): " + response);
               }
               break;
+            case 'ip2hostname':
+              var node = nodes.get(selectedNodeId);
+              if (node && node.address == request) {
+                writeToScreen("reversedns", "Reverse DNS: " + response);
+              }
+              break;
+            case 'ip2netowner':
+              var node = nodes.get(selectedNodeId);
+              if (node && node.address == request) {
+                writeToScreen("netowner", "Network owner: " + response);
+              }
+              break;
             case 'arp2dhcpname':
               var node = nodes.get(getNodeId(request));
               node.label = response;
               nodes.update(node);
-              break
+              break;
         }
     }
 
@@ -278,6 +315,8 @@
         writeToScreen("lastseen", "Last seen: " + new Date(node.lastseen*1000));
         // TODO: mark that this is hw not ip
         info_ws.send("arp2ip " + node.address);
+        info_ws.send("ip2hostname " + node.address);
+        info_ws.send("ip2netowner " + node.address);
     }
 
     function nodeSelected(event) {

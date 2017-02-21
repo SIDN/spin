@@ -28,6 +28,29 @@ local websocket = require'websocket'
 -- note: if this turns out to need more granular data, we'll need
 -- to jsonify it
 
+function handle_command(command, argument)
+  local response
+  if (command == "arp2ip") then
+    local hw = argument
+    local ips = arp:get_ip_addresses(hw)
+    if #ips > 0 then
+      response = "arp2ip " .. hw .. " " .. table.concat(ips, ", ")
+    end
+  elseif (command == "arp2dhcpname") then
+    local dhcpdb = util:read_dhcp_config_hosts("/etc/config/dhcp")
+    if dhcpdb then
+      if dhcpdb[argument] then
+        response = "arp2dhcpname " .. argument .. " " .. dhcpdb[argument]
+      end
+    end
+  elseif (command == "ip2hostname") then
+    response = "ip2hostname " .. argument .. " " .. util:reverse_lookup(argument)
+  elseif (command == "ip2netowner") then
+    response = "ip2netowner " .. argument .. " " .. util:whois_desc(argument)
+  end
+  return response
+end
+
 
 local server = websocket.server.copas.listen
 {
@@ -59,24 +82,7 @@ local server = websocket.server.copas.listen
           local response = nil
           tokens = util:line_to_tokens(msg)
           print("[XX] TOKENS[1]: '" .. tokens[1] .. "'")
-          if (tokens[1] == "arp2ip") then
-            local hw = tokens[2]
-            local ips = arp:get_ip_addresses(hw)
-            if #ips > 0 then
-              response = "arp2ip " .. hw .. " " .. table.concat(ips, ", ")
-            else
-              print("[XX] ip for arp entry '" .. hw .. "' not found")
-              arp:print_table()
-            end
-          elseif (tokens[1] == "arp2dhcpname") then
-            local dhcpdb = util:read_dhcp_config_hosts("/etc/config/dhcp")
-            if dhcpdb then
-              if dhcpdb[tokens[2]] then
-                response = "arp2dhcpname " .. tokens[2] .. " " .. dhcpdb[tokens[2]]
-              end
-            end
-          end
-
+          response = handle_command(tokens[1], tokens[2])
           if response then
             print("[XX] SENDING RESPONSE: " .. response)
             ws:send(response)
