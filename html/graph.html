@@ -55,8 +55,13 @@
     //
     // WEBSOCKET CODE
     //
-    var wsUri = "ws://localhost:12345/";
     var running = true;
+
+    function createWebSocketUri() {
+        var protocolPrefix = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
+        var host = (window.location.host === '') ? 'localhost' : window.location.host
+        return protocolPrefix + '//' + host + ":12345";
+    }
 
     function init()
     {
@@ -65,13 +70,13 @@
 
     function startWebSockets()
     {
-        traffic_ws = new WebSocket(wsUri, "traffic-data-protocol");
+        traffic_ws = new WebSocket(createWebSocketUri(), "traffic-data-protocol");
         traffic_ws.onopen = function(evt) { onTrafficOpen(evt) };
         traffic_ws.onclose = function(evt) { onTrafficClose(evt) };
         traffic_ws.onmessage = function(evt) { onTrafficMessage(evt) };
         traffic_ws.onerror = function(evt) { onTrafficError(evt) };
 
-        info_ws = new WebSocket(wsUri, "info-protocol");
+        info_ws = new WebSocket(createWebSocketUri(), "info-protocol");
         info_ws.onmessage = function(evt) { onInfoMessage(evt) };
     }
 
