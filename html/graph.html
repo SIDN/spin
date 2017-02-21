@@ -55,8 +55,8 @@
             <td>
                 <div id="lastseen">Last seen:</div>
             </td>
-            <td>
-                <div colspan="2" id="ipaddress"></div>
+            <td colspan="2" >
+                <div id="ipaddress"></div>
             </td>
         </tr>
         <tr>
@@ -311,7 +311,7 @@
         writeToScreen("selected", "Selected: " + node.label);
         writeToScreen("trafficsize", "Connections seen: " + node.count);
         writeToScreen("trafficcount", "Traffic size: " + node.size);
-        writeToScreen("ipaddress", "");
+        writeToScreen("ipaddress", "Reverse DNS:");
         writeToScreen("lastseen", "Last seen: " + new Date(node.lastseen*1000));
         // TODO: mark that this is hw not ip
     }
@@ -322,7 +322,9 @@
             updateNodeInfo(nodeId);
             selectedNodeId = nodeId;
             info_ws.send("arp2ip " + node.address);
+            writeToScreen("reversedns", "Reverse DNS: &lt;searching&gt;");
             info_ws.send("ip2hostname " + node.address);
+            writeToScreen("netowner", "Network owner: &lt;searching&gt;");
             info_ws.send("ip2netowner " + node.address);
         }
     }
