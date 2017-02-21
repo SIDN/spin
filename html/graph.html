@@ -314,9 +314,6 @@
         writeToScreen("ipaddress", "");
         writeToScreen("lastseen", "Last seen: " + new Date(node.lastseen*1000));
         // TODO: mark that this is hw not ip
-        info_ws.send("arp2ip " + node.address);
-        info_ws.send("ip2hostname " + node.address);
-        info_ws.send("ip2netowner " + node.address);
     }
 
     function nodeSelected(event) {
@@ -324,6 +321,9 @@
         if (typeof(nodeId) == 'number' && selectedNodeId != nodeId) {
             updateNodeInfo(nodeId);
             selectedNodeId = nodeId;
+            info_ws.send("arp2ip " + node.address);
+            info_ws.send("ip2hostname " + node.address);
+            info_ws.send("ip2netowner " + node.address);
         }
     }
 
