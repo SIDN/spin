@@ -151,7 +151,7 @@
 
     function createWebSocketUri() {
         var protocolPrefix = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
-        var host = (window.location.host === '') ? '192.168.8.1' : window.location.host
+        var host = (window.location.host === '') ? 'localhost' : window.location.host
         return protocolPrefix + '//' + host + ":12345/";
     }
 

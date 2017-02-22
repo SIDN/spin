@@ -20,14 +20,10 @@ local websocket = require'websocket'
 --
 -- The info protocol is a simple async request response protocol
 -- requests are in the form
--- <type> <request data>
--- and responses in the form
--- <type> <request data> <response data>
--- example:
--- Request: arp2ip aa:bb:cc:dd:ee:ff
--- Response: arp2ip aa:bb:cc:dd:ee:ff 192.168.1.1
--- note: if this turns out to need more granular data, we'll need
--- to jsonify it
+-- { "command": <command>,
+--   "argument": <argument> }
+-- Responses get an additional field "result", with
+-- data format depending on the command (usualy just a string)
 
 function handle_command(command, argument)
   local response = {}
@@ -61,44 +57,21 @@ local server = websocket.server.copas.listen
     ['traffic-data-protocol'] = function(ws)
       traffic_clients[ws] = 0
       while true do
-        local message,opcode = ws:receive()
-        if not message then
-          ws:close()
-          traffic_clients[ws] = nil
-          return
-        end
-        if opcode == websocket.TEXT then
-          if message:match('reset') then
-            traffic_clients[ws] = 0
-          end
-        end
-      end
-    end,
-    ['info-protocol'] = function(ws)
-      while true do
         local msg,opcode = ws:receive()
         if not msg then
           ws:close()
           return
         else
-          print("[XX] GOT MESSAGE: " .. msg)
           local response = nil
           command = json.decode(msg)
           if (command["command"] and command["argument"]) then
             tokens = util:line_to_tokens(msg)
             response = handle_command(command.command, command.argument)
             if response then
-              print("[XX] SENDING RESPONSE: " .. json.encode(response))
               ws:send(json.encode(response))
             end
-          else
-            print("[XX] bad command, ignoring")
           end
         end
-        --if opcode == websocket.TEXT then
-        --  request
-        --  ws:send(response)
-        --end
       end
     end
   },

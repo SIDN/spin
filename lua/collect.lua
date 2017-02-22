@@ -9,8 +9,7 @@ local arp = require 'arp'
 --}
 
 
---local filter_list = util.get_all_bound_ip_addresses()
-local filter_list = {}
+local filter_list = util.get_all_bound_ip_addresses()
 
 --
 -- flow information
