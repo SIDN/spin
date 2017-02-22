@@ -93,8 +93,7 @@
     var graph2d_1;
     var selectedNodeId;
     var traffic_ws;
-    var info_ws;
-
+    
     // mapping of node names
     nodeNames = {}
     // feed this data from websocket command
@@ -168,39 +167,39 @@
         traffic_ws.onclose = function(evt) { onTrafficClose(evt) };
         traffic_ws.onmessage = function(evt) { onTrafficMessage(evt) };
         traffic_ws.onerror = function(evt) { onTrafficError(evt) };
-
-        info_ws = new WebSocket(createWebSocketUri(), "info-protocol");
-        info_ws.onmessage = function(evt) { onInfoMessage(evt) };
     }
 
-    function onInfoMessage(evt) {
-        var data_parts = evt.data.split(/\s+/);
-        var type = data_parts[0];
-        var request = data_parts[1];
-        var response = data_parts.slice(2).join(" ");
-        switch (type) {
+    function onTrafficMessage(evt) {
+        var message = JSON.parse(evt.data)
+        var command = message['command'];
+        var argument = message['argument'];
+        var result = message['result'];
+        switch (command) {
             case 'arp2ip':
               var node = nodes.get(selectedNodeId);
-              if (node && node.address == request) {
-                writeToScreen("ipaddress", "IP(s): " + response);
+              if (node && node.address == argument) {
+                writeToScreen("ipaddress", "IP(s): " + result);
               }
               break;
             case 'ip2hostname':
               var node = nodes.get(selectedNodeId);
-              if (node && node.address == request) {
-                writeToScreen("reversedns", "Reverse DNS: " + response);
+              if (node && node.address == argument) {
+                writeToScreen("reversedns", "Reverse DNS: " + result);
               }
               break;
             case 'ip2netowner':
               var node = nodes.get(selectedNodeId);
-              if (node && node.address == request) {
-                writeToScreen("netowner", "Network owner: " + response);
+              if (node && node.address == argument) {
+                writeToScreen("netowner", "Network owner: " + result);
               }
               break;
             case 'arp2dhcpname':
-              var node = nodes.get(getNodeId(request));
-              node.label = response;
+              var node = nodes.get(getNodeId(argument));
+              node.label = result;
               nodes.update(node);
+              break;
+            case 'traffic':
+              handleTrafficMessage(result);
               break;
         }
     }
@@ -215,65 +214,72 @@
         //show disconnected status somewhere
     }
 
+    function handleTrafficMessage(data) {
+        try {
+            var timestamp = data['timestamp']
+            // update traffic view
+            d = new Date(timestamp*1000);
+            traffic_dataset.add({x: d, y: data['total_size'], group: 0});
+            traffic_dataset.add({x: d, y: data['total_count'], group: 1});
+
+            var options = {
+                start: new Date((timestamp*1000)-600000),
+                end: d,
+                height: '140px',
+                drawPoints: false,
+            };
+            graph2d_1.setOptions(options);
+            ids = traffic_dataset.getIds();
+            if (ids.length > 100) {
+                //traffic_dataset.remove(ids[0]);
+                //running = false;
+            }
+
+            //
+            // update network view
+            //
+
+            // clean out old nodes, and reset color
+            var now = Math.floor(Date.now() / 1000);
+            var delete_before = now - 600;
+            var unhighlight_before = now - 10;
+            for (ip in nodeIds) {
+                var nodeId = getNodeId(ip)
+                node = nodes.get(nodeId);
+                if (node.lastseen < delete_before) {
+                    // does this remove the edges as well?
+                    delete nodeIds[ip];
+                    nodes.remove(nodeId);
+                    deleteEdges(nodeId);
+                } else if (node.lastseen < unhighlight_before  && node["color"] == 'red') {
+                    node["color"] = 'lightblue';
+                    nodes.update(node);
+                }
+            }
+
+            // Add the new flows
+            var arr = data['flows'];
+            for (var i = 0, len = arr.length; i < len; i++) {
+                var f = arr[i];
+                addFlow(timestamp, f['from'], f['to'], f['count'], f['size']);
+            }
+        } catch (error) {
+            alert(error + ": " + evt.data);
+        }
+    }
+
+    /*
     function onTrafficMessage(evt)
     {
         if (running) {
             //writeToScreen('<span style="color: blue;">RESPONSE: .' + evt.data+'.</span>');
-            try {
-                var data = JSON.parse(evt.data);
-                var timestamp = data['timestamp']
-                // update traffic view
-                d = new Date(timestamp*1000);
-                traffic_dataset.add({x: d, y: data['total_size'], group: 0});
-                traffic_dataset.add({x: d, y: data['total_count'], group: 1});
-
-                var options = {
-                    start: new Date((timestamp*1000)-600000),
-                    end: d,
-                    height: '140px',
-                    drawPoints: false,
-                };
-                graph2d_1.setOptions(options);
-                ids = traffic_dataset.getIds();
-                if (ids.length > 100) {
-                    //traffic_dataset.remove(ids[0]);
-                    //running = false;
-                }
-
-                //
-                // update network view
-                //
-
-                // clean out old nodes, and reset color
-                var now = Math.floor(Date.now() / 1000);
-                var delete_before = now - 600;
-                var unhighlight_before = now - 10;
-                for (ip in nodeIds) {
-                    var nodeId = getNodeId(ip)
-                    node = nodes.get(nodeId);
-                    if (node.lastseen < delete_before) {
-                        // does this remove the edges as well?
-                        delete nodeIds[ip];
-                        nodes.remove(nodeId);
-                        deleteEdges(nodeId);
-                    } else if (node.lastseen < unhighlight_before  && node["color"] == 'red') {
-                        node["color"] = 'lightblue';
-                        nodes.update(node);
-                    }
-                }
-
-                // Add the new flows
-                var arr = data['flows'];
-                for (var i = 0, len = arr.length; i < len; i++) {
-                    var f = arr[i];
-                    addFlow(timestamp, f['from'], f['to'], f['count'], f['size']);
-                }
-            } catch (error) {
-                alert(error + ": " + evt.data);
+            var message = JSON.parse(evt.data);
+            if (message["command"] == "traffic") {
+                handleTrafficMessage(message["result"]);
             }
-            //traffic_ws.close();
         }
     }
+    */
 
     function onTrafficError(evt)
     {
@@ -378,16 +384,23 @@
         // TODO: mark that this is hw not ip
     }
 
+    function sendCommand(command, argument) {
+        cmd = {}
+        cmd['command'] = command;
+        cmd['argument'] = argument;
+        traffic_ws.send(JSON.stringify(cmd));
+    }
+
     function nodeSelected(event) {
         var nodeId = event.nodes[0];
         if (typeof(nodeId) == 'number' && selectedNodeId != nodeId) {
             updateNodeInfo(nodeId);
             selectedNodeId = nodeId;
-            info_ws.send("arp2ip " + node.address);
+            sendCommand("arp2ip", node.address);
             writeToScreen("reversedns", "Reverse DNS: &lt;searching&gt;");
-            info_ws.send("ip2hostname " + node.address);
+            sendCommand("ip2hostname", node.address);
             writeToScreen("netowner", "Network owner: &lt;searching&gt;");
-            info_ws.send("ip2netowner " + node.address);
+            sendCommand("ip2netowner", node.address);
         }
         show_sidebar();
     }
@@ -490,7 +503,7 @@
                        }
                     });
             curNodeId += 1;
-            info_ws.send("arp2dhcpname " + ip)
+            sendCommand("arp2dhcpname ", ip)
         }
         if (selectedNodeId && selectedNodeId == existing) {
             updateNodeInfo(selectedNodeId);

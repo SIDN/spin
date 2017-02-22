@@ -77,6 +77,9 @@ end
 -- calls the whois command and returns the *first* descr: line value
 function util:whois_desc(address)
   local s = util:capture("whois " .. address, true)
+  for token in string.gmatch(s, "OrgName:%s+([^\r\n]+)") do
+    return token
+  end
   for token in string.gmatch(s, "descr:%s+([^\r\n]+)") do
     return token
   end

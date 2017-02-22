@@ -7,7 +7,10 @@ local arp = require 'arp'
 --  ["127.0.0.1"] = true,
 --  ["::1"] = true
 --}
-local filter_list = util.get_all_bound_ip_addresses()
+
+
+--local filter_list = util.get_all_bound_ip_addresses()
+local filter_list = {}
 
 --
 -- flow information
@@ -97,12 +100,14 @@ function Aggregator:json()
     total_size = total_size + s.size
     i = i + 1
   end
-  local s = '{ "timestamp": ' .. self.data.timestamp .. ', '
+  local s = '{ "command": "traffic", '
+  s = s .. '"argument": "",'
+  s = s .. '"result": { "timestamp": ' .. self.data.timestamp .. ', '
   s = s .. '"total_count": ' .. total_count .. ', '
   s = s .. '"total_size": ' .. total_size .. ', '
   s = s .. '"flows": ['
   s = s .. table.concat(ft, ", ")
-  s = s .. '] }'
+  s = s .. '] } }'
 
   return s
 end

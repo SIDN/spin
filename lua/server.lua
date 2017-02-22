@@ -8,6 +8,7 @@ local socket = require'socket'
 local P = require'posix'
 local arp = require'arp'
 local util = require'util'
+local json = require'json'
 
 local traffic_clients = {}
 local info_clients = {}
@@ -29,24 +30,26 @@ local websocket = require'websocket'
 -- to jsonify it
 
 function handle_command(command, argument)
-  local response
+  local response = {}
+  response["command"] = command
+  response["argument"] = argument
   if (command == "arp2ip") then
     local hw = argument
     local ips = arp:get_ip_addresses(hw)
     if #ips > 0 then
-      response = "arp2ip " .. hw .. " " .. table.concat(ips, ", ")
+      response["result"] = table.concat(ips, ", ")
     end
   elseif (command == "arp2dhcpname") then
     local dhcpdb = util:read_dhcp_config_hosts("/etc/config/dhcp")
     if dhcpdb then
       if dhcpdb[argument] then
-        response = "arp2dhcpname " .. argument .. " " .. dhcpdb[argument]
+        response["result"] = dhcpdb[argument]
       end
     end
   elseif (command == "ip2hostname") then
-    response = "ip2hostname " .. argument .. " " .. util:reverse_lookup(argument)
+    response["result"] = util:reverse_lookup(argument)
   elseif (command == "ip2netowner") then
-    response = "ip2netowner " .. argument .. " " .. util:whois_desc(argument)
+    response["result"] = util:whois_desc(argument)
   end
   return response
 end
@@ -80,12 +83,16 @@ local server = websocket.server.copas.listen
         else
           print("[XX] GOT MESSAGE: " .. msg)
           local response = nil
-          tokens = util:line_to_tokens(msg)
-          print("[XX] TOKENS[1]: '" .. tokens[1] .. "'")
-          response = handle_command(tokens[1], tokens[2])
-          if response then
-            print("[XX] SENDING RESPONSE: " .. response)
-            ws:send(response)
+          command = json.decode(msg)
+          if (command["command"] and command["argument"]) then
+            tokens = util:line_to_tokens(msg)
+            response = handle_command(command.command, command.argument)
+            if response then
+              print("[XX] SENDING RESPONSE: " .. json.encode(response))
+              ws:send(json.encode(response))
+            end
+          else
+            print("[XX] bad command, ignoring")
           end
         end
         --if opcode == websocket.TEXT then
