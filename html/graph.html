@@ -1,8 +1,13 @@
 <!DOCTYPE HTML>
 <html>
 <head>
-    <script src="./vis-4.18.0/dist/vis.js"></script>
-    <link href="./vis-4.18.0/dist/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
+    <script src="./js/jquery-3.1.1.min.js"></script>
+
+    <script src="./js/jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
+    <link href="./js/jquery-ui-1.12.1.custom/jquery-ui.theme.css" rel="stylesheet" type="text/css" />
+
+    <script src="./js/vis-4.18.0/dist/vis.js"></script>
+    <link href="./js/vis-4.18.0/dist/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
 
     <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
     <meta content="utf-8" http-equiv="encoding">
@@ -31,48 +36,56 @@
             flex:1;
             border: 1px solid lightgray;
         }
+
+        // don't put any visible elements in the toggler
+        // they will remain after hide
+        .toggler {
+            display: none;
+            width: 35%;
+        }
+        #infopanel {
+            position: absolute;
+            width: 35%;
+            z-index: 100;
+        }
+        .panelclose {
+            position: relative;
+            top: 0px;
+            right: 0px;
+        }
+        #pc {
+            position: relative;
+            top: 0px;
+            right: 0px;
+        }
     </style>
 </head>
 <body>
 
 <h2>SPIN traffic data prototype</h2>
 
-<div id="visualization"></div>
-<div id="infobar">
-    <table>
-        <tr>
-            <td>
-                <div id="selected">Selected:</div>
-            </td>
-            <td>
-                <div id="trafficcount">Connections seen:</div>
-            </td>
-            <td>
-                <div id="trafficsize">Traffic size:</div>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div id="lastseen">Last seen:</div>
-            </td>
-            <td colspan="2" >
-                <div id="ipaddress"></div>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div id="reversedns"></div>
-            </td>
-            <td></td>
-            <td>
-                <div id="netowner"></div>
-            </td>
-        </tr>
-    </table>
-</div>
-<div id="mynetwork"></div>
+<div id="visualization" class="ui-widget-content ui-corner-all"></div>
 
-<div id="output"></div>
+<div class="toggler positionable" id="infopanel">
+  <div id="effect" class="ui-widget-content ui-corner-all">
+    <div id="infotitle" class="ui-widget-header ui-corner-all">Show</div>
+    <div id="infoclose" class="panelclose ui-icon ui-icon-close positionable"></div>
+    <div>
+        
+        <div id="trafficcount">Connections seen:</div>
+        <div id="trafficsize">Traffic size:</div>
+        <div id="lastseen">Last seen:</div>
+        <div id="ipaddress">IP Address(es)</div>
+        <div id="reversedns">Reverse DNS:</div>
+        <div id="netowner">Network owner:</div>
+        <div id="options">
+            <!--todo <button class="">Ignore this node</button>-->
+            <button class="">Name this node</button>
+        </div>
+    </div>
+  </div>
+</div>
+<div id="mynetwork" class="ui-corner-all"></div>
 
 <script language="javascript" type="text/javascript">
 
@@ -81,7 +94,56 @@
     var selectedNodeId;
     var traffic_ws;
     var info_ws;
+
+    // mapping of node names
+    nodeNames = {}
+    // feed this data from websocket command
+    //nodeNames["9c:eb:e8:0c:b7:7b"] = "kweenie";
+    //nodeNames["ac:22:0b:9b:74:41"] = "kweenie2";
+
     showGraph(traffic_dataset);
+
+    var sidebar_visible = false;
+
+    function show_sidebar() {
+        var options = {};
+        var callback = null;
+        if (!sidebar_visible) {
+            $("#effect").show("slide", options, 500, callback);
+            sidebar_visible=true;
+        }
+    }
+    function hide_sidebar() {
+        var options = {};
+        var callback = null;
+        if (sidebar_visible) {
+            $("#effect").hide("slide", options, 500, callback);
+            sidebar_visible=false;
+        }
+    }
+
+    $( "#infotitle" ).position({
+        of: $( "#infopanel" ),
+        my: "right top",
+        at: "right top"
+    });
+    $( "#infoclose" ).position({
+        of: $( "#infopanel" ),
+        my: "right top",
+        at: "right top"
+    }).click(hide_sidebar);
+    $( "#infopanel" ).position({
+        of: $( "#mynetwork" ),
+        my: "left top",
+        at: "left top"
+    });
+    $( "#effect" ).position({
+        of: $( "#mynetwork" ),
+        my: "left+10 top-40",
+        at: "left+10 top-40"
+    });
+    $("#effect").hide();
+    //show_sidebar();
 
     //
     // WEBSOCKET CODE
@@ -90,7 +152,7 @@
 
     function createWebSocketUri() {
         var protocolPrefix = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
-        var host = (window.location.host === '') ? 'localhost' : window.location.host
+        var host = (window.location.host === '') ? '192.168.8.1' : window.location.host
         return protocolPrefix + '//' + host + ":12345/";
     }
 
@@ -308,10 +370,10 @@
 
     function updateNodeInfo(nodeId) {
         node = nodes.get(nodeId);
-        writeToScreen("selected", "Selected: " + node.label);
+        writeToScreen("infotitle", node.label);
         writeToScreen("trafficsize", "Connections seen: " + node.count);
         writeToScreen("trafficcount", "Traffic size: " + node.size);
-        writeToScreen("ipaddress", "Reverse DNS:");
+        writeToScreen("ipaddress", "");
         writeToScreen("lastseen", "Last seen: " + new Date(node.lastseen*1000));
         // TODO: mark that this is hw not ip
     }
@@ -327,6 +389,7 @@
             writeToScreen("netowner", "Network owner: &lt;searching&gt;");
             info_ws.send("ip2netowner " + node.address);
         }
+        show_sidebar();
     }
 
     function resetAllNodes() {
@@ -360,6 +423,10 @@
     }
 
     function getNodeId(ip) {
+        var nodeName = ip;
+        if (ip in nodeNames) {
+            nodeName = nodeNames[ip];
+        }
         if (ip in nodeIds) {
             return nodeIds[ip];
         } else {
@@ -379,6 +446,8 @@
 
     function addNode(timestamp, ip, scale, count, size, lwith) {
         var existing = getNodeId(ip);
+        // By default, the ip/mac is the node name, but if
+        // it is present in the user-set nodeNames dict, use that
         if (existing) {
             var node = nodes.get(existing)
             //alert("node: " + node + " color: " + node['color'] + " size: " + node.size);
@@ -394,6 +463,10 @@
             }
             nodes.update(node);
         } else {
+            var nodeName = ip;
+            if (ip in nodeNames) {
+                nodeName = nodeNames[ip];
+            }
             var c;
             if (scale) {
                 c = 'red';
@@ -403,7 +476,7 @@
             nodeIds[ip] = curNodeId;
             nodes.add({id:curNodeId,
                        address: ip, // (note: this can also be mac addr)
-                       label: ip,
+                       label: nodeName,
                        color: c,
                        value: size,
                        count: count,
