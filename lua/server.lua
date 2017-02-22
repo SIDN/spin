@@ -9,10 +9,15 @@ local P = require'posix'
 local arp = require'arp'
 local util = require'util'
 local json = require'json'
+local filter = require'filter'
 
 local traffic_clients = {}
 local info_clients = {}
 local websocket = require'websocket'
+
+filter:load(true)
+print("[XX] loaded filter")
+filter:print()
 
 --
 -- The traffic data protocol send out continuous updates of
@@ -34,28 +39,65 @@ function handle_command(command, argument)
     local ips = arp:get_ip_addresses(hw)
     if #ips > 0 then
       response["result"] = table.concat(ips, ", ")
+    else
+      response = nil
     end
   elseif (command == "arp2dhcpname") then
     local dhcpdb = util:read_dhcp_config_hosts("/etc/config/dhcp")
     if dhcpdb then
       if dhcpdb[argument] then
         response["result"] = dhcpdb[argument]
+      else
+        response = nil
       end
+    else
+      response = nil
     end
   elseif (command == "ip2hostname") then
     response["result"] = util:reverse_lookup(argument)
   elseif (command == "ip2netowner") then
     response["result"] = util:whois_desc(argument)
+  elseif (command == "add_ignore") then
+    print("[XX] GOT IGNORE COMMAND FOR " .. argument);
+    -- response necessary? resend the ignore list?
+    filter:load()
+    filter:add_ignore(argument)
+    filter:save()
+    response = nil
+  elseif (command == "add_name") then
+    filter:load()
+    filter:add_name(argument["address"], argument["name"])
+    filter:save()
+    -- rebroadcast names?
+    response = nil
   end
   return response
 end
 
+function send_ignore_list(ws)
+  local update  = {}
+  update ["command"] = "ignore"
+  update ["argument"] = ""
+  update ["result"] = filter:get_ignore_list()
+  ws:send(json.encode(update))
+end
+
+function send_name_list(ws)
+  local update  = {}
+  update ["command"] = "names"
+  update ["argument"] = ""
+  update ["result"] = filter:get_name_list()
+  ws:send(json.encode(update))
+end
 
 local server = websocket.server.copas.listen
 {
   protocols = {
     ['traffic-data-protocol'] = function(ws)
       traffic_clients[ws] = 0
+      send_ignore_list(ws)
+      send_name_list(ws)
+      
       while true do
         local msg,opcode = ws:receive()
         if not msg then
@@ -65,7 +107,7 @@ local server = websocket.server.copas.listen
           local response = nil
           command = json.decode(msg)
           if (command["command"] and command["argument"]) then
-            tokens = util:line_to_tokens(msg)
+            print("[XX] GOT COMMAND: " + command)
             response = handle_command(command.command, command.argument)
             if response then
               ws:send(json.encode(response))
@@ -125,7 +167,7 @@ function collector_loop()
     while true do
         --print("collector loop")
         copas.step(0.1)
-        handle_pipe_output(fd1, cb)
+        handle_pipe_output(fd1, cb, filter:get_ignore_table())
     end
 end
 

@@ -13,6 +13,11 @@
     <meta content="utf-8" http-equiv="encoding">
     <title>Websocket client</title>
 
+<!-- move locally? -->
+  <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+  <link rel="stylesheet" href="/resources/demos/style.css">
+<!-- ^^ -->
+
     <style type="text/css">
         html, body
         {
@@ -79,13 +84,34 @@
         <div id="reversedns">Reverse DNS:</div>
         <div id="netowner">Network owner:</div>
         <div id="options">
-            <!--todo <button class="">Ignore this node</button>-->
-            <button class="">Name this node</button>
+            <button class="" onclick="confirmIgnore()">Ignore this node</button>
+            <button id="rename-node" class="">Rename this node</button>
         </div>
     </div>
   </div>
 </div>
 <div id="mynetwork" class="ui-corner-all"></div>
+
+
+
+
+<div id="ignore-confirm" title="Ignore this node?">
+  <p><span class="ui-icon ui-icon-alert" style="float:left; margin:12px 12px 20px 0;"></span>Right now there is no easy way to unignore. Are you sure?</p>
+</div>
+
+<div id="rename-form" title="Rename node">
+  <form>
+    <fieldset>
+      <label for="rename-field">Name</label>
+      <input type="text" name="rename-field" id="rename-field" value="" class="text ui-widget-content ui-corner-all">
+ 
+      <!-- Allow form submission with keyboard without duplicating the dialog button -->
+      <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
+    </fieldset>
+  </form>
+</div>
+
+
 
 <script language="javascript" type="text/javascript">
 
@@ -142,7 +168,86 @@
         at: "left+10 top-40"
     });
     $("#effect").hide();
+    $("#ignore-confirm").hide();
+    $("#rename-form").hide();
     //show_sidebar();
+
+    //
+    // code to ignore nodes
+    // 
+    function ignoreNode(nodeId) {
+        var node = nodes.get(nodeId);
+
+        sendCommand("add_ignore", node.address);
+
+        // should we remove it now?
+    }
+
+    function confirmIgnore() {
+      $( function() {
+        $( "#ignore-confirm" ).dialog({
+          resizable: false,
+          height: "auto",
+          width: 400,
+          modal: true,
+          buttons: {
+            "Ignore node": function() {
+              ignoreNode(selectedNodeId);
+              $( this ).dialog( "close" );
+            },
+            Cancel: function() {
+              $( this ).dialog( "close" );
+            }
+          }
+        });
+      } );
+    }
+    //
+    // Code for the rename dialog
+    //
+    $( function() {
+        var name = $( "#rename-field" );
+        var dialog;
+        var allFields = $( [] ).add( name );
+        
+        function renameNode() {
+            var argument = {};
+            var node = nodes.get(selectedNodeId);
+            var newname = name.val();
+            argument['address'] = node.address;
+            argument['name'] = newname;
+            sendCommand("add_name", argument);
+
+            node.label = newname;
+            nodes.update(node);
+        }
+
+        dialog = $( "#rename-form" ).dialog({
+          autoOpen: false,
+          height: 400,
+          width: 350,
+          modal: true,
+          buttons: {
+            "Rename node": renameNode,
+            Cancel: function() {
+              dialog.dialog( "close" );
+            }
+          },
+          close: function() {
+            form[ 0 ].reset();
+            allFields.removeClass( "ui-state-error" );
+          }
+        });
+     
+        form = dialog.find( "form" ).on( "submit", function( event ) {
+          event.preventDefault();
+          renameNode();
+        });
+     
+        $( "#rename-node" ).button().on( "click", function() {
+            dialog.dialog( "open" );
+          });
+    } );
 
     //
     // WEBSOCKET CODE
@@ -170,37 +275,53 @@
     }
 
     function onTrafficMessage(evt) {
-        var message = JSON.parse(evt.data)
-        var command = message['command'];
-        var argument = message['argument'];
-        var result = message['result'];
-        switch (command) {
-            case 'arp2ip':
-              var node = nodes.get(selectedNodeId);
-              if (node && node.address == argument) {
-                writeToScreen("ipaddress", "IP(s): " + result);
-              }
-              break;
-            case 'ip2hostname':
-              var node = nodes.get(selectedNodeId);
-              if (node && node.address == argument) {
-                writeToScreen("reversedns", "Reverse DNS: " + result);
-              }
-              break;
-            case 'ip2netowner':
-              var node = nodes.get(selectedNodeId);
-              if (node && node.address == argument) {
-                writeToScreen("netowner", "Network owner: " + result);
-              }
-              break;
-            case 'arp2dhcpname':
-              var node = nodes.get(getNodeId(argument));
-              node.label = result;
-              nodes.update(node);
-              break;
-            case 'traffic':
-              handleTrafficMessage(result);
-              break;
+        try {
+            var message = JSON.parse(evt.data)
+            var command = message['command'];
+            var argument = message['argument'];
+            var result = message['result'];
+            switch (command) {
+                case 'arp2ip':
+                  var node = nodes.get(selectedNodeId);
+                  if (node && node.address == argument) {
+                    writeToScreen("ipaddress", "IP(s): " + result);
+                  }
+                  break;
+                case 'ip2hostname':
+                  var node = nodes.get(selectedNodeId);
+                  if (node && node.address == argument) {
+                    writeToScreen("reversedns", "Reverse DNS: " + result);
+                  }
+                  break;
+                case 'ip2netowner':
+                  var node = nodes.get(selectedNodeId);
+                  if (node && node.address == argument) {
+                    writeToScreen("netowner", "Network owner: " + result);
+                  }
+                  break;
+                // this one should be obsolete
+                /*case 'arp2dhcpname':
+                  if (result && result != "") {
+                      var node = nodes.get(getNodeId(argument));
+                      node.label = result;
+                      nodes.update(node);
+                  }
+                  break;*/
+                case 'traffic':
+                  handleTrafficMessage(result);
+                  break;
+                case 'names':
+                  nodeNames = result;
+                  break;
+                case 'ignore':
+                  ignoreList = result;
+                  break;
+                default:
+                  alert("unknown message from server: '" + command + "' with argument: '"+argument+"' and data: " + result)
+                  break;
+            }
+        } catch (error) {
+            alert(error + ": " + evt.data);
         }
     }
 
@@ -215,7 +336,6 @@
     }
 
     function handleTrafficMessage(data) {
-        try {
             var timestamp = data['timestamp']
             // update traffic view
             d = new Date(timestamp*1000);
@@ -263,9 +383,6 @@
                 var f = arr[i];
                 addFlow(timestamp, f['from'], f['to'], f['count'], f['size']);
             }
-        } catch (error) {
-            alert(error + ": " + evt.data);
-        }
     }
 
     /*
@@ -503,7 +620,7 @@
                        }
                     });
             curNodeId += 1;
-            sendCommand("arp2dhcpname ", ip)
+            //sendCommand("arp2dhcpname", ip)
         }
         if (selectedNodeId && selectedNodeId == existing) {
             updateNodeInfo(selectedNodeId);

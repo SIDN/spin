@@ -2,14 +2,13 @@ local util = require 'util'
 local P = require 'posix'
 local arp = require 'arp'
 
-
 --local filter_list = {
 --  ["127.0.0.1"] = true,
 --  ["::1"] = true
 --}
 
 
-local filter_list = util.get_all_bound_ip_addresses()
+--local filter_list = util.get_all_bound_ip_addresses()
 
 --
 -- flow information
@@ -125,7 +124,7 @@ end
 
 local cur_aggr
 
-function add_flow(timestamp, from, to, count, size, callback)
+function add_flow(timestamp, from, to, count, size, callback, filter_list)
   if not (filter_list[from] or filter_list[to]) then
     if not cur_aggr then
       cur_aggr = Aggregator:create(timestamp)
@@ -148,7 +147,7 @@ function startswith(str, part)
   return string.len(str) >= string.len(part) and str:sub(0, string.len(part)) == part
 end
 
-function handle_line(line, callback)
+function handle_line(line, callback, filter_list)
   local timestamp
   local from
   local to
@@ -173,7 +172,7 @@ function handle_line(line, callback)
     end
   end
   if from and to and count and size then
-    add_flow(timestamp, from, to, count, size, callback)
+    add_flow(timestamp, from, to, count, size, callback, filter_list)
   end
 end
 
@@ -200,14 +199,14 @@ function read_line_from_fd(fd)
   return result
 end
 
-function handle_pipe_output(fd, callback)
+function handle_pipe_output(fd, callback, filter_list)
   local pr = P.rpoll(fd,10)
   if pr == 0 then
     return
   end
   str = read_line_from_fd(fd)
   while str do
-    handle_line(str, callback)
+    handle_line(str, callback, filter_list)
     str = read_line_from_fd(fd)
   end
 end
