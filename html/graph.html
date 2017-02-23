@@ -537,7 +537,10 @@
             nodes: nodes,
             edges: edges
         };
-        var options = {};
+        var options = {
+            // Fixes strange (newer) Firefox behaviour
+            height: '100%'
+        };
         network = new vis.Network(container, data, options);
         network.on("selectNode", nodeSelected);
     }
