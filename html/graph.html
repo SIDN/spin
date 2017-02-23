@@ -43,12 +43,6 @@
             border: 1px solid lightgray;
         }
 
-        // don't put any visible elements in the toggler
-        // they will remain after hide
-        .toggler {
-            display: none;
-            width: 35%;
-        }
         .panelclose {
             position: relative;
             top: 0px;
@@ -75,6 +69,11 @@
 
 <div id="status" class="ui-corner-all">Not connected</div>
 
+<div id="buttonbar">
+  <span></span>
+  <button id="show_ignore_list">Show filter list</button>
+</div>
+
 <div id="visualization" class="ui-widget-content ui-corner-all"></div>
 
 <div id="mynetwork" class="ui-corner-all"></div>
@@ -86,10 +85,10 @@
   <p><span class="ui-icon ui-icon-alert" style="float:left; margin:12px 12px 20px 0;"></span>Right now there is no easy way to unignore. Are you sure?</p>
 </div>
 
-<div id="rename-form" title="Rename node">
+<div id="rename-dialog" title="Rename node">
   <form>
     <fieldset>
-      <label for="rename-field">Name</label>
+      <label for="rename-field">New node name</label>
       <input type="text" name="rename-field" id="rename-field" value="" class="text ui-widget-content ui-corner-all">
  
       <!-- Allow form submission with keyboard without duplicating the dialog button -->
@@ -98,7 +97,7 @@
   </form>
 </div>
 
-<div id="dialog" title="Basic dialog">
+<div id="nodeinfo" title="Basic dialog">
     <div>
         <div id="trafficcount">Connections seen:</div>
         <div id="trafficsize">Traffic size:</div>
@@ -133,10 +132,11 @@
     var sidebar_visible = false;
 
     $("#ignore-dialog").hide();
-    $("#rename-form").hide();
+    $("#rename-dialog").hide();
 
-    $( "#dialog" ).dialog({
-      autoOpen: false
+    $( "#nodeinfo" ).dialog({
+      autoOpen: false,
+      position: { my: "left top", at: "left top", of: "#mynetwork" }
     });
     
     //
@@ -194,13 +194,12 @@
             nodes.update(node);
         }
 
-        dialog = $( "#rename-form" ).dialog({
+        dialog = $( "#rename-dialog" ).dialog({
           autoOpen: false,
-          height: 400,
-          width: 350,
+          width: 380,
           modal: true,
           buttons: {
-            "Rename node": renameNode,
+            "Rename node": submitted,
             Cancel: function() {
               dialog.dialog( "close" );
             }
@@ -210,10 +209,15 @@
             allFields.removeClass( "ui-state-error" );
           }
         });
-     
+
+        function submitted() {
+          renameNode();
+          dialog.dialog("close");
+        }
+        
         form = dialog.find( "form" ).on( "submit", function( event ) {
           event.preventDefault();
-          renameNode();
+          submitted();
         });
      
         $( "#rename-node-button" ).button().on( "click", function() {
@@ -493,8 +497,8 @@
             sendCommand("ip2hostname", node.address);
             writeToScreen("netowner", "Network owner: &lt;searching&gt;");
             sendCommand("ip2netowner", node.address);
-            $("#dialog").dialog('option','title', node.label);
-            $("#dialog").dialog('open');
+            $("#nodeinfo").dialog('option','title', node.label);
+            $("#nodeinfo").dialog('open');
         }
         
     }
