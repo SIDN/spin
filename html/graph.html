@@ -39,16 +39,11 @@
             border: 1px solid lightgray;
         }
 
-        .panelclose {
-            position: relative;
-            top: 0px;
-            right: 0px;
+        #nodeinfo-data {
+            padding: 10px;
+            spacing: 6px;
         }
-        #pc {
-            position: relative;
-            top: 0px;
-            right: 0px;
-        }
+        #title { float: left; }
         #status {
             background-color: ffcccc;
             //position: absolute;
@@ -58,8 +53,6 @@
             float:right;
             padding: 4px;
         }
-        #title { float: left; }
-
         #filter-list-button { float: right; spacing: 10px;}
         #filter-list .ui-selecting { background: #FECA40; }
         #filter-list .ui-selected { background: #F39814; color: white; }
@@ -108,15 +101,17 @@
 
 <div id="nodeinfo" title="Basic dialog">
     <div>
-        <div id="trafficcount">Connections seen:</div>
-        <div id="trafficsize">Traffic size:</div>
-        <div id="lastseen">Last seen:</div>
-        <div id="ipaddress">IP Address(es)</div>
-        <div id="reversedns">Reverse DNS:</div>
-        <div id="netowner">Network owner:</div>
         <div id="options">
             <button id="ignore-node-button" class="">Ignore this node</button>
             <button id="rename-node-button" class="">Rename this node</button>
+        </div>
+        <div id="nodeinfo-data" class="ui-widget-content ui-corner-all">
+            <div id="trafficcount">Connections seen:</div>
+            <div id="trafficsize">Traffic size:</div>
+            <div id="lastseen">Last seen:</div>
+            <div id="ipaddress">IP Address(es)</div>
+            <div id="reversedns">Reverse DNS:</div>
+            <div id="netowner">Network owner:</div>
         </div>
     </div>
 </div>
