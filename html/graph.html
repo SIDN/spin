@@ -5,6 +5,7 @@
 
     <script src="./js/jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
     <link href="./js/jquery-ui-1.12.1.custom/jquery-ui.theme.css" rel="stylesheet" type="text/css" />
+    <link href="./js/jquery-ui-1.12.1.custom/jquery-ui.css" rel="stylesheet" type="text/css" />
 
     <script src="./js/vis-4.18.0/dist/vis.js"></script>
     <link href="./js/vis-4.18.0/dist/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
@@ -48,11 +49,6 @@
             display: none;
             width: 35%;
         }
-        #infopanel {
-            position: absolute;
-            width: 35%;
-            z-index: 100;
-        }
         .panelclose {
             position: relative;
             top: 0px;
@@ -71,31 +67,12 @@
 
 <div id="visualization" class="ui-widget-content ui-corner-all"></div>
 
-<div class="toggler positionable" id="infopanel">
-  <div id="effect" class="ui-widget-content ui-corner-all">
-    <div id="infotitle" class="ui-widget-header ui-corner-all">Show</div>
-    <div id="infoclose" class="panelclose ui-icon ui-icon-close positionable"></div>
-    <div>
-        
-        <div id="trafficcount">Connections seen:</div>
-        <div id="trafficsize">Traffic size:</div>
-        <div id="lastseen">Last seen:</div>
-        <div id="ipaddress">IP Address(es)</div>
-        <div id="reversedns">Reverse DNS:</div>
-        <div id="netowner">Network owner:</div>
-        <div id="options">
-            <button class="" onclick="confirmIgnore()">Ignore this node</button>
-            <button id="rename-node" class="">Rename this node</button>
-        </div>
-    </div>
-  </div>
-</div>
 <div id="mynetwork" class="ui-corner-all"></div>
 
 
+<!-- dialogs -->
 
-
-<div id="ignore-confirm" title="Ignore this node?">
+<div id="ignore-dialog" title="Ignore this node?">
   <p><span class="ui-icon ui-icon-alert" style="float:left; margin:12px 12px 20px 0;"></span>Right now there is no easy way to unignore. Are you sure?</p>
 </div>
 
@@ -111,7 +88,22 @@
   </form>
 </div>
 
+<div id="dialog" title="Basic dialog">
+    <div>
+        <div id="trafficcount">Connections seen:</div>
+        <div id="trafficsize">Traffic size:</div>
+        <div id="lastseen">Last seen:</div>
+        <div id="ipaddress">IP Address(es)</div>
+        <div id="reversedns">Reverse DNS:</div>
+        <div id="netowner">Network owner:</div>
+        <div id="options">
+            <button id="ignore-node-button" class="">Ignore this node</button>
+            <button id="rename-node-button" class="">Rename this node</button>
+        </div>
+    </div>
+</div>
 
+<!-- end of dialogs -->
 
 <script language="javascript" type="text/javascript">
 
@@ -130,48 +122,13 @@
 
     var sidebar_visible = false;
 
-    function show_sidebar() {
-        var options = {};
-        var callback = null;
-        if (!sidebar_visible) {
-            $("#effect").show("slide", options, 500, callback);
-            sidebar_visible=true;
-        }
-    }
-    function hide_sidebar() {
-        var options = {};
-        var callback = null;
-        if (sidebar_visible) {
-            $("#effect").hide("slide", options, 500, callback);
-            sidebar_visible=false;
-        }
-    }
-
-    $( "#infotitle" ).position({
-        of: $( "#infopanel" ),
-        my: "right top",
-        at: "right top"
-    });
-    $( "#infoclose" ).position({
-        of: $( "#infopanel" ),
-        my: "right top",
-        at: "right top"
-    }).click(hide_sidebar);
-    $( "#infopanel" ).position({
-        of: $( "#mynetwork" ),
-        my: "left top",
-        at: "left top"
-    });
-    $( "#effect" ).position({
-        of: $( "#mynetwork" ),
-        my: "left+10 top-40",
-        at: "left+10 top-40"
-    });
-    $("#effect").hide();
-    $("#ignore-confirm").hide();
+    $("#ignore-dialog").hide();
     $("#rename-form").hide();
-    //show_sidebar();
 
+    $( "#dialog" ).dialog({
+      autoOpen: false
+    });
+    
     //
     // code to ignore nodes
     // 
@@ -183,9 +140,11 @@
         // should we remove it now?
     }
 
-    function confirmIgnore() {
-      $( function() {
-        $( "#ignore-confirm" ).dialog({
+    $( function() {
+        var dialog;
+        
+        dialog = $( "#ignore-dialog" ).dialog({
+          autoOpen: false,
           resizable: false,
           height: "auto",
           width: 400,
@@ -200,8 +159,11 @@
             }
           }
         });
-      } );
-    }
+        $( "#ignore-node-button" ).button().on( "click", function() {
+          dialog.dialog( "open" );
+        });
+    } );
+
     //
     // Code for the rename dialog
     //
@@ -244,9 +206,9 @@
           renameNode();
         });
      
-        $( "#rename-node" ).button().on( "click", function() {
+        $( "#rename-node-button" ).button().on( "click", function() {
             dialog.dialog( "open" );
-          });
+        });
     } );
 
     //
@@ -256,7 +218,7 @@
 
     function createWebSocketUri() {
         var protocolPrefix = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
-        var host = (window.location.host === '') ? 'localhost' : window.location.host
+        var host = (window.location.host === '') ? '192.168.8.1' : window.location.host
         return protocolPrefix + '//' + host + ":12345/";
     }
 
@@ -365,7 +327,7 @@
             var unhighlight_before = now - 10;
             for (ip in nodeIds) {
                 var nodeId = getNodeId(ip)
-                node = nodes.get(nodeId);
+                var node = nodes.get(nodeId);
                 if (node.lastseen < delete_before) {
                     // does this remove the edges as well?
                     delete nodeIds[ip];
@@ -492,13 +454,14 @@
     }
 
     function updateNodeInfo(nodeId) {
-        node = nodes.get(nodeId);
-        writeToScreen("infotitle", node.label);
+        var node = nodes.get(nodeId);
+        //writeToScreen("infotitle", node.label);
         writeToScreen("trafficsize", "Connections seen: " + node.count);
         writeToScreen("trafficcount", "Traffic size: " + node.size);
         writeToScreen("ipaddress", "");
         writeToScreen("lastseen", "Last seen: " + new Date(node.lastseen*1000));
         // TODO: mark that this is hw not ip
+        return node;
     }
 
     function sendCommand(command, argument) {
@@ -511,15 +474,17 @@
     function nodeSelected(event) {
         var nodeId = event.nodes[0];
         if (typeof(nodeId) == 'number' && selectedNodeId != nodeId) {
-            updateNodeInfo(nodeId);
+            node = updateNodeInfo(nodeId);
             selectedNodeId = nodeId;
             sendCommand("arp2ip", node.address);
             writeToScreen("reversedns", "Reverse DNS: &lt;searching&gt;");
             sendCommand("ip2hostname", node.address);
             writeToScreen("netowner", "Network owner: &lt;searching&gt;");
             sendCommand("ip2netowner", node.address);
+            $("#dialog").dialog('option','title', node.label);
+            $("#dialog").dialog('open');
         }
-        show_sidebar();
+        
     }
 
     function resetAllNodes() {
