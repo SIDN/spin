@@ -31,5 +31,5 @@ make sure conntrack has output (try sudo conntrack -E for a bit)
 run ./test_server.sh
 This creates a named pipe, starts conntrack (will ask for sudo password), and start the websocket server.
 Then open html/print.html in a browser to see data is getting through.
-For the visual representation, open html/graph.html
+For the visual representation, open html/graph.html.
 
