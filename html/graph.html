@@ -59,11 +59,21 @@
             top: 0px;
             right: 0px;
         }
+        #status {
+            background-color: ffcccc;
+            position: absolute;
+            border: 1px solid black;
+            top: 20px;
+            right: 80px;
+            padding: 4px;
+        }
     </style>
 </head>
 <body>
 
 <h2>SPIN traffic data prototype</h2>
+
+<div id="status" class="ui-corner-all">Not connected</div>
 
 <div id="visualization" class="ui-widget-content ui-corner-all"></div>
 
@@ -290,11 +300,13 @@
     function onTrafficOpen(evt)
     {
         //show connected status somewhere
+        $("#status").css("background-color", "#ccffcc").text("Connected");
     }
 
     function onTrafficClose(evt)
     {
         //show disconnected status somewhere
+        $("#status").css("background-color", "#ffcccc").text("Not connected");
     }
 
     function handleTrafficMessage(data) {
