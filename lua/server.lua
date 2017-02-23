@@ -63,7 +63,14 @@ function handle_command(command, argument)
     filter:load()
     filter:add_ignore(argument)
     filter:save()
-    response = nil
+    -- don't send direct response, but send a 'new list' update
+    response = create_ignore_list_command()
+  elseif (command == "remove_ignore") then
+    filter:load()
+    filter:remove_ignore(argument)
+    filter:save()
+    -- don't send direct response, but send a 'new list' update
+    response = create_ignore_list_command()
   elseif (command == "add_name") then
     filter:load()
     filter:add_name(argument["address"], argument["name"])
@@ -74,11 +81,16 @@ function handle_command(command, argument)
   return response
 end
 
-function send_ignore_list(ws)
+function create_ignore_list_command()
   local update  = {}
   update ["command"] = "ignore"
   update ["argument"] = ""
   update ["result"] = filter:get_ignore_list()
+  return update
+end
+
+function send_ignore_list(ws)
+  local update = create_ignore_list_command()
   ws:send(json.encode(update))
 end
 
@@ -107,7 +119,7 @@ local server = websocket.server.copas.listen
           local response = nil
           command = json.decode(msg)
           if (command["command"] and command["argument"]) then
-            print("[XX] GOT COMMAND: " + command)
+            print("[XX] GOT COMMAND: " .. msg)
             response = handle_command(command.command, command.argument)
             if response then
               ws:send(json.encode(response))

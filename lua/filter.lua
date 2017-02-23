@@ -70,6 +70,10 @@ function filter:add_ignore(address)
   filter.data.ignore[address] = true
 end
 
+function filter:remove_ignore(address)
+  filter.data.ignore[address] = nil
+end
+
 function filter:add_name(address, name)
   filter.data.names[address] = name
 end

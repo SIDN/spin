@@ -55,23 +55,36 @@
         }
         #status {
             background-color: ffcccc;
-            position: absolute;
+            //position: absolute;
             border: 1px solid black;
-            top: 20px;
-            right: 80px;
+            //top: 20px;
+            //right: 80px;
+            float:right;
             padding: 4px;
+        }
+        #title { float: left; }
+
+        #filter-list-button { float: right; spacing: 10px;}
+        #filter-list .ui-selecting { background: #FECA40; }
+        #filter-list .ui-selected { background: #F39814; color: white; }
+        #filter-list {
+            list-style-type: none; margin: 0; padding: 0;
+        }
+
+        #filter-list li {
+            margin: 3px; padding: 0.4em; 
         }
     </style>
 </head>
 <body>
 
-<h2>SPIN traffic data prototype</h2>
 
-<div id="status" class="ui-corner-all">Not connected</div>
+
 
 <div id="buttonbar">
-  <span></span>
-  <button id="show_ignore_list">Show filter list</button>
+  <div id="title"><h2>SPIN traffic data prototype</h2></div>
+  <div id="status" class="ui-corner-all">Not connected</div>
+  <button id="filter-list-button">Show filter list</button>
 </div>
 
 <div id="visualization" class="ui-widget-content ui-corner-all"></div>
@@ -112,6 +125,11 @@
     </div>
 </div>
 
+<div id="filter-list-dialog" title="Filter list">
+    <ul id="filter-list">
+    </ul>
+</div>
+
 <!-- end of dialogs -->
 
 <script language="javascript" type="text/javascript">
@@ -122,7 +140,9 @@
     var traffic_ws;
     
     // mapping of node names
-    nodeNames = {}
+    var nodeNames = {}
+    // list of filters
+    var filterList = [];
     // feed this data from websocket command
     //nodeNames["9c:eb:e8:0c:b7:7b"] = "kweenie";
     //nodeNames["ac:22:0b:9b:74:41"] = "kweenie2";
@@ -150,6 +170,9 @@
         // should we remove it now?
     }
 
+    //
+    // Create the ignore node dialog
+    //
     $( function() {
         var dialog;
         
@@ -226,6 +249,65 @@
     } );
 
     //
+    // Filter list dialog
+    //
+    $( function() {
+      $( "#filter-list" ).selectable({
+        stop: function() {
+          var selected = [];
+          $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
+          $( ".ui-selected", this ).each(function() {
+            selected.push(index);
+            var index = $( "#filter-list li" ).index( this );
+          });
+          if (selected.length > 0) {
+            $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("enable");
+          }
+        }
+      });
+    } );
+
+    $( function() {
+        var dialog;
+        var selected;
+        
+        dialog = $( "#filter-list-dialog" ).dialog({
+          autoOpen: false,
+          autoResize:true,
+          resizable: true,
+          modal: false,
+          buttons: {
+            "Remove Filters": function() {
+              $( "#filter-list .ui-selected", this ).each(function() {
+                  // The inner text contains the name of the filter
+                  sendCommand("remove_ignore", this.innerText);
+              });
+            },
+            Cancel: function() {
+              dialog.dialog( "close" );
+            }
+          },
+          close: function() {
+          }
+        });
+
+        $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
+        $( "#filter-list-button" ).button().on( "click", function() {
+            dialog.dialog( "open" );
+        });
+    } );
+
+    function updateFilterList() {
+        $("#filter-list").empty();
+        for (var i=0; i<filterList.length; i++) {
+            var li = $("<li class='ui-widget-content'></li> ").text(filterList[i]);
+            $("#filter-list").append(li);
+        }
+    }
+
+
+
+    //
     // WEBSOCKET CODE
     //
     var running = true;
@@ -290,7 +372,8 @@
                   nodeNames = result;
                   break;
                 case 'ignore':
-                  ignoreList = result;
+                  filterList = result;
+                  updateFilterList();
                   break;
                 default:
                   alert("unknown message from server: '" + command + "' with argument: '"+argument+"' and data: " + result)
