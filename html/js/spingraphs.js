@@ -328,7 +328,7 @@ function showNetwork() {
     network.on("selectNode", nodeSelected);
     network.on("dragStart", nodeSelected);
     network.on("zoom", enableZoomLock);
-    network.setOptions({nodes:{shadow:shadowState},edges:{shadow:shadowState}});
+    network.setOptions({nodes:{shadow:shadowState},edges:{shadow:shadowState,arrows:'to'}});
 }
 
 function updateNodeInfo(nodeId) {
