@@ -1,6 +1,7 @@
-/* SPIN CSS - v0.0.1 - 2017-02-24
+/*
+ *  SPIN CSS - v0.0.1 - 2017-02-24
  * https://valibox.sidn.nl/
- * /
+ */
 
 html, body
 {
@@ -20,24 +21,22 @@ body
 #mynetwork {
  flex:1;
  border: 2px solid lightgray;
+ /* TODO: moves down after loading of document */
  margin-bottom: 20px
 }
 #nodeinfo-data {
  padding: 10px;
- spacing: 6px;
+ /* spacing: 6px; */
 }
 #title { float: left; }
 #status {
- background-color: ffcccc;
- /*position: absolute;*/
+ background-color: #ffcccc;
  border: 1px solid black;
- /*top: 20px;*/
- /*right: 80px;*/
  float:right;
  padding: 4px;
 }
 #autozoom-button { float: right; }
-#filter-list-button { float: right; spacing: 10px;}
+#filter-list-button { float: right; /* spacing: 10px; */}
 #filter-list .ui-selecting { background: #FECA40; }
 #filter-list .ui-selected { background: #F39814; color: white; }
 #filter-list { list-style-type: none; margin: 0; padding: 0; }
