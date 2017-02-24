@@ -600,6 +600,7 @@
         };
         network = new vis.Network(container, data, options);
         network.on("selectNode", nodeSelected);
+        network.on("dragStart", nodeSelected);
         network.on("zoom", enableZoomLock);
     }
 
