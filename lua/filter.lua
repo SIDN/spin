@@ -10,6 +10,7 @@
 -- ignore: <address>
 
 local util = require 'util'
+local arp = require 'arp'
 
 local filter = {}
 filter.filename = "/tmp/spin_userdata.cfg"
@@ -34,7 +35,7 @@ function filter:load(add_own_if_new)
 
   s = f:read("*all")
   f:close()
-  
+
   for address,name in string.gmatch(s, "name:%s+(%S+)%s+([^\r\n]+)") do
     filter.data.names[address] = name
   end
@@ -67,7 +68,16 @@ function filter:print()
 end
 
 function filter:add_ignore(address)
-  filter.data.ignore[address] = true
+  -- address might be a mac address, if so, find the
+  -- associated IPs
+  local ips = arp:get_ip_addresses(address)
+  if #ips > 0 then
+    for i,ip in pairs(ips) do
+      filter.data.ignore[ip] = true
+    end
+  else
+    filter.data.ignore[address] = true
+  end
 end
 
 function filter:remove_ignore(address)
