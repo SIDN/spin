@@ -1,12 +1,9 @@
+
 <!DOCTYPE HTML>
 <html>
 <head>
-    <script src="./vis-4.18.0/dist/vis.js"></script>
-    <link href="./vis-4.18.0/dist/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css" />
-
-    <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
-    <meta content="utf-8" http-equiv="encoding">
-    <title>Websocket client</title>
+    <meta charset="utf-8">
+    <title>Websocket client for testing</title>
 </head>
 <body>
 
@@ -14,13 +11,11 @@
 
 <div id="output"></div>
 
-<script language="javascript" type="text/javascript">
-
-
+<script>
     //
     // WEBSOCKET CODE
     //
-    var wsUri = "ws://localhost:12345/";
+    var wsUri = "ws://192.168.8.1:12345/";
     var output;
     var running = true;
 
@@ -32,7 +27,8 @@
 
     function testWebSocket()
     {
-        websocket = new WebSocket(wsUri, "dumb-increment-protocol");
+        //websocket = new WebSocket(wsUri, "dumb-increment-protocol");
+        websocket = new WebSocket(wsUri, "traffic-data-protocol");
         websocket.onopen = function(evt) { onOpen(evt) };
         websocket.onclose = function(evt) { onClose(evt) };
         websocket.onmessage = function(evt) { onMessage(evt) };
