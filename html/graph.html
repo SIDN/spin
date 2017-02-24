@@ -53,6 +53,7 @@
             float:right;
             padding: 4px;
         }
+        #autozoom-button { float: right; }
         #filter-list-button { float: right; spacing: 10px;}
         #filter-list .ui-selecting { background: #FECA40; }
         #filter-list .ui-selected { background: #F39814; color: white; }
@@ -74,6 +75,7 @@
   <div id="title"><h2>SPIN traffic data prototype</h2></div>
   <div id="status" class="ui-corner-all">Not connected</div>
   <button id="filter-list-button">Show filter list</button>
+  <button id="autozoom-button"/><label for="autozoom-button">Lock view</label>
 </div>
 
 <div id="visualization" class="ui-widget-content ui-corner-all"></div>
@@ -142,9 +144,33 @@
     showGraph(traffic_dataset);
 
     var sidebar_visible = false;
+    var zoom_locked = false;
 
     $("#new-filter-dialog").hide();
     $("#rename-dialog").hide();
+    $("#autozoom-button").button({
+        "icons": {
+            "primary": "ui-icon-unlocked"
+        },
+        "label": "Lock view"
+    }).click(toggleZoomLock);
+
+    function enableZoomLock() {
+        updateZoomLock(true);
+    }
+    function toggleZoomLock() {
+        updateZoomLock(!zoom_locked);
+    }
+    function updateZoomLock(newBool) {
+        zoom_locked = newBool;
+        if (zoom_locked) {
+            $("#autozoom-button").button("option", {
+                "icons": { "primary": "ui-icon-locked" } });
+        } else {
+            $("#autozoom-button").button("option", {
+                "icons": { "primary": "ui-icon-unlocked" } });
+        }
+    }
 
     $( "#nodeinfo" ).dialog({
       autoOpen: false,
@@ -574,6 +600,7 @@
         };
         network = new vis.Network(container, data, options);
         network.on("selectNode", nodeSelected);
+        network.on("zoom", enableZoomLock);
     }
 
     function updateNodeInfo(nodeId) {
@@ -747,7 +774,9 @@
         addNode(timestamp, from, false, count, size, "to " + to);
         addNode(timestamp, to, true, count, size, "from " + from);
         addEdge(from, to);
-        network.fit({ duration: 500 } );
+        if (!zoom_locked) {
+            network.fit({ duration: 500 } );
+        }
     }
 
     startNetwork();
