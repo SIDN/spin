@@ -47,6 +47,7 @@ function sendCommand(command, argument) {
     cmd['argument'] = argument;
     //console.log("sending command: '" + command + "' with argument: '" + JSON.stringify(argument) + "'");
     traffic_ws.send(JSON.stringify(cmd));
+    // TODO: error-handling when WebSocket is no longer there?
 }
 
 function writeToScreen(element, message) {
@@ -121,6 +122,7 @@ function onTrafficOpen(evt) {
 function onTrafficClose(evt) {
     //show disconnected status somewhere
     $("#status").css("background-color", "#ffcccc").text("Not connected");
+    console.log('Websocket has dissapeared');
 }
 
 function onTrafficError(evt) {
