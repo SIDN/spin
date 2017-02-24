@@ -106,6 +106,7 @@
             <button id="rename-node-button" class="">Rename this node</button>
         </div>
         <div id="nodeinfo-data" class="ui-widget-content ui-corner-all">
+            <div id="node">node:</div>
             <div id="trafficcount">Connections seen:</div>
             <div id="trafficsize">Traffic size:</div>
             <div id="lastseen">Last seen:</div>
@@ -577,10 +578,9 @@
 
     function updateNodeInfo(nodeId) {
         var node = nodes.get(nodeId);
-        //writeToScreen("infotitle", node.label);
+        writeToScreen("node", "node: " + node.address);
         writeToScreen("trafficsize", "Connections seen: " + node.count);
         writeToScreen("trafficcount", "Traffic size: " + node.size);
-        writeToScreen("ipaddress", "");
         writeToScreen("lastseen", "Last seen: " + new Date(node.lastseen*1000));
         // TODO: mark that this is hw not ip
         return node;
@@ -596,6 +596,8 @@
     function nodeSelected(event) {
         var nodeId = event.nodes[0];
         if (typeof(nodeId) == 'number' && selectedNodeId != nodeId) {
+            writeToScreen("ipaddress", "");
+
             node = updateNodeInfo(nodeId);
             selectedNodeId = nodeId;
             sendCommand("arp2ip", node.address);
