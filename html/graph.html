@@ -183,7 +183,7 @@
     //
     function sendAddFilterCommand(nodeId) {
         var node = nodes.get(nodeId);
-        sendCommand("add_ignore", node.address);
+        sendCommand("add_filter", node.address);
         // should we remove these nodes now?
     }
 
@@ -327,9 +327,9 @@
                   //alertWithObject("[XX] selected:", this);
                   var address;
                   if (this.innerText) {
-                    sendCommand("remove_ignore", this.innerText);
+                    sendCommand("remove_filter", this.innerText);
                   } else if (this.innerHTML) {
-                    sendCommand("remove_ignore", this.innerHTML);
+                    sendCommand("remove_filter", this.innerHTML);
                   }
               });
             },
@@ -421,7 +421,7 @@
                 case 'names':
                   nodeNames = result;
                   break;
-                case 'ignore':
+                case 'filters':
                   filterList = result;
                   updateFilterList();
                   break;

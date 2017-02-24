@@ -7,7 +7,7 @@
 --
 -- format:
 -- name: <address> <name>
--- ignore: <address>
+-- filter: <address>
 
 local util = require 'util'
 local arp = require 'arp'
@@ -18,7 +18,7 @@ filter.data = {}
 
 function filter:load(add_own_if_new)
   filter.data = {}
-  filter.data.ignore = {}
+  filter.data.filters = {}
   filter.data.names = {}
 
   -- just ignore it for now if we can't read it
@@ -26,7 +26,7 @@ function filter:load(add_own_if_new)
   if not f then
     if add_own_if_new then
       -- read names from dhcp config
-      filter.data.ignore = util.get_all_bound_ip_addresses()
+      filter.data.filters = util.get_all_bound_ip_addresses()
       filter.data.names = util:read_dhcp_config_hosts("/etc/config/dhcp")
       filter:save()
     end
@@ -39,8 +39,8 @@ function filter:load(add_own_if_new)
   for address,name in string.gmatch(s, "name:%s+(%S+)%s+([^\r\n]+)") do
     filter.data.names[address] = name
   end
-  for ignore in string.gmatch(s, "ignore:%s+([^\r\n]+)") do
-    filter.data.ignore[ignore] = true
+  for rfilter in string.gmatch(s, "filter:%s+([^\r\n]+)") do
+    filter.data.filters[rfilter] = true
   end
 end
 
@@ -52,8 +52,8 @@ function filter:save()
   for address,name in pairs(filter.data.names) do
     f:write("name: " .. address .. " " .. name .. "\n")
   end
-  for ignore,v in pairs(filter.data.ignore) do
-    f:write("ignore: " .. ignore .. "\n")
+  for ffilter,v in pairs(filter.data.filters) do
+    f:write("filter: " .. ffilter .. "\n")
   end
   f:close()
 end
@@ -62,39 +62,39 @@ function filter:print()
   for address,name in pairs(filter.data.names) do
     print("name: " .. address .. " " .. name)
   end
-  for ignore,v in pairs(filter.data.ignore) do
-    print("ignore: " .. ignore .. "\n")
+  for ffilter,v in pairs(filter.data.filters) do
+    print("filter: " .. ffilter .. "\n")
   end
 end
 
-function filter:add_ignore(address)
+function filter:add_filter(address)
   -- address might be a mac address, if so, find the
   -- associated IPs
   local ips = arp:get_ip_addresses(address)
   if #ips > 0 then
     for i,ip in pairs(ips) do
-      filter.data.ignore[ip] = true
+      filter.data.filters[ip] = true
     end
   else
-    filter.data.ignore[address] = true
+    filter.data.filters[address] = true
   end
 end
 
-function filter:remove_ignore(address)
-  filter.data.ignore[address] = nil
+function filter:remove_filter(address)
+  filter.data.filters[address] = nil
 end
 
 function filter:add_name(address, name)
   filter.data.names[address] = name
 end
 
-function filter:get_ignore_table()
-  return filter.data.ignore
+function filter:get_filter_table()
+  return filter.data.filters
 end
 
-function filter:get_ignore_list()
+function filter:get_filter_list()
   local result = {}
-  for k,v in pairs(filter.data.ignore) do
+  for k,v in pairs(filter.data.filters) do
     table.insert(result, k)
   end
   return result

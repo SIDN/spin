@@ -57,20 +57,20 @@ function handle_command(command, argument)
     response["result"] = util:reverse_lookup(argument)
   elseif (command == "ip2netowner") then
     response["result"] = util:whois_desc(argument)
-  elseif (command == "add_ignore") then
+  elseif (command == "add_filter") then
     print("[XX] GOT IGNORE COMMAND FOR " .. argument);
-    -- response necessary? resend the ignore list?
+    -- response necessary? resend the filter list?
     filter:load()
-    filter:add_ignore(argument)
+    filter:add_filter(argument)
     filter:save()
     -- don't send direct response, but send a 'new list' update
-    response = create_ignore_list_command()
-  elseif (command == "remove_ignore") then
+    response = create_filter_list_command()
+  elseif (command == "remove_filter") then
     filter:load()
-    filter:remove_ignore(argument)
+    filter:remove_filter(argument)
     filter:save()
     -- don't send direct response, but send a 'new list' update
-    response = create_ignore_list_command()
+    response = create_filter_list_command()
   elseif (command == "add_name") then
     filter:load()
     filter:add_name(argument["address"], argument["name"])
@@ -81,16 +81,16 @@ function handle_command(command, argument)
   return response
 end
 
-function create_ignore_list_command()
+function create_filter_list_command()
   local update  = {}
-  update ["command"] = "ignore"
+  update ["command"] = "filters"
   update ["argument"] = ""
-  update ["result"] = filter:get_ignore_list()
+  update ["result"] = filter:get_filter_list()
   return update
 end
 
-function send_ignore_list(ws)
-  local update = create_ignore_list_command()
+function send_filter_list(ws)
+  local update = create_filter_list_command()
   ws:send(json.encode(update))
 end
 
@@ -107,9 +107,9 @@ local server = websocket.server.copas.listen
   protocols = {
     ['traffic-data-protocol'] = function(ws)
       traffic_clients[ws] = 0
-      send_ignore_list(ws)
+      send_filter_list(ws)
       send_name_list(ws)
-      
+
       while true do
         local msg,opcode = ws:receive()
         if not msg then
@@ -179,7 +179,7 @@ function collector_loop()
     while true do
         --print("collector loop")
         copas.step(0.1)
-        handle_pipe_output(fd1, cb, filter:get_ignore_table())
+        handle_pipe_output(fd1, cb, filter:get_filter_table())
     end
 end
 
