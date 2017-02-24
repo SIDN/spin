@@ -300,7 +300,7 @@ function showNetwork() {
     // mapping from ip to nodeId
     nodeIds = {};
 
-    shadowState = false;
+    shadowState = true;
 
     // start counting with one (is this internally handled?)
     curNodeId = 1;
@@ -328,6 +328,7 @@ function showNetwork() {
     network.on("selectNode", nodeSelected);
     network.on("dragStart", nodeSelected);
     network.on("zoom", enableZoomLock);
+    network.setOptions({nodes:{shadow:shadowState},edges:{shadow:shadowState}});
 }
 
 function updateNodeInfo(nodeId) {
