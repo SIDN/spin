@@ -240,18 +240,44 @@
     //
     // Filter list dialog
     //
+    var _selectRange = false, _deselectQueue = [];
     $( function() {
       $( "#filter-list" ).selectable({
-        stop: function() {
-          var selected = [];
-          $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
-          $( ".ui-selected", this ).each(function() {
-            selected.push(index);
-            var index = $( "#filter-list li" ).index( this );
-          });
-          if (selected.length > 0) {
-            $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("enable");
-          }
+        selecting: function (event, ui) {
+            if (event.detail == 0) {
+                _selectRange = true;
+                return true;
+            }
+            if ($(ui.selecting).hasClass('ui-selected')) {
+                _deselectQueue.push(ui.selecting);
+            }
+        },
+        unselecting: function (event, ui) {
+            $(ui.unselecting).addClass('ui-selected');
+        },
+        stop: function () {
+            if (!_selectRange) {
+                $.each(_deselectQueue, function (ix, de) {
+                    $(de)
+                        .removeClass('ui-selecting')
+                        .removeClass('ui-selected');
+                });
+            }
+            _selectRange = false;
+            _deselectQueue = [];
+
+            // enable or disable the remove filters button depending
+            // on whether any elements have been selected
+            var selected = [];
+            $( ".ui-selected", this ).each(function() {
+                selected.push(index);
+                var index = $( "#filter-list li" ).index( this );
+            });
+            if (selected.length > 0) {
+                $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("enable");
+            } else {
+                $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
+            }
         }
       });
     } );
