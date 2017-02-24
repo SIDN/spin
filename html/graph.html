@@ -142,6 +142,7 @@
     //nodeNames["ac:22:0b:9b:74:41"] = "kweenie2";
 
     showGraph(traffic_dataset);
+    initTrafficDataView();
 
     var sidebar_visible = false;
     var zoom_locked = false;
@@ -443,6 +444,11 @@
     {
         //show disconnected status somewhere
         $("#status").css("background-color", "#ffcccc").text("Not connected");
+    }
+
+    function initTrafficDataView() {
+        data = { 'timestamp': Math.floor(Date.now() / 1000), 'flows': []}
+        handleTrafficMessage(data);
     }
 
     function handleTrafficMessage(data) {
