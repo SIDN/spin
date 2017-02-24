@@ -61,7 +61,7 @@
         }
 
         #filter-list li {
-            margin: 3px; padding: 0.4em; 
+            margin: 3px; padding: 0.4em;
         }
     </style>
 </head>
@@ -83,8 +83,8 @@
 
 <!-- dialogs -->
 
-<div id="ignore-dialog" title="Ignore this node?">
-  <p><span class="ui-icon ui-icon-alert" style="float:left; margin:12px 12px 20px 0;"></span>Right now there is no easy way to unignore. Are you sure?</p>
+<div id="new-filter-dialog" title="Filter out this node?">
+  <p><span class="ui-icon ui-icon-alert" style="float:left; margin:12px 12px 20px 0;"></span>If you filter out this note, new traffic from and to its IP address(es) will no longer be registered. You can remove filters in the Filter List window.</p>
 </div>
 
 <div id="rename-dialog" title="Rename node">
@@ -92,7 +92,7 @@
     <fieldset>
       <label for="rename-field">New node name</label>
       <input type="text" name="rename-field" id="rename-field" value="" class="text ui-widget-content ui-corner-all">
- 
+
       <!-- Allow form submission with keyboard without duplicating the dialog button -->
       <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
     </fieldset>
@@ -102,7 +102,7 @@
 <div id="nodeinfo" title="Basic dialog">
     <div>
         <div id="options">
-            <button id="ignore-node-button" class="">Ignore this node</button>
+            <button id="add-filter-button" class="">Ignore this node</button>
             <button id="rename-node-button" class="">Rename this node</button>
         </div>
         <div id="nodeinfo-data" class="ui-widget-content ui-corner-all">
@@ -129,7 +129,7 @@
     var graph2d_1;
     var selectedNodeId;
     var traffic_ws;
-    
+
     // mapping of node names
     var nodeNames = {}
     // list of filters
@@ -142,32 +142,30 @@
 
     var sidebar_visible = false;
 
-    $("#ignore-dialog").hide();
+    $("#new-filter-dialog").hide();
     $("#rename-dialog").hide();
 
     $( "#nodeinfo" ).dialog({
       autoOpen: false,
       position: { my: "left top", at: "left top", of: "#mynetwork" }
     });
-    
+
     //
-    // code to ignore nodes
-    // 
-    function ignoreNode(nodeId) {
+    // code to add filters
+    //
+    function sendAddFilterCommand(nodeId) {
         var node = nodes.get(nodeId);
-
         sendCommand("add_ignore", node.address);
-
-        // should we remove it now?
+        // should we remove these nodes now?
     }
 
     //
-    // Create the ignore node dialog
+    // Create the add filter node dialog
     //
     $( function() {
         var dialog;
-        
-        dialog = $( "#ignore-dialog" ).dialog({
+
+        dialog = $( "#new-filter-dialog" ).dialog({
           autoOpen: false,
           resizable: false,
           height: "auto",
@@ -175,7 +173,7 @@
           modal: true,
           buttons: {
             "Ignore node": function() {
-              ignoreNode(selectedNodeId);
+              sendAddFilterCommand(selectedNodeId);
               $( this ).dialog( "close" );
             },
             Cancel: function() {
@@ -183,7 +181,7 @@
             }
           }
         });
-        $( "#ignore-node-button" ).button().on( "click", function() {
+        $( "#add-filter-button" ).button().on( "click", function() {
           dialog.dialog( "open" );
         });
     } );
@@ -195,7 +193,7 @@
         var name = $( "#rename-field" );
         var dialog;
         var allFields = $( [] ).add( name );
-        
+
         function renameNode() {
             var argument = {};
             var node = nodes.get(selectedNodeId);
@@ -228,12 +226,12 @@
           renameNode();
           dialog.dialog("close");
         }
-        
+
         form = dialog.find( "form" ).on( "submit", function( event ) {
           event.preventDefault();
           submitted();
         });
-     
+
         $( "#rename-node-button" ).button().on( "click", function() {
             dialog.dialog( "open" );
         });
@@ -261,17 +259,24 @@
     $( function() {
         var dialog;
         var selected;
-        
+
         dialog = $( "#filter-list-dialog" ).dialog({
           autoOpen: false,
           autoResize:true,
           resizable: true,
           modal: false,
+          position: { my: "right top", at: "right top", of: "#mynetwork" },
           buttons: {
             "Remove Filters": function() {
               $( "#filter-list .ui-selected", this ).each(function() {
                   // The inner text contains the name of the filter
-                  sendCommand("remove_ignore", this.innerText);
+                  //alertWithObject("[XX] selected:", this);
+                  var address;
+                  if (this.innerText) {
+                    sendCommand("remove_ignore", this.innerText);
+                  } else if (this.innerHTML) {
+                    sendCommand("remove_ignore", this.innerHTML);
+                  }
               });
             },
             Cancel: function() {
@@ -305,7 +310,7 @@
 
     function createWebSocketUri() {
         var protocolPrefix = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
-        var host = (window.location.host === '') ? '192.168.8.1' : window.location.host
+        var host = (window.location.host === '') ? '192.168.1.1' : window.location.host
         return protocolPrefix + '//' + host + ":12345/";
     }
 
@@ -575,7 +580,7 @@
             $("#nodeinfo").dialog('option','title', node.label);
             $("#nodeinfo").dialog('open');
         }
-        
+
     }
 
     function resetAllNodes() {
