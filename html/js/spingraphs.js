@@ -21,7 +21,7 @@ var filterList = [];
 // feed this data from websocket command
 //nodeNames["de:ad:be:ef:1e:e7"] = "kweenie";
 //nodeNames["1e:e7:be:ef:de:ad"] = "kweenie2";
-var sidebar_visible = false;
+var sidebar_visible = false; //TODO: whatsthis
 var zoom_locked = false;
 
 // greenfield; hide stuff
