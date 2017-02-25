@@ -8,6 +8,10 @@ body {
     height: 100%;
     font-family: Arial, Helvetica, sans-serif;
 }
+.ui-button
+{
+   padding: 3px 11px 3px 11px !important;
+}
 body {
     display: flex;
     flex-direction: column;
@@ -24,7 +28,7 @@ body {
 #mynetwork {
     flex: 1;
     border: 2px solid lightgray;
-    /* TODO: moves down after loading of document */ 
+    /* TODO: moves down after loading of document */
     margin-bottom: 20px
 }
 #nodeinfo-data {
