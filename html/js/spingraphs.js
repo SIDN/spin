@@ -74,6 +74,7 @@ $("#nodeinfo").dialog({
 // code to add filters
 function sendAddFilterCommand(nodeId) {
     var node = nodes.get(nodeId);
+    filterList.push(node.address);
 
     sendCommand("add_filter", node.address); // talk to websocket
     deleteNodeAndConnectedNodes(node);
@@ -206,6 +207,7 @@ $(function() {
         autoResize: true,
         resizable: true,
         modal: false,
+        minWidth: 360,
         position: {
             my: "right top",
             at: "right top",
@@ -225,7 +227,10 @@ $(function() {
                     $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
                 });
             },
-            Cancel: function() {
+            Reset: function() {
+                sendCommand("reset_filters", "");
+            },
+            Close: function() {
                 dialog.dialog("close");
             }
         },
@@ -587,11 +592,20 @@ function deleteEdges(nodeId) {
     }
 }
 
+function contains(l, e) {
+    for (var i=l.length; i>=0; i--) {
+        if (l[i] == e) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Used in in spinsocket.js
 function addFlow(timestamp, from, to, count, size) {
     // there may be some residual additions from a recently added
     // filter, so ignore those
-    if (from in filterList || to in filterList) {
+    if (contains(filterList, from) || contains(filterList, to)) {
         return;
     }
     addNode(timestamp, from, false, count, size, "to " + to);

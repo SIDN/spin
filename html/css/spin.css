@@ -34,6 +34,9 @@ body {
 #nodeinfo-data {
     padding: 10px;
 }
+#title-logo {
+    float: left;
+}
 #title {
     float: left;
 }

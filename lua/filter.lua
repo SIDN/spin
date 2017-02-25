@@ -25,8 +25,9 @@ function filter:load(add_own_if_new)
   local f = io.open(filter.filename, "r")
   if not f then
     if add_own_if_new then
+      -- default to own ip addresses
+      filter:add_own_ips()
       -- read names from dhcp config
-      filter.data.filters = util.get_all_bound_ip_addresses()
       filter.data.names = util:read_dhcp_config_hosts("/etc/config/dhcp")
       filter:save()
     end
@@ -80,8 +81,16 @@ function filter:add_filter(address)
   end
 end
 
+function filter:add_own_ips()
+  util:merge_tables(self.data.filters, util:get_all_bound_ip_addresses())
+end
+
 function filter:remove_filter(address)
   filter.data.filters[address] = nil
+end
+
+function filter:remove_all_filters()
+  filter.data.filters = {}
 end
 
 function filter:add_name(address, name)

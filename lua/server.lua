@@ -71,6 +71,11 @@ function handle_command(command, argument)
     filter:save()
     -- don't send direct response, but send a 'new list' update
     response = create_filter_list_command()
+  elseif (command == "reset_filters") then
+    filter:remove_all_filters()
+    filter:add_own_ips()
+    filter:save()
+    response = create_filter_list_command()
   elseif (command == "add_name") then
     filter:load()
     filter:add_name(argument["address"], argument["name"])
@@ -119,10 +124,12 @@ local server = websocket.server.copas.listen
           local response = nil
           command = json.decode(msg)
           if (command["command"] and command["argument"]) then
-            print("[XX] GOT COMMAND: " .. msg)
+            print("[XX] Command: " .. msg)
             response = handle_command(command.command, command.argument)
             if response then
-              ws:send(json.encode(response))
+              local response_txt = json.encode(response)
+              print("[XX] Response: " .. response_txt)
+              ws:send(response_txt)
             end
           end
         end
