@@ -21,7 +21,6 @@ var filterList = [];
 // feed this data from websocket command
 //nodeNames["de:ad:be:ef:1e:e7"] = "kweenie";
 //nodeNames["1e:e7:be:ef:de:ad"] = "kweenie2";
-var sidebar_visible = false; //TODO: whatsthis
 var zoom_locked = false;
 
 var colour_src = "lightgray";
@@ -77,7 +76,7 @@ function sendAddFilterCommand(nodeId) {
     var node = nodes.get(nodeId);
 
     sendCommand("add_filter", node.address); // talk to websocket
-    // TODO: should we remove these nodes now?
+    deleteNodeAndConnectedNodes(node);
 }
 
 // create the ignore node dialog
@@ -518,6 +517,58 @@ function addEdge(from, to) {
         curEdgeId += 1;
     }
 }
+
+// Delete the given node (note: not nodeId) and all nodes
+// that are connected only to this node
+function deleteNodeAndConnectedNodes(node) {
+    // find all nodes to delete; that is this node and all nodes
+    // connected to it that have no other connections
+    var connectedNodes = getConnectedNodes(node.id);
+    var toDelete = [];
+    for (var i=0; i < connectedNodes.length; i++) {
+        var otherNodeId = connectedNodes[i];
+        var otherConnections = getConnectedNodes(otherNodeId);
+        if (otherConnections.length == 1) {
+            deleteNode(nodes.get(otherNodeId), false);
+        }
+    }
+    deleteNode(node, true);
+}
+
+// Remove a node from the screen
+// If deleteEdges is true, also remove all edges connected to this node
+function deleteNode(node, deleteNodeEdges) {
+    delete nodeIds[node.address];
+    nodes.remove(node.id);
+    if (deleteNodeEdges) {
+        deleteEdges(node.id);
+    }
+}
+
+// Returns a list of all nodeIds that have an edge to the given nodeId
+function getConnectedNodes(nodeId) {
+    var result = [];
+    var cedges = edges.get({
+        filter: function(item) {
+            return (item.from == nodeId);
+        }
+    });
+    for (var i=0; i < cedges.length; i++) {
+        var edge = cedges[i];
+        result.push(edge.to);
+    }
+    cedges = edges.get({
+        filter: function(item) {
+            return (item.to == nodeId);
+        }
+    });
+    for (var i=0; i < cedges.length; i++) {
+        var edge = cedges[i];
+        result.push(edge.from);
+    }
+    return result;
+}
+
 
 // Used in spinsocket.js
 function deleteEdges(nodeId) {

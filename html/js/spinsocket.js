@@ -165,11 +165,6 @@ function handleTrafficMessage(data) {
     };
     graph2d_1.setOptions(options);
     var ids = traffic_dataset.getIds();
-    // TODO:
-    if (ids.length > 100) {
-        //traffic_dataset.remove(ids[0]);
-        //running = false;
-    }
 
     //
     // update network view
@@ -185,10 +180,7 @@ function handleTrafficMessage(data) {
         var nodeId = getNodeId(ip)
         var node = nodes.get(nodeId);
         if (node.lastseen < delete_before) {
-            // does this remove the edges as well?
-            delete nodeIds[ip];
-            nodes.remove(nodeId);
-            deleteEdges(nodeId);
+            deleteNode(node, true);
         } else if (node.lastseen < unhighlight_before && node["color"] == colour_recent) {
             node["color"] = colour_dst;
             nodes.update(node);
