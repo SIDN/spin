@@ -24,6 +24,11 @@ var filterList = [];
 var sidebar_visible = false; //TODO: whatsthis
 var zoom_locked = false;
 
+var colour_src = "lightgray";
+var colour_dst = "lightblue";
+var colour_recent = "#bbffbb";
+var colour_edge = "#9999ff";
+
 // greenfield; hide stuff
 $("#new-filter-dialog").hide();
 $("#rename-dialog").hide();
@@ -244,7 +249,7 @@ function updateFilterList() {
 // init
 showGraph(traffic_dataset);
 showNetwork();
-// initTrafficDataView();    
+// initTrafficDataView();
 
 //
 // Traffic-graph code
@@ -323,12 +328,36 @@ function showNetwork() {
     var options = {
         autoResize: false,
         //clickToUse: true,
+        physics: {
+            solver: 'repulsion',
+            enabled:true,
+            barnesHut: {
+/*
+                gravitationalConstant: -2000,
+                centralGravity: 0.3,
+                springLength: 95,
+                springConstant: 0.04,
+                damping: 0.09,
+                avoidOverlap: 0.5
+*/
+            },
+            stabilization: {
+                enabled: true,
+                iterations: 5,
+            }
+        },
+        nodes: {
+            shadow:shadowState
+        },
+        edges: {
+            shadow:shadowState,
+            arrows:'to',smooth:true
+        }
     };
     network = new vis.Network(container, data, options);
     network.on("selectNode", nodeSelected);
     network.on("dragStart", nodeSelected);
     network.on("zoom", enableZoomLock);
-    network.setOptions({nodes:{shadow:shadowState},edges:{shadow:shadowState,arrows:'to',smooth:true}});
 }
 
 function updateNodeInfo(nodeId) {
@@ -430,7 +459,7 @@ function addNode(timestamp, ip, scale, count, size, lwith) {
         node["lastseen"] = timestamp;
 
         if (scale) {
-            node["color"] = 'red';
+            node["color"] = colour_recent;
             node["value"] = node["value"] + size;
         }
         nodes.update(node);
@@ -441,9 +470,9 @@ function addNode(timestamp, ip, scale, count, size, lwith) {
         }
         var c;
         if (scale) {
-            c = 'red';
+            c = colour_recent;
         } else {
-            c = 'gray';
+            c = colour_src;
         }
         nodeIds[ip] = curNodeId;
         nodes.add({
@@ -484,7 +513,7 @@ function addEdge(from, to) {
             id: curEdgeId,
             from: fromNodeId,
             to: toNodeId,
-            color: 'blue'
+            color: colour_edge
         });
         curEdgeId += 1;
     }
@@ -511,7 +540,7 @@ function addFlow(timestamp, from, to, count, size) {
     addEdge(from, to);
     if (!zoom_locked) {
         network.fit({
-            duration: 500
+            duration: 0
         });
     }
 }

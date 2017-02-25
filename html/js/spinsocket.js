@@ -5,7 +5,7 @@
  * @version 0.0.1
  * @date 2017-02-24
  *
- * SPIN WebSocket code 
+ * SPIN WebSocket code
  * Main functionality: maintain websocket communitation
  *
  */
@@ -21,7 +21,7 @@ function init() {
 // TODO: use hostname (valibox.) ?
 function createWebSocketUri() {
     var protocolPrefix = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
-    var host = (window.location.host === '') ? '192.168.8.1' : window.location.host
+    var host = (window.location.host === '') ? '192.168.1.1' : window.location.host
     return protocolPrefix + '//' + host + ":12345/";
 }
 
@@ -103,6 +103,7 @@ function onTrafficMessage(evt) {
                 break;
             case 'filters':
                 filterList = result;
+                filterList.sort();
                 updateFilterList();
                 break;
             default:
@@ -188,8 +189,8 @@ function handleTrafficMessage(data) {
             delete nodeIds[ip];
             nodes.remove(nodeId);
             deleteEdges(nodeId);
-        } else if (node.lastseen < unhighlight_before && node["color"] == 'red') {
-            node["color"] = 'lightblue';
+        } else if (node.lastseen < unhighlight_before && node["color"] == colour_recent) {
+            node["color"] = colour_dst;
             nodes.update(node);
         }
     }

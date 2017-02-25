@@ -2,8 +2,8 @@
 <html>
 <head>
     <!-- Load jQuery and stylesheets first -->
-    <script src="./js/jquery-3.1.1.min.js" async></script>
-    <script src="./js/jquery-ui-1.12.1.custom/jquery-ui.min.js" async></script>
+    <script src="./js/jquery-3.1.1.min.js" ></script>
+    <script src="./js/jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
     <link href="./js/jquery-ui-1.12.1.custom/jquery-ui.theme.css" rel="stylesheet">
     <link href="./js/jquery-ui-1.12.1.custom/jquery-ui.css" rel="stylesheet">
     <!-- load VisJS script and stylesheet -->
@@ -46,7 +46,7 @@
     <fieldset>
       <label for="rename-field">New node name</label>
       <input type="text" name="rename-field" id="rename-field" value="" class="text ui-widget-content ui-corner-all">
- 
+
       <!-- Allow form submission with keyboard without duplicating the dialog button -->
       <input type="submit" tabindex="-1" style="position:absolute; top:-1000px">
     </fieldset>
@@ -56,7 +56,7 @@
 <div id="nodeinfo" title="Basic dialog" class="initiallyHidden">
     <div>
         <div id="options">
-            <button id="ignore-node-button" class="">Ignore this node</button>
+            <button id="add-filter-button" class="">Ignore this node</button>
             <button id="rename-node-button" class="">Rename this node</button>
         </div>
         <div id="nodeinfo-data" class="ui-widget-content ui-corner-all">
