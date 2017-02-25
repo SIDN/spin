@@ -222,6 +222,7 @@ $(function() {
                     } else if (this.innerHTML) {
                         sendCommand("remove_filter", this.innerHTML);
                     }
+                    $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
                 });
             },
             Cancel: function() {
@@ -328,7 +329,7 @@ function showNetwork() {
         autoResize: false,
         //clickToUse: true,
         physics: {
-            solver: 'repulsion',
+            //solver: 'repulsion',
             enabled:true,
             barnesHut: {
 /*
@@ -523,6 +524,7 @@ function addEdge(from, to) {
 function deleteNodeAndConnectedNodes(node) {
     // find all nodes to delete; that is this node and all nodes
     // connected to it that have no other connections
+    network.stopSimulation();
     var connectedNodes = getConnectedNodes(node.id);
     var toDelete = [];
     for (var i=0; i < connectedNodes.length; i++) {
@@ -533,6 +535,7 @@ function deleteNodeAndConnectedNodes(node) {
         }
     }
     deleteNode(node, true);
+    network.startSimulation();
 }
 
 // Remove a node from the screen
@@ -586,6 +589,11 @@ function deleteEdges(nodeId) {
 
 // Used in in spinsocket.js
 function addFlow(timestamp, from, to, count, size) {
+    // there may be some residual additions from a recently added
+    // filter, so ignore those
+    if (from in filterList || to in filterList) {
+        return;
+    }
     addNode(timestamp, from, false, count, size, "to " + to);
     addNode(timestamp, to, true, count, size, "from " + from);
     addEdge(from, to);
