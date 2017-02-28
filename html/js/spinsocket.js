@@ -117,7 +117,9 @@ function onTrafficMessage(evt) {
 
 function onTrafficOpen(evt) {
     //show connected status somewhere
-    $("#status").css("background-color", "#ccffcc").text("Connected");
+    $("#status").css("background-color", "#ccffcc");
+    $(".statustext").css("background-color", "#ccffcc").text("Connected");
+    $(".tooltiptext").text("Collecting data.");    
 }
 
 function onTrafficClose(evt) {
