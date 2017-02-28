@@ -46,6 +46,23 @@ body {
     float: right;
     padding: 4px;
 }
+/* Tooltip text */
+#status .tooltiptext {
+    visibility: hidden;
+    /*width: 120px;*/
+    background-color: black;
+    color: #fff;
+    text-align: center;
+    padding: 3px 0;
+    border-radius: 3px;
+    /* Position the tooltip text */
+    position: absolute;
+    z-index: 1;
+}
+/* Show the tooltip text when mouse over  */
+#status:hover .tooltiptext {
+    visibility: visible;
+}
 #autozoom-button {
     float: right;
 }
@@ -69,9 +86,6 @@ body {
     padding: 0.4em;
 }
 
-.ui-dialog
-{
+.ui-dialog {
     box-shadow: 1px 1px 5px #333;
 }
-
-
