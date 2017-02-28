@@ -1,5 +1,5 @@
 /*
- *  SPIN CSS - v0.0.1 - 2017-02-24
+ *  SPIN CSS - v0.0.1 - 2017-02-28
  * https://valibox.sidn.nl/
  */
 
@@ -68,3 +68,10 @@ body {
     margin: 3px;
     padding: 0.4em;
 }
+
+.ui-dialog
+{
+    box-shadow: 1px 1px 5px #333;
+}
+
+
