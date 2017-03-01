@@ -27,8 +27,7 @@
 
     function testWebSocket()
     {
-        //websocket = new WebSocket(wsUri, "dumb-increment-protocol");
-        websocket = new WebSocket(wsUri, "traffic-data-protocol");
+        websocket = new WebSocket(wsUri, "v1.spin.sidnlabs.nl");
         websocket.onopen = function(evt) { onOpen(evt) };
         websocket.onclose = function(evt) { onClose(evt) };
         websocket.onmessage = function(evt) { onMessage(evt) };
