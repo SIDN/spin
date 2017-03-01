@@ -118,14 +118,12 @@ function onTrafficMessage(evt) {
 
 function onTrafficOpen(evt) {
     //show connected status somewhere
-    $("#status").css("background-color", "#ccffcc");
-    $(".statustext").css("background-color", "#ccffcc").text("Connected");
-    $(".tooltiptext").text("Collecting data.");    
+    $("#statustext").css("background-color", "#ccffcc").text("Connected");
 }
 
 function onTrafficClose(evt) {
     //show disconnected status somewhere
-    $("#status").css("background-color", "#ffcccc").text("Not connected");
+    $("#statustext").css("background-color", "#ffcccc").text("Not connected");
     console.log('Websocket has dissapeared');
 }
 
@@ -133,8 +131,6 @@ function onTrafficError(evt) {
     //show traffick errors on the console
     console.log('WebSocket traffic error: ' + evt.data);
 }
-
-/* TODO: somehow broke durng splitup - should fix */
 
 function initTrafficDataView() {
     var data = { 'timestamp': Math.floor(Date.now() / 1000),

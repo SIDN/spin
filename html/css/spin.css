@@ -3,6 +3,9 @@
  * https://valibox.sidn.nl/
  */
 
+* {
+    box-sizing: border-box; /* needed? */
+}
 html,
 body {
     height: calc(100% - 2px);
@@ -26,17 +29,25 @@ body {
 .body-item {
     margin: 4px;
 }
-#buttonbar {
-    /* border-bottom: thick solid #4682B4; */
+#buttonbarleft {
+    display: inline-block;
+}
+#buttonbarright {
+    display: inline-block;
+    vertical-align: top;
+    position: absolute;
+    right: 0px;
+}
+@media screen and (max-width: 875px) {
+    #buttonbarright {
+        position: relative;}
 }
 #visualization {
     /*height: 140px;*/
-    /*border: 1px solid lightgray;*/
     background-color: #faffff;
     box-shadow: 1px 1px 5px #333;
 }
 #mynetwork {
-    /*border: 1px solid lightgray;*/
     background-color: white;
     background-color: #fafaff;
     height: calc(100% - 250px);
@@ -52,42 +63,24 @@ body {
     padding: 10px;
 }
 #title-logo {
- /*   float: left; */
     vertical-align: middle;
 }
+@media screen and (max-width: 550px) {
+    #title-logo {display:none;}
+}
 #title {
-    /*    float: left; */
     font-weight: bold;
     font-size: 1.5em;
 }
-#status {
+@media screen and (max-width: 375px) {
+    #title { font-size: 0.75em;}
+}
+#statustext {
     background-color: #ffcccc;
-    border: 1px solid black;
-    float: right;
-    padding: 4px;
-}
-/* Tooltip text */
-#status .tooltiptext {
-    visibility: hidden;
-    /*width: 120px;*/
-    background-color: black;
-    color: #fff;
-    text-align: center;
-    padding: 3px 0;
-    border-radius: 3px;
-    /* Position the tooltip text */
-    position: absolute;
-    z-index: 1;
-}
-/* Show the tooltip text when mouse over  */
-#status:hover .tooltiptext {
-    visibility: visible;
 }
 #autozoom-button {
-    float: right;
 }
 #filter-list-button {
-    float: right;
 }
 #filter-list .ui-selecting {
     background: #FECA40;

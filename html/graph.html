@@ -18,20 +18,21 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SPIN Traffic monitor prototype</title>
-
 </head>
 <body>
 
-<div id="buttonbar" class="body-item">
+<div id="buttonbarleft" class="body-item">
  <img id="title-logo" src="img/sidnlabs_logo.png" alt="[SIDN Labs logo]">
  <span id="title">SPIN Traffic monitor prototype</span>
- <div id="status" class="ui-corner-all" ><div class="statustext">Not connected</div>
-     <span class="tooltiptext">Not collecting data.</span>
- </div>    
- <button id="filter-list-button">Show filter list</button>
- <button id="autozoom-button"></button>
 </div>
-    
+<div id="buttonbarright" class="body-item">
+ <span>
+   <button id="autozoom-button"></button>
+   <button id="filter-list-button">Show filter list</button>
+   <span id="statustext" class="ui-button ui-corner-all">Not connected</span>
+ </span>
+</div>
+
 <div id="visualization" class="ui-corner-all body-item"></div>
 
 <div id="mynetwork" class="ui-corner-all body-item"><noscript> [JavaScript Required!]</noscript></div>
