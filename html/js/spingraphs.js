@@ -608,7 +608,7 @@ function contains(l, e) {
     return false;
 }
 
-// Used in in spinsocket.js
+// Used in spinsocket.js
 function addFlow(timestamp, from, to, count, size) {
     // there may be some residual additions from a recently added
     // filter, so ignore those
