@@ -52,13 +52,15 @@ function updateZoomLock(newBool) {
         $("#autozoom-button").button("option", {
             "icons": {
                 "primary": "ui-icon-locked"
-            }
+            },
+            "label": "Unlock view"
         });
     } else {
         $("#autozoom-button").button("option", {
             "icons": {
                 "primary": "ui-icon-unlocked"
-            }
+            },
+            "label": "Lock view"
         });
     }
 }
