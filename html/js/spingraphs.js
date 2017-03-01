@@ -334,7 +334,7 @@ function showNetwork() {
         edges: edges
     };
     var options = {
-        autoResize: false,
+        autoResize: true,
         //clickToUse: true,
         physics: {
             //solver: 'repulsion',
