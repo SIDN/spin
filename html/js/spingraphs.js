@@ -28,15 +28,9 @@ var colour_dst = "lightblue";
 var colour_recent = "#bbffbb";
 var colour_edge = "#9999ff";
 
-// greenfield; hide stuff
-$("#new-filter-dialog").hide();
-$("#rename-dialog").hide();
-$("#autozoom-button").button({
-    "icons": {
-        "primary": "ui-icon-unlocked"
-    },
-    "label": "Lock view"
-}).click(toggleZoomLock);
+// these are used in the filterlist dialog
+var _selectRange = false,
+    _deselectQueue = [];
 
 function enableZoomLock() {
     updateZoomLock(true);
@@ -64,14 +58,6 @@ function updateZoomLock(newBool) {
         });
     }
 }
-$("#nodeinfo").dialog({
-    autoOpen: false,
-    position: {
-        my: "left top",
-        at: "left top",
-        of: "#mynetwork"
-    }
-});
 
 // code to add filters
 function sendAddFilterCommand(nodeId) {
@@ -82,169 +68,6 @@ function sendAddFilterCommand(nodeId) {
     deleteNodeAndConnectedNodes(node);
 }
 
-// create the ignore node dialog
-$(function() {
-    var dialog;
-
-    dialog = $("#new-filter-dialog").dialog({
-        autoOpen: false,
-        resizable: false,
-        height: "auto",
-        width: 400,
-        modal: true,
-        buttons: {
-            "Ignore node": function() {
-                sendAddFilterCommand(selectedNodeId);
-                $(this).dialog("close");
-            },
-            Cancel: function() {
-                $(this).dialog("close");
-            }
-        }
-    });
-    $("#add-filter-button").button().on("click", function() {
-        dialog.dialog("open");
-    });
-});
-
-// create the rename dialog
-$(function() {
-    var name = $("#rename-field");
-    var dialog;
-    var allFields = $([]).add(name);
-
-    function renameNode() {
-        var argument = {};
-        var node = nodes.get(selectedNodeId);
-        var newname = name.val();
-        argument['address'] = node.address;
-        argument['name'] = newname;
-        sendCommand("add_name", argument); // talk to Websocket
-
-        node.label = newname;
-        nodes.update(node);
-    }
-
-    dialog = $("#rename-dialog").dialog({
-        autoOpen: false,
-        width: 380,
-        modal: true,
-        buttons: {
-            "Rename node": submitted,
-            Cancel: function() {
-                dialog.dialog("close");
-            }
-        },
-        close: function() {
-            form[0].reset();
-            allFields.removeClass("ui-state-error");
-        }
-    });
-
-    function submitted() {
-        renameNode();
-        dialog.dialog("close");
-    }
-
-    var form = dialog.find("form").on("submit", function(event) {
-        event.preventDefault();
-        submitted();
-    });
-
-    $("#rename-node-button").button().on("click", function() {
-        dialog.dialog("open");
-    });
-});
-
-// create the filterlist dialog
-var _selectRange = false,
-    _deselectQueue = [];
-$(function() {
-    $("#filter-list").selectable({
-        selecting: function(event, ui) {
-            if (event.detail == 0) {
-                _selectRange = true;
-                return true;
-            }
-            if ($(ui.selecting).hasClass('ui-selected')) {
-                _deselectQueue.push(ui.selecting);
-            }
-        },
-        unselecting: function(event, ui) {
-            $(ui.unselecting).addClass('ui-selected');
-        },
-        stop: function() {
-            if (!_selectRange) {
-                $.each(_deselectQueue, function(ix, de) {
-                    $(de)
-                        .removeClass('ui-selecting')
-                        .removeClass('ui-selected');
-                });
-            }
-            _selectRange = false;
-            _deselectQueue = [];
-
-            // enable or disable the remove filters button depending
-            // on whether any elements have been selected
-            var selected = [];
-            $(".ui-selected", this).each(function() {
-                selected.push(index);
-                var index = $("#filter-list li").index(this);
-            });
-            if (selected.length > 0) {
-                $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("enable");
-            } else {
-                $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
-            }
-        }
-    });
-});
-
-$(function() {
-    var dialog;
-    var selected;
-
-    dialog = $("#filter-list-dialog").dialog({
-        autoOpen: false,
-        autoResize: true,
-        resizable: true,
-        modal: false,
-        minWidth: 360,
-        position: {
-            my: "right top",
-            at: "right top",
-            of: "#mynetwork"
-        },
-        buttons: {
-            "Remove Filters": function() {
-                $("#filter-list .ui-selected", this).each(function() {
-                    // The inner text contains the name of the filter
-                    //alertWithObject("[XX] selected:", this);
-                    var address;
-                    if (this.innerText) {
-                        sendCommand("remove_filter", this.innerText);
-                    } else if (this.innerHTML) {
-                        sendCommand("remove_filter", this.innerHTML);
-                    }
-                    $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
-                });
-            },
-            Reset: function() {
-                sendCommand("reset_filters", "");
-            },
-            Close: function() {
-                dialog.dialog("close");
-            }
-        },
-        close: function() {}
-    });
-
-    $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
-    $("#filter-list-button").button().on("click", function() {
-        dialog.dialog("open");
-    });
-});
-
 function updateFilterList() {
     $("#filter-list").empty();
     for (var i = 0; i < filterList.length; i++) {
@@ -254,6 +77,187 @@ function updateFilterList() {
 }
 
 function initGraphs() {
+    $("#new-filter-dialog").hide();
+    $("#rename-dialog").hide();
+    $("#autozoom-button").button({
+        "icons": {
+            "primary": "ui-icon-unlocked"
+        },
+        "label": "Lock view"
+    }).click(toggleZoomLock);
+
+    // create the node information dialog
+    $("#nodeinfo").dialog({
+        autoOpen: false,
+        position: {
+            my: "left top",
+            at: "left top",
+            of: "#mynetwork"
+        }
+    });
+
+    // create the ignore node dialog
+    $(function() {
+        var dialog;
+
+        dialog = $("#new-filter-dialog").dialog({
+            autoOpen: false,
+            resizable: false,
+            height: "auto",
+            width: 400,
+            modal: true,
+            buttons: {
+                "Ignore node": function() {
+                    sendAddFilterCommand(selectedNodeId);
+                    $(this).dialog("close");
+                },
+                Cancel: function() {
+                    $(this).dialog("close");
+                }
+            }
+        });
+        $("#add-filter-button").button().on("click", function() {
+            dialog.dialog("open");
+        });
+    });
+
+    // create the rename dialog
+    $(function() {
+        var name = $("#rename-field");
+        var dialog;
+        var allFields = $([]).add(name);
+
+        function renameNode() {
+            var argument = {};
+            var node = nodes.get(selectedNodeId);
+            var newname = name.val();
+            argument['address'] = node.address;
+            argument['name'] = newname;
+            sendCommand("add_name", argument); // talk to Websocket
+
+            node.label = newname;
+            nodes.update(node);
+        }
+
+        dialog = $("#rename-dialog").dialog({
+            autoOpen: false,
+            width: 380,
+            modal: true,
+            buttons: {
+                "Rename node": submitted,
+                Cancel: function() {
+                    dialog.dialog("close");
+                }
+            },
+            close: function() {
+                form[0].reset();
+                allFields.removeClass("ui-state-error");
+            }
+        });
+
+        function submitted() {
+            renameNode();
+            dialog.dialog("close");
+        }
+
+        var form = dialog.find("form").on("submit", function(event) {
+            event.preventDefault();
+            submitted();
+        });
+
+        $("#rename-node-button").button().on("click", function() {
+            dialog.dialog("open");
+        });
+    });
+
+    // create the filterlist dialog
+    $(function() {
+        $("#filter-list").selectable({
+            selecting: function(event, ui) {
+                if (event.detail == 0) {
+                    _selectRange = true;
+                    return true;
+                }
+                if ($(ui.selecting).hasClass('ui-selected')) {
+                    _deselectQueue.push(ui.selecting);
+                }
+            },
+            unselecting: function(event, ui) {
+                $(ui.unselecting).addClass('ui-selected');
+            },
+            stop: function() {
+                if (!_selectRange) {
+                    $.each(_deselectQueue, function(ix, de) {
+                        $(de)
+                            .removeClass('ui-selecting')
+                            .removeClass('ui-selected');
+                    });
+                }
+                _selectRange = false;
+                _deselectQueue = [];
+
+                // enable or disable the remove filters button depending
+                // on whether any elements have been selected
+                var selected = [];
+                $(".ui-selected", this).each(function() {
+                    selected.push(index);
+                    var index = $("#filter-list li").index(this);
+                });
+                if (selected.length > 0) {
+                    $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("enable");
+                } else {
+                    $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
+                }
+            }
+        });
+    });
+
+    $(function() {
+        var dialog;
+        var selected;
+
+        dialog = $("#filter-list-dialog").dialog({
+            autoOpen: false,
+            autoResize: true,
+            resizable: true,
+            modal: false,
+            minWidth: 360,
+            position: {
+                my: "right top",
+                at: "right top",
+                of: "#mynetwork"
+            },
+            buttons: {
+                "Remove Filters": function() {
+                    $("#filter-list .ui-selected", this).each(function() {
+                        // The inner text contains the name of the filter
+                        //alertWithObject("[XX] selected:", this);
+                        var address;
+                        if (this.innerText) {
+                            sendCommand("remove_filter", this.innerText);
+                        } else if (this.innerHTML) {
+                            sendCommand("remove_filter", this.innerHTML);
+                        }
+                        $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
+                    });
+                },
+                Reset: function() {
+                    sendCommand("reset_filters", "");
+                },
+                Close: function() {
+                    dialog.dialog("close");
+                }
+            },
+            close: function() {}
+        });
+
+        $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
+        $("#filter-list-button").button().on("click", function() {
+            dialog.dialog("open");
+        });
+    });
+
+
     showGraph(traffic_dataset);
     showNetwork();
     initTrafficDataView();
