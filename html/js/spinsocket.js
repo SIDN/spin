@@ -14,6 +14,7 @@
 var traffic_ws;
 
 function init() {
+    initGraphs();
     startWebSockets();
 }
 
@@ -21,7 +22,7 @@ function init() {
 // TODO: use hostname (valibox.) ?
 function createWebSocketUri() {
     var protocolPrefix = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
-    var host = (window.location.host === '') ? '192.168.1.1' : window.location.host
+    var host = (window.location.host === '') ? '192.168.8.1' : window.location.host
     return protocolPrefix + '//' + host + ":12345/";
 }
 
@@ -133,13 +134,12 @@ function onTrafficError(evt) {
     console.log('WebSocket traffic error: ' + evt.data);
 }
 
-/* TODO: somehow broke durng splitup - should fix
+/* TODO: somehow broke durng splitup - should fix */
 
-    function initTrafficDataView() {
-        data = { 'timestamp': Math.floor(Date.now() / 1000), 'flows': []}
-        handleTrafficMessage(data);
-    }
-*/
+function initTrafficDataView() {
+    var data = { 'timestamp': Math.floor(Date.now() / 1000), 'flows': []}
+    handleTrafficMessage(data);
+}
 
 // Update the Graphs (traffic graph and network view)
 function handleTrafficMessage(data) {

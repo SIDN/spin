@@ -251,10 +251,11 @@ function updateFilterList() {
     }
 }
 
-// init
-showGraph(traffic_dataset);
-showNetwork();
-// initTrafficDataView();
+function initGraphs() {
+    showGraph(traffic_dataset);
+    showNetwork();
+    initTrafficDataView();
+}
 
 //
 // Traffic-graph code
