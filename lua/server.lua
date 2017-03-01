@@ -16,8 +16,6 @@ local info_clients = {}
 local websocket = require'websocket'
 
 filter:load(true)
-print("[XX] loaded filter")
-filter:print()
 
 --
 -- The traffic data protocol send out continuous updates of
@@ -118,6 +116,7 @@ local server = websocket.server.copas.listen
       while true do
         local msg,opcode = ws:receive()
         if not msg then
+          traffic_clients[ws] = nil
           ws:close()
           return
         else
@@ -186,7 +185,7 @@ function collector_loop()
     while true do
         --print("collector loop")
         copas.step(0.1)
-        handle_pipe_output(fd1, cb, filter:get_filter_table())
+        handle_pipe_output(fd1, cb, traffic_clients, filter:get_filter_table())
     end
 end
 

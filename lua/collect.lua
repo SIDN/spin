@@ -199,14 +199,16 @@ function read_line_from_fd(fd)
   return result
 end
 
-function handle_pipe_output(fd, callback, filter_list)
+function handle_pipe_output(fd, callback, clients, filter_list)
   local pr = P.rpoll(fd,10)
   if pr == 0 then
     return
   end
   str = read_line_from_fd(fd)
   while str do
-    handle_line(str, callback, filter_list)
+    if next(clients) ~= nil then
+        handle_line(str, callback, filter_list)
+    end
     str = read_line_from_fd(fd)
   end
 end
