@@ -27,7 +27,7 @@ function createWebSocketUri() {
 }
 
 function startWebSockets() {
-    traffic_ws = new WebSocket(createWebSocketUri(), "traffic-data-protocol");
+    traffic_ws = new WebSocket(createWebSocketUri(), "v1.spin.sidnlabs.nl");
     traffic_ws.onopen = function(evt) {
         onTrafficOpen(evt)
     };

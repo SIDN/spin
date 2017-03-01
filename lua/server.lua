@@ -108,7 +108,7 @@ end
 local server = websocket.server.copas.listen
 {
   protocols = {
-    ['traffic-data-protocol'] = function(ws)
+    ['v1.spin.sidnlabs.nl'] = function(ws)
       traffic_clients[ws] = 0
       send_filter_list(ws)
       send_name_list(ws)
@@ -133,7 +133,7 @@ local server = websocket.server.copas.listen
           end
         end
       end
-    end
+    end,
   },
   port = 12345
 }
