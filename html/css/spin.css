@@ -1,5 +1,5 @@
 /*
- *  SPIN CSS - v0.0.1 - 2017-02-28
+ * SPIN CSS - v0.0.1 - 2017-03-01
  * https://valibox.sidn.nl/
  */
 
@@ -12,30 +12,48 @@ body {
 {
    padding: 3px 11px 3px 11px !important;
 }
+.ui-dialog {
+    box-shadow: 1px 1px 5px #333;
+}
 body {
-    display: flex;
-    flex-direction: column;
 }
 .initiallyHidden {
     display: none;
 }
+.body-item {
+    margin: 4px;
+}
+#buttonbar {
+    /* border-bottom: thick solid #4682B4; */
+}
 #visualization {
-    height: 140px;
+    /*height: 140px;*/
+    /*border: 1px solid lightgray;*/
+    background-color: #C0FFF4;
+    box-shadow: 1px 1px 5px #333;
 }
 #mynetwork {
-    flex: 1;
-    border: 2px solid lightgray;
-    /* TODO: moves down after loading of document */
-    margin-bottom: 20px
+    /*border: 1px solid lightgray;*/
+    background-color: #C0FFF4;
+    height: calc(100% - 250px);
+    box-shadow: 1px 1px 5px #333;
+}
+#footer {
+    margin-bottom: 20px;
+    font-size: 75%;
+    text-align: right;
 }
 #nodeinfo-data {
     padding: 10px;
 }
 #title-logo {
-    float: left;
+ /*   float: left; */
+    vertical-align: middle;
 }
 #title {
-    float: left;
+    /*    float: left; */
+    font-weight: bold;
+    font-size: 1.5em;
 }
 #status {
     background-color: #ffcccc;
@@ -81,8 +99,4 @@ body {
 #filter-list li {
     margin: 3px;
     padding: 0.4em;
-}
-
-.ui-dialog {
-    box-shadow: 1px 1px 5px #333;
 }
