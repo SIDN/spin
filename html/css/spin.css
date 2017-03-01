@@ -22,9 +22,6 @@ body {
 #visualization {
     height: 140px;
 }
-#infobar {
-    background: white;
-}
 #mynetwork {
     flex: 1;
     border: 2px solid lightgray;
