@@ -137,7 +137,9 @@ function onTrafficError(evt) {
 /* TODO: somehow broke durng splitup - should fix */
 
 function initTrafficDataView() {
-    var data = { 'timestamp': Math.floor(Date.now() / 1000), 'flows': []}
+    var data = { 'timestamp': Math.floor(Date.now() / 1000),
+                 'total_size': 0, 'total_count': 0,
+                 'flows': []}
     handleTrafficMessage(data);
 }
 
