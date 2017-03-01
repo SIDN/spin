@@ -23,7 +23,7 @@ var filterList = [];
 //nodeNames["1e:e7:be:ef:de:ad"] = "kweenie2";
 var zoom_locked = false;
 
-var colour_src = "lightgray";
+var colour_src = "#dddddd";
 var colour_dst = "lightblue";
 var colour_recent = "#bbffbb";
 var colour_edge = "#9999ff";

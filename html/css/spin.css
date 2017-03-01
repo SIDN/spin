@@ -5,8 +5,11 @@
 
 html,
 body {
-    height: 100%;
+    height: calc(100% - 2px);
     font-family: Arial, Helvetica, sans-serif;
+    padding: 0px 0px 0px 0px;
+    margin-top: 0px;
+    margin-bottom: 0px;
 }
 .ui-button
 {
@@ -29,17 +32,19 @@ body {
 #visualization {
     /*height: 140px;*/
     /*border: 1px solid lightgray;*/
-    background-color: #C0FFF4;
+    background-color: #faffff;
     box-shadow: 1px 1px 5px #333;
 }
 #mynetwork {
     /*border: 1px solid lightgray;*/
-    background-color: #C0FFF4;
+    background-color: white;
+    background-color: #fafaff;
     height: calc(100% - 250px);
     box-shadow: 1px 1px 5px #333;
 }
 #footer {
-    margin-bottom: 20px;
+    margin-top: 0px;
+    margin-bottom: 0px;
     font-size: 75%;
     text-align: right;
 }
