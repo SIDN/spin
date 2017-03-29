@@ -1,2 +1,2 @@
 all:
-	echo "Nothing to build right now"
+	(cd src; make)
