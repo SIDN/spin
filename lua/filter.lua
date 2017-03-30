@@ -46,6 +46,8 @@ function filter:load(add_own_if_new)
 end
 
 function filter:save()
+  if not filter.data.names then return end
+
   -- just ignore it for now if we can't write it
   local f = io.open(filter.filename, "w")
   if not f then return end

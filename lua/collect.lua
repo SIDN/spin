@@ -165,10 +165,10 @@ function handle_line(line, callback, filter_list)
       to = token:sub(5)
     end
     if not count and startswith(token, "packets=") then
-      count = token:sub(9)
+      count = tonumber(token:sub(9))
     end
     if not size and startswith(token, "bytes=") then
-      size = token:sub(7)
+      size = tonumber(token:sub(7))
     end
   end
   if from and to and count and size then
@@ -206,7 +206,7 @@ function handle_pipe_output(fd, callback, clients, filter_list)
   end
   str = read_line_from_fd(fd)
   while str do
-    if next(clients) ~= nil then
+    if (clients == nil) or (next(clients) ~= nil) then
         handle_line(str, callback, filter_list)
     end
     str = read_line_from_fd(fd)
