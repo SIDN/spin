@@ -68,6 +68,6 @@ int print_nflog_data(struct nflog_g_handle *handle, struct nfgenmsg *msg, struct
 int main(int argc, char** argv) {
     signal(SIGINT, cleanup);
     signal(SIGKILL, cleanup);
-    setup_netlogger_loop(1, &print_nflog_data, &handle);
+    setup_netlogger_loop(1, &print_nflog_data, NULL, &handle, NULL);
     return 0;
 }

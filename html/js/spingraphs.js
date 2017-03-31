@@ -27,6 +27,7 @@ var colour_src = "#dddddd";
 var colour_dst = "lightblue";
 var colour_recent = "#bbffbb";
 var colour_edge = "#9999ff";
+var colour_blocked = "#ff0000";
 
 // these are used in the filterlist dialog
 var _selectRange = false,
@@ -457,7 +458,7 @@ function getNodeId(ip) {
 }
 
 // Used in AddFlow()
-function addNode(timestamp, ip, scale, count, size, lwith) {
+function addNode(timestamp, ip, scale, count, size, lwith, type) {
     var existing = getNodeId(ip);
     // By default, the ip/mac is the node name, but if
     // it is present in the user-set nodeNames dict, use that
@@ -481,10 +482,18 @@ function addNode(timestamp, ip, scale, count, size, lwith) {
             nodeName = nodeNames[ip];
         }
         var c;
-        if (scale) {
+        switch (type) {
+        case "traffic":
             c = colour_recent;
-        } else {
+            break;
+        case "source":
             c = colour_src;
+            break;
+        case "blocked":
+            c = colour_blocked;
+            break;
+        default:
+            c = "#000000";
         }
         nodeIds[ip] = curNodeId;
         nodes.add({
@@ -615,8 +624,22 @@ function addFlow(timestamp, from, to, count, size) {
     if (contains(filterList, from) || contains(filterList, to)) {
         return;
     }
-    addNode(timestamp, from, false, count, size, "to " + to);
-    addNode(timestamp, to, true, count, size, "from " + from);
+    addNode(timestamp, from, false, count, size, "to " + to, "source");
+    addNode(timestamp, to, true, count, size, "from " + from, "traffic");
+    addEdge(from, to);
+    if (!zoom_locked) {
+        network.fit({
+            duration: 0
+        });
+    }
+}
+
+function addBlocked(timestamp, from, to) {
+    if (contains(filterList, from) || contains(filterList, to)) {
+        return;
+    }
+    addNode(timestamp, from, false, 1, 1, "to " + to, "source");
+    addNode(timestamp, to, false, 1, 1, "from " + from, "blocked");
     addEdge(from, to);
     if (!zoom_locked) {
         network.fit({

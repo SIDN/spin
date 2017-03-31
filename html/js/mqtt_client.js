@@ -1,4 +1,4 @@
-var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
+var client = new Paho.MQTT.Client("192.168.1.1", 1884, "clientId");
 
 
 function init() {
@@ -97,6 +97,9 @@ function onTrafficMessage(msg) {
                 //console.log("handling trafficcommand: " + evt.data);
                 // update the Graphs
                 handleTrafficMessage(result);
+                break;
+            case 'blocked':
+                handleBlockedMessage(result);
                 break;
             case 'names':
                 nodeNames = result;
@@ -201,6 +204,12 @@ function handleTrafficMessage(data) {
         // defined in spingraph.js
         addFlow(timestamp, f['from'], f['to'], f['count'], f['size']);
     }
+}
+
+function handleBlockedMessage(data) {
+    var timestamp = data['timestamp']
+
+    addBlocked(timestamp, data['from'], data['to']);
 }
 
 
