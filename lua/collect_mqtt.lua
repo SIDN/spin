@@ -22,6 +22,8 @@ local posix = require 'posix'
 local filter = require'filter'
 local bit = require 'bit'
 local json = require 'json'
+local arp = require 'arp'
+local util = require 'util'
 
 local TRAFFIC_CHANNEL = "SPIN/traffic"
 local COMMAND_CHANNEL = "SPIN/commands"

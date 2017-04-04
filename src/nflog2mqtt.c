@@ -64,6 +64,7 @@ int publish_nflog_data(struct nflog_g_handle *handle, struct nfgenmsg *msg, stru
     printf("%02x\n", phdr->hw_protocol);
 
     struct timeval tv;
+    unsigned int timestamp;
     char ip_frm[INET6_ADDRSTRLEN];
     char ip_to[INET6_ADDRSTRLEN];
 
@@ -72,7 +73,11 @@ int publish_nflog_data(struct nflog_g_handle *handle, struct nfgenmsg *msg, stru
     data = NULL;
     datalen = nflog_get_payload(nfldata, &data);
     nflog_get_timestamp(nfldata, &tv);
-
+    if (tv.tv_sec > 0) {
+        timestamp = tv.tv_sec;
+    } else {
+        timestamp = time(NULL);
+    } 
 
     printf("NFLOG event, payload size: %u, data:\n", (unsigned int)datalen);
     hexprint(data, datalen);
@@ -88,7 +93,7 @@ int publish_nflog_data(struct nflog_g_handle *handle, struct nfgenmsg *msg, stru
     printf("From: %s\n", ip_frm);
     printf("To:   %s\n", ip_to);
 
-    publish_blocked_event(mqtt_ptr, ip_frm, ip_to, tv.tv_sec);
+    publish_blocked_event(mqtt_ptr, ip_frm, ip_to, timestamp);
 
     return 0;
 }
