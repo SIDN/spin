@@ -4,6 +4,10 @@ VERSION=0.2
 
 BNAME="${PACKAGE}-${VERSION}"
 
+autoreconf --install &&\
+./configure &&\
+make &&\
+make distclean &&\
 mkdir -p /tmp/${BNAME} &&\
 cp -r * /tmp/${BNAME}/ &&\
 (cd /tmp; tar -czvf ${BNAME}.tar.gz ${BNAME}) &&\

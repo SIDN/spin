@@ -47,7 +47,7 @@ AC_CHECK_LIB([mosquitto], [mosquitto_lib_init],
 	[mosquitto_LIBS="-lmosquitto"],
 	AC_ERROR([Misssing mosquitto client library]))
 
-AC_CONFIG_FILES(src/Makefile)
+AC_CONFIG_FILES(Makefile src/Makefile)
 AC_OUTPUT
 
 echo "You can now run 'make' and 'make install'"
