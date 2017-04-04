@@ -96,7 +96,7 @@ int publish_nflog_data(struct nflog_g_handle *handle, struct nfgenmsg *msg, stru
 struct mosquitto*
 setup_mqtt_client() {
     struct mosquitto* mqtt = mosquitto_new(NULL, true, NULL);
-    int result = mosquitto_connect(mqtt, "192.168.1.1", 1883, 10);
+    int result = mosquitto_connect(mqtt, "127.0.0.1", 1883, 10);
     if (result != MOSQ_ERR_SUCCESS) {
         printf("Error connecting to mqtt server\n");
         exit(1);

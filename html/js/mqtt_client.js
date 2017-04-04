@@ -1,4 +1,4 @@
-var client = new Paho.MQTT.Client("192.168.1.1", 1884, "clientId");
+var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
 
 
 function init() {
