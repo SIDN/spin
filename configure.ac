@@ -47,6 +47,15 @@ AC_CHECK_LIB([mosquitto], [mosquitto_lib_init],
 	[mosquitto_LIBS="-lmosquitto"],
 	AC_ERROR([Misssing mosquitto client library]))
 
+AX_PROG_LUA(5.1)
+AX_LUA_HEADERS([], AC_MSG_ERROR([Lua headers not found]))
+AX_LUA_LIBS([], AC_MSG_ERROR([Lua library not found]))
+
+#AC_CHECK_HEADER(lua.h, , AC_MSG_ERROR([can not find lua.h; try --with-lua* arguments]))
+#AC_CHECK_LIB([lua], [lua_pushnumber],
+#	[lua_LIBS="-llua"],
+#	AC_ERROR([Misssing Lua dev library]))
+
 AC_CONFIG_FILES(Makefile src/Makefile)
 AC_OUTPUT
 
