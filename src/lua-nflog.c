@@ -21,6 +21,7 @@
 #include <math.h>
 #define LUA_NFLOG_NAME "nflog"
 #define LUA_NFLOG_HANDLER_NAME "nflog.Handler"
+#define LUA_NFLOG_EVENT_NAME "nflog.Event"
 #define PI 3.1415729
 
 static int math_sin (lua_State *L) {
@@ -78,6 +79,11 @@ typedef struct {
     lua_State* L;
 } netlogger_info;
 
+typedef struct {
+    struct nfulnl_msg_packet_hdr* header;
+    struct nflog_data *data;
+} event_info;
+
 static void print_nli(netlogger_info* nli) {
     printf("[Netlogger info]\n");
     printf("callback id: %d\n", nli->lua_callback_regid);
@@ -93,89 +99,26 @@ int callback_handler(struct nflog_g_handle *handle,
                      struct nfgenmsg *msg,
                      struct nflog_data *nfldata,
                      void *netlogger_info_ptr) {
-    printf("callback handler called\n");
     netlogger_info* nli = (netlogger_info*) netlogger_info_ptr;
 
     lua_rawgeti(nli->L, LUA_REGISTRYINDEX, nli->lua_callback_regid);
-    lua_pushnumber(nli->L, 1);
-    lua_pushnumber(nli->L, 2);
-    lua_pushnumber(nli->L, 3);
+    lua_rawgeti(nli->L, LUA_REGISTRYINDEX, nli->lua_callback_data_regid);
 
-    //stackdump_g(nli->L);
-    int result = lua_pcall(nli->L, 3, 0, 0);
-    //stackdump_g(nli->L);
-    printf("[XX] CALLBACK RESULT: %d\n", result);
+    // create the event object and add it to the stack
+    event_info* event = (event_info*) lua_newuserdata(nli->L, sizeof(event_info));
+    // Make that into an actual object
+    luaL_getmetatable(nli->L, LUA_NFLOG_EVENT_NAME);
+    lua_setmetatable(nli->L, -2);
+
+    event->data = nfldata;
+    event->header = nflog_get_msg_packet_hdr(nfldata);
+
+    int result = lua_pcall(nli->L, 2, 0, 0);
     if (result != 0) {
-        printf("ERROR: %s\n", lua_tostring(nli->L, 1));
+        lua_error(nli->L);
     }
+    //stackdump_g(nli->L);
 }
-
-static int setup_netlogger_loop(lua_State *L);
-
-static int close_netlogger(lua_State *L) {
-    netlogger_info* nli = (netlogger_info*) lua_touserdata(L, 1);
-
-    nflog_unbind_group(nli->ghandle);
-    nflog_close(nli->handle);
-    printf("[XX] free %u bytes at %p", sizeof(netlogger_info), nli);
-    free(nli);
-
-    lua_pushnil(L);
-    return 1;
-}
-
-
-static int loop_once(lua_State *L) {
-    int sz;
-    //int fd = -1;
-    char buf[BUFSZ];
-
-    netlogger_info* nli = (netlogger_info*) lua_touserdata(L, 1);
-    printf("[XX] got nli at %p\n", nli);
-    print_nli(nli);
-    printf("[XX] read\n");
-    sz = recv(nli->fd, buf, BUFSZ, 0);
-    if (sz < 0 && (errno == EINTR || errno == EAGAIN)) {
-        printf("[XX] EINTR or EAGAIN\n", nli);
-        lua_pushnil(L);
-        return 1;
-    } else if (sz < 0) {
-        printf("Error reading from nflog socket\n");
-        lua_pushnil(L);
-        return 1;
-    }
-    printf("[XX] call handle packet\n", nli);
-    nflog_handle_packet(nli->handle, buf, sz);
-
-    lua_pushnil(L);
-    return 1;
-}
-
-static int loop_forever(lua_State *L) {
-    int sz;
-    //int fd = -1;
-    char buf[BUFSZ];
-
-    netlogger_info* nli = (netlogger_info*) lua_touserdata(L, 1);
-    printf("[XX] got nli at %p\n", nli);
-    for (;;) {
-        printf("[XX] read\n");
-        sz = recv(nli->fd, buf, BUFSZ, 0);
-        if (sz < 0 && (errno == EINTR || errno == EAGAIN)) {
-            printf("[XX] EINTR or EAGAIN\n", nli);
-
-            continue;
-        } else if (sz < 0) {
-            printf("Error reading from nflog socket\n");
-            break;
-        }
-        printf("[XX] call handle packet\n", nli);
-        nflog_handle_packet(nli->handle, buf, sz);
-    }
-    lua_pushnil(L);
-    return 1;
-}
-
 
 //
 // Sets up a loop
@@ -186,7 +129,6 @@ static int loop_forever(lua_State *L) {
 //
 // The callback function will be passed a pointer to the event and the optional extra user argument
 //
-// This function returns the *group* handle
 static int setup_netlogger_loop(lua_State *L) {
     int fd = -1;
 
@@ -197,9 +139,8 @@ static int setup_netlogger_loop(lua_State *L) {
     int groupnum = luaL_checknumber(L, 1);
     luaL_checktype(L, 2, LUA_TFUNCTION);
 
-    // create a new state, add the function to it, then add the arguments as they come along
-    // Make a reference from the userdata table and the callback functions;
-    // we will push these on the stack when performing the callback.
+    // TODO: make setter functions for the options below
+    // e.g. handler:settimeout(secs, millisecs), etc.
 
     /* This opens the relevent netlink socket of the relevent type */
     if ((handle = nflog_open()) == NULL){
@@ -233,74 +174,154 @@ static int setup_netlogger_loop(lua_State *L) {
     fd = nflog_fd(handle);
 
     struct timeval tv;
-    tv.tv_sec = 1;  /* 30 Secs Timeout */
-    tv.tv_usec = 0;  // Not init'ing this can cause strange errors
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
-
 
     stackdump_g(L);
 
     int cb_d = luaL_ref(L, LUA_REGISTRYINDEX);
     int cb_f = luaL_ref(L, LUA_REGISTRYINDEX);
 
+    // Create the result and put it on the stack to return
     netlogger_info* nli = (netlogger_info*) lua_newuserdata(L, sizeof(netlogger_info));
 
+    // Make that into an actual object
     luaL_getmetatable(L, LUA_NFLOG_HANDLER_NAME);
     lua_setmetatable(L, -2);
+
     nli->fd = fd;
     nli->handle = handle;
     nli->L = L;
     nli->lua_callback_data_regid = cb_d;
     nli->lua_callback_regid = cb_f;
 
-
     nflog_callback_register(group, &callback_handler, nli);
 
-    //lua_pushcfunction(L, g);
+    return 1;
+}
 
-    /* We continually read from the loop and push the contents into
-    nflog_handle_packet (which seperates one entry from the other),
-    which will eventually invoke our callback (queue_push) */
-    /*
-    for (;;) {
-    sz = recv(fd, buf, BUFSZ, 0);
+
+static int handler_loop_once(lua_State *L) {
+    int sz;
+    char buf[BUFSZ];
+
+    netlogger_info* nli = (netlogger_info*) lua_touserdata(L, 1);
+    sz = recv(nli->fd, buf, BUFSZ, 0);
     if (sz < 0 && (errno == EINTR || errno == EAGAIN)) {
-        continue;
+        //printf("[XX] EINTR or EAGAIN\n", nli);
+        return 0;
     } else if (sz < 0) {
         printf("Error reading from nflog socket\n");
-        break;
+        return 0;
     }
-        nflog_handle_packet(handle, buf, sz);
+    nflog_handle_packet(nli->handle, buf, sz);
+    return 0;
+}
+
+static int handler_loop_forever(lua_State *L) {
+    int sz;
+    char buf[BUFSZ];
+
+    netlogger_info* nli = (netlogger_info*) lua_touserdata(L, 1);
+    for (;;) {
+        sz = recv(nli->fd, buf, BUFSZ, 0);
+        if (sz < 0 && (errno == EINTR || errno == EAGAIN)) {
+            continue;
+        } else if (sz < 0) {
+            printf("Error reading from nflog socket\n");
+            break;
+        }
+        nflog_handle_packet(nli->handle, buf, sz);
     }
-*/
+    return 0;
+}
 
-    //luaL_register(L, "Handler", handler_mapping);
-    print_nli(nli);
-    stackdump_g(L);
+static int handler_close(lua_State *L) {
+    netlogger_info* nli = (netlogger_info*) lua_touserdata(L, 1);
 
-    //printf("[XX] created nli at %p\n", nli);
-    //lua_pushlightuserdata(L, nli);
+    nflog_unbind_group(nli->ghandle);
+    nflog_close(nli->handle);
+
+    return 0;
+}
+
+static int event_get_from_addr(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+
+    char* data;
+    size_t datalen;
+    char ip_frm[INET6_ADDRSTRLEN];
+
+    data = NULL;
+    datalen = nflog_get_payload(event->data, &data);
+
+    if (ntohs(event->header->hw_protocol) == 0x86dd) {
+        inet_ntop(AF_INET6, &data[8], ip_frm, INET6_ADDRSTRLEN);
+    } else {
+        inet_ntop(AF_INET, &data[12], ip_frm, INET6_ADDRSTRLEN);
+    }
+
+    lua_pushstring(L, ip_frm);
     return 1;
+}
+
+static int event_get_to_addr(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+
+    char* data;
+    size_t datalen;
+    char ip_to[INET6_ADDRSTRLEN];
+
+    data = NULL;
+    datalen = nflog_get_payload(event->data, &data);
+
+    if (ntohs(event->header->hw_protocol) == 0x86dd) {
+        inet_ntop(AF_INET6, &data[24], ip_to, INET6_ADDRSTRLEN);
+    } else {
+        inet_ntop(AF_INET, &data[16], ip_to, INET6_ADDRSTRLEN);
+    }
+
+    lua_pushstring(L, ip_to);
+    return 1;
+}
+
+static int event_get_payload_size(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+    char* data = NULL;
+    size_t datalen = nflog_get_payload(event->data, &data);
+    lua_pushnumber(L, datalen);
+    return 1;
+}
+
+static int event_get_timestamp(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+    return 0;
 }
 
 // Library function mapping
 static const luaL_Reg nflog_lib[] = {
     {"sin", math_sin},
     {"setup_netlogger_loop", setup_netlogger_loop},
-//    {"loop_forever", loop_forever},
-//    {"loop_once", loop_once},
-//    {"close_netlogger", close_netlogger},
     {NULL, NULL}
 };
 
 // Handler function mapping
 static const luaL_Reg handler_mapping[] = {
-    {"loop_forever", loop_forever},
-    {"loop_once", loop_once},
-    {"close_netlogger", close_netlogger},
+    {"loop_forever", handler_loop_forever},
+    {"loop_once", handler_loop_once},
+    {"close", handler_close},
     {NULL, NULL}
 };
 
+// Event function mapping
+static const luaL_Reg event_mapping[] = {
+    {"get_from_addr", event_get_from_addr},
+    {"get_to_addr", event_get_to_addr},
+    {"get_payload_size", event_get_payload_size},
+    {"get_timestamp", event_get_timestamp},
+    {NULL, NULL}
+};
 
 /*
 ** Netfilter-log library initialization
@@ -313,6 +334,14 @@ LUALIB_API int luaopen_lnflog (lua_State *L) {
     lua_setfield(L, -2, "__index"); // pop one of those copies and assign it to
                                     // __index field od the 1st metatable
     luaL_register(L, NULL, handler_mapping); // register functions in the metatable
+
+    // register the event class
+    luaL_newmetatable(L, LUA_NFLOG_EVENT_NAME); //leaves new metatable on the stack
+    lua_pushvalue(L, -1); // there are two 'copies' of the metatable on the stack
+    lua_setfield(L, -2, "__index"); // pop one of those copies and assign it to
+                                    // __index field od the 1st metatable
+    luaL_register(L, NULL, event_mapping); // register functions in the metatable
+
     // register the library
     luaL_register(L, LUA_NFLOG_NAME, nflog_lib);
 
