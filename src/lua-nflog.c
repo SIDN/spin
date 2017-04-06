@@ -19,7 +19,8 @@
 
 
 #include <math.h>
-#define LUA_MATHLIBNAME "myname"
+#define LUA_NFLOG_NAME "nflog"
+#define LUA_NFLOG_HANDLER_NAME "nflog.Handler"
 #define PI 3.1415729
 
 static int math_sin (lua_State *L) {
@@ -77,6 +78,17 @@ typedef struct {
     lua_State* L;
 } netlogger_info;
 
+static void print_nli(netlogger_info* nli) {
+    printf("[Netlogger info]\n");
+    printf("callback id: %d\n", nli->lua_callback_regid);
+    printf("callback data id: %d\n", nli->lua_callback_data_regid);
+    printf("callback fd: %d\n", nli->fd);
+    printf("callback handle ptr: %p\n", nli->handle);
+    printf("callback ghandle ptr: %p\n", nli->ghandle);
+    printf("callback state ptr: %p\n", nli->L);
+}
+
+
 int callback_handler(struct nflog_g_handle *handle,
                      struct nfgenmsg *msg,
                      struct nflog_data *nfldata,
@@ -98,117 +110,7 @@ int callback_handler(struct nflog_g_handle *handle,
     }
 }
 
-// Library function mapping
-static const luaL_Reg mathlib[] = {
-    {"sin", math_sin},
-    {"setup_netlogger_loop", setup_netlogger_loop},
-//    {"loop_forever", loop_forever},
-//    {"loop_once", loop_once},
-//    {"close_netlogger", close_netlogger},
-    {NULL, NULL}
-};
-
-// Handler function mapping
-static const luaL_Reg handler_mapping[] = {
-    {"loop_forever", loop_forever},
-    {"loop_once", loop_once},
-    {"close_netlogger", close_netlogger},
-    {NULL, NULL}
-};
-
-
-
-//
-// Sets up a loop
-// arguments:
-// group_number (int)
-// callback_function (function)
-// optional callback function extra argument
-//
-// The callback function will be passed a pointer to the event and the optional extra user argument
-//
-// This function returns the *group* handle
-static int setup_netlogger_loop(lua_State *L) {
-    int fd = -1;
-
-    struct nflog_handle *handle = NULL;
-    struct nflog_g_handle *group = NULL;
-    netlogger_info* nli = (netlogger_info*) malloc(sizeof(netlogger_info));
-    printf("[XX] alloced %u bytes at %p\n", sizeof(netlogger_info), nli);
-    // handle the lua arugments to this function
-    int groupnum = luaL_checknumber(L, 1);
-    luaL_checktype(L, 2, LUA_TFUNCTION);
-
-    // create a new state, add the function to it, then add the arguments as they come along
-    // Make a reference from the userdata table and the callback functions;
-    // we will push these on the stack when performing the callback.
-    nli->L = L;
-    nli->lua_callback_data_regid = luaL_ref(L, LUA_REGISTRYINDEX);
-    nli->lua_callback_regid = luaL_ref(L, LUA_REGISTRYINDEX);
-
-    /* This opens the relevent netlink socket of the relevent type */
-    if ((handle = nflog_open()) == NULL){
-        fprintf(stderr, "Could not get netlink handle\n");
-        exit(1);
-    }
-
-    if (nflog_bind_pf(handle, AF_INET) < 0) {
-        fprintf(stderr, "Could not bind netlink handle\n");
-        exit(1);
-    }
-
-    if ((group = nflog_bind_group(handle, groupnum)) == NULL) {
-        fprintf(stderr, "Could not bind to group\n");
-        exit(1);
-    }
-
-    if (nflog_set_mode(group, NFULNL_COPY_PACKET, 0xffff) < 0) {
-        fprintf(stderr, "Could not set group mode\n");
-        exit(1);
-    }
-    if (nflog_set_nlbufsiz(group, BUFSZ) < 0) {
-        fprintf(stderr, "Could not set group buffer size\n");
-        exit(1);
-    }
-    if (nflog_set_timeout(group, 1) < 0) {
-        fprintf(stderr, "Could not set the group timeout\n");
-    }
-
-    nflog_callback_register(group, &callback_handler, nli);
-
-    //lua_pushcfunction(L, g);
-
-    /* Get the actual FD for the netlogger entry */
-    fd = nflog_fd(handle);
-
-    struct timeval tv;
-    tv.tv_sec = 1;  /* 30 Secs Timeout */
-    tv.tv_usec = 0;  // Not init'ing this can cause strange errors
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
-
-    /* We continually read from the loop and push the contents into
-    nflog_handle_packet (which seperates one entry from the other),
-    which will eventually invoke our callback (queue_push) */
-    /*
-    for (;;) {
-    sz = recv(fd, buf, BUFSZ, 0);
-    if (sz < 0 && (errno == EINTR || errno == EAGAIN)) {
-        continue;
-    } else if (sz < 0) {
-        printf("Error reading from nflog socket\n");
-        break;
-    }
-        nflog_handle_packet(handle, buf, sz);
-    }
-*/
-    nli->fd = fd;
-    nli->handle = handle;
-
-
-    printf("[XX] created nli at %p\n", nli);
-    lua_pushlightuserdata(L, nli);
-    return 1;
-}
+static int setup_netlogger_loop(lua_State *L);
 
 static int close_netlogger(lua_State *L) {
     netlogger_info* nli = (netlogger_info*) lua_touserdata(L, 1);
@@ -230,6 +132,7 @@ static int loop_once(lua_State *L) {
 
     netlogger_info* nli = (netlogger_info*) lua_touserdata(L, 1);
     printf("[XX] got nli at %p\n", nli);
+    print_nli(nli);
     printf("[XX] read\n");
     sz = recv(nli->fd, buf, BUFSZ, 0);
     if (sz < 0 && (errno == EINTR || errno == EAGAIN)) {
@@ -274,18 +177,145 @@ static int loop_forever(lua_State *L) {
 }
 
 
-    luaL_newmetatable(L, "LuaBook.testclass"); //leaves new metatable on the stack
+//
+// Sets up a loop
+// arguments:
+// group_number (int)
+// callback_function (function)
+// optional callback function extra argument
+//
+// The callback function will be passed a pointer to the event and the optional extra user argument
+//
+// This function returns the *group* handle
+static int setup_netlogger_loop(lua_State *L) {
+    int fd = -1;
+
+    struct nflog_handle *handle = NULL;
+    struct nflog_g_handle *group = NULL;
+
+    // handle the lua arugments to this function
+    int groupnum = luaL_checknumber(L, 1);
+    luaL_checktype(L, 2, LUA_TFUNCTION);
+
+    // create a new state, add the function to it, then add the arguments as they come along
+    // Make a reference from the userdata table and the callback functions;
+    // we will push these on the stack when performing the callback.
+
+    /* This opens the relevent netlink socket of the relevent type */
+    if ((handle = nflog_open()) == NULL){
+        fprintf(stderr, "Could not get netlink handle\n");
+        exit(1);
+    }
+
+    if (nflog_bind_pf(handle, AF_INET) < 0) {
+        fprintf(stderr, "Could not bind netlink handle\n");
+        exit(1);
+    }
+
+    if ((group = nflog_bind_group(handle, groupnum)) == NULL) {
+        fprintf(stderr, "Could not bind to group\n");
+        exit(1);
+    }
+
+    if (nflog_set_mode(group, NFULNL_COPY_PACKET, 0xffff) < 0) {
+        fprintf(stderr, "Could not set group mode\n");
+        exit(1);
+    }
+    if (nflog_set_nlbufsiz(group, BUFSZ) < 0) {
+        fprintf(stderr, "Could not set group buffer size\n");
+        exit(1);
+    }
+    if (nflog_set_timeout(group, 1) < 0) {
+        fprintf(stderr, "Could not set the group timeout\n");
+    }
+
+    /* Get the actual FD for the netlogger entry */
+    fd = nflog_fd(handle);
+
+    struct timeval tv;
+    tv.tv_sec = 1;  /* 30 Secs Timeout */
+    tv.tv_usec = 0;  // Not init'ing this can cause strange errors
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
+
+
+    stackdump_g(L);
+
+    int cb_d = luaL_ref(L, LUA_REGISTRYINDEX);
+    int cb_f = luaL_ref(L, LUA_REGISTRYINDEX);
+
+    netlogger_info* nli = (netlogger_info*) lua_newuserdata(L, sizeof(netlogger_info));
+
+    luaL_getmetatable(L, LUA_NFLOG_HANDLER_NAME);
+    lua_setmetatable(L, -2);
+    nli->fd = fd;
+    nli->handle = handle;
+    nli->L = L;
+    nli->lua_callback_data_regid = cb_d;
+    nli->lua_callback_regid = cb_f;
+
+
+    nflog_callback_register(group, &callback_handler, nli);
+
+    //lua_pushcfunction(L, g);
+
+    /* We continually read from the loop and push the contents into
+    nflog_handle_packet (which seperates one entry from the other),
+    which will eventually invoke our callback (queue_push) */
+    /*
+    for (;;) {
+    sz = recv(fd, buf, BUFSZ, 0);
+    if (sz < 0 && (errno == EINTR || errno == EAGAIN)) {
+        continue;
+    } else if (sz < 0) {
+        printf("Error reading from nflog socket\n");
+        break;
+    }
+        nflog_handle_packet(handle, buf, sz);
+    }
+*/
+
+    //luaL_register(L, "Handler", handler_mapping);
+    print_nli(nli);
+    stackdump_g(L);
+
+    //printf("[XX] created nli at %p\n", nli);
+    //lua_pushlightuserdata(L, nli);
+    return 1;
+}
+
+// Library function mapping
+static const luaL_Reg nflog_lib[] = {
+    {"sin", math_sin},
+    {"setup_netlogger_loop", setup_netlogger_loop},
+//    {"loop_forever", loop_forever},
+//    {"loop_once", loop_once},
+//    {"close_netlogger", close_netlogger},
+    {NULL, NULL}
+};
+
+// Handler function mapping
+static const luaL_Reg handler_mapping[] = {
+    {"loop_forever", loop_forever},
+    {"loop_once", loop_once},
+    {"close_netlogger", close_netlogger},
+    {NULL, NULL}
+};
+
+
+/*
+** Netfilter-log library initialization
+*/
+LUALIB_API int luaopen_lnflog (lua_State *L) {
+
+    // register the handler class
+    luaL_newmetatable(L, LUA_NFLOG_HANDLER_NAME); //leaves new metatable on the stack
     lua_pushvalue(L, -1); // there are two 'copies' of the metatable on the stack
     lua_setfield(L, -2, "__index"); // pop one of those copies and assign it to
                                     // __index field od the 1st metatable
-    luaL_register(L, NULL, arraylib_m); // register functions in the metatable
-    luaL_register(L, "testclass", arraylib_f);
+    luaL_register(L, NULL, handler_mapping); // register functions in the metatable
+    // register the library
+    luaL_register(L, LUA_NFLOG_NAME, nflog_lib);
 
-/*
-** Netfilter-log library
-*/
-LUALIB_API int luaopen_lnflog (lua_State *L) {
-    luaL_register(L, LUA_MATHLIBNAME, mathlib);
     lua_pushnumber(L, PI);
     lua_setfield(L, -2, "pi");
     lua_pushnumber(L, HUGE_VAL);

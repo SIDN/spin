@@ -20,11 +20,17 @@ mydata.foo = 123
 mydata.bar = "asdf"
 
 nl = lnflog.setup_netlogger_loop(1, my_cb, mydata)
+print(nl.loop_once);
+nl:loop_once()
+nl:loop_once()
+nl:loop_once()
+nl:loop_once()
+nl:close_netlogger()
 --lnflog.loop_once(nl)
 --lnflog.loop_once(nl)
-for i=1,1000 do
-    lnflog.loop_once(nl)
-end
-lnflog.close_netlogger(nl)
+--for i=1,1000 do
+--    lnflog.loop_once(nl)
+--end
+--lnflog.close_netlogger(nl)
 
 --lnflog.setup_netlogger_loop(1, noarg_cb, mydata)
