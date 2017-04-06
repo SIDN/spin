@@ -1,6 +1,6 @@
 #!/bin/sh
 PACKAGE=spin
-VERSION=0.2
+VERSION=0.3
 
 BNAME="${PACKAGE}-${VERSION}"
 

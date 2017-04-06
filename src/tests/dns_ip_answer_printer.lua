@@ -102,7 +102,7 @@ function get_dns_answer_info(event)
     if qtype == 1 then
       if rdata_len ~= 4 then
         -- TODO: if CNAME etc
-        return nil, "Answer to A query is not an A record"
+        return nil, "Answer to A query is not an A record (has len " .. rdata_len .. ")"
       else
         rdata_bytes = event:get_octets(i, 4)
         ip_address = table.concat(rdata_bytes, ".")
@@ -111,7 +111,7 @@ function get_dns_answer_info(event)
     elseif qtype == 28 then
       if rdata_len ~= 16 then
         -- TODO: if CNAME etc
-        return nil, "Answer to AAAA query is not an AAAA record"
+        return nil, "Answer to AAAA query is not an AAAA record (has len " .. rdata_len .. ")"
       else
         rdata_bytes = event:get_octets(i, 16)
         ip_address = string.format("%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
@@ -137,6 +137,7 @@ function get_dns_answer_info(event)
 
     if ip_address then
         info = {}
+        info.to_addr = event:get_to_addr()
         info.timestamp = event:get_timestamp()
         info.dname = dname
         info.ip_address = ip_address
@@ -166,21 +167,21 @@ function print_dns_cb(mydata, event)
     if event:get_octet(21) == 53 then
       info, err = get_dns_answer_info(event)
       if info == nil then
-        print("Error: " .. err)
+        --print("Error: " .. err)
       else
-        print("er got " .. info.timestamp .. " " .. info.dname .. " " .. info.ip_address)
+        --print("er got " .. info.timestamp .. " " .. info.dname .. " " .. info.ip_address)
         local cached = false
         for i, cinfo in pairs(info_cache) do
-          print("[XX] cinfo: " .. cinfo.timestamp .. " " .. cinfo.dname .. " " .. cinfo.ip_address)
-          if cinfo.dname == info.dname and cinfo.ip_address == info.ip_address then
+          --print("[XX] cinfo: " .. cinfo.timestamp .. " " .. cinfo.dname .. " " .. cinfo.ip_address)
+          if cinfo.to_addr == info.to_addr and cinfo.dname == info.dname and cinfo.ip_address == info.ip_address then
             -- cached, don't print
-            print("[XX] cached")
+            --print("[XX] cached")
             cached = true
           end
         end
         if not cached then
           -- print, add to cache, cleanup cache
-          print(info.timestamp .. " " .. info.dname .. " " .. info.ip_address)
+          print(info.timestamp .. " " .. info.to_addr .. " " .. info.dname .. " " .. info.ip_address)
           table.insert(info_cache, info)
           if table.getn(info_cache) > 10 then
             table.remove(info_cache, 0)

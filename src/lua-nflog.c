@@ -178,7 +178,7 @@ static int setup_netlogger_loop(lua_State *L) {
     tv.tv_usec = 0;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
 
-    stackdump_g(L);
+    //stackdump_g(L);
 
     int cb_d = luaL_ref(L, LUA_REGISTRYINDEX);
     int cb_f = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -294,6 +294,44 @@ static int event_get_payload_size(lua_State *L) {
     return 1;
 }
 
+static int event_get_payload_hex(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+    char* data = NULL;
+    size_t datalen = nflog_get_payload(event->data, &data);
+    size_t i;
+    char c[3];
+
+    // create a table and put it on the stack
+    lua_newtable(L);
+    for (i = 0; i < datalen; i++) {
+        // note: lua arrays begin at index 1
+        lua_pushnumber(L, i+1);
+        // should we prepend with 0x?
+        sprintf(c, "%02x", (uint8_t)data[i]);
+        lua_pushstring(L, c);
+        lua_settable(L, -3);
+    }
+    return 1;
+}
+
+static int event_get_payload_dec(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+    char* data = NULL;
+    size_t datalen = nflog_get_payload(event->data, &data);
+    size_t i;
+    char c[3];
+
+    // create a table and put it on the stack
+    lua_newtable(L);
+    for (i = 0; i < datalen; i++) {
+        // note: lua arrays begin at index 1
+        lua_pushnumber(L, i+1);
+        lua_pushnumber(L, (uint8_t)data[i]);
+        lua_settable(L, -3);
+    }
+    return 1;
+}
+
 static int event_get_timestamp(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
 
@@ -307,6 +345,72 @@ static int event_get_timestamp(lua_State *L) {
     }
 
     lua_pushnumber(L, timestamp);
+    return 1;
+}
+
+static int event_get_octet(lua_State *L) {
+    char* err_info;
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+    size_t i = lua_tonumber(L, 2);
+    char* data = NULL;
+    size_t datalen = nflog_get_payload(event->data, &data);
+    if (i > datalen) {
+        lua_pushnil(L);
+        err_info = malloc(1024);
+        snprintf(err_info, 1024, "octet index (%u) larger than packet size (%u)", i, datalen);
+        lua_pushstring(L, err_info);
+        free(err_info);
+        return 2;
+    }
+
+    lua_pushnumber(L, (uint8_t)data[i]);
+    return 1;
+}
+
+static int event_get_int16(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+    size_t i = lua_tonumber(L, 2);
+    uint16_t result;
+    char* data = NULL;
+    size_t datalen = nflog_get_payload(event->data, &data);
+    if (i+1 > datalen) {
+        lua_pushnil(L);
+        lua_pushstring(L, "octet index larger than packet size");
+        return 2;
+    }
+
+    //printf("[XX] octet at %u: %02x\n", i, (uint8_t)data[i]);
+    //printf("[XX] octet at %u: %02x\n", i+1, (uint8_t)data[i+1]);
+
+    result = (uint8_t)data[i] * 255 + (uint8_t)data[i+1];
+    lua_pushnumber(L, result);
+    lua_pushnumber(L, i + 2);
+    //stackdump_g(L);
+    return 2;
+}
+
+static int event_get_octets(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+    size_t start_i = lua_tonumber(L, 2);
+    size_t len = lua_tonumber(L, 3);
+    size_t i;
+
+    char* data = NULL;
+    size_t datalen = nflog_get_payload(event->data, &data);
+    if (start_i + len > datalen) {
+        lua_pushnil(L);
+        lua_pushstring(L, "octet index+range larger than packet size");
+        return 2;
+    }
+
+    // create a table and put it on the stack
+    lua_newtable(L);
+    for (i = 0; i < len; i++) {
+        // note: lua arrays begin at index 1
+        lua_pushnumber(L, i+1);
+        lua_pushnumber(L, (uint8_t)data[i+start_i]);
+        lua_settable(L, -3);
+    }
     return 1;
 }
 
@@ -331,6 +435,11 @@ static const luaL_Reg event_mapping[] = {
     {"get_to_addr", event_get_to_addr},
     {"get_payload_size", event_get_payload_size},
     {"get_timestamp", event_get_timestamp},
+    {"get_payload_hex", event_get_payload_hex},
+    {"get_payload_dec", event_get_payload_dec},
+    {"get_octet", event_get_octet},
+    {"get_int16", event_get_int16},
+    {"get_octets", event_get_octets},
     {NULL, NULL}
 };
 
