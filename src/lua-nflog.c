@@ -296,7 +296,18 @@ static int event_get_payload_size(lua_State *L) {
 
 static int event_get_timestamp(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
-    return 0;
+
+    struct timeval tv;
+    unsigned int timestamp;
+
+    if (nflog_get_timestamp(event->data, &tv) > 0) {
+        timestamp = tv.tv_sec;
+    } else {
+        timestamp = time(NULL);
+    }
+
+    lua_pushnumber(L, timestamp);
+    return 1;
 }
 
 // Library function mapping

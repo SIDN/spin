@@ -8,6 +8,7 @@ function my_cb(mydata, event)
     print("Event:")
     print("  from: " .. event:get_from_addr())
     print("  to:   " .. event:get_to_addr())
+    print("  timestamp: " .. event:get_timestamp())
     print("  size: " .. event:get_payload_size())
 end
 
