@@ -1,6 +1,6 @@
 
 AM_CPPFLAGS = -I$(top_srcdir)/include
-AM_CFLAGS = ${regular_CFLAGS}
+AM_CFLAGS = ${regular_CFLAGS} -g
 
 sbin_PROGRAMS = nflog_print nflog2mqtt
 lib_LTLIBRARIES = lnflog.la

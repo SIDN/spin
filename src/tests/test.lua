@@ -5,10 +5,10 @@ local lnflog = require 'lnflog'
 --print(lnflog.sin(lnflog.pi))
 
 function my_cb(a,b,c)
-  print("callback")
-  print("a: " .. a)
-  print("b: " .. b)
-  print("c: " .. c)
+  print("XXXXXXXXXXXX callback")
+  print("XXXXXXXXXXXX a: " .. a)
+  print("XXXXXXXXXXXX b: " .. b)
+  print("XXXXXXXXXXXX c: " .. c)
 end
 
 function noarg_cb()
@@ -19,5 +19,12 @@ local mydata = {}
 mydata.foo = 123
 mydata.bar = "asdf"
 
---lnflog.setup_netlogger_loop(1, my_cb, mydata)
-lnflog.setup_netlogger_loop(1, noarg_cb, mydata)
+nl = lnflog.setup_netlogger_loop(1, my_cb, mydata)
+--lnflog.loop_once(nl)
+--lnflog.loop_once(nl)
+for i=1,1000 do
+    lnflog.loop_once(nl)
+end
+lnflog.close_netlogger(nl)
+
+--lnflog.setup_netlogger_loop(1, noarg_cb, mydata)
