@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <errno.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
@@ -17,11 +18,13 @@
 #include <libnfnetlink/libnfnetlink.h>
 #include <libnetfilter_log/libnetfilter_log.h>
 
+#include <ldns/ldns.h>
 
 #include <math.h>
 #define LUA_NFLOG_NAME "nflog"
 #define LUA_NFLOG_HANDLER_NAME "nflog.Handler"
 #define LUA_NFLOG_EVENT_NAME "nflog.Event"
+#define LUA_NFLOG_DNSPACKET_NAME "nflog.DNSPacket"
 #define PI 3.1415729
 
 static int math_sin (lua_State *L) {
@@ -192,6 +195,7 @@ static int setup_netlogger_loop(lua_State *L) {
 
     nli->fd = fd;
     nli->handle = handle;
+    nli->ghandle = group;
     nli->L = L;
     nli->lua_callback_data_regid = cb_d;
     nli->lua_callback_regid = cb_f;
@@ -414,6 +418,56 @@ static int event_get_octets(lua_State *L) {
     return 1;
 }
 
+typedef struct {
+  ldns_pkt* dnspacket;
+} dnspacket_info;
+
+static int event_get_payload_dns(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+    char* data = NULL;
+    size_t datalen = nflog_get_payload(event->data, &data);
+    if (datalen <= 30) {
+        // TODO: error
+        return 0;
+    }
+
+    dnspacket_info* dnspacket = (dnspacket_info*) lua_newuserdata(L, sizeof(dnspacket_info));
+
+
+    // TODO: this function needs to be freed as well. add __gc?
+    if (ldns_wire2pkt(&(dnspacket->dnspacket), &data[28], datalen-28) == LDNS_STATUS_OK) {
+        // can this be done directly? do we need to copy all data?
+        // can we transfer ownership and use __gc?
+
+        printf("[XX] CREATED DNSPACKET PTR %p\n", dnspacket);
+        //char* pktstr = ldns_pkt2str(dnspacket->dnspacket);
+        //printf("[XX] STR: %s\n", pktstr);
+        //free(pktstr);
+        //ldns_pkt_free(tmp_pkt);
+        // create the event object and add it to the stack
+        //ldns_pkt* event = (ldns_pkt*) lua_newuserdata(nli->L, sizeof(ldns_pkt));
+        // Make that into an actual object
+        luaL_getmetatable(L, LUA_NFLOG_DNSPACKET_NAME);
+        lua_setmetatable(L, -2);
+        return 1;
+    } else {
+        // uninitialized packet is now on the stack, remove it
+        // TODO: error
+        fprintf(stderr, "[XX] ERROR PARSING DNS PACKET DATA\n");
+    }
+
+    return 0;
+}
+
+static int dnspacket_gc(lua_State *L) {
+    dnspacket_info* event = (dnspacket_info*) lua_touserdata(L, 1);
+    if (event->dnspacket != NULL) {
+        ldns_pkt_free(event->dnspacket);
+    }
+    free(event);
+    return 0;
+}
+
 // Library function mapping
 static const luaL_Reg nflog_lib[] = {
     {"sin", math_sin},
@@ -440,6 +494,41 @@ static const luaL_Reg event_mapping[] = {
     {"get_octet", event_get_octet},
     {"get_int16", event_get_int16},
     {"get_octets", event_get_octets},
+    {"get_payload_dns", event_get_payload_dns},
+    {NULL, NULL}
+};
+
+//
+// For some packet types, we provide additional helper classes,
+// such as DNSPacket, specifically wrapping only the functionality we
+// need.
+//
+static int dnspacket_tostring(lua_State* L) {
+    ldns_pkt* dnspacket = (ldns_pkt*) lua_touserdata(L, 1);
+
+    printf("[XX] READING DNSPACKET PTR %p\n", dnspacket);
+
+    char* pktstr = ldns_pkt2str(dnspacket);
+    lua_pushstring(L, pktstr);
+    free(pktstr);
+
+    return 1;
+}
+
+
+static int dnspacket_get_rcode() {
+    return 1;
+}
+
+// necessary functions:
+// -get_rcode()
+// -get_qname()
+// -get_qtype()
+// -get_ancount()
+// -get_answer_rdatas(type)
+static const luaL_Reg dnspacket_mapping[] = {
+    {"tostring", dnspacket_tostring},
+    {"__gc", dnspacket_gc},
     {NULL, NULL}
 };
 
@@ -462,7 +551,13 @@ LUALIB_API int luaopen_lnflog (lua_State *L) {
                                     // __index field od the 1st metatable
     luaL_register(L, NULL, event_mapping); // register functions in the metatable
 
-    // register the library
+    luaL_newmetatable(L, LUA_NFLOG_DNSPACKET_NAME); //leaves new metatable on the stack
+    lua_pushvalue(L, -1); // there are two 'copies' of the metatable on the stack
+    lua_setfield(L, -2, "__index"); // pop one of those copies and assign it to
+                                    // __index field od the 1st metatable
+    luaL_register(L, NULL, dnspacket_mapping); // register functions in the metatable
+
+    // register the library itself
     luaL_register(L, LUA_NFLOG_NAME, nflog_lib);
 
     lua_pushnumber(L, PI);

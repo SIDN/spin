@@ -70,6 +70,9 @@ function get_dns_answer_info(event)
     if event:get_octet(21) ~= 53 then
         return nil, "Event is not a DNS answer"
     end
+    local dnsp = event:get_payload_dns()
+    print(dnsp:tostring());
+
     -- check if there are a query and answer in the first place
     qdcount = event:get_int16(32)
     --print("qdcount: " .. qdcount)
@@ -165,6 +168,7 @@ local info_cache = {}
 
 function print_dns_cb(mydata, event)
     if event:get_octet(21) == 53 then
+      print_array(event:get_payload_hex());
       info, err = get_dns_answer_info(event)
       if info == nil then
         --print("Error: " .. err)
@@ -197,8 +201,8 @@ mydata.bar = "asdf"
 
 --nl = lnflog.setup_netlogger_loop(1, my_cb, mydata)
 nl = lnflog.setup_netlogger_loop(1, print_dns_cb, mydata)
-nl:loop_forever()
-for i=1,1 do
+--nl:loop_forever()
+for i=1,200 do
     nl:loop_once()
 end
 nl:close()

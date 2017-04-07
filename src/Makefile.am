@@ -14,4 +14,4 @@ nflog2mqtt_LDFLAGS = -lnetfilter_log -lnfnetlink -lmosquitto
 lnflog_la_SOURCES = lua-nflog.c
 lnflog_la_LDFLAGS = -module -lnetfilter_log -lnfnetlink
 lnflog_la_CFLAGS = ${LUA_INCLUDE}
-lnflog_la_LIBADD = ${LUA_LIB}
+lnflog_la_LIBADD = ${LUA_LIB} -lldns
