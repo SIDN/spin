@@ -56,6 +56,25 @@ AX_LUA_LIBS([], AC_MSG_ERROR([Lua library not found]))
 #	[lua_LIBS="-llua"],
 #	AC_ERROR([Misssing Lua dev library]))
 
+# check for ldns
+AC_ARG_WITH(ldns,
+	AC_HELP_STRING([--with-ldns=PATH        specify prefix of path of ldns library to use])
+	,
+	[
+		specialldnsdir="$withval"
+		CPPFLAGS="$CPPFLAGS -I$withval/include"
+		LDFLAGS="-L$withval -L$withval/lib $LDFLAGS"
+		LDNSDIR="$withval"
+	]
+)
+
+AC_CHECK_LIB(ldns, ldns_rr_new,, [
+		AC_MSG_ERROR([Can't find ldns library])dnl'
+	]
+)
+
+
+
 AC_CONFIG_FILES(Makefile src/Makefile)
 AC_OUTPUT
 

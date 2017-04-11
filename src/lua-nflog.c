@@ -428,6 +428,9 @@ static int event_get_payload_dns(lua_State *L) {
     size_t datalen = nflog_get_payload(event->data, &data);
     if (datalen <= 30) {
         // TODO: error
+        fprintf(stderr, "[XX] error:packet too small to be dns\n");
+        lua_pushnil(L);
+        lua_pushstring(L, "Data packet too small to be DNS\n");
         return 0;
     }
 
@@ -439,7 +442,12 @@ static int event_get_payload_dns(lua_State *L) {
         // can this be done directly? do we need to copy all data?
         // can we transfer ownership and use __gc?
 
-        printf("[XX] CREATED DNSPACKET PTR %p\n", dnspacket);
+        //char* tmp = ldns_pkt2str(dnspacket->dnspacket);
+        //printf("[XX] PACKET at %p -> %p:\n%s\n", dnspacket, dnspacket->dnspacket, tmp);
+        //free(tmp);
+
+        //printf("[XX] CREATED DNSPACKET PTR %p\n", dnspacket);
+
         //char* pktstr = ldns_pkt2str(dnspacket->dnspacket);
         //printf("[XX] STR: %s\n", pktstr);
         //free(pktstr);
@@ -454,6 +462,8 @@ static int event_get_payload_dns(lua_State *L) {
         // uninitialized packet is now on the stack, remove it
         // TODO: error
         fprintf(stderr, "[XX] ERROR PARSING DNS PACKET DATA\n");
+        lua_pushnil(L);
+        lua_pushstring(L, "Error parsing DNS packet\n");
     }
 
     return 0;
@@ -464,7 +474,6 @@ static int dnspacket_gc(lua_State *L) {
     if (event->dnspacket != NULL) {
         ldns_pkt_free(event->dnspacket);
     }
-    free(event);
     return 0;
 }
 
@@ -504,11 +513,11 @@ static const luaL_Reg event_mapping[] = {
 // need.
 //
 static int dnspacket_tostring(lua_State* L) {
-    ldns_pkt* dnspacket = (ldns_pkt*) lua_touserdata(L, 1);
+    dnspacket_info* dnspacket = (dnspacket_info*) lua_touserdata(L, 1);
 
-    printf("[XX] READING DNSPACKET PTR %p\n", dnspacket);
+    //printf("[XX] READING DNSPACKET PTR %p\n", dnspacket->dnspacket);
 
-    char* pktstr = ldns_pkt2str(dnspacket);
+    char* pktstr = ldns_pkt2str(dnspacket->dnspacket);
     lua_pushstring(L, pktstr);
     free(pktstr);
 
@@ -516,7 +525,97 @@ static int dnspacket_tostring(lua_State* L) {
 }
 
 
-static int dnspacket_get_rcode() {
+//
+// local dns packet helper functions
+//
+// If this returns NULL it has set nil+error on the stack
+static ldns_rr* get_dns_pkt_query_rr(lua_State* L, ldns_pkt* pkt) {
+    if (ldns_pkt_qdcount(pkt) == 0) {
+        lua_pushnil(L);
+        lua_pushstring(L, "No question in DNS packet");
+        return NULL;
+    }
+    ldns_rr_list* questions = ldns_pkt_question(pkt);
+    return ldns_rr_list_rr(questions, 0);
+}
+
+// returns 0 on error, nil+errormsg set to stack on L
+static int get_dns_pkt_query_type(lua_State* L, ldns_pkt* pkt) {
+    ldns_rr* qrr = get_dns_pkt_query_rr(L, pkt);
+    if (qrr == NULL) {
+        return 0;
+    }
+    return ldns_rr_get_type(qrr);
+}
+
+
+//
+// Lua functions
+//
+static int dnspacket_get_rcode(lua_State* L) {
+    dnspacket_info* dnspacket = (dnspacket_info*) lua_touserdata(L, 1);
+    lua_pushnumber(L, ldns_pkt_get_rcode(dnspacket->dnspacket));
+    return 1;
+}
+
+static int dnspacket_get_qname(lua_State* L) {
+    dnspacket_info* dnspacket = (dnspacket_info*) lua_touserdata(L, 1);
+    ldns_pkt* pkt = dnspacket->dnspacket;
+    ldns_rr* qrr = get_dns_pkt_query_rr(L, pkt);
+    if (qrr == NULL) {
+        return 2;
+    }
+    lua_pushstring(L, ldns_rdf2str(ldns_rr_owner(qrr)));
+    return 1;
+}
+
+static int dnspacket_get_qtype(lua_State* L) {
+    dnspacket_info* dnspacket = (dnspacket_info*) lua_touserdata(L, 1);
+    ldns_pkt* pkt = dnspacket->dnspacket;
+    ldns_rr* qrr = get_dns_pkt_query_rr(L, pkt);
+    if (qrr == NULL) {
+        return 2;
+    }
+    int qtype = get_dns_pkt_query_type(L, pkt);
+    if (qtype == 0) {
+        return 2;
+    } else {
+        lua_pushnumber(L, qtype);
+        return 1;
+    }
+}
+
+static int dnspacket_get_answer_address_strings(lua_State* L) {
+    dnspacket_info* dnspacket = (dnspacket_info*) lua_touserdata(L, 1);
+    ldns_pkt* pkt = dnspacket->dnspacket;
+
+    int i, j;
+    ldns_rr* cur_rr;
+
+    ldns_rr* qrr = get_dns_pkt_query_rr(L, pkt);
+    if (qrr == NULL) {
+        return 2;
+    }
+    int qtype = get_dns_pkt_query_type(L, pkt);
+    if (qtype == 0) {
+        return 2;
+    }
+    ldns_rr_list* answers = ldns_pkt_answer(pkt);
+
+
+    // create a table and put it on the stack
+    lua_newtable(L);
+    // note: lua arrays begin at index 1
+    j = 1;
+    for (i = 0; i < ldns_rr_list_rr_count(answers); i++) {
+        cur_rr = ldns_rr_list_rr(answers, i);
+        if (ldns_rr_get_type(cur_rr) == qtype) {
+            lua_pushnumber(L, j);
+            lua_pushstring(L, ldns_rdf2str(ldns_rr_rdf(cur_rr, 0)));
+            lua_settable(L, -3);
+            j++;
+        }
+    }
     return 1;
 }
 
@@ -527,7 +626,13 @@ static int dnspacket_get_rcode() {
 // -get_ancount()
 // -get_answer_rdatas(type)
 static const luaL_Reg dnspacket_mapping[] = {
+    // some general functions
     {"tostring", dnspacket_tostring},
+    {"get_rcode", dnspacket_get_qname},
+    {"get_qname", dnspacket_get_qname},
+    {"get_qtype", dnspacket_get_qtype},
+    // some highly specific functions for SPIN
+    {"get_answer_address_strings", dnspacket_get_answer_address_strings},
     {"__gc", dnspacket_gc},
     {NULL, NULL}
 };

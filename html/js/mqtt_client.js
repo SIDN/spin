@@ -76,6 +76,18 @@ function onTrafficMessage(msg) {
                 if (node && node.address == argument) {
                     writeToScreen("reversedns", "Reverse DNS: " + result);
                 }
+                // update_ip_nodes
+                if (result != "No reverse name found") {
+                    nodeNames[argument] = result;
+                    for (ip in nodeIds) {
+                        if (ip == argument) {
+                            var nodeId = getNodeId(ip)
+                            var node = nodes.get(nodeId);
+                            node.label = result;
+                            nodes.update(node);
+                        }
+                    }
+                }
                 break;
             case 'ip2netowner':
                 //console.log("issueing ip2netowner command");
@@ -102,7 +114,7 @@ function onTrafficMessage(msg) {
                 handleBlockedMessage(result);
                 break;
             case 'names':
-                nodeNames = result;
+                //nodeNames = result;
                 break;
             case 'filters':
                 filterList = result;
@@ -189,6 +201,11 @@ function handleTrafficMessage(data) {
     for (ip in nodeIds) {
         var nodeId = getNodeId(ip)
         var node = nodes.get(nodeId);
+        if (node.address in nodeNames) {
+            node.label = nodeNames[node.address];
+            nodes.update(node);
+        }
+
         if (node.lastseen < delete_before) {
             deleteNode(node, true);
         } else if (node.lastseen < unhighlight_before && node["color"] == colour_recent) {
