@@ -463,7 +463,7 @@ function addNodeName(ip, name) {
 
 // Used in AddFlow()
 function addNode(timestamp, ip, scale, count, size, lwith, type) {
-    sendCommand("ip2hostname", ip);
+    sendCommandDNS("ip2hostname", ip);
     var existing = getNodeId(ip);
     // By default, the ip/mac is the node name, but if
     // it is present in the user-set nodeNames dict, use that

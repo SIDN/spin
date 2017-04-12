@@ -216,7 +216,7 @@ static int handler_loop_once(lua_State *L) {
         //printf("[XX] EINTR or EAGAIN\n", nli);
         return 0;
     } else if (sz < 0) {
-        printf("Error reading from nflog socket\n");
+        printf("Error reading from nflog socket: %s\n", strerror(errno));
         return 0;
     }
     nflog_handle_packet(nli->handle, buf, sz);

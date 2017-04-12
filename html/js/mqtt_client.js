@@ -50,6 +50,32 @@ function sendCommand(command, argument) {
     console.log("Sent: " + json_cmd)
 }
 
+function sendCommand(command, argument) {
+    var cmd = {}
+    cmd['command'] = command;
+    cmd['argument'] = argument;
+    //console.log("sending command: '" + command + "' with argument: '" + JSON.stringify(argument) + "'");
+
+    var json_cmd = JSON.stringify(cmd);
+    var message = new Paho.MQTT.Message(json_cmd);
+    message.destinationName = "SPIN/commands";
+    client.send(message);
+    console.log("Sent: " + json_cmd)
+}
+
+function sendCommandDNS(command, argument) {
+    var cmd = {}
+    cmd['command'] = command;
+    cmd['argument'] = argument;
+    //console.log("sending command: '" + command + "' with argument: '" + JSON.stringify(argument) + "'");
+
+    var json_cmd = JSON.stringify(cmd);
+    var message = new Paho.MQTT.Message(json_cmd);
+    message.destinationName = "SPIN/dnsnames";
+    client.send(message);
+    console.log("Sent: " + json_cmd)
+}
+
 function writeToScreen(element, message) {
     var el = document.getElementById(element);
     el.innerHTML = message;
