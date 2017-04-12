@@ -29,6 +29,14 @@ local TRAFFIC_CHANNEL = "SPIN/traffic"
 local COMMAND_CHANNEL = "SPIN/commands"
 local client = mqtt.new()
 
+local verbose = false
+
+function vprint(msg)
+  if verbose then
+    print(msg)
+  end
+end
+
 client.ON_CONNECT = function()
     client:subscribe(COMMAND_CHANNEL)
 --        local qos = 1
@@ -44,11 +52,11 @@ client.ON_MESSAGE = function(mid, topic, payload)
     if topic == COMMAND_CHANNEL then
         command = json.decode(payload)
         if (command["command"] and command["argument"]) then
-            print("[XX] Command: " .. payload)
+            vprint("[XX] Command: " .. payload)
             response = handle_command(command.command, command.argument)
             if response then
                 local response_txt = json.encode(response)
-                print("[XX] Response: " .. response_txt)
+                vprint("[XX] Response: " .. response_txt)
                 client:publish(TRAFFIC_CHANNEL, response_txt)
             end
         end
@@ -99,7 +107,7 @@ function handle_command(command, argument)
   elseif (command == "ip2netowner") then
     response["result"] = util:whois_desc(argument)
   elseif (command == "add_filter") then
-    print("[XX] GOT IGNORE COMMAND FOR " .. argument);
+    vprint("[XX] GOT IGNORE COMMAND FOR " .. argument);
     -- response necessary? resend the filter list?
     filter:load()
     filter:add_filter(argument)
@@ -118,7 +126,7 @@ function handle_command(command, argument)
     filter:save()
     response = create_filter_list_command()
   elseif (command == "get_filters") then
-    print("RETURNING FILTER LIST SSSSSSSSSSSSSSS")
+    vprint("RETURNING FILTER LIST SSSSSSSSSSSSSSS")
     response = create_filter_list_command()
   elseif (command == "add_name") then
     filter:load()
@@ -135,7 +143,7 @@ end
 
 function create_callback()
   return function(msg)
-    print("[XX] publish: " .. msg)
+    vprint("[XX] publish: " .. msg)
     client:publish(TRAFFIC_CHANNEL, msg)
   end
 end

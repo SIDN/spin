@@ -5,7 +5,86 @@ local lnflog = require 'lnflog'
 local bit = require 'bit'
 local json = require 'json'
 
-local verbose = false
+local verbose = true
+
+--
+-- A simple DNS cache for answered queries
+--
+local DNSCacheEntry = {}
+DNSCacheEntry.__index = DNSCacheEntry
+
+function DNSCacheEntry_create()
+  local cache_entry = {}
+  setmetatable(cache_entry, DNSCacheEntry)
+  cache_entry.domains = {}
+  cache_entry.size = 0
+  return cache_entry
+end
+
+function DNSCacheEntry:add_domain(domain, timestamp)
+  local existing_domain = self.domains[domain]
+  if existing_domain == nil then
+    self.size = self.size + 1
+  end
+  self.domains[domain] = timestamp
+end
+
+function DNSCacheEntry:clean(clean_before)
+  for domain,timestamp in pairs(self.domains) do
+    if timestamp < clean_before then
+      self.domains[domain] = nil
+      self.size = self.size - 1
+    end
+  end
+end
+
+local DNSCache = {}
+DNSCache.__index = DNSCache
+
+function DNSCache_create()
+    local cache = {}
+    setmetatable(cache, DNSCache)
+    cache.entries = {}
+    cache.size = 0
+    return cache
+end
+
+function DNSCache:add(address, domain, timestamp)
+  vprint("Add to cache: " .. address .. " " .. domain .. " at " .. timestamp)
+  local entry = self.entries[address]
+  if entry == nil then
+    entry = DNSCacheEntry_create()
+    self.size = self.size + 1
+  end
+  entry:add_domain(domain, timestamp)
+  self.entries[address] = entry
+end
+
+function DNSCache:clean(clean_before)
+  for address, entry in pairs(self.entries) do
+    entry:clean(clean_before)
+    if entry.size == 0 then
+      self.entries[address] = nil
+      self.size = self.size - 1
+    end
+  end
+  vprint("Cache size: " .. self.size)
+end
+
+function DNSCache:get_domains(address)
+  local result = {}
+  local entry = self.entries[address]
+  if entry ~= nil then
+    for domain,_ in pairs(entry.domains) do
+      table.insert(result, domain)
+    end
+  else
+    vprint("no cache entry for " .. address)
+  end
+  return result
+end
+
+local dnscache = DNSCache_create()
 
 --
 -- mqtt-related things
@@ -15,30 +94,30 @@ local TRAFFIC_CHANNEL = "SPIN/traffic"
 
 function vprint(msg)
     if verbose then
-        vprint(msg)
+        print("[SPIN/DNS] " .. msg)
     end
 end
 
 local client = mqtt.new()
 client.ON_CONNECT = function()
-    vprint("[XX] Connected to MQTT broker")
+    vprint("Connected to MQTT broker")
     client:subscribe(DNS_COMMAND_CHANNEL)
-    vprint("[XX] Subscribed to " .. DNS_COMMAND_CHANNEL)
+    vprint("Subscribed to " .. DNS_COMMAND_CHANNEL)
 --        local qos = 1
 --        local retain = true
 --        local mid = client:publish("my/topic/", "my payload", qos, retain)
 end
 
 client.ON_MESSAGE = function(mid, topic, payload)
-    vprint("[XX] got message on " .. topic)
+    vprint("got message on " .. topic)
     if topic == DNS_COMMAND_CHANNEL then
         command = json.decode(payload)
         if (command["command"] and command["argument"]) then
-            vprint("[XX] Command: " .. payload)
+            vprint("Command: " .. payload)
             response = handle_command(command.command, command.argument)
             if response then
                 local response_txt = json.encode(response)
-                vprint("[XX] Response: " .. response_txt)
+                vprint("Response: " .. response_txt)
                 client:publish(TRAFFIC_CHANNEL, response_txt)
             end
         end
@@ -52,7 +131,8 @@ function handle_command(command, argument)
 
   if (command == "ip2hostname") then
     local ip = argument
-    local names = get_dnames_from_cache(ip)
+    --local names = get_dnames_from_cache(ip)
+    local names = dnscache:get_domains(ip)
     if #names > 0 then
       response["result"] = names
     else
@@ -110,10 +190,10 @@ function get_dns_qname(event)
 end
 
 function dns_skip_dname(event, i)
-    --vprint("[XX] Get octet at " .. i)
+    --vprint("Get octet at " .. i)
     local labellen = event:get_octet(i)
     if bit.band(labellen, 0xc0) then
-        --vprint("[XX] is dname shortcut")
+        --vprint("is dname shortcut")
         return i + 2
     end
     while labellen > 0 do
@@ -121,7 +201,7 @@ function dns_skip_dname(event, i)
 --      vprint("Get octet at " .. i)
       labellen = event:get_octet(i)
       if bit.band(labellen, 0xc0) then
-          --vprint("[XX] is dname shortcut")
+          --vprint("is dname shortcut")
           return i + 2
       end
     end
@@ -134,9 +214,12 @@ function get_dns_answer_info(event)
         return nil, "Event is not a DNS answer"
     end
     local dnsp = event:get_payload_dns()
+    if not dnsp:is_response() or not (dnsp:get_qtype() == 1 or dnsp:get_qtype() == 28) then
+        return nil, "DNS Packet is not an A/AAAA response packet"
+    end
     --vprint(dnsp:tostring());
-    --vprint("[XX] QUESTION NAME: " .. dnsp:get_qname())
-    --vprint("[XX] QUESTION TYPE: " .. dnsp:get_qtype())
+    --vprint("QUESTION NAME: " .. dnsp:get_qname())
+    --vprint("QUESTION TYPE: " .. dnsp:get_qtype())
     dname = dnsp:get_qname()
     if dname == nil then
         return nil, err
@@ -172,35 +255,6 @@ function my_cb(mydata, event)
     end
 end
 
-local info_cache = {}
-
-function add_to_cache(addr, dname, timestamp)
-    ce = info_cache.addr
-    if ce == nil then
-      ce = {}
-    end
-    ce[dname] = timestamp
-    info_cache[addr] = ce
-end
-
-function get_dnames_from_cache(addr)
-  for a,c in pairs(info_cache) do
-    vprint("[XX] CACHED: " .. a)
-  end
-  result = {}
-  ce = info_cache[addr]
-  if ce ~= nil then
-    vprint("[XX] FOUND " .. addr)
-    for n,t in pairs(ce) do
-      vprint("[XX]   ENTRY: " .. n .. " at " .. t)
-    end
-    for n,_ in pairs(ce) do
-      table.insert(result, n)
-    end
-  end
-  return result
-end
-
 function print_dns_cb(mydata, event)
     if event:get_octet(21) == 53 then
       info, err = get_dns_answer_info(event)
@@ -208,24 +262,24 @@ function print_dns_cb(mydata, event)
         vprint("Error: " .. err)
       else
         for _,addr in pairs(info.ip_addrs) do
-          add_to_cache(addr, info.dname, info.timestamp)
+          --add_to_cache(addr, info.dname, info.timestamp)
+          dnscache:add(addr, info.dname, info.timestamp)
+          dnscache:clean(info.timestamp - 10)
         end
         addrs_str = "[ " .. table.concat(info.ip_addrs, ", ") .. " ]"
-        vprint(info.timestamp .. " " .. info.to_addr .. " " .. info.dname .. " " .. addrs_str)
-        table.insert(info_cache, info)
-        if table.getn(info_cache) > 10 then
-          table.remove(info_cache, 0)
-        end
+        vprint("Event: " .. info.timestamp .. " " .. info.to_addr .. " " .. info.dname .. " " .. addrs_str)
       end
     end
 end
 
 
-
+vprint("SPIN experimental DNS capture tool")
 broker = arg[1] -- defaults to "localhost" if arg not set
 nl = lnflog.setup_netlogger_loop(1, print_dns_cb, mydata)
+vprint("Connecting to broker")
 client:connect(broker)
 --nl:loop_forever()
+vprint("Starting listen loop")
 while true do
     nl:loop_once()
     client:loop()

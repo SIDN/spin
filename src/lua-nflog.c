@@ -35,7 +35,7 @@ static int math_sin (lua_State *L) {
     return 1;
 }
 
-#define BUFSZ 10000
+#define BUFSZ 100000
 
 void stackdump_g(lua_State* l)
 {
@@ -552,6 +552,14 @@ static int get_dns_pkt_query_type(lua_State* L, ldns_pkt* pkt) {
 //
 // Lua functions
 //
+static int dnspacket_isresponse(lua_State* L) {
+    dnspacket_info* dnspacket = (dnspacket_info*) lua_touserdata(L, 1);
+    lua_pushboolean(L, ldns_pkt_qr(dnspacket->dnspacket));
+    return 1;
+}
+
+
+
 static int dnspacket_get_rcode(lua_State* L) {
     dnspacket_info* dnspacket = (dnspacket_info*) lua_touserdata(L, 1);
     lua_pushnumber(L, ldns_pkt_get_rcode(dnspacket->dnspacket));
@@ -628,6 +636,7 @@ static int dnspacket_get_answer_address_strings(lua_State* L) {
 static const luaL_Reg dnspacket_mapping[] = {
     // some general functions
     {"tostring", dnspacket_tostring},
+    {"is_response", dnspacket_isresponse},
     {"get_rcode", dnspacket_get_qname},
     {"get_qname", dnspacket_get_qname},
     {"get_qtype", dnspacket_get_qtype},
