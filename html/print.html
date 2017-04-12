@@ -2,6 +2,7 @@
 <!DOCTYPE HTML>
 <html>
 <head>
+    <script src="./js/mqttws31.js"></script>
     <meta charset="utf-8">
     <title>Websocket client for testing</title>
 </head>
@@ -15,24 +16,23 @@
     //
     // WEBSOCKET CODE
     //
+    var client;
+    var output;
+
+    function init() {
+        output = document.getElementById("output");
+        client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
+        client.onConnectionLost = onTrafficClose;
+        client.onMessageArrived = origonMessageArrived;
+        client.onError = onError
+
+        // connect the client
+        client.connect({onSuccess:onTrafficOpen});
+    }
+
     var wsUri = "ws://192.168.8.1:12345/";
     var output;
     var running = true;
-
-    function init()
-    {
-        output = document.getElementById("output");
-        testWebSocket();
-    }
-
-    function testWebSocket()
-    {
-        websocket = new WebSocket(wsUri, "v1.spin.sidnlabs.nl");
-        websocket.onopen = function(evt) { onOpen(evt) };
-        websocket.onclose = function(evt) { onClose(evt) };
-        websocket.onmessage = function(evt) { onMessage(evt) };
-        websocket.onerror = function(evt) { onError(evt) };
-    }
 
     function onOpen(evt)
     {

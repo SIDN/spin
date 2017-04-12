@@ -4,87 +4,12 @@ local mqtt = require 'mosquitto'
 local lnflog = require 'lnflog'
 local bit = require 'bit'
 local json = require 'json'
+local dnscache = require 'dns_cache'
 
 local verbose = true
-
 --
 -- A simple DNS cache for answered queries
 --
-local DNSCacheEntry = {}
-DNSCacheEntry.__index = DNSCacheEntry
-
-function DNSCacheEntry_create()
-  local cache_entry = {}
-  setmetatable(cache_entry, DNSCacheEntry)
-  cache_entry.domains = {}
-  cache_entry.size = 0
-  return cache_entry
-end
-
-function DNSCacheEntry:add_domain(domain, timestamp)
-  local existing_domain = self.domains[domain]
-  if existing_domain == nil then
-    self.size = self.size + 1
-  end
-  self.domains[domain] = timestamp
-end
-
-function DNSCacheEntry:clean(clean_before)
-  for domain,timestamp in pairs(self.domains) do
-    if timestamp < clean_before then
-      self.domains[domain] = nil
-      self.size = self.size - 1
-    end
-  end
-end
-
-local DNSCache = {}
-DNSCache.__index = DNSCache
-
-function DNSCache_create()
-    local cache = {}
-    setmetatable(cache, DNSCache)
-    cache.entries = {}
-    cache.size = 0
-    return cache
-end
-
-function DNSCache:add(address, domain, timestamp)
-  vprint("Add to cache: " .. address .. " " .. domain .. " at " .. timestamp)
-  local entry = self.entries[address]
-  if entry == nil then
-    entry = DNSCacheEntry_create()
-    self.size = self.size + 1
-  end
-  entry:add_domain(domain, timestamp)
-  self.entries[address] = entry
-end
-
-function DNSCache:clean(clean_before)
-  for address, entry in pairs(self.entries) do
-    entry:clean(clean_before)
-    if entry.size == 0 then
-      self.entries[address] = nil
-      self.size = self.size - 1
-    end
-  end
-  vprint("Cache size: " .. self.size)
-end
-
-function DNSCache:get_domains(address)
-  local result = {}
-  local entry = self.entries[address]
-  if entry ~= nil then
-    for domain,_ in pairs(entry.domains) do
-      table.insert(result, domain)
-    end
-  else
-    vprint("no cache entry for " .. address)
-  end
-  return result
-end
-
-local dnscache = DNSCache_create()
 
 --
 -- mqtt-related things
@@ -132,7 +57,7 @@ function handle_command(command, argument)
   if (command == "ip2hostname") then
     local ip = argument
     --local names = get_dnames_from_cache(ip)
-    local names = dnscache:get_domains(ip)
+    local names = dnscache.dnscache:get_domains(ip)
     if #names > 0 then
       response["result"] = names
     else
@@ -263,8 +188,8 @@ function print_dns_cb(mydata, event)
       else
         for _,addr in pairs(info.ip_addrs) do
           --add_to_cache(addr, info.dname, info.timestamp)
-          dnscache:add(addr, info.dname, info.timestamp)
-          dnscache:clean(info.timestamp - 10)
+          dnscache.dnscache:add(addr, info.dname, info.timestamp)
+          dnscache.dnscache:clean(info.timestamp - 10)
         end
         addrs_str = "[ " .. table.concat(info.ip_addrs, ", ") .. " ]"
         vprint("Event: " .. info.timestamp .. " " .. info.to_addr .. " " .. info.dname .. " " .. addrs_str)
