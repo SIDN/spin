@@ -140,6 +140,8 @@ function add_flow(timestamp, from, to, count, size, callback, filter_list)
       cur_aggr:add_flow(from, to, count, size)
     end
     --print("ts: " .. timestamp .. " from: " .. from .. " to: " .. to .. " count: " .. count .. " size: " .. size)
+  else
+    print("[XX] filtered out (" .. from .. " or " .. to .. ")")
   end
 end
 

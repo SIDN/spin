@@ -577,6 +577,29 @@ static int dnspacket_get_qname(lua_State* L) {
     return 1;
 }
 
+static int dnspacket_get_qname_second_level_only(lua_State* L) {
+    dnspacket_info* dnspacket = (dnspacket_info*) lua_touserdata(L, 1);
+    ldns_pkt* pkt = dnspacket->dnspacket;
+    ldns_rr* qrr = get_dns_pkt_query_rr(L, pkt);
+    ldns_rdf* qname;
+    uint8_t label_count;
+
+    if (qrr == NULL) {
+        return 2;
+    }
+    label_count = (int) ldns_dname_label_count(ldns_rr_owner(qrr));
+    if (label_count > 2) {
+        label_count -= 2;
+        qname = ldns_dname_clone_from(ldns_rr_owner(qrr), label_count);
+    } else {
+        qname = ldns_rdf_clone(ldns_rr_owner(qrr));
+    }
+    lua_pushstring(L, ldns_rdf2str(qname));
+    ldns_rdf_deep_free(qname);
+    return 1;
+}
+
+
 static int dnspacket_get_qtype(lua_State* L) {
     dnspacket_info* dnspacket = (dnspacket_info*) lua_touserdata(L, 1);
     ldns_pkt* pkt = dnspacket->dnspacket;
@@ -639,6 +662,7 @@ static const luaL_Reg dnspacket_mapping[] = {
     {"is_response", dnspacket_isresponse},
     {"get_rcode", dnspacket_get_qname},
     {"get_qname", dnspacket_get_qname},
+    {"get_qname_second_level_only", dnspacket_get_qname_second_level_only},
     {"get_qtype", dnspacket_get_qtype},
     // some highly specific functions for SPIN
     {"get_answer_address_strings", dnspacket_get_answer_address_strings},

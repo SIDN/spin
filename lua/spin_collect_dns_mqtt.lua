@@ -6,6 +6,11 @@ local bit = require 'bit'
 local json = require 'json'
 local dnscache = require 'dns_cache'
 
+-- tmp: treat DNS traffic as actual traffic
+local aggregator = require 'collect'
+local filter = require 'filter'
+filter:load(true)
+
 local verbose = true
 --
 -- A simple DNS cache for answered queries
@@ -91,48 +96,6 @@ function print_array(arr)
     vprint("")
 end
 
-function get_dns_qname(event)
-    local result = ""
-    local cur_di = 40
-    local labellen = event:get_octet(cur_di)
-
-    cur_di = cur_di + 1
-    while labellen > 0 do
-      label_ar, err = event:get_octets(cur_di, labellen)
-      if label_ar == nil then
-        vprint(err)
-        return err, cur_di
-      end
-      for _,c in pairs(label_ar) do
-        result = result .. string.char(c)
-      end
-      result = result .. "."
-      cur_di = cur_di + labellen
-      labellen = event:get_octet(cur_di)
-      cur_di = cur_di + 1
-    end
-    return result, cur_di
-end
-
-function dns_skip_dname(event, i)
-    --vprint("Get octet at " .. i)
-    local labellen = event:get_octet(i)
-    if bit.band(labellen, 0xc0) then
-        --vprint("is dname shortcut")
-        return i + 2
-    end
-    while labellen > 0 do
-      i = i + 1 + labellen
---      vprint("Get octet at " .. i)
-      labellen = event:get_octet(i)
-      if bit.band(labellen, 0xc0) then
-          --vprint("is dname shortcut")
-          return i + 2
-      end
-    end
-    return i
-end
-
 function get_dns_answer_info(event)
     -- check whether this is a dns answer event (source port 53)
     if event:get_octet(21) ~= 53 then
@@ -145,7 +108,7 @@ function get_dns_answer_info(event)
     --vprint(dnsp:tostring());
     --vprint("QUESTION NAME: " .. dnsp:get_qname())
     --vprint("QUESTION TYPE: " .. dnsp:get_qtype())
-    dname = dnsp:get_qname()
+    dname = dnsp:get_qname_second_level_only()
     if dname == nil then
         return nil, err
     end
@@ -180,22 +143,32 @@ function my_cb(mydata, event)
     end
 end
 
+local function my_callback(msg)
+  vprint("Yolo. callback: " .. msg)
+  client:publish(TRAFFIC_CHANNEL, msg)
+end
+
 function print_dns_cb(mydata, event)
     if event:get_octet(21) == 53 then
       info, err = get_dns_answer_info(event)
       if info == nil then
-        vprint("Error: " .. err)
+        vprint("Notice: " .. err)
       else
         for _,addr in pairs(info.ip_addrs) do
           --add_to_cache(addr, info.dname, info.timestamp)
           dnscache.dnscache:add(addr, info.dname, info.timestamp)
           dnscache.dnscache:clean(info.timestamp - 10)
+          -- tmp: treat DNS queries as actual traffic
+          vprint("Adding flow")
+          add_flow(info.timestamp, info.to_addr, info.dname, 1, 1, my_callback, filter:get_filter_table())
         end
         addrs_str = "[ " .. table.concat(info.ip_addrs, ", ") .. " ]"
         vprint("Event: " .. info.timestamp .. " " .. info.to_addr .. " " .. info.dname .. " " .. addrs_str)
       end
     end
 end
+
+
 
 
 vprint("SPIN experimental DNS capture tool")
