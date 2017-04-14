@@ -35,7 +35,7 @@ static int math_sin (lua_State *L) {
     return 1;
 }
 
-#define BUFSZ 100000
+#define BUFSZ 2097152
 
 void stackdump_g(lua_State* l)
 {
@@ -216,7 +216,7 @@ static int handler_loop_once(lua_State *L) {
         //printf("[XX] EINTR or EAGAIN\n", nli);
         return 0;
     } else if (sz < 0) {
-        printf("Error reading from nflog socket: %s\n", strerror(errno));
+        printf("Error reading from nflog socket: %s (%d) ((bufsize %u))\n", strerror(errno), errno, BUFSZ);
         return 0;
     }
     nflog_handle_packet(nli->handle, buf, sz);

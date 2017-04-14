@@ -168,18 +168,28 @@ function print_dns_cb(mydata, event)
     end
 end
 
+function print_blocked_cb(mydata, event)
+  print("[XX] PACKET GOT BLOCKED (TODO: report)")
+end
 
+function print_traffic_cb(mydata, event)
+  print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_from_addr() .. " -> " .. event:get_to_addr())
+end
 
 
 vprint("SPIN experimental DNS capture tool")
 broker = arg[1] -- defaults to "localhost" if arg not set
-nl = lnflog.setup_netlogger_loop(772, print_dns_cb, mydata)
+traffic = lnflog.setup_netlogger_loop(771, print_traffic_cb, mydata)
+dns = lnflog.setup_netlogger_loop(772, print_dns_cb, mydata)
+blocked = lnflog.setup_netlogger_loop(773, print_blocked_cb, nil)
 vprint("Connecting to broker")
 client:connect(broker)
 --nl:loop_forever()
 vprint("Starting listen loop")
 while true do
-    nl:loop_once()
+    dns:loop_once()
+    traffic:loop_once()
+    blocked:loop_once()
     client:loop()
 end
 nl:close()
