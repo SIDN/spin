@@ -28,10 +28,18 @@ function Aggregator:same_timestamp(timestamp)
   return self.data.timestamp == timestamp
 end
 
-function Aggregator:add_flow(from_ip, to, count, size)
+function Aggregator:add_flow(from_ip, to_ip, count, size)
   local from = arp:get_hw_address(from_ip)
   if not from then
     from = from_ip
+  end
+  -- should we switch if to does indeed have arp?
+  local to = arp:get_hw_address(to_ip)
+  if not to then
+    to = to_ip
+  else
+    --from = to
+    --to = from_ip
   end
   local fdata = self.data.flows[from .. "," .. to]
   if not fdata then

@@ -5,7 +5,7 @@ local lnflog = require 'lnflog'
 local bit = require 'bit'
 local json = require 'json'
 local dnscache = require 'dns_cache'
-
+local arp = require 'arp'
 -- tmp: treat DNS traffic as actual traffic
 local aggregator = require 'collect'
 local filter = require 'filter'
@@ -160,7 +160,8 @@ function print_dns_cb(mydata, event)
           dnscache.dnscache:clean(info.timestamp - 10)
           -- tmp: treat DNS queries as actual traffic
           vprint("Adding flow")
-          add_flow(info.timestamp, info.to_addr, info.dname, 1, 1, my_callback, filter:get_filter_table())
+          -- ADD TO DNS AGGREGATOR?...
+          --add_flow(info.timestamp, info.to_addr, info.dname, 1, 1, my_callback, filter:get_filter_table())
         end
         addrs_str = "[ " .. table.concat(info.ip_addrs, ", ") .. " ]"
         vprint("Event: " .. info.timestamp .. " " .. info.to_addr .. " " .. info.dname .. " " .. addrs_str)
@@ -169,11 +170,31 @@ function print_dns_cb(mydata, event)
 end
 
 function print_blocked_cb(mydata, event)
+  local from_ip = event:get_from_addr()
+  local from = arp:get_hw_address(from_ip)
+  if not from then
+    from = from_ip
+  end
+  local to_ip = event:get_to_addr()
+  local domains = dnscache.dnscache:get_domains(to_ip)
+  if #domains > 0 then
+    to_ip = domains[0]
+  end
+
   print("[XX] PACKET GOT BLOCKED (TODO: report)")
+  msg = { command = "blocked", argument = "", result = {
+              timestamp = event:get_timestamp(),
+              from = from,
+              to = event:get_to_addr()
+          }
+        }
+  client:publish(TRAFFIC_CHANNEL, json.encode(msg))
 end
 
 function print_traffic_cb(mydata, event)
   print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_from_addr() .. " -> " .. event:get_to_addr())
+  add_flow(event:get_timestamp(), event:get_from_addr(), event:get_to_addr(), event:get_payload_size(), 1, my_callback, filter:get_filter_table())
+
 end
 
 
