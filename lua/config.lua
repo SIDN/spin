@@ -2,6 +2,10 @@
 -- Wrapper for OpenWRT-style config files
 --
 
+-- TODO: either start using /etc/firewall.user fully
+-- or make a SPIN-only section in the config file (and blind-copy the
+-- other parts of the config file)
+
 local _m = {}
 
 local mio = require 'mio'
@@ -66,14 +70,14 @@ function ConfigSection:get_list(list_name)
   end
 end
 
-function ConfigSection:print()
-  print("config " .. self:get_name())
+function ConfigSection:write(out)
+  out:write("config " .. self:get_name() .. "\n")
   for option_name,value in pairs(self.options) do
-    print("\toption " .. option_name .. " '" .. value .. "'")
+    out:write("\toption " .. option_name .. " '" .. value .. "'\n")
   end
   for list_name,value in pairs(self.lists) do
     for _,list_entry in value do
-      print("\tlist " .. list_name .. " '" .. list_entry .. "'")
+      out:write("\tlist " .. list_name .. " '" .. list_entry .. "'\n")
     end
   end
 end
@@ -177,7 +181,7 @@ end
 
 function Config:print()
   for _,section in pairs(self.sections) do
-    section:print()
+    section:write(io.stdout)
     print("")
   end
 end
@@ -227,11 +231,26 @@ end
 -- returns all sections where there is an option with the given
 -- name that is set to the given value (for instance:
 -- give me the first section where 'name' is set to 'SPIN-Block-rule-1'
-function Config:get_section_by_option_value(section_name, option_name, option_value)
+function Config:get_sections_by_option_value(section_name, option_name, option_value)
   local result = {}
   for _,section in pairs(self.sections) do
     if section:get_name() == section_name and section:get_option(option_name) == option_value then
       table.insert(result, section)
+    end
+  end
+  return result
+end
+
+-- returns all sections where there is an option with the given
+-- name that matches (string:match()) the given value (for instance:
+-- give me the first section where 'name' contains 'SPIN-'
+function Config:get_sections_by_option_match(section_name, option_name, option_value)
+  local result = {}
+  for _,section in pairs(self.sections) do
+    if section:get_name() == section_name and section:get_option(option_name) then
+      if section:get_option(option_name):match(option_value) then
+        table.insert(result, section)
+      end
     end
   end
   return result

@@ -173,7 +173,7 @@ end
 
 vprint("SPIN experimental DNS capture tool")
 broker = arg[1] -- defaults to "localhost" if arg not set
-nl = lnflog.setup_netlogger_loop(1, print_dns_cb, mydata)
+nl = lnflog.setup_netlogger_loop(772, print_dns_cb, mydata)
 vprint("Connecting to broker")
 client:connect(broker)
 --nl:loop_forever()

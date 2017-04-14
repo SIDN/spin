@@ -33,3 +33,7 @@ This creates a named pipe, starts conntrack (will ask for sudo password), and st
 Then open html/print.html in a browser to see data is getting through.
 For the visual representation, open html/graph.html.
 
+# Notes:
+For the DNS output, we need a logging rule NFLOG (group 1 atm); on openwrt
+we add these lines to /etc/firewall.user:
+iptables -I OUTPUT -p udp --source-port 53 -j NFLOG --nflog-group 1
