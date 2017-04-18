@@ -1,5 +1,6 @@
 var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
 
+var node_cache = {}
 
 function init() {
     initGraphs();
@@ -33,7 +34,7 @@ function origonConnectionLost(responseObject) {
 */
 // called when a message arrives
 function origonMessageArrived(message) {
-    console.log("onMessageArrived:"+message.payloadString);
+    //console.log("SPIN/traffic message:"+message.payloadString);
     onTrafficMessage(message.payloadString);
 }
 
@@ -82,7 +83,7 @@ function writeToScreen(element, message) {
 }
 
 function onTrafficMessage(msg) {
-    try {
+    //try {
         var message = JSON.parse(msg)
         var command = message['command'];
         var argument = message['argument'];
@@ -147,13 +148,16 @@ function onTrafficMessage(msg) {
                 filterList.sort();
                 updateFilterList();
                 break;
+            case 'nodeUpdate':
+                node_cache[result.id] = result
+                break;
             default:
                 console.log("unknown command from server: " + msg)
                 break;
         }
-    } catch (error) {
-        console.log(error + ": " + error);
-    }
+    //} catch (error) {
+    //    console.log(error + ": " + error);
+    //}
 }
 
 function onTrafficOpen(evt) {
@@ -245,7 +249,24 @@ function handleTrafficMessage(data) {
     for (var i = 0, len = arr.length; i < len; i++) {
         var f = arr[i];
         // defined in spingraph.js
-        addFlow(timestamp, f['from'], f['to'], f['count'], f['size']);
+        //alert("FIND NODE: " + f['from'])
+        var from_node = node_cache[f['from']];
+        if (!from_node) {
+            // some dummy data, ask for data update
+            from_node = {};
+            from_node.id = f['from'];
+            // what else?
+        }
+        var to_node = node_cache[f['to']];
+        if (!to_node) {
+            // some dummy data, ask for data update
+            from_node = {};
+            from_node.id = f['to'];
+            // what else?
+            // TODO send command
+        }
+
+        addFlow(timestamp, from_node, to_node, f['count'], f['size']);
     }
 }
 

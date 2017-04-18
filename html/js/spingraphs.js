@@ -393,7 +393,7 @@ function nodeSelected(event) {
         selectedNodeId = nodeId;
         sendCommand("arp2ip", node.address); // talk to Websocket
         writeToScreen("reversedns", "Reverse DNS: &lt;searching&gt;");
-        sendCommand("ip2hostname", node.address);
+        //sendCommand("ip2hostname", node.address);
         writeToScreen("netowner", "Network owner: &lt;searching&gt;");
         sendCommand("ip2netowner", node.address); // talk to Websocket
         $("#nodeinfo").dialog('option', 'title', node.label);
@@ -462,8 +462,57 @@ function addNodeName(ip, name) {
 }
 
 // Used in AddFlow()
-function addNode(timestamp, ip, scale, count, size, lwith, type) {
-    sendCommandDNS("ip2hostname", ip);
+function addNode(timestamp, node, scale, count, size, lwith, type) {
+    // why does this happen
+    if (!node) { return; }
+    // find the 'best' info we can display in the main view
+    var label = node.id;
+    var colour = colour_recent;
+    var ips = node.ips ? node.ips : [];
+    var domains = node.domains ? node.domains : [];
+    if (node.mac) {
+        label = node.mac;
+        colour = colour_src;
+    } else if (domains.length > 0) {
+        label = node.domains[0];
+    } else if (ips.length > 0) {
+        label = node.ips[0];
+    }
+
+    //alert("add node: " + node)
+    var enode = nodes.get(node.id);
+    if (enode) {
+        // update is
+        enode.label = label;
+        enode.ips = ips;
+        enode.domains = domains;
+        enode.colour = colour;
+        nodes.update(enode);
+    } else {
+        // it's new
+        nodes.add({
+            id: node.id,
+            addresses: node.ips ? node.ips : [],
+            domains: node.domains ? node.domains : [],
+            label: label,
+            color: colour,
+            value: size,
+            count: count,
+            size: size,
+            lastseen: timestamp,
+            scaling: {
+                min: 1,
+                label: {
+                    enabled: true
+                }
+            }
+        });
+    }
+}
+
+
+function oldaddNode(timestamp, ip, scale, count, size, lwith, type) {
+    //sendCommandDNS("ip2hostname", ip);
     var existing = getNodeId(ip);
     // By default, the ip/mac is the node name, but if
     // it is present in the user-set nodeNames dict, use that
@@ -527,18 +576,16 @@ function addNode(timestamp, ip, scale, count, size, lwith, type) {
 
 // Used in AddFlow()
 function addEdge(from, to) {
-    var fromNodeId = nodeIds[from];
-    var toNodeId = nodeIds[to];
     var existing = edges.get({
         filter: function(item) {
-            return (item.from == fromNodeId && item.to == toNodeId);
+            return (item.from == from.id && item.to == to.id);
         }
     });
     if (existing.length == 0) {
         edges.add({
             id: curEdgeId,
-            from: fromNodeId,
-            to: toNodeId,
+            from: from.id,
+            to: to.id,
             color: colour_edge
         });
         curEdgeId += 1;
@@ -626,9 +673,11 @@ function contains(l, e) {
 function addFlow(timestamp, from, to, count, size) {
     // there may be some residual additions from a recently added
     // filter, so ignore those
-    if (contains(filterList, from) || contains(filterList, to)) {
-        return;
-    }
+
+    // TODO ignore for now, data structure of from and to changed
+    //if (contains(filterList, from) || contains(filterList, to)) {
+    //    return;
+    //}
     addNode(timestamp, from, false, count, size, "to " + to, "source");
     addNode(timestamp, to, true, count, size, "from " + from, "traffic");
     addEdge(from, to);

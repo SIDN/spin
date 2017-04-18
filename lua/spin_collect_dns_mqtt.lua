@@ -6,6 +6,7 @@ local bit = require 'bit'
 local json = require 'json'
 local dnscache = require 'dns_cache'
 local arp = require 'arp'
+local nc = require 'node_cache'
 -- tmp: treat DNS traffic as actual traffic
 local aggregator = require 'collect'
 local filter = require 'filter'
@@ -191,12 +192,43 @@ function print_blocked_cb(mydata, event)
   client:publish(TRAFFIC_CHANNEL, json.encode(msg))
 end
 
-function print_traffic_cb(mydata, event)
-  print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_from_addr() .. " -> " .. event:get_to_addr())
-  add_flow(event:get_timestamp(), event:get_from_addr(), event:get_to_addr(), event:get_payload_size(), 1, my_callback, filter:get_filter_table())
+local node_cache = nc.NodeCache_create()
+node_cache:set_arp_cache(arp)
+node_cache:set_dns_cache(dnscache.dnscache)
 
+function publish_node_update(node)
+  local msg = {}
+  msg.command = "nodeUpdate"
+  msg.argument = ""
+  msg.result = node
+  local msg_json = json.encode(msg)
+  print("[XX] publish to " .. TRAFFIC_CHANNEL .. ":")
+  print(msg_json)
+  client:publish(TRAFFIC_CHANNEL, msg_json)
 end
 
+function print_traffic_cb(mydata, event)
+  print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_from_addr() .. " -> " .. event:get_to_addr())
+  -- Find the node-id's of the IP addresses
+  local from_node_id, to_node_id, new
+  from_node_id, new = node_cache:add_ip(event:get_from_addr())
+  if new then
+    -- publish it to the traffic channel
+    publish_node_update(node_cache:get_by_id(from_node_id))
+  end
+  to_node_id, new = node_cache:add_ip(event:get_to_addr())
+  if new then
+    -- publish it to the traffic channel
+    publish_node_update(node_cache:get_by_id(to_node_id))
+  end
+  --if from_node_id < to_node_id then
+  --  tmp = from_node_id
+  --  from_node_id = to_node_id
+  --  to_node_id = from_node_id
+  --end
+
+  add_flow(event:get_timestamp(), from_node_id, to_node_id, event:get_payload_size(), 1, my_callback, filter:get_filter_table())
+end
 
 vprint("SPIN experimental DNS capture tool")
 broker = arg[1] -- defaults to "localhost" if arg not set
