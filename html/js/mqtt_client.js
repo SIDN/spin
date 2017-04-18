@@ -149,6 +149,7 @@ function onTrafficMessage(msg) {
                 updateFilterList();
                 break;
             case 'nodeUpdate':
+                console.log("Got node update command: " + msg)
                 node_cache[result.id] = result
                 break;
             default:
@@ -255,13 +256,15 @@ function handleTrafficMessage(data) {
             // some dummy data, ask for data update
             from_node = {};
             from_node.id = f['from'];
+            sendCommandDNS('missingNodeInfo', f['from']);
             // what else?
         }
         var to_node = node_cache[f['to']];
         if (!to_node) {
             // some dummy data, ask for data update
-            from_node = {};
-            from_node.id = f['to'];
+            to_node = {};
+            to_node.id = f['to'];
+            sendCommandDNS('missingNodeInfo', f['to']);
             // what else?
             // TODO send command
         }

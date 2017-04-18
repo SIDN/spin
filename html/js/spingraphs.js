@@ -391,11 +391,11 @@ function nodeSelected(event) {
 
         var node = updateNodeInfo(nodeId);
         selectedNodeId = nodeId;
-        sendCommand("arp2ip", node.address); // talk to Websocket
+        //sendCommand("arp2ip", node.address); // talk to Websocket
         writeToScreen("reversedns", "Reverse DNS: &lt;searching&gt;");
         //sendCommand("ip2hostname", node.address);
         writeToScreen("netowner", "Network owner: &lt;searching&gt;");
-        sendCommand("ip2netowner", node.address); // talk to Websocket
+        //sendCommand("ip2netowner", node.address); // talk to Websocket
         $("#nodeinfo").dialog('option', 'title', node.label);
         $("#nodeinfo").dialog('open');
     }

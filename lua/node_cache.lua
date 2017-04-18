@@ -169,6 +169,8 @@ function NodeCache:add_ip(ip)
   end
   -- todo: should we have another find/merge round now that
   -- we have more information about the node?
+  print("[Xx] CACHE NOW")
+  self:print(io.stdout)
   print("[Xx] RETURNING NEW NODE")
   return n.id, true
 end

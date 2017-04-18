@@ -23,6 +23,11 @@ local verbose = true
 local DNS_COMMAND_CHANNEL = "SPIN/dnsnames"
 local TRAFFIC_CHANNEL = "SPIN/traffic"
 
+local node_cache = nc.NodeCache_create()
+node_cache:set_arp_cache(arp)
+node_cache:set_dns_cache(dnscache.dnscache)
+
+
 function vprint(msg)
     if verbose then
         print("[SPIN/DNS] " .. msg)
@@ -69,6 +74,13 @@ function handle_command(command, argument)
     else
       response = nil
     end
+  elseif command == "missingNodeInfo" then
+    -- just publish it again?
+    local node = node_cache:get_by_id(tonumber(argument))
+    print("[XX] WAS ASKED FOR INFO ABOUT NODE " .. argument .. "(type " .. type(argument) .. ")")
+
+    publish_node_update(node)
+    response = nil
   end
   return response
 end
@@ -191,10 +203,6 @@ function print_blocked_cb(mydata, event)
         }
   client:publish(TRAFFIC_CHANNEL, json.encode(msg))
 end
-
-local node_cache = nc.NodeCache_create()
-node_cache:set_arp_cache(arp)
-node_cache:set_dns_cache(dnscache.dnscache)
 
 function publish_node_update(node)
   local msg = {}
