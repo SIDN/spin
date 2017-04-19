@@ -258,7 +258,6 @@ function initGraphs() {
         });
     });
 
-
     showGraph(traffic_dataset);
     showNetwork();
     initTrafficDataView();
@@ -376,31 +375,66 @@ function showNetwork() {
 function updateNodeInfo(nodeId) {
     var node = nodes.get(nodeId);
     writeToScreen("node", "node: " + node.address);
-    writeToScreen("trafficsize", "Connections seen: " + node.count);
-    writeToScreen("trafficcount", "Traffic size: " + node.size);
+    writeToScreen("trafficcount", "Connections seen: " + node.count);
+    writeToScreen("trafficsize", "Traffic size: " + node.size);
     writeToScreen("ipaddress", "");
     writeToScreen("lastseen", "Last seen: " + new Date(node.lastseen * 1000));
     // TODO: mark that this is hw not ip
+
     return node;
 }
 
 function nodeSelected(event) {
     var nodeId = event.nodes[0];
     if (typeof(nodeId) == 'number' && selectedNodeId != nodeId) {
-        writeToScreen("ipaddress", "");
-
         var node = updateNodeInfo(nodeId);
         selectedNodeId = nodeId;
         //sendCommand("arp2ip", node.address); // talk to Websocket
-        writeToScreen("reversedns", "Reverse DNS: &lt;searching&gt;");
+        if ("ips" in node) {
+            writeToScreen("ipaddress", "IP: " + node.ips.join());
+        } else {
+            writeToScreen("ipaddress", "IP: ");
+        }
+        if ("domains" in node) {
+            writeToScreen("reversedns", "DNS: " + node.domains.join());
+        } else {
+            writeToScreen("reversedns", "DNS: ");
+        }
+
+
         //sendCommand("ip2hostname", node.address);
-        writeToScreen("netowner", "Network owner: &lt;searching&gt;");
+        //writeToScreen("netowner", "Network owner: &lt;searching&gt;");
         //sendCommand("ip2netowner", node.address); // talk to Websocket
         $("#nodeinfo").dialog('option', 'title', node.label);
         $("#nodeinfo").dialog('open');
-    }
 
+        $("#firewall-node-button").button().on("click", function () {
+            var node = nodes.get(selectedNodeId);
+            // hmm. misschien we should actually remove the node and
+            // let the next occurrence take care of presentation?
+            if (node.blocked) {
+                sendCommandDNS("stopblockdata", selectedNodeId);
+                node.blocked = false;
+            } else {
+                sendCommandDNS("blockdata", selectedNodeId);
+                node.blocked = true;
+            }
+            nodes.update(node);
+            updateBlockedButton();
+        })
+        updateBlockedButton();
+
+    }
 }
+
+function updateBlockedButton() {
+    var node = nodes.get(selectedNodeId);
+    var label = node.blocked ? "Unblock node" : "Block node";
+    $("#firewall-node-button").button("option", {
+        "label": label
+    });
+}
+
 /* needed?
     function resetAllNodes() {
         nodes.clear();
@@ -467,12 +501,15 @@ function updateNode(node) {
     if (!enode) { return; }
 
     var label = node.id;
-    var colour = colour_recent;
+    // should only change color if it was recent and is no longer so
+    // but that is for a separate loop (unless it's internal device
+    // and we just discovered that, in which case we set it to _src)
+    //var colour = node.blocked ? colour_blocked : colour_recent;
     var ips = node.ips ? node.ips : [];
     var domains = node.domains ? node.domains : [];
     if (node.mac) {
         label = node.mac;
-        colour = colour_src;
+        node.color = colour_src;
     } else if (domains.length > 0) {
         label = node.domains[0];
     } else if (ips.length > 0) {
@@ -482,7 +519,7 @@ function updateNode(node) {
     enode.label = label;
     enode.ips = ips;
     enode.domains = domains;
-    enode.color = colour;
+    //enode.color = colour;
     nodes.update(enode);
 }
 
@@ -495,6 +532,7 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
     var colour = colour_recent;
     var ips = node.ips ? node.ips : [];
     var domains = node.domains ? node.domains : [];
+    var blocked = type == "blocked";
     if (node.mac) {
         label = node.mac;
         colour = colour_src;
@@ -502,6 +540,10 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
         label = node.domains[0];
     } else if (ips.length > 0) {
         label = node.ips[0];
+    }
+
+    if (blocked) {
+        colour = colour_blocked;
     }
 
     //alert("add node: " + node)
@@ -525,6 +567,7 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
             count: count,
             size: size,
             lastseen: timestamp,
+            blocked: blocked,
             scaling: {
                 min: 1,
                 label: {
@@ -547,7 +590,7 @@ function oldaddNode(timestamp, ip, scale, count, size, lwith, type) {
         // Set the color to mark 'recent'
 
         node["size"] += size;
-        node["count"] += size;
+        node["count"] += count;
         node["lastseen"] = timestamp;
 
         if (scale) {

@@ -17,8 +17,8 @@
 
 local mio = require 'mio'
 
-local FIREWALL_RULES_CONFIG = "/home/jelte/myvalibox/etc/spin/firewall.conf"
---local FIREWALL_RULES_CONFIG = "/etc/spin/firewall.conf"
+local FIREWALL_RULES_CONFIG = "/etc/spin/firewall.conf"
+--local FIREWALL_RULES_CONFIG = "/tmp/firewall.conf"
 
 local default_initial_rules = {
   "# SPIN Firewall module configuration file",
@@ -49,6 +49,8 @@ local default_initial_rules = {
   "iptables -A SPIN_CHECK -j RETURN",
   "",
 }
+
+local _M = {}
 
 local SpinFW = {}
 SpinFW.__index = SpinFW
@@ -127,8 +129,54 @@ function SpinFW:write(out)
   end
 end
 
-local s = _M.SpinFW_create()
-s:read()
-s:write(io.stdout)
+function SpinFW:add_block_ip(ip)
+  for _,v in pairs(self.reject) do
+    if v == ip then return end
+  end
+  table.insert(self.reject, ip)
+end
+
+function SpinFW:remove_block_ip(ip)
+  local di = nil
+  for i,v in pairs(self.reject) do
+    if v == ip then
+      di = i
+    end
+  end
+  if di then table.remove(self.reject, di) end
+end
+
+function SpinFW:save()
+  local writer, err = io.open(FIREWALL_RULES_CONFIG, "w")
+  if not writer then
+    error(err)
+  end
+  for _,l in pairs(self.initial) do
+    writer:write(l .. "\n")
+  end
+  writer:write("# SPIN_ALLOW Specifically allowed addresses go below\n")
+  for _,l in pairs(self.allow) do
+    writer:write("iptables -A SPIN_CHECK -d " .. l .. " -j RETURN\n")
+  end
+  writer:write("# SPIN_REJECT Specifically denied addresses go below\n")
+  for _,l in pairs(self.reject) do
+    writer:write("iptables -A SPIN_CHECK -d " .. l .. " -j SPIN_BLOCKED\n")
+  end
+  writer:write("# SPIN_END End of managed entries\n")
+  for _,l in pairs(self.final) do
+    writer:write(l .. "\n")
+  end
+  writer:close()
+end
+
+function SpinFW:commit()
+  self:save()
+  mio.execute("/etc/init.d/firewall restart")
+end
+
+--local s = _M.SpinFW_create()
+--s:read()
+--s:write(io.stdout)
+--s:commit()
 
 return _M

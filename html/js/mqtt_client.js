@@ -116,28 +116,13 @@ function onTrafficMessage(msg) {
                     }
                 }
                 break;
-            case 'ip2netowner':
-                //console.log("issueing ip2netowner command");
-                var node = nodes.get(selectedNodeId);
-                if (node && node.address == argument) {
-                    writeToScreen("netowner", "Network owner: " + result);
-                }
-                break;
-                // this one should be obsolete
-                /*case 'arp2dhcpname':
-                  //console.log("issueing arp2dhcpname command");
-                  if (result && result != "") {
-                      var node = nodes.get(getNodeId(argument));
-                      node.label = result;
-                      nodes.update(node);
-                  }
-                  break;*/
             case 'traffic':
                 //console.log("handling trafficcommand: " + evt.data);
                 // update the Graphs
                 handleTrafficMessage(result);
                 break;
             case 'blocked':
+                console.log("Got blocked command: " + msg);
                 handleBlockedMessage(result);
                 break;
             case 'names':
@@ -149,12 +134,15 @@ function onTrafficMessage(msg) {
                 updateFilterList();
                 break;
             case 'nodeUpdate':
-                console.log("Got node update command: " + msg)
-                node_cache[result.id] = result
+                console.log("Got node update command: " + msg);
+                node_cache[result.id] = result;
                 updateNode(result);
                 break;
+            case 'serverRestart':
+                serverRestart();
+                break;
             default:
-                console.log("unknown command from server: " + msg)
+                console.log("unknown command from server: " + msg);
                 break;
         }
     //} catch (error) {
@@ -277,8 +265,28 @@ function handleTrafficMessage(data) {
 function handleBlockedMessage(data) {
     var timestamp = data['timestamp']
 
-    addBlocked(timestamp, data['from'], data['to']);
+    var from_node = node_cache[data['from']];
+    if (!from_node) {
+        // some dummy data, ask for data update
+        from_node = {};
+        from_node.id = data['from'];
+        sendCommandDNS('missingNodeInfo', data['from']);
+        // what else?
+    }
+    var to_node = node_cache[data['to']];
+    if (!to_node) {
+        // some dummy data, ask for data update
+        to_node = {};
+        to_node.id = data['to'];
+        sendCommandDNS('missingNodeInfo', data['to']);
+        // what else?
+        // TODO send command
+    }
+    addBlocked(timestamp, from_node, to_node);
 }
 
+function serverRestart() {
+    location.reload(true);
+}
 
 window.addEventListener("load", init, false);

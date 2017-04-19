@@ -88,7 +88,7 @@ end
 function flow_as_json(c, s)
   local str = '{ '
   local parts = Split(c, ",", 2)
-  str = str .. '"from": "' .. parts[1] .. '", "to": "' .. parts[2] .. '", '
+  str = str .. '"from": ' .. parts[1] .. ', "to": ' .. parts[2] .. ', '
   str = str .. '"count": ' .. s.count .. ', '
   str = str .. '"size": ' .. s.size
   str = str .. ' }'

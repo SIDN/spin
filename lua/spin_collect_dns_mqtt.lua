@@ -9,6 +9,7 @@ local arp = require 'arp'
 local nc = require 'node_cache'
 -- tmp: treat DNS traffic as actual traffic
 local aggregator = require 'collect'
+local firewall = require 'spin_firewall'
 local filter = require 'filter'
 filter:load(true)
 
@@ -39,6 +40,15 @@ client.ON_CONNECT = function()
     vprint("Connected to MQTT broker")
     client:subscribe(DNS_COMMAND_CHANNEL)
     vprint("Subscribed to " .. DNS_COMMAND_CHANNEL)
+
+    local msg = {}
+    msg.command = "serverRestart"
+    msg.argument = ""
+    msg.result = node
+    local msg_json = json.encode(msg)
+    print("[XX] publish to " .. TRAFFIC_CHANNEL .. ":")
+    print(msg_json)
+    client:publish(TRAFFIC_CHANNEL, msg_json)
 --        local qos = 1
 --        local retain = true
 --        local mid = client:publish("my/topic/", "my payload", qos, retain)
@@ -81,6 +91,35 @@ function handle_command(command, argument)
 
     publish_node_update(node)
     response = nil
+  elseif command == "blockdata" then
+    -- add block to iptables
+    response = nil
+    local fw = firewall.SpinFW_create()
+    fw:read()
+    local node = node_cache:get_by_id(argument)
+    if node then
+      for _,ip in pairs(node.ips) do
+        print("[XX] ADDING BLOCK FOR IP: " .. ip)
+        fw:add_block_ip(ip)
+      end
+      fw:commit()
+    end
+  elseif command == "stopblockdata" then
+    -- remove block from iptables
+    response = nil
+    local fw = firewall.SpinFW_create()
+    fw:read()
+    local node = node_cache:get_by_id(argument)
+    if node then
+      for _,ip in pairs(node.ips) do
+        fw:remove_block_ip(ip)
+      end
+      fw:commit()
+    end
+  elseif command == "allowdata" then
+    -- add allow to iptables
+  elseif command == "stopallowdata" then
+    -- stop allow from iptables
   end
   return response
 end
@@ -191,22 +230,28 @@ function print_dns_cb(mydata, event)
 end
 
 function print_blocked_cb(mydata, event)
-  local from_ip = event:get_from_addr()
-  local from = arp:get_hw_address(from_ip)
-  if not from then
-    from = from_ip
+  from_node, new = node_cache:add_ip(event:get_from_addr())
+  if new then
+    -- publish it to the traffic channel
+    publish_node_update(from_node)
   end
-  local to_ip = event:get_to_addr()
-  local domains = dnscache.dnscache:get_domains(to_ip)
-  if #domains > 0 then
-    to_ip = domains[0]
+
+  to_node, new = node_cache:add_ip(event:get_to_addr())
+  if new then
+    -- publish it to the traffic channel
+    publish_node_update(to_node)
+  end
+
+  -- put internal nodes as the source
+  if to_node.mac then
+    from_node, to_node = to_node, from_node
   end
 
   print("[XX] PACKET GOT BLOCKED (TODO: report)")
   msg = { command = "blocked", argument = "", result = {
               timestamp = event:get_timestamp(),
-              from = from,
-              to = event:get_to_addr()
+              from = from_node.id,
+              to = to_node.id
           }
         }
   client:publish(TRAFFIC_CHANNEL, json.encode(msg))
@@ -235,6 +280,7 @@ function print_traffic_cb(mydata, event)
     -- publish it to the traffic channel
     publish_node_update(from_node)
   end
+
   to_node, new = node_cache:add_ip(event:get_to_addr())
   if new then
     -- publish it to the traffic channel
@@ -246,7 +292,7 @@ function print_traffic_cb(mydata, event)
     from_node, to_node = to_node, from_node
   end
 
-  add_flow(event:get_timestamp(), from_node.id, to_node.id, event:get_payload_size(), 1, publish_traffic, filter:get_filter_table())
+  add_flow(event:get_timestamp(), from_node.id, to_node.id, 1, event:get_payload_size(), publish_traffic, filter:get_filter_table())
 end
 
 vprint("SPIN experimental DNS capture tool")
