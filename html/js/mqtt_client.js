@@ -151,6 +151,7 @@ function onTrafficMessage(msg) {
             case 'nodeUpdate':
                 console.log("Got node update command: " + msg)
                 node_cache[result.id] = result
+                updateNode(result);
                 break;
             default:
                 console.log("unknown command from server: " + msg)

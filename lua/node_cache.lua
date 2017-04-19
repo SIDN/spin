@@ -56,7 +56,9 @@ end
 function Node:add_domain(domain)
   if not list_contains(self.domains, domain) then
     table.insert(self.domains, domain)
+    return true
   end
+  return false
 end
 
 function Node:has_ip(ip)
@@ -66,7 +68,9 @@ end
 function Node:add_ip(ip)
   if not list_contains(self.ips, ip) then
     table.insert(self.ips, ip)
+    return true
   end
+  return false
 end
 
 function Node:set_mac(mac)
@@ -135,7 +139,7 @@ end
 function NodeCache:get_by_ip(ip)
   --print("[XX] GET BY IP CALLED")
   for _,n in pairs(self.nodes) do
-    if n:has_ip(ip) then return n.id end
+    if n:has_ip(ip) then return n end
   end
   return nil
 end
@@ -150,11 +154,11 @@ end
 -- id, the id of the node that was found or created
 -- new, true if the node is new (no nodes known with given ip)
 function NodeCache:add_ip(ip)
-  local n_id = self:get_by_ip(ip)
-  if n_id then return n_id, false end
+  local n = self:get_by_ip(ip)
+  if n then return n, false end
 
   -- ok it's new
-  local n = self:create_node()
+  n = self:create_node()
   print("[Xx] NEW NODE CREATED")
   n:add_ip(ip)
   if self.arp_cache then
@@ -171,9 +175,21 @@ function NodeCache:add_ip(ip)
   -- we have more information about the node?
   print("[Xx] CACHE NOW")
   self:print(io.stdout)
-  print("[Xx] RETURNING NEW NODE")
-  return n.id, true
+  print("[Xx] RETURNING NEW NODE (id " .. n.id .. ")")
+  return n, true
 end
+
+-- Add a domain to the given ip in the node cache
+-- If this updates the cache (either ip is new or
+-- domain is new for that ip), return the node
+-- return nil otherwise
+function NodeCache:add_domain_to_ip(ip, domain)
+  local n, node_new = self:add_ip(ip)
+  local domain_new = n:add_domain(domain)
+  if node_new or domain_new then return n end
+  return nil
+end
+
 
 function NodeCache:print(out)
   out:write("------- FULL NODE CACHE -------\n")

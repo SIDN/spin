@@ -461,6 +461,31 @@ function addNodeName(ip, name) {
     nodeNames[ip] = name;
 }
 
+function updateNode(node) {
+    if (!node) { return; }
+    var enode = nodes.get(node.id);
+    if (!enode) { return; }
+
+    var label = node.id;
+    var colour = colour_recent;
+    var ips = node.ips ? node.ips : [];
+    var domains = node.domains ? node.domains : [];
+    if (node.mac) {
+        label = node.mac;
+        colour = colour_src;
+    } else if (domains.length > 0) {
+        label = node.domains[0];
+    } else if (ips.length > 0) {
+        label = node.ips[0];
+    }
+
+    enode.label = label;
+    enode.ips = ips;
+    enode.domains = domains;
+    enode.color = colour;
+    nodes.update(enode);
+}
+
 // Used in AddFlow()
 function addNode(timestamp, node, scale, count, size, lwith, type) {
     // why does this happen
@@ -486,7 +511,7 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
         enode.label = label;
         enode.ips = ips;
         enode.domains = domains;
-        enode.colour = colour;
+        enode.color = colour;
         nodes.update(enode);
     } else {
         // it's new

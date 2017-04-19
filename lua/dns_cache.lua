@@ -8,7 +8,7 @@
 -- was triggered by.
 --
 
-local verbose = true
+local verbose = false
 
 local _M = {}
 
@@ -63,9 +63,12 @@ function DNSCache:add(address, domain, timestamp)
   if entry == nil then
     entry = _M.DNSCacheEntry_create()
     self.size = self.size + 1
+    return true
   end
   entry:add_domain(domain, timestamp)
   self.entries[address] = entry
+  -- return false if now new?
+  return true
 end
 
 function DNSCache:clean(clean_before)

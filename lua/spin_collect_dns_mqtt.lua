@@ -156,8 +156,9 @@ function my_cb(mydata, event)
     end
 end
 
-local function my_callback(msg)
-  vprint("Yolo. callback: " .. msg)
+local function publish_traffic(msg)
+  --vprint("Yolo. callback: " .. msg)
+  vprint("Publish traffic data: " .. msg)
   client:publish(TRAFFIC_CHANNEL, msg)
 end
 
@@ -169,15 +170,21 @@ function print_dns_cb(mydata, event)
       else
         for _,addr in pairs(info.ip_addrs) do
           --add_to_cache(addr, info.dname, info.timestamp)
-          dnscache.dnscache:add(addr, info.dname, info.timestamp)
+          update = dnscache.dnscache:add(addr, info.dname, info.timestamp)
           dnscache.dnscache:clean(info.timestamp - 10)
+          if update then
+            -- update the node cache, and publish if it changed
+            local updated_node = node_cache:add_domain_to_ip(addr, info.dname)
+            if updated_node then publish_node_update(updated_node) end
+          end
           -- tmp: treat DNS queries as actual traffic
-          vprint("Adding flow")
+          --vprint("Adding flow")
           -- ADD TO DNS AGGREGATOR?...
-          --add_flow(info.timestamp, info.to_addr, info.dname, 1, 1, my_callback, filter:get_filter_table())
+          --add_flow(info.timestamp, info.to_addr, info.dname, 1, 1, publish_traffic, filter:get_filter_table())
+
         end
-        addrs_str = "[ " .. table.concat(info.ip_addrs, ", ") .. " ]"
-        vprint("Event: " .. info.timestamp .. " " .. info.to_addr .. " " .. info.dname .. " " .. addrs_str)
+        --addrs_str = "[ " .. table.concat(info.ip_addrs, ", ") .. " ]"
+        --vprint("Event: " .. info.timestamp .. " " .. info.to_addr .. " " .. info.dname .. " " .. addrs_str)
       end
     end
 end
@@ -205,6 +212,9 @@ function print_blocked_cb(mydata, event)
 end
 
 function publish_node_update(node)
+  if node == nil then
+    error("nil node")
+  end
   local msg = {}
   msg.command = "nodeUpdate"
   msg.argument = ""
@@ -216,26 +226,26 @@ function publish_node_update(node)
 end
 
 function print_traffic_cb(mydata, event)
-  print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_from_addr() .. " -> " .. event:get_to_addr())
+  --print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_from_addr() .. " -> " .. event:get_to_addr())
   -- Find the node-id's of the IP addresses
   local from_node_id, to_node_id, new
-  from_node_id, new = node_cache:add_ip(event:get_from_addr())
+  from_node, new = node_cache:add_ip(event:get_from_addr())
   if new then
     -- publish it to the traffic channel
-    publish_node_update(node_cache:get_by_id(from_node_id))
+    publish_node_update(from_node)
   end
-  to_node_id, new = node_cache:add_ip(event:get_to_addr())
+  to_node, new = node_cache:add_ip(event:get_to_addr())
   if new then
     -- publish it to the traffic channel
-    publish_node_update(node_cache:get_by_id(to_node_id))
+    publish_node_update(to_node)
   end
-  --if from_node_id < to_node_id then
-  --  tmp = from_node_id
-  --  from_node_id = to_node_id
-  --  to_node_id = from_node_id
-  --end
 
-  add_flow(event:get_timestamp(), from_node_id, to_node_id, event:get_payload_size(), 1, my_callback, filter:get_filter_table())
+  -- put internal nodes as the source
+  if to_node.mac then
+    from_node, to_node = to_node, from_node
+  end
+
+  add_flow(event:get_timestamp(), from_node.id, to_node.id, event:get_payload_size(), 1, publish_traffic, filter:get_filter_table())
 end
 
 vprint("SPIN experimental DNS capture tool")
