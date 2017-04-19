@@ -27,6 +27,9 @@
 #define LUA_NFLOG_DNSPACKET_NAME "nflog.DNSPacket"
 #define PI 3.1415729
 
+#define DEFAULT_BUFFER_SIZE 4194304
+#define MAX_BUFFER_SIZE 8000000
+
 static int math_sin (lua_State *L) {
     //char* a = malloc(24000);
     //(void)a;
@@ -34,8 +37,6 @@ static int math_sin (lua_State *L) {
     lua_pushnumber(L, 32);
     return 1;
 }
-
-#define BUFSZ 2097152
 
 void stackdump_g(lua_State* l)
 {
@@ -80,6 +81,8 @@ typedef struct {
     struct nflog_g_handle *ghandle;
     // lua state stack, used when calling the callback
     lua_State* L;
+    // size_t buffer_size
+    size_t buffer_size;
 } netlogger_info;
 
 typedef struct {
@@ -129,6 +132,7 @@ int callback_handler(struct nflog_g_handle *handle,
 // group_number (int)
 // callback_function (function)
 // optional callback function extra argument
+// optional timeout value for reads in the loop_ functions later
 //
 // The callback function will be passed a pointer to the event and the optional extra user argument
 //
@@ -137,6 +141,34 @@ static int setup_netlogger_loop(lua_State *L) {
 
     struct nflog_handle *handle = NULL;
     struct nflog_g_handle *group = NULL;
+
+    unsigned long timeout_sec = 1;
+    unsigned long timeout_usec = 0;
+    double timeout_number;
+    size_t buffer_size = DEFAULT_BUFFER_SIZE;
+    int arguments = lua_gettop(L);
+
+    // optional timeout for socket reads
+    if (arguments >= 4) {
+        timeout_number = luaL_checknumber(L, 4);
+        timeout_sec = (unsigned long)timeout_number;
+        timeout_usec = (unsigned long)((timeout_number - timeout_sec) * 10000000);
+        // get rid of all extraneous arguments, next piece of code needs
+        // to pop the right ones
+    }
+
+    // optional buffer size
+    if (arguments >= 5) {
+        buffer_size = luaL_checknumber(L, 5);
+        if (buffer_size > MAX_BUFFER_SIZE) {
+            fprintf(stderr, "Warning: limiting buffer size to %u bytes\n", MAX_BUFFER_SIZE);
+            buffer_size = MAX_BUFFER_SIZE;
+        }
+    }
+
+    if (arguments > 3) {
+        lua_pop(L, arguments - 3);
+    }
 
     // handle the lua arugments to this function
     int groupnum = luaL_checknumber(L, 1);
@@ -165,7 +197,7 @@ static int setup_netlogger_loop(lua_State *L) {
         fprintf(stderr, "Could not set group mode\n");
         exit(1);
     }
-    if (nflog_set_nlbufsiz(group, BUFSZ) < 0) {
+    if (nflog_set_nlbufsiz(group, buffer_size) < 0) {
         fprintf(stderr, "Could not set group buffer size\n");
         exit(1);
     }
@@ -176,15 +208,15 @@ static int setup_netlogger_loop(lua_State *L) {
     /* Get the actual FD for the netlogger entry */
     fd = nflog_fd(handle);
 
+    int cb_d = luaL_ref(L, LUA_REGISTRYINDEX);
+    int cb_f = luaL_ref(L, LUA_REGISTRYINDEX);
+
     struct timeval tv;
     tv.tv_sec = 1;
     tv.tv_usec = 0;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
 
     //stackdump_g(L);
-
-    int cb_d = luaL_ref(L, LUA_REGISTRYINDEX);
-    int cb_f = luaL_ref(L, LUA_REGISTRYINDEX);
 
     // Create the result and put it on the stack to return
     netlogger_info* nli = (netlogger_info*) lua_newuserdata(L, sizeof(netlogger_info));
@@ -199,6 +231,7 @@ static int setup_netlogger_loop(lua_State *L) {
     nli->L = L;
     nli->lua_callback_data_regid = cb_d;
     nli->lua_callback_regid = cb_f;
+    nli->buffer_size = buffer_size;
 
     nflog_callback_register(group, &callback_handler, nli);
 
@@ -208,15 +241,16 @@ static int setup_netlogger_loop(lua_State *L) {
 
 static int handler_loop_once(lua_State *L) {
     int sz;
-    char buf[BUFSZ];
-
     netlogger_info* nli = (netlogger_info*) lua_touserdata(L, 1);
-    sz = recv(nli->fd, buf, BUFSZ, 0);
+    char buf[nli->buffer_size];
+
+    errno = 0;
+    sz = recv(nli->fd, buf, nli->buffer_size, 0);
     if (sz < 0 && (errno == EINTR || errno == EAGAIN)) {
         //printf("[XX] EINTR or EAGAIN\n", nli);
         return 0;
     } else if (sz < 0) {
-        printf("Error reading from nflog socket: %s (%d) ((bufsize %u))\n", strerror(errno), errno, BUFSZ);
+        printf("Error reading from nflog socket: %s (%d) ((bufsize %u))\n", strerror(errno), errno, nli->buffer_size);
         return 0;
     }
     nflog_handle_packet(nli->handle, buf, sz);
@@ -225,11 +259,11 @@ static int handler_loop_once(lua_State *L) {
 
 static int handler_loop_forever(lua_State *L) {
     int sz;
-    char buf[BUFSZ];
-
     netlogger_info* nli = (netlogger_info*) lua_touserdata(L, 1);
+    char buf[nli->buffer_size];
+
     for (;;) {
-        sz = recv(nli->fd, buf, BUFSZ, 0);
+        sz = recv(nli->fd, buf, nli->buffer_size, 0);
         if (sz < 0 && (errno == EINTR || errno == EAGAIN)) {
             continue;
         } else if (sz < 0) {

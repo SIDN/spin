@@ -200,7 +200,7 @@ mydata.foo = 123
 mydata.bar = "asdf"
 
 --nl = lnflog.setup_netlogger_loop(1, my_cb, mydata)
-nl = lnflog.setup_netlogger_loop(1, print_dns_cb, mydata)
+nl = lnflog.setup_netlogger_loop(771, print_dns_cb, mydata, 0.1, 18000000)
 --nl:loop_forever()
 for i=1,200 do
     nl:loop_once()

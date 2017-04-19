@@ -121,7 +121,8 @@ function get_dns_answer_info(event)
     --vprint(dnsp:tostring());
     --vprint("QUESTION NAME: " .. dnsp:get_qname())
     --vprint("QUESTION TYPE: " .. dnsp:get_qtype())
-    dname = dnsp:get_qname_second_level_only()
+    --dname = dnsp:get_qname_second_level_only()
+    dname = dnsp:get_qname()
     if dname == nil then
         return nil, err
     end
@@ -250,9 +251,9 @@ end
 
 vprint("SPIN experimental DNS capture tool")
 broker = arg[1] -- defaults to "localhost" if arg not set
-traffic = lnflog.setup_netlogger_loop(771, print_traffic_cb, mydata)
-dns = lnflog.setup_netlogger_loop(772, print_dns_cb, mydata)
-blocked = lnflog.setup_netlogger_loop(773, print_blocked_cb, nil)
+traffic = lnflog.setup_netlogger_loop(771, print_traffic_cb, mydata, 0.2)
+dns = lnflog.setup_netlogger_loop(772, print_dns_cb, mydata, 0.2)
+blocked = lnflog.setup_netlogger_loop(773, print_blocked_cb, nil, 0.2)
 vprint("Connecting to broker")
 client:connect(broker)
 --nl:loop_forever()
