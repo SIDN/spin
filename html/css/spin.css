@@ -1,5 +1,5 @@
 /*
- * SPIN CSS - v0.0.1 - 2017-03-01
+ * SPIN CSS - v0.0.2 - 2017-04-19
  * https://valibox.sidn.nl/
  */
 
@@ -67,6 +67,7 @@ body {
 }
 @media screen and (max-width: 550px) {
     #title-logo {display:none;}
+    #visualization {display:none;}
 }
 #title {
     font-weight: bold;
