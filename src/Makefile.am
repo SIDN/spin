@@ -2,16 +2,9 @@
 AM_CPPFLAGS = -I$(top_srcdir)/include
 AM_CFLAGS = ${regular_CFLAGS} -g
 
-sbin_PROGRAMS = nflog_print nflog2mqtt
-lib_LTLIBRARIES = lnflog.la
+lib_LTLIBRARIES = lua-spin-nflog.la
 
-nflog_print_SOURCES = nflog_print.c nflog.c
-nflog_print_LDFLAGS = -lnetfilter_log -lnfnetlink -lmosquitto
-
-nflog2mqtt_SOURCES = nflog2mqtt.c nflog.c
-nflog2mqtt_LDFLAGS = -lnetfilter_log -lnfnetlink -lmosquitto
-
-lnflog_la_SOURCES = lua-nflog.c
-lnflog_la_LDFLAGS = -module -lnetfilter_log -lnfnetlink
-lnflog_la_CFLAGS = ${LUA_INCLUDE}
-lnflog_la_LIBADD = ${LUA_LIB} -lldns
+lua_spin_nflog_la_SOURCES = lua-spin-nflog.c
+lua_spin_nflog_la_LDFLAGS = -module -lnetfilter_log -lnfnetlink
+lua_spin_nflog_la_CFLAGS = ${LUA_INCLUDE}
+lua_spin_nflog_la_LIBADD = ${LUA_LIB} -lldns

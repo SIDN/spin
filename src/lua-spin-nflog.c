@@ -21,11 +21,10 @@
 #include <ldns/ldns.h>
 
 #include <math.h>
-#define LUA_NFLOG_NAME "nflog"
-#define LUA_NFLOG_HANDLER_NAME "nflog.Handler"
-#define LUA_NFLOG_EVENT_NAME "nflog.Event"
-#define LUA_NFLOG_DNSPACKET_NAME "nflog.DNSPacket"
-#define PI 3.1415729
+#define LUA_NFLOG_NAME "lua-spin-nflog"
+#define LUA_NFLOG_HANDLER_NAME "lua-spin-nflog.Handler"
+#define LUA_NFLOG_EVENT_NAME "lua-spin-nflog.Event"
+#define LUA_NFLOG_DNSPACKET_NAME "lua-spin-nflog.DNSPacket"
 
 #define DEFAULT_BUFFER_SIZE 4194304
 #define MAX_BUFFER_SIZE 8000000
@@ -731,13 +730,6 @@ LUALIB_API int luaopen_lnflog (lua_State *L) {
 
     // register the library itself
     luaL_register(L, LUA_NFLOG_NAME, nflog_lib);
-
-    lua_pushnumber(L, PI);
-    lua_setfield(L, -2, "pi");
-    lua_pushnumber(L, HUGE_VAL);
-    lua_setfield(L, -2, "huge");
-
-    // any additional initialization code goes here
 
     return 1;
 }

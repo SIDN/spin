@@ -1,7 +1,7 @@
 #!/usr/bin/lua
 
 local mqtt = require 'mosquitto'
-local lnflog = require 'lnflog'
+local lnflog = require 'lua-spin-nflog'
 local bit = require 'bit'
 local json = require 'json'
 local dnscache = require 'dns_cache'
