@@ -13,25 +13,6 @@ function init() {
     client.connect({onSuccess:onTrafficOpen});
 }
 
-// called when the client connects
-/*
-function origonConnect() {
-    alert("Connect")
-    // Once a connection has been made, make a subscription and send a message.
-    console.log("onConnect");
-    client.subscribe("SPIN-output-all");
-    message = new Paho.MQTT.Message("Hello");
-    message.destinationName = "SPIN-Config";
-    client.send(message);
-}
-
-// called when the client loses its connection
-function origonConnectionLost(responseObject) {
-    if (responseObject.errorCode !== 0) {
-        console.log("onConnectionLost:"+responseObject.errorMessage);
-    }
-}
-*/
 // called when a message arrives
 function origonMessageArrived(message) {
     //console.log("SPIN/traffic message:"+message.payloadString);
@@ -48,33 +29,7 @@ function sendCommand(command, argument) {
     var message = new Paho.MQTT.Message(json_cmd);
     message.destinationName = "SPIN/commands";
     client.send(message);
-    console.log("Sent: " + json_cmd)
-}
-
-function sendCommand(command, argument) {
-    var cmd = {}
-    cmd['command'] = command;
-    cmd['argument'] = argument;
-    //console.log("sending command: '" + command + "' with argument: '" + JSON.stringify(argument) + "'");
-
-    var json_cmd = JSON.stringify(cmd);
-    var message = new Paho.MQTT.Message(json_cmd);
-    message.destinationName = "SPIN/commands";
-    client.send(message);
-    console.log("Sent: " + json_cmd)
-}
-
-function sendCommandDNS(command, argument) {
-    var cmd = {}
-    cmd['command'] = command;
-    cmd['argument'] = argument;
-    //console.log("sending command: '" + command + "' with argument: '" + JSON.stringify(argument) + "'");
-
-    var json_cmd = JSON.stringify(cmd);
-    var message = new Paho.MQTT.Message(json_cmd);
-    message.destinationName = "SPIN/dnsnames";
-    client.send(message);
-    console.log("Sent: " + json_cmd)
+    console.log("Sent to SPIN/commands: " + json_cmd)
 }
 
 function writeToScreen(element, message) {
@@ -97,26 +52,8 @@ function onTrafficMessage(msg) {
                     writeToScreen("ipaddress", "IP(s): " + result);
                 }
                 break;
-            case 'ip2hostname':
-                //console.log("issueing ip2hostname command");
-                var node = nodes.get(selectedNodeId);
-                if (node && node.address == argument) {
-                    writeToScreen("reversedns", "Reverse DNS: " + result);
-                }
-                // update_ip_nodes
-                if (result != "No reverse name found") {
-                    nodeNames[argument] = result;
-                    for (ip in nodeIds) {
-                        if (ip == argument) {
-                            var nodeId = getNodeId(ip)
-                            var node = nodes.get(nodeId);
-                            node.label = result;
-                            nodes.update(node);
-                        }
-                    }
-                }
-                break;
             case 'traffic':
+                console.log("Got traffic command: " + msg);
                 //console.log("handling trafficcommand: " + evt.data);
                 // update the Graphs
                 handleTrafficMessage(result);
@@ -124,9 +61,6 @@ function onTrafficMessage(msg) {
             case 'blocked':
                 console.log("Got blocked command: " + msg);
                 handleBlockedMessage(result);
-                break;
-            case 'names':
-                //nodeNames = result;
                 break;
             case 'filters':
                 filterList = result;
@@ -156,7 +90,6 @@ function onTrafficOpen(evt) {
     client.subscribe("SPIN/traffic");
 
     sendCommand("get_filters", {})//, "")
-    sendCommand("get_names", {})//, "")
     //show connected status somewhere
     $("#statustext").css("background-color", "#ccffcc").text("Connected");
 }
@@ -212,28 +145,6 @@ function handleTrafficMessage(data) {
     // update network view
     //
 
-    // clean out old nodes, and reset color
-    // TODO: Websocket heartbeat signal with regular intervals to trigger this part?
-    var now = Math.floor(Date.now() / 1000);
-    var delete_before = now - 600;
-    var unhighlight_before = now - 10;
-    var ip;
-    for (ip in nodeIds) {
-        var nodeId = getNodeId(ip)
-        var node = nodes.get(nodeId);
-        if (node.address in nodeNames) {
-            node.label = nodeNames[node.address];
-            nodes.update(node);
-        }
-
-        if (node.lastseen < delete_before) {
-            deleteNode(node, true);
-        } else if (node.lastseen < unhighlight_before && node["color"] == colour_recent) {
-            node["color"] = colour_dst;
-            nodes.update(node);
-        }
-    }
-
     // Add the new flows
     var arr = data['flows'];
     for (var i = 0, len = arr.length; i < len; i++) {
@@ -245,7 +156,7 @@ function handleTrafficMessage(data) {
             // some dummy data, ask for data update
             from_node = {};
             from_node.id = f['from'];
-            sendCommandDNS('missingNodeInfo', f['from']);
+            sendCommand('missingNodeInfo', f['from']);
             // what else?
         }
         var to_node = node_cache[f['to']];
@@ -253,7 +164,7 @@ function handleTrafficMessage(data) {
             // some dummy data, ask for data update
             to_node = {};
             to_node.id = f['to'];
-            sendCommandDNS('missingNodeInfo', f['to']);
+            sendCommand('missingNodeInfo', f['to']);
             // what else?
             // TODO send command
         }
@@ -270,7 +181,7 @@ function handleBlockedMessage(data) {
         // some dummy data, ask for data update
         from_node = {};
         from_node.id = data['from'];
-        sendCommandDNS('missingNodeInfo', data['from']);
+        sendCommand('missingNodeInfo', data['from']);
         // what else?
     }
     var to_node = node_cache[data['to']];
@@ -278,7 +189,7 @@ function handleBlockedMessage(data) {
         // some dummy data, ask for data update
         to_node = {};
         to_node.id = data['to'];
-        sendCommandDNS('missingNodeInfo', data['to']);
+        sendCommand('missingNodeInfo', data['to']);
         // what else?
         // TODO send command
     }

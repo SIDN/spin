@@ -22,6 +22,7 @@ end
 function util:get_all_bound_ip_addresses()
   local s = util:capture("ip addr show", true)
   local result = {}
+  result["0.0.0.0"] = true
   for l in string.gmatch(s, "inet %d+.%d+.%d+.%d+") do
     result[l:sub(6)] = true
   end

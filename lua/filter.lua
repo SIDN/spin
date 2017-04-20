@@ -13,7 +13,7 @@ local util = require 'util'
 local arp = require 'arp'
 
 local filter = {}
-filter.filename = "/tmp/spin_userdata.cfg"
+filter.filename = "/etc/spin/spin_userdata.cfg"
 filter.data = {}
 
 function filter:load(add_own_if_new)
@@ -97,6 +97,10 @@ end
 
 function filter:add_name(address, name)
   filter.data.names[address] = name
+end
+
+function filter:get_name(address)
+  return filter.data.names[address]
 end
 
 function filter:get_filter_table()

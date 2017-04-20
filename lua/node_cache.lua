@@ -43,6 +43,7 @@ function Node_create()
   local n = {}
   setmetatable(n, Node)
   n.mac = nil
+  n.name = nil
   n.domains = {}
   n.ips = {}
   n.lastseen = os.time()
@@ -80,6 +81,14 @@ end
 
 function Node:get_mac(mac)
   return self.mac
+end
+
+function Node:set_name(name)
+  self.name = name
+end
+
+function Node:get_name()
+  return self.name
 end
 
 function Node:shared_data(other)
@@ -145,6 +154,10 @@ function NodeCache:set_arp_cache(arp_cache)
   self.arp_cache = arp_cache
 end
 
+function NodeCache:set_filter_tool(filter_tool)
+  self.filter_tool = filter_tool
+end
+
 function NodeCache:create_node()
   local n = Node_create()
   table.insert(self.nodes, n)
@@ -180,30 +193,46 @@ function NodeCache:add_ip(ip)
 
   -- ok it's new
   n = self:create_node()
-  print("[Xx] NEW NODE CREATED")
   n:add_ip(ip)
+  local mac = nil
+
+  -- see if the address is a local one (found in ARP cache)
   if self.arp_cache then
-    print("[Xx] try ARP")
-    n:set_mac(self.arp_cache:get_hw_address(ip))
+    mac = self.arp_cache:get_hw_address(ip)
+    if mac then
+      n:set_mac(mac)
+    end
   end
+
+  -- if we have a custom name for it, set that
+  if self.filter_tool then
+    -- if we have a mac and a name for that, use it, if not
+    -- see if ip has a user-set name.
+    local name = nil
+    if mac then name = self.filter_tool:get_name(mac) end
+    if not name then name = self.filter_tool:get_name(ip) end
+    if name then
+      n:set_name(name)
+    end
+  end
+
+  -- add the domains we have seen for this address
   if self.dns_cache then
-    print("[Xx] try DNS")
     for _,d in pairs(self.dns_cache:get_domains(ip)) do
       n:add_domain(d)
     end
   end
 
+  -- Now check if this node shares data with any other node
+  -- if so, merge them
   for _,other in pairs(self.nodes) do
     if n:shared_data(other) then
-      print("[Xx] MERGING NODE WITH OTHER NODE")
       other:merge(n)
       return other, true
     end
   end
   -- todo: should we have another find/merge round now that
   -- we have more information about the node?
-  print("[Xx] CACHE NOW SIZE: " .. self:size())
-  print("[Xx] RETURNING NEW NODE (id " .. n.id .. ")")
   return n, true
 end
 

@@ -21,13 +21,13 @@ local verbose = true
 --
 -- mqtt-related things
 --
-local DNS_COMMAND_CHANNEL = "SPIN/dnsnames"
+local COMMAND_CHANNEL = "SPIN/commands"
 local TRAFFIC_CHANNEL = "SPIN/traffic"
 
 local node_cache = nc.NodeCache_create()
 node_cache:set_arp_cache(arp)
 node_cache:set_dns_cache(dnscache.dnscache)
-
+node_cache:set_filter_tool(filter)
 
 function vprint(msg)
     if verbose then
@@ -38,17 +38,11 @@ end
 local client = mqtt.new()
 client.ON_CONNECT = function()
     vprint("Connected to MQTT broker")
-    client:subscribe(DNS_COMMAND_CHANNEL)
-    vprint("Subscribed to " .. DNS_COMMAND_CHANNEL)
+    client:subscribe(COMMAND_CHANNEL)
+    vprint("Subscribed to " .. COMMAND_CHANNEL)
 
-    local msg = {}
-    msg.command = "serverRestart"
-    msg.argument = ""
-    msg.result = node
-    local msg_json = json.encode(msg)
-    print("[XX] publish to " .. TRAFFIC_CHANNEL .. ":")
-    print(msg_json)
-    client:publish(TRAFFIC_CHANNEL, msg_json)
+    -- Reset any running clients
+    client:publish(TRAFFIC_CHANNEL, json.encode(create_server_restart_command()))
 --        local qos = 1
 --        local retain = true
 --        local mid = client:publish("my/topic/", "my payload", qos, retain)
@@ -56,7 +50,7 @@ end
 
 client.ON_MESSAGE = function(mid, topic, payload)
     vprint("got message on " .. topic)
-    if topic == DNS_COMMAND_CHANNEL then
+    if topic == COMMAND_CHANNEL then
         command = json.decode(payload)
         if (command["command"] and command["argument"]) then
             vprint("Command: " .. payload)
@@ -68,6 +62,60 @@ client.ON_MESSAGE = function(mid, topic, payload)
             end
         end
     end
+end
+
+function create_server_restart_command()
+  local update  = {}
+  update ["command"] = "serverRestart"
+  update ["argument"] = ""
+  return update
+end
+
+function create_filter_list_command()
+  local update  = {}
+  update ["command"] = "filters"
+  update ["argument"] = ""
+  update ["result"] = filter:get_filter_list()
+  return update
+end
+
+function create_name_list_command()
+  local update  = {}
+  update ["command"] = "names"
+  update ["argument"] = ""
+  update ["result"] = filter:get_name_list()
+  return update
+end
+
+function add_filters_for_node(node_id)
+  local node = node_cache:get_by_id(node_id)
+  if not node then return end
+  filter:load()
+  for _,ip in pairs(node.ips) do
+    filter:add_filter(ip)
+  end
+  filter:save()
+end
+
+function remove_filters_for_node(node_id)
+  local node = node_cache:get_by_id(node_id)
+  if not node then return end
+  filter:load()
+  for _,ip in pairs(node.ips) do
+    filter:remove_filter(ip)
+  end
+  filter:save()
+end
+
+function add_name_for_node(node_id, name)
+
+  local node = node_cache:get_by_id(node_id)
+  if not node then return end
+  filter:load()
+  for _,ip in pairs(node.ips) do
+    filter:add_name(ip, name)
+  end
+  filter:save()
 end
 
 function handle_command(command, argument)
@@ -84,11 +132,34 @@ function handle_command(command, argument)
     else
       response = nil
     end
+  elseif (command == "get_filters") then
+    response = create_filter_list_command()
+  elseif (command == "add_filter") then
+    print("[XX] GOT IGNORE COMMAND FOR " .. argument);
+    -- response necessary? resend the filter list?
+    add_filters_for_node(argument)
+    -- don't send direct response, but send a 'new list' update
+    response = create_filter_list_command()
+  elseif (command == "remove_filter") then
+    filter:load()
+    filter:remove_filter(argument)
+    filter:save()
+    -- don't send direct response, but send a 'new list' update
+    response = create_filter_list_command()
+  elseif (command == "reset_filters") then
+    filter:remove_all_filters()
+    filter:add_own_ips()
+    filter:save()
+    response = create_filter_list_command()
+  elseif (command == "get_names") then
+    response = create_name_list_command()
+  elseif (command == "add_name") then
+    add_name_for_node(argument["node_id"], argument["name"])
+    -- rebroadcast names?
+    response = nil
   elseif command == "missingNodeInfo" then
     -- just publish it again?
     local node = node_cache:get_by_id(tonumber(argument))
-    print("[XX] WAS ASKED FOR INFO ABOUT NODE " .. argument .. "(type " .. type(argument) .. ")")
-
     publish_node_update(node)
     response = nil
   elseif command == "blockdata" then
@@ -120,6 +191,10 @@ function handle_command(command, argument)
     -- add allow to iptables
   elseif command == "stopallowdata" then
     -- stop allow from iptables
+  else
+    response = {}
+    response["command"] = "error"
+    response["argument"] = "Unknown command: " .. command
   end
   return response
 end
@@ -197,8 +272,7 @@ function my_cb(mydata, event)
 end
 
 local function publish_traffic(msg)
-  --vprint("Yolo. callback: " .. msg)
-  vprint("Publish traffic data: " .. msg)
+  --vprint("Publish traffic data: " .. msg)
   client:publish(TRAFFIC_CHANNEL, msg)
 end
 
@@ -266,8 +340,8 @@ function publish_node_update(node)
   msg.argument = ""
   msg.result = node
   local msg_json = json.encode(msg)
-  print("[XX] publish to " .. TRAFFIC_CHANNEL .. ":")
-  print(msg_json)
+  --print("[XX] publish to " .. TRAFFIC_CHANNEL .. ":")
+  --print(msg_json)
   client:publish(TRAFFIC_CHANNEL, msg_json)
 end
 

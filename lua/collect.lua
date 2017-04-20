@@ -25,7 +25,8 @@ function Aggregator:create(timestamp)
 end
 
 function Aggregator:same_timestamp(timestamp)
-  return self.data.timestamp == timestamp
+  --return self.data.timestamp == timestamp
+  return timestamp - self.data.timestamp < 3
 end
 
 function Aggregator:add_flow(from_ip, to_ip, count, size)
