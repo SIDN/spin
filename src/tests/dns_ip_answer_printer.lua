@@ -1,6 +1,6 @@
 #!/usr/bin/lua
 
-local lnflog = require 'lnflog'
+local lnflog = require 'lua-spin_nflog'
 local bit = require 'bit'
 
 

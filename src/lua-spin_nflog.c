@@ -21,10 +21,10 @@
 #include <ldns/ldns.h>
 
 #include <math.h>
-#define LUA_NFLOG_NAME "lua-spin-nflog"
-#define LUA_NFLOG_HANDLER_NAME "lua-spin-nflog.Handler"
-#define LUA_NFLOG_EVENT_NAME "lua-spin-nflog.Event"
-#define LUA_NFLOG_DNSPACKET_NAME "lua-spin-nflog.DNSPacket"
+#define LUA_NFLOG_NAME "lua-spin_nflog"
+#define LUA_NFLOG_HANDLER_NAME "lua-spin_nflog.Handler"
+#define LUA_NFLOG_EVENT_NAME "lua-spin_nflog.Event"
+#define LUA_NFLOG_DNSPACKET_NAME "lua-spin_nflog.DNSPacket"
 
 #define DEFAULT_BUFFER_SIZE 4194304
 #define MAX_BUFFER_SIZE 8000000
@@ -706,7 +706,7 @@ static const luaL_Reg dnspacket_mapping[] = {
 /*
 ** Netfilter-log library initialization
 */
-LUALIB_API int luaopen_lnflog (lua_State *L) {
+LUALIB_API int luaopen_spin_nflog (lua_State *L) {
 
     // register the handler class
     luaL_newmetatable(L, LUA_NFLOG_HANDLER_NAME); //leaves new metatable on the stack
