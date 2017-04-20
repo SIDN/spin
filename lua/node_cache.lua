@@ -82,6 +82,27 @@ function Node:get_mac(mac)
   return self.mac
 end
 
+function Node:shared_data(other)
+  if self.mac and self.mac == other.mac then return true end
+  for _,ip in pairs(self.ips) do
+    if other:has_ip(ip) then return true end
+  end
+  for _,domain in pairs(self.domains) do
+    if other:has_domain(domain) then return true end
+  end
+  return false
+end
+
+function Node:merge(other)
+  if other.mac then self.mac = other.mac end
+  for _,ip in pairs(other.ips) do
+    self:add_ip(ip)
+  end
+  for _,domain in pairs(other.domains) do
+    self:add_domain(domain)
+  end
+end
+
 function Node:print(out)
   out:write("- Node " .. self.id .. ":\n")
   out:write("  lastseen: " .. self.lastseen .. "\n")
@@ -171,10 +192,17 @@ function NodeCache:add_ip(ip)
       n:add_domain(d)
     end
   end
+
+  for _,other in pairs(self.nodes) do
+    if n:shared_data(other) then
+      print("[Xx] MERGING NODE WITH OTHER NODE")
+      other:merge(n)
+      return other, true
+    end
+  end
   -- todo: should we have another find/merge round now that
   -- we have more information about the node?
-  print("[Xx] CACHE NOW")
-  self:print(io.stdout)
+  print("[Xx] CACHE NOW SIZE: " .. self:size())
   print("[Xx] RETURNING NEW NODE (id " .. n.id .. ")")
   return n, true
 end
@@ -190,6 +218,23 @@ function NodeCache:add_domain_to_ip(ip, domain)
   return nil
 end
 
+-- Note: we want to preserve the ID when removing old nodes,
+-- so we only set the value to nil
+function NodeCache:clean(remove_before)
+  for i,v in pairs(self.nodes) do
+    if v.lastseen < remove_before then
+      self.nodes[i] = nil
+    end
+  end
+end
+
+function NodeCache:size()
+  local result = 0
+  for _,_ in pairs(self.nodes) do
+    result = result + 1
+  end
+  return result
+end
 
 function NodeCache:print(out)
   out:write("------- FULL NODE CACHE -------\n")
@@ -204,35 +249,5 @@ end
 
 
 _M.NodeCache = NodeCache
-
---
--- some initial testing code
---
-function test()
-    local nc = _M.NodeCache_create()
-
-    local arp = require 'arp'
-    nc:set_arp_cache(arp)
-
-    nc:print(io.stdout)
-    local n1 = nc:create_node()
-    local n2 = nc:create_node()
-    nc:print(io.stdout)
-
-    n1:add_ip("1.2.3.4")
-
-
-    nc:print(io.stdout)
-
-    print("[XX] ADDING (again)")
-    local i = nc:add_ip("1.2.3.4")
-    print("[XX] ID of node: " .. i)
-    print("[XX] ADDING (new)")
-    i = nc:add_ip("192.168.8.1")
-    print("[XX] ID of node: " .. i)
-    nc:print(io.stdout)
-end
-
---print("cache size: " .. table.getn(nc))
 
 return _M

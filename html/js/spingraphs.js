@@ -528,7 +528,7 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
     // why does this happen
     if (!node) { return; }
     // find the 'best' info we can display in the main view
-    var label = node.id;
+    var label = "<working>";
     var colour = colour_recent;
     var ips = node.ips ? node.ips : [];
     var domains = node.domains ? node.domains : [];
@@ -643,7 +643,7 @@ function oldaddNode(timestamp, ip, scale, count, size, lwith, type) {
 }
 
 // Used in AddFlow()
-function addEdge(from, to) {
+function addEdge(from, to, colour) {
     var existing = edges.get({
         filter: function(item) {
             return (item.from == from.id && item.to == to.id);
@@ -654,7 +654,7 @@ function addEdge(from, to) {
             id: curEdgeId,
             from: from.id,
             to: to.id,
-            color: colour_edge
+            color: colour
         });
         curEdgeId += 1;
     }
@@ -748,7 +748,7 @@ function addFlow(timestamp, from, to, count, size) {
     //}
     addNode(timestamp, from, false, count, size, "to " + to, "source");
     addNode(timestamp, to, true, count, size, "from " + from, "traffic");
-    addEdge(from, to);
+    addEdge(from, to, colour_edge);
     if (!zoom_locked) {
         network.fit({
             duration: 0
@@ -762,7 +762,7 @@ function addBlocked(timestamp, from, to) {
     }
     addNode(timestamp, from, false, 1, 1, "to " + to, "source");
     addNode(timestamp, to, false, 1, 1, "from " + from, "blocked");
-    addEdge(from, to);
+    addEdge(from, to, colour_blocked);
     if (!zoom_locked) {
         network.fit({
             duration: 0

@@ -211,7 +211,7 @@ function print_dns_cb(mydata, event)
         for _,addr in pairs(info.ip_addrs) do
           --add_to_cache(addr, info.dname, info.timestamp)
           update = dnscache.dnscache:add(addr, info.dname, info.timestamp)
-          dnscache.dnscache:clean(info.timestamp - 10)
+          --dnscache.dnscache:clean(info.timestamp - 10)
           if update then
             -- update the node cache, and publish if it changed
             local updated_node = node_cache:add_domain_to_ip(addr, info.dname)
@@ -309,5 +309,9 @@ while true do
     traffic:loop_once()
     blocked:loop_once()
     client:loop()
+    -- clean data older than 15 minutes
+    local clean_before = os.time() - 900
+    node_cache:clean(clean_before)
+    dnscache.dnscache:clean(clean_before)
 end
 nl:close()
