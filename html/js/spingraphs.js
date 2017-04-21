@@ -389,6 +389,7 @@ function nodeSelected(event) {
     if (typeof(nodeId) == 'number' && selectedNodeId != nodeId) {
         var node = updateNodeInfo(nodeId);
         selectedNodeId = nodeId;
+        writeToScreen("nodeid", "Node: " + nodeId);
         //sendCommand("arp2ip", node.address); // talk to Websocket
         if ("ips" in node) {
             writeToScreen("ipaddress", "IP: " + node.ips.join());

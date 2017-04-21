@@ -1,0 +1,77 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <!-- Load jQuery and stylesheets first -->
+    <script src="./js/jquery-3.1.1.min.js" ></script>
+    <script src="./js/jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
+    <link href="./js/jquery-ui-1.12.1.custom/jquery-ui.theme.css" rel="stylesheet">
+    <link href="./js/jquery-ui-1.12.1.custom/jquery-ui.css" rel="stylesheet">
+    <!-- load VisJS script and stylesheet -->
+    <script src="./js/vis-4.18.0/dist/vis.js"></script>
+    <link href="./js/vis-4.18.0/dist/vis.css" rel="stylesheet">
+    <!-- load SpinJS scripts and stylesheet -->
+    <script src="./js/mqttws31.js"></script>
+<script>
+var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
+if (!client.connected) {
+    client = new Paho.MQTT.Client("192.168.1.1", 1884, "clientId");
+}
+
+function init() {
+    // set callback handlers
+    client.onConnectionLost = onTrafficClose;
+    client.onMessageArrived = onMessageArrived;
+
+    // connect the client
+    client.connect({onSuccess:onTrafficOpen});
+}
+
+// max_children makes this a fifo-queue; when this size of additions is reached,
+// the earliest ones are removed. set to 1 to replace everything
+function writeToScreen(element, message, max_children) {
+    var output = $("#"+element);
+    if (output.children().length >= max_children) {
+        while (output.children().length >= max_children) {
+            output.children()[0].remove();
+        }
+    }
+
+    var addto = document.getElementById(element);
+    var pre = document.createElement("div");
+    pre.style.wordWrap = "break-word";
+    pre.innerHTML = message;
+    addto.appendChild(pre);
+}
+
+function onTrafficOpen(evt) {
+    // Once a connection has been made, make a subscription and send a message.
+    console.log("onConnect");
+    client.subscribe("SPIN/traffic");
+}
+
+function onTrafficClose(evt) {
+    console.log('Websocket has disappeared');
+    console.log(evt.errorMessage)
+}
+
+
+// called when a message arrives
+function onMessageArrived(message) {
+    //console.log("SPIN/traffic message:"+message.payloadString);
+    writeToScreen("traffic_output", message.payloadString, 10);
+}
+
+window.addEventListener("load", init, false);
+
+</script>
+    <title>SPIN Traffic monitor debug monitor</title>
+</head>
+<body>
+
+<div>
+<p><b>Traffic:</b></p>
+<div id="traffic_output"/>
+</div>
+
+</body>
+</html>

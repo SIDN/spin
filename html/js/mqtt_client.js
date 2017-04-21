@@ -1,4 +1,7 @@
 var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
+if (!client.connected) {
+    client = new Paho.MQTT.Client("192.168.1.1", 1884, "clientId");
+}
 
 var node_cache = {}
 
@@ -7,14 +10,14 @@ function init() {
 
     // set callback handlers
     client.onConnectionLost = onTrafficClose;
-    client.onMessageArrived = origonMessageArrived;
+    client.onMessageArrived = onMessageArrived;
 
     // connect the client
     client.connect({onSuccess:onTrafficOpen});
 }
 
 // called when a message arrives
-function origonMessageArrived(message) {
+function onMessageArrived(message) {
     //console.log("SPIN/traffic message:"+message.payloadString);
     onTrafficMessage(message.payloadString);
 }
