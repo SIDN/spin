@@ -17,45 +17,12 @@
 
 local mio = require 'mio'
 
-local FIREWALL_RULES_CONFIG = "/etc/spin/firewall.conf"
---local FIREWALL_RULES_CONFIG = "/tmp/firewall.conf"
-
-local default_initial_rules = {
-  "# SPIN Firewall module configuration file",
-  "# Set and manipulated by the SPIN daemon",
-  "# Do not manually edit",
-  "",
-  "iptables -N SPIN_CHECK",
-  "iptables -N SPIN_DNS",
-  "iptables -N SPIN_BLOCKED",
-  "",
-  "iptables -I FORWARD 1 -j SPIN_CHECK",
-  "iptables -A SPIN_CHECK -j NFLOG --nflog-group 771",
-  "",
-  -- DNS is output from ourselves
-  "iptables -I OUTPUT 1 -p tcp --source-port 53 -j SPIN_DNS",
-  "iptables -I OUTPUT 1 -p udp --source-port 53 -j SPIN_DNS",
-  "",
-  "iptables -A SPIN_DNS -j NFLOG --nflog-group 772",
-  "iptables -A SPIN_DNS -j RETURN",
-  "",
-  "iptables -A SPIN_BLOCKED -j NFLOG --nflog-group 773",
-  "iptables -A SPIN_BLOCKED -j REJECT",
-  "",
-  "",
-  -- temp test rules as example
-  "iptables -A SPIN_CHECK -d 10.1.2.3 -j RETURN",
-  "iptables -A SPIN_CHECK -d 10.1.2.0/24 -j SPIN_BLOCKED",
-  "iptables -A SPIN_CHECK -j RETURN",
-  "",
-}
-
 local _M = {}
 
 local SpinFW = {}
 SpinFW.__index = SpinFW
 
-function _M.SpinFW_create()
+function _M.SpinFW_create(ipv6)
   local sfw = {}
   setmetatable(sfw, SpinFW)
   -- logging rules
@@ -63,6 +30,14 @@ function _M.SpinFW_create()
   sfw.allow = {}
   sfw.reject = {}
   sfw.final = {}
+  sfw.ipv6 = ipv6
+  if ipv6 then
+    sfw.command = "ip6tables"
+    sfw.config_file = "/etc/spin/firewall6.conf"
+  else
+    sfw.command = "iptables"
+    sfw.config_file = "/etc/spin/firewall.conf"
+  end
   return sfw
 end
 
@@ -70,16 +45,47 @@ function startswith(str, part)
   return string.len(str) >= string.len(part) and str:sub(0, string.len(part)) == part
 end
 
+function SpinFW:make_inital_rules()
+    return {
+      "# SPIN Firewall module configuration file",
+      "# Set and manipulated by the SPIN daemon",
+      "# Do not manually edit",
+      "",
+      self.command .. " -N SPIN_CHECK",
+      self.command .. " -N SPIN_DNS",
+      self.command .. " -N SPIN_BLOCKED",
+      "",
+      self.command .. " -I FORWARD 1 -j SPIN_CHECK",
+      self.command .. " -A SPIN_CHECK -j NFLOG --nflog-group 771",
+      "",
+      -- DNS is output from ourselves
+      self.command .. " -I OUTPUT 1 -p tcp --source-port 53 -j SPIN_DNS",
+      self.command .. " -I OUTPUT 1 -p udp --source-port 53 -j SPIN_DNS",
+      "",
+      self.command .. " -A SPIN_DNS -j NFLOG --nflog-group 772",
+      self.command .. " -A SPIN_DNS -j RETURN",
+      "",
+      self.command .. " -A SPIN_BLOCKED -j NFLOG --nflog-group 773",
+      self.command .. " -A SPIN_BLOCKED -j REJECT",
+      "",
+      "",
+      -- temp test rules as example
+      self.command .. " -A SPIN_CHECK -d 10.1.2.3 -j RETURN",
+      self.command .. " -A SPIN_CHECK -d 10.1.2.0/24 -j SPIN_BLOCKED",
+      self.command .. " -A SPIN_CHECK -j RETURN",
+      "",
+    }
+end
+
 function SpinFW:read()
-  local cfr, err = mio.file_reader(FIREWALL_RULES_CONFIG)
+  local cfr, err = mio.file_reader(self.config_file)
   if cfr == nil then
-    io.stderr:write("Unable to open " .. FIREWALL_RULES_CONFIG .. ": " .. err .. "\n")
+    io.stderr:write("Unable to open " .. self.config_file .. ": " .. err .. "\n")
     io.stderr:write("Creating new SPIN firewall config\n")
     self.initial = default_initial_rules
   else
     local state = 1
     for line in cfr:read_line_iterator(true) do
-      print("[XX] state " .. state)
       if startswith(line, "# SPIN_ALLOW") then state = 2
       elseif startswith(line, "# SPIN_REJECT") then state = 3
       elseif startswith(line, "# SPIN_END") then state = 4
@@ -87,14 +93,14 @@ function SpinFW:read()
         if state == 1 then
           table.insert(self.initial, line)
         elseif state == 2 then
-          --if line:match("iptables -A SPIN_CHECK -d 10.1.2.3 -j RETURN") then
-          addr = line:match("iptables %-A SPIN_CHECK %-d (%S+) %-j RETURN")
+          --if line:match(self.command .. " -A SPIN_CHECK -d 10.1.2.3 -j RETURN") then
+          addr = line:match(self.command .. " %-A SPIN_CHECK %-d (%S+) %-j RETURN")
           if addr then
             table.insert(self.allow, addr)
           end
           -- todo read the ip here
         elseif state == 3 then
-          addr = line:match("iptables %-A SPIN_CHECK %-d (%S+) %-j SPIN_BLOCKED")
+          addr = line:match(self.command .. " %-A SPIN_CHECK %-d (%S+) %-j SPIN_BLOCKED")
           if addr then
             table.insert(self.reject, addr)
           end
@@ -117,11 +123,11 @@ function SpinFW:write(out)
   end
   out:write("# SPIN_ALLOW Specifically allowed addresses go below\n")
   for _,l in pairs(self.allow) do
-    out:write("iptables -A SPIN_CHECK -d " .. l .. " -j RETURN\n")
+    out:write(self.command .. " -A SPIN_CHECK -d " .. l .. " -j RETURN\n")
   end
   out:write("# SPIN_REJECT Specifically denied addresses go below\n")
   for _,l in pairs(self.reject) do
-    out:write("iptables -A SPIN_CHECK -d " .. l .. " -j SPIN_BLOCKED\n")
+    out:write(self.command .. " -A SPIN_CHECK -d " .. l .. " -j SPIN_BLOCKED\n")
   end
   out:write("# SPIN_END End of managed entries\n")
   for _,l in pairs(self.final) do
@@ -147,7 +153,7 @@ function SpinFW:remove_block_ip(ip)
 end
 
 function SpinFW:save()
-  local writer, err = io.open(FIREWALL_RULES_CONFIG, "w")
+  local writer, err = io.open(self.config_file, "w")
   if not writer then
     error(err)
   end
@@ -156,11 +162,11 @@ function SpinFW:save()
   end
   writer:write("# SPIN_ALLOW Specifically allowed addresses go below\n")
   for _,l in pairs(self.allow) do
-    writer:write("iptables -A SPIN_CHECK -d " .. l .. " -j RETURN\n")
+    writer:write(self.command .. " -A SPIN_CHECK -d " .. l .. " -j RETURN\n")
   end
   writer:write("# SPIN_REJECT Specifically denied addresses go below\n")
   for _,l in pairs(self.reject) do
-    writer:write("iptables -A SPIN_CHECK -d " .. l .. " -j SPIN_BLOCKED\n")
+    writer:write(self.command .. " -A SPIN_CHECK -d " .. l .. " -j SPIN_BLOCKED\n")
   end
   writer:write("# SPIN_END End of managed entries\n")
   for _,l in pairs(self.final) do

@@ -258,6 +258,21 @@ function initGraphs() {
         });
     });
 
+    $("#firewall-node-button").button().on("click", function (evt) {
+        var node = nodes.get(selectedNodeId);
+        // hmm. misschien we should actually remove the node and
+        // let the next occurrence take care of presentation?
+        if (node.blocked) {
+            sendCommand("stopblockdata", selectedNodeId);
+            node.blocked = false;
+        } else {
+            sendCommand("blockdata", selectedNodeId);
+            node.blocked = true;
+        }
+        nodes.update(node);
+        updateBlockedButton();
+    })
+
     showGraph(traffic_dataset);
     showNetwork();
     initTrafficDataView();
@@ -402,28 +417,13 @@ function nodeSelected(event) {
             writeToScreen("reversedns", "DNS: ");
         }
 
+        updateBlockedButton();
 
         //sendCommand("ip2hostname", node.address);
         //writeToScreen("netowner", "Network owner: &lt;searching&gt;");
         //sendCommand("ip2netowner", node.address); // talk to Websocket
         $("#nodeinfo").dialog('option', 'title', node.label);
         $("#nodeinfo").dialog('open');
-
-        $("#firewall-node-button").button().on("click", function () {
-            var node = nodes.get(selectedNodeId);
-            // hmm. misschien we should actually remove the node and
-            // let the next occurrence take care of presentation?
-            if (node.blocked) {
-                sendCommand("stopblockdata", selectedNodeId);
-                node.blocked = false;
-            } else {
-                sendCommand("blockdata", selectedNodeId);
-                node.blocked = true;
-            }
-            nodes.update(node);
-            updateBlockedButton();
-        })
-        updateBlockedButton();
 
     }
 }

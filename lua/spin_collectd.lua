@@ -118,6 +118,10 @@ function add_name_for_node(node_id, name)
   filter:save()
 end
 
+function is_ipv6_ip(ip)
+    return ip:find(":")
+end
+
 function handle_command(command, argument)
   local response = {}
   response["command"] = command
@@ -135,7 +139,6 @@ function handle_command(command, argument)
   elseif (command == "get_filters") then
     response = create_filter_list_command()
   elseif (command == "add_filter") then
-    print("[XX] GOT IGNORE COMMAND FOR " .. argument);
     -- response necessary? resend the filter list?
     add_filters_for_node(argument)
     -- don't send direct response, but send a 'new list' update
@@ -165,27 +168,43 @@ function handle_command(command, argument)
   elseif command == "blockdata" then
     -- add block to iptables
     response = nil
-    local fw = firewall.SpinFW_create()
+    local fw = firewall.SpinFW_create(false)
+    local fw6 = firewall.SpinFW_create(true)
     fw:read()
+    fw6:read()
     local node = node_cache:get_by_id(argument)
     if node then
       for _,ip in pairs(node.ips) do
         print("[XX] ADDING BLOCK FOR IP: " .. ip)
-        fw:add_block_ip(ip)
+        if is_ipv6_ip(ip) then
+          print("[XX] IS IPV6")
+          fw6:add_block_ip(ip)
+        else
+          print("[XX] IS ipv4")
+          fw:add_block_ip(ip)
+        end
       end
       fw:commit()
+      fw6:commit()
     end
   elseif command == "stopblockdata" then
     -- remove block from iptables
     response = nil
-    local fw = firewall.SpinFW_create()
+    local fw = firewall.SpinFW_create(false)
+    local fw6 = firewall.SpinFW_create(true)
     fw:read()
+    fw6:read()
     local node = node_cache:get_by_id(argument)
     if node then
       for _,ip in pairs(node.ips) do
-        fw:remove_block_ip(ip)
+        if is_ipv6_ip(ip) then
+          fw6:remove_block_ip(ip)
+        else
+          fw:remove_block_ip(ip)
+        end
       end
       fw:commit()
+      fw6:commit()
     end
   elseif command == "allowdata" then
     -- add allow to iptables
@@ -280,7 +299,7 @@ function print_dns_cb(mydata, event)
     if event:get_octet(21) == 53 then
       info, err = get_dns_answer_info(event)
       if info == nil then
-        vprint("Notice: " .. err)
+        --vprint("Notice: " .. err)
       else
         for _,addr in pairs(info.ip_addrs) do
           --add_to_cache(addr, info.dname, info.timestamp)
@@ -321,7 +340,6 @@ function print_blocked_cb(mydata, event)
     from_node, to_node = to_node, from_node
   end
 
-  print("[XX] PACKET GOT BLOCKED (TODO: report)")
   msg = { command = "blocked", argument = "", result = {
               timestamp = event:get_timestamp(),
               from = from_node.id,
