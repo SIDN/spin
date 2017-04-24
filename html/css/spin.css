@@ -1,5 +1,5 @@
 /*
- * SPIN CSS - v0.0.2 - 2017-04-19
+ * SPIN CSS - v0.0.3 - 2017-04-24
  * https://valibox.sidn.nl/
  */
 
@@ -43,7 +43,7 @@ body {
         position: relative;}
 }
 #visualization {
-    /*height: 140px;*/
+    /*height: 138px;*/
     background-color: #faffff;
     box-shadow: 1px 1px 5px #333;
 }
@@ -65,9 +65,10 @@ body {
 #title-logo {
     vertical-align: middle;
 }
-@media screen and (max-width: 550px) {
+@media screen and (max-width: 550px), screen and (max-height: 550px) {
     #title-logo {display:none;}
     #visualization {display:none;}
+    #mynetwork {height: calc(100% - 112px);}
 }
 #title {
     font-weight: bold;
