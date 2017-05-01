@@ -13,6 +13,8 @@
     <script src="./js/mqttws31.js"></script>
 <script>
 var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
+var clientId;
+
 if (!client.connected) {
     client = new Paho.MQTT.Client("192.168.1.1", 1884, "clientId");
 }
@@ -24,6 +26,31 @@ function init() {
 
     // connect the client
     client.connect({onSuccess:onTrafficOpen});
+
+    $(function() {
+      $('#nodeForm').on("submit",function(e) {
+        e.preventDefault(); // cancel the actual submit
+
+        /* do what you want with the form */
+
+        // Should be triggered on form submit
+        sendCommand("debugNodeInfo", $('#nodeId').val());
+      });
+    });
+
+}
+
+function sendCommand(command, argument) {
+    var cmd = {}
+    cmd['command'] = command;
+    cmd['argument'] = argument;
+    //console.log("sending command: '" + command + "' with argument: '" + JSON.stringify(argument) + "'");
+
+    var json_cmd = JSON.stringify(cmd);
+    var message = new Paho.MQTT.Message(json_cmd);
+    message.destinationName = "SPIN/commands";
+    client.send(message);
+    console.log("Sent to SPIN/commands: " + json_cmd)
 }
 
 // max_children makes this a fifo-queue; when this size of additions is reached,
@@ -46,7 +73,9 @@ function writeToScreen(element, message, max_children) {
 function onTrafficOpen(evt) {
     // Once a connection has been made, make a subscription and send a message.
     console.log("onConnect");
-    client.subscribe("SPIN/traffic");
+    writeToScreen("traffic_output", JSON.stringify(evt), 10);
+    //client.subscribe("SPIN/traffic");
+    client.subscribe("SPIN/debug");
 }
 
 function onTrafficClose(evt) {
@@ -67,6 +96,15 @@ window.addEventListener("load", init, false);
     <title>SPIN Traffic monitor debug monitor</title>
 </head>
 <body>
+
+<div>
+    Node:
+    <form id="nodeForm">
+    <input type="text" id="nodeId"/>
+    <button type="submit">Get info</button>
+    </form>
+<div id="node_info"/>
+</div>
 
 <div>
 <p><b>Traffic:</b></p>

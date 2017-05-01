@@ -35,6 +35,12 @@ function vprint(msg)
     end
 end
 
+function vwrite(msg)
+    if verbose then
+        io.write(msg)
+    end
+end
+
 local client = mqtt.new()
 client.ON_CONNECT = function()
     vprint("Connected to MQTT broker")
@@ -50,6 +56,7 @@ end
 
 client.ON_MESSAGE = function(mid, topic, payload)
     vprint("got message on " .. topic)
+    vprint("from: " .. mid)
     if topic == COMMAND_CHANNEL then
         command = json.decode(payload)
         if (command["command"] and command["argument"]) then
@@ -210,6 +217,10 @@ function handle_command(command, argument)
     -- add allow to iptables
   elseif command == "stopallowdata" then
     -- stop allow from iptables
+  elseif command == "debugNodeInfo" then
+    response = nil
+    client:publish("SPIN/debug", json.encode(node_cache:get_by_id(tonumber(argument))))
+    vprint("[XX] publishing: " .. json.encode(node_cache:get_by_id(tonumber(argument))))
   else
     response = {}
     response["command"] = "error"
@@ -226,31 +237,39 @@ end
 --vprint(lnflog.sin(lnflog.pi))
 
 function print_array(arr)
-    io.write("0:   ")
+    vwrite("0:   ")
     for i,x in pairs(arr) do
-      io.write(x)
+      vwrite(x)
       if (i == 0 or i % 10 == 0) then
-        vprint("")
-        io.write(i .. ": ")
+        vwrite("\n")
+        vwrite(i .. ": ")
         if (i < 100) then
-          io.write(" ")
+          vwrite(" ")
         end
       else
-        io.write(" ")
+        vwrite(" ")
       end
     end
-    vprint("")
+    vwrite("\n")
 end
 
 function get_dns_answer_info(event)
     -- check whether this is a dns answer event (source port 53)
-    if event:get_octet(21) ~= 53 then
+    if event:get_source_port() ~= 53 then
         return nil, "Event is not a DNS answer"
     end
     local dnsp = event:get_payload_dns()
+    if not dnsp then
+        vwrite("DNS packet malgormed\n")
+        vwrite("Packet hex data:\n")
+        print_array(event:get_payload_hex())
+        return nil, "DNS Packet is malformed or not an A/AAAA response packet"
+    end
     if not dnsp:is_response() or not (dnsp:get_qtype() == 1 or dnsp:get_qtype() == 28) then
         return nil, "DNS Packet is not an A/AAAA response packet"
     end
+    --vwrite("Packet hex data:\n")
+    --print_array(event:get_payload_hex())
     --vprint(dnsp:tostring());
     --vprint("QUESTION NAME: " .. dnsp:get_qname())
     --vprint("QUESTION TYPE: " .. dnsp:get_qtype())
@@ -285,7 +304,7 @@ function my_cb(mydata, event)
     vprint("  hex:")
     --print_array(event:get_payload_hex());
 
-    if event:get_octet(21) == 53 then
+    if event:get_source_port() == 53 then
       vprint(get_dns_answer_info(event))
     end
 end
@@ -296,7 +315,7 @@ local function publish_traffic(msg)
 end
 
 function print_dns_cb(mydata, event)
-    if event:get_octet(21) == 53 then
+    if event:get_source_port() == 53 then
       info, err = get_dns_answer_info(event)
       if info == nil then
         --vprint("Notice: " .. err)
