@@ -1,0 +1,109 @@
+/*
+ * SPIN CSS - v0.0.3 - 2017-04-24
+ * https://valibox.sidn.nl/
+ */
+
+* {
+    box-sizing: border-box; /* needed? */
+}
+html,
+body {
+    height: calc(100% - 2px);
+    font-family: Arial, Helvetica, sans-serif;
+    padding: 0px 0px 0px 0px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
+.ui-button
+{
+   padding: 3px 11px 3px 11px !important;
+}
+.ui-dialog {
+    box-shadow: 1px 1px 5px #333;
+}
+body {
+}
+.initiallyHidden {
+    display: none;
+}
+.body-item {
+    margin: 4px;
+}
+#buttonbarleft {
+    display: inline-block;
+}
+#buttonbarright {
+    display: inline-block;
+    vertical-align: top;
+    position: absolute;
+    right: 0px;
+}
+@media screen and (max-width: 875px) {
+    #buttonbarright {
+        position: relative;}
+}
+#visualization {
+    /*height: 138px;*/
+    background-color: #faffff;
+    box-shadow: 1px 1px 5px #333;
+}
+#mynetwork {
+    background-color: white;
+    background-color: #fafaff;
+    height: calc(100% - 250px);
+    box-shadow: 1px 1px 5px #333;
+}
+#footer {
+    margin-top: 0px;
+    margin-bottom: 0px;
+    font-size: 75%;
+    text-align: right;
+}
+#nodeinfo-data {
+    padding: 10px;
+}
+#title-logo {
+    vertical-align: middle;
+}
+@media screen and (max-width: 550px), screen and (max-height: 550px) {
+    #title-logo {display:none;}
+    #visualization {display:none;}
+    #mynetwork {height: calc(100% - 112px);}
+}
+#title {
+    font-weight: bold;
+    font-size: 1.5em;
+}
+@media screen and (max-width: 375px) {
+    #title { font-size: 0.75em;}
+}
+#statustext {
+    background-color: #ffcccc;
+}
+#autozoom-button {
+}
+#filter-list-button {
+}
+#filter-list .ui-selecting {
+    background: #FECA40;
+}
+#filter-list .ui-selected {
+    background: #F39814;
+    color: white;
+}
+#filter-list {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+#filter-list li {
+    margin: 3px;
+    padding: 0.4em;
+}
+
+pre {outline: 1px solid #ccc; padding: 5px; margin: 5px; }
+.string { color: green; }
+.number { color: darkorange; }
+.boolean { color: blue; }
+.null { color: magenta; }
+.key { color: red; }

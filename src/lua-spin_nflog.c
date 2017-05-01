@@ -456,11 +456,55 @@ typedef struct {
   ldns_pkt* dnspacket;
 } dnspacket_info;
 
+// Returns the source port
+// currently only works for UDP.
+// returns nil if the event is not a UDP packet
+// (TODO: add for TCP as well)
+// (better TODO: do the basic general packet parsing, such as
+// port numbers, addresses and payload offset once at the start)
+static int event_get_source_port(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+    char* data = NULL;
+    size_t datalen = nflog_get_payload(event->data, &data);
+    uint16_t result;
+
+    if (datalen < 1) {
+        lua_pushnil(L);
+        lua_pushstring(L, "Data packet too small; not even a version octet\n");
+        return 0;
+    }
+    uint8_t version = ((uint8_t)data[0] & 0xf0) >> 4;
+    if (version == 4) {
+        if (datalen < 22) {
+            lua_pushnil(L);
+            lua_pushstring(L, "Data packet too small; can't read port info\n");
+            return 0;
+        }
+        result = (uint8_t)data[20] * 255 + (uint8_t)data[21];
+    } else if (version == 6) {
+        // TODO: for v6, there may be additional headers
+        if (datalen < 42) {
+            lua_pushnil(L);
+            lua_pushstring(L, "Data packet too small; can't read port info\n");
+            return 0;
+        }
+        result = (uint8_t)data[40] * 255 + (uint8_t)data[41];
+    } else {
+        lua_pushnil(L);
+        lua_pushstring(L, "Unknown IP version of data packet\n");
+        return 0;
+    }
+
+    lua_pushnumber(L, result);
+    return 1;
+}
+
 static int event_get_payload_dns(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
     char* data = NULL;
     size_t datalen = nflog_get_payload(event->data, &data);
-    if (datalen <= 30) {
+    uint8_t version, headerlen, next_header, next_header_pos;
+    if (datalen <= 28) {
         // TODO: error
         fprintf(stderr, "[XX] error:packet too small to be dns\n");
         lua_pushnil(L);
@@ -468,11 +512,35 @@ static int event_get_payload_dns(lua_State *L) {
         return 0;
     }
 
+    // some bad assumptions here (TODO ;)); assume UDP so header length
+    // 8 octets.
+    version = ((uint8_t)data[0] & 0xf0) >> 4;
+    if (version == 4) {
+        headerlen = 8 + 4 * ((uint8_t)data[0] & 0x0f);
+    } else if (version == 6) {
+        // just assume no fancy v6 header stuff for now
+        next_header = (uint8_t)data[6];
+        if (next_header == 6 || next_header == 17) {
+            headerlen = 48;
+        } else {
+            fprintf(stderr, "[XX] error: IPv6 packet is not UDP or TCP (next header val: %02x\n", next_header);
+            lua_pushnil(L);
+            lua_pushstring(L, "IPv6 Packet is not UDP or TCP\n");
+            return 0;
+        }
+    } else {
+        fprintf(stderr, "[XX] error: unknown IP version (%u)\n", version);
+        lua_pushnil(L);
+        lua_pushstring(L, "Data packet of unknown IP version\n");
+        return 0;
+    }
+
+    //fprintf(stderr, "[XX] header length: %u\n", headerlen);
     dnspacket_info* dnspacket = (dnspacket_info*) lua_newuserdata(L, sizeof(dnspacket_info));
 
 
     // TODO: this function needs to be freed as well. add __gc?
-    if (ldns_wire2pkt(&(dnspacket->dnspacket), &data[28], datalen-28) == LDNS_STATUS_OK) {
+    if (ldns_wire2pkt(&(dnspacket->dnspacket), &data[headerlen], datalen-headerlen) == LDNS_STATUS_OK) {
         // can this be done directly? do we need to copy all data?
         // can we transfer ownership and use __gc?
 
@@ -537,6 +605,7 @@ static const luaL_Reg event_mapping[] = {
     {"get_octet", event_get_octet},
     {"get_int16", event_get_int16},
     {"get_octets", event_get_octets},
+    {"get_source_port", event_get_source_port},
     {"get_payload_dns", event_get_payload_dns},
     {NULL, NULL}
 };
