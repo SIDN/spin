@@ -9,15 +9,12 @@
     <!-- load VisJS script and stylesheet -->
     <script src="./js/vis-4.18.0/dist/vis.js"></script>
     <link href="./js/vis-4.18.0/dist/vis.css" rel="stylesheet">
+    <link href="./css/debug.css" rel="stylesheet">
     <!-- load SpinJS scripts and stylesheet -->
     <script src="./js/mqttws31.js"></script>
 <script>
-var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
+var client = new Paho.MQTT.Client("192.168.8.1", 1884, "debugClient");
 var clientId;
-
-if (!client.connected) {
-    client = new Paho.MQTT.Client("192.168.1.1", 1884, "clientId");
-}
 
 function init() {
     // set callback handlers
@@ -30,11 +27,21 @@ function init() {
     $(function() {
       $('#nodeForm').on("submit",function(e) {
         e.preventDefault(); // cancel the actual submit
+        sendCommand("debugNodeById", $('#nodeId').val());
+      });
+    });
 
-        /* do what you want with the form */
+    $(function() {
+      $('#domainForm').on("submit",function(e) {
+        e.preventDefault(); // cancel the actual submit
+        sendCommand("debugNodesByDNS", $('#domain').val());
+      });
+    });
 
-        // Should be triggered on form submit
-        sendCommand("debugNodeInfo", $('#nodeId').val());
+    $(function() {
+      $('#ipForm').on("submit",function(e) {
+        e.preventDefault(); // cancel the actual submit
+        sendCommand("debugNodesByIP", $('#ip').val());
       });
     });
 
@@ -64,16 +71,16 @@ function writeToScreen(element, message, max_children) {
     }
 
     var addto = document.getElementById(element);
-    var pre = document.createElement("div");
+    var pre = document.createElement("pre");
     pre.style.wordWrap = "break-word";
     pre.innerHTML = message;
-    addto.appendChild(pre);
+    addto.insertBefore(pre, addto.childNodes[0]);
+    //addto.appendChild(pre);
 }
 
 function onTrafficOpen(evt) {
     // Once a connection has been made, make a subscription and send a message.
     console.log("onConnect");
-    writeToScreen("traffic_output", JSON.stringify(evt), 10);
     //client.subscribe("SPIN/traffic");
     client.subscribe("SPIN/debug");
 }
@@ -83,11 +90,33 @@ function onTrafficClose(evt) {
     console.log(evt.errorMessage)
 }
 
+function syntaxHighlight(json) {
+    if (typeof json != 'string') {
+         json = JSON.stringify(json, undefined, 2);
+    }
+    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+        var cls = 'number';
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) {
+                cls = 'key';
+            } else {
+                cls = 'string';
+            }
+        } else if (/true|false/.test(match)) {
+            cls = 'boolean';
+        } else if (/null/.test(match)) {
+            cls = 'null';
+        }
+        return '<span class="' + cls + '">' + match + '</span>';
+    });
+}
 
 // called when a message arrives
 function onMessageArrived(message) {
     //console.log("SPIN/traffic message:"+message.payloadString);
-    writeToScreen("traffic_output", message.payloadString, 10);
+    var text = syntaxHighlight(JSON.parse(message.payloadString))
+    writeToScreen("responses", text, 10);
 }
 
 window.addEventListener("load", init, false);
@@ -98,17 +127,32 @@ window.addEventListener("load", init, false);
 <body>
 
 <div>
-    Node:
+    Node ID:
     <form id="nodeForm">
     <input type="text" id="nodeId"/>
     <button type="submit">Get info</button>
     </form>
-<div id="node_info"/>
 </div>
 
 <div>
-<p><b>Traffic:</b></p>
-<div id="traffic_output"/>
+    Nodes for domain name:
+    <form id="domainForm">
+    <input type="text" id="domain"/>
+    <button type="submit">Get info</button>
+    </form>
+</div>
+
+<div>
+    Nodes for IP:
+    <form id="ipForm">
+    <input type="text" id="ip"/>
+    <button type="submit">Get info</button>
+    </form>
+</div>
+
+<div>
+<p><b>Responses:</b></p>
+<div id="responses"/>
 </div>
 
 </body>

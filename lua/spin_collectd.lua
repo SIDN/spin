@@ -133,6 +133,7 @@ function handle_command(command, argument)
   local response = {}
   response["command"] = command
   response["argument"] = argument
+  vprint("Got command '"..command.."' with argument '"..json.encode(argument).."'")
 
   if (command == "ip2hostname") then
     local ip = argument
@@ -170,7 +171,9 @@ function handle_command(command, argument)
   elseif command == "missingNodeInfo" then
     -- just publish it again?
     local node = node_cache:get_by_id(tonumber(argument))
-    publish_node_update(node)
+    if node then
+      publish_node_update(node)
+    end
     response = nil
   elseif command == "blockdata" then
     -- add block to iptables
@@ -217,10 +220,19 @@ function handle_command(command, argument)
     -- add allow to iptables
   elseif command == "stopallowdata" then
     -- stop allow from iptables
-  elseif command == "debugNodeInfo" then
+  elseif command == "debugNodeById" then
     response = nil
-    client:publish("SPIN/debug", json.encode(node_cache:get_by_id(tonumber(argument))))
-    vprint("[XX] publishing: " .. json.encode(node_cache:get_by_id(tonumber(argument))))
+    local debug_response = node_cache:get_by_id(tonumber(argument));
+    if debug_response == nil then
+      debug_response = { "error:", "node " .. argument .. " not found"}
+    end
+    client:publish("SPIN/debug", json.encode(debug_response))
+  elseif command == "debugNodesByIP" then
+    response = nil
+    client:publish("SPIN/debug", json.encode(node_cache:get_by_ip_mult(argument)))
+  elseif command == "debugNodesByDNS" then
+    response = nil
+    client:publish("SPIN/debug", json.encode(node_cache:get_by_domain(argument)))
   else
     response = {}
     response["command"] = "error"
@@ -385,6 +397,10 @@ end
 function print_traffic_cb(mydata, event)
   --print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_from_addr() .. " -> " .. event:get_to_addr())
   -- Find the node-id's of the IP addresses
+  if filter:get_filter_table()[event:get_from_addr()] or filter:get_filter_table()[event:get_to_addr()] then
+    -- filtered, skip
+    return
+  end
   local from_node_id, to_node_id, new
   from_node, new = node_cache:add_ip(event:get_from_addr())
   if new then
