@@ -534,7 +534,7 @@ static int event_get_payload_dns(lua_State *L) {
         return 0;
     }
 
-    fprintf(stderr, "[XX] header length: %u\n", headerlen);
+    //fprintf(stderr, "[XX] header length: %u\n", headerlen);
     dnspacket_info* dnspacket = (dnspacket_info*) lua_newuserdata(L, sizeof(dnspacket_info));
 
 
