@@ -84,9 +84,22 @@ typedef struct {
     size_t buffer_size;
 } netlogger_info;
 
+// We parse the nflog event info into the data we need for our
+// applications
 typedef struct {
-    struct nfulnl_msg_packet_hdr* header;
-    struct nflog_data *data;
+    // full data of the nflog event
+    char* data;
+    size_t data_len;
+
+    uint8_t ip_version;
+    uint8_t protocol; // tcp, udp, icmp
+    char src_addr[INET6_ADDRSTRLEN];
+    char dst_addr[INET6_ADDRSTRLEN];
+    uint16_t src_port;
+    uint16_t dst_port;
+    // position of the actual payload in the content
+    size_t payload_pos;
+    unsigned int timestamp;
 } event_info;
 
 static void print_nli(netlogger_info* nli) {
@@ -111,12 +124,67 @@ int callback_handler(struct nflog_g_handle *handle,
 
     // create the event object and add it to the stack
     event_info* event = (event_info*) lua_newuserdata(nli->L, sizeof(event_info));
+    memset(event, 0, sizeof(event_info));
     // Make that into an actual object
     luaL_getmetatable(nli->L, LUA_NFLOG_EVENT_NAME);
     lua_setmetatable(nli->L, -2);
 
-    event->data = nfldata;
-    event->header = nflog_get_msg_packet_hdr(nfldata);
+    //event->data = nfldata;
+    //event->header = nflog_get_msg_packet_hdr(nfldata);
+
+    // initial parsing of common data goes here
+    event->data = NULL;
+    event->data_len = nflog_get_payload(nfldata, &event->data);
+
+    struct timeval tv;
+    if (nflog_get_timestamp(nfldata, &tv) > 0) {
+        event->timestamp = tv.tv_sec;
+    } else {
+        event->timestamp = time(NULL);
+    }
+
+    if (event->data_len < 1) {
+        // TODO: what to do with errors?
+        return -1;
+    }
+    event->ip_version = ((uint8_t)event->data[0] & 0xf0) >> 4;
+    if (event->ip_version == 4) {
+        // TODO: check size again
+        event->protocol = (uint8_t)event->data[9];
+        inet_ntop(AF_INET, &event->data[12], event->src_addr, INET6_ADDRSTRLEN);
+        inet_ntop(AF_INET, &event->data[16], event->dst_addr, INET6_ADDRSTRLEN);
+        if (event->protocol == 6 || event->protocol == 17) {
+            event->src_port = (uint8_t)event->data[20] * 255 + (uint8_t)event->data[21];
+            event->dst_port = (uint8_t)event->data[22] * 255 + (uint8_t)event->data[23];
+        }
+        event->payload_pos = 8 + 4 * ((uint8_t)event->data[0] & 0x0f);
+    } else if (event->ip_version == 6) {
+        // TODO: for v6, there may be additional headers
+        // do we need to parse those too or just skip such packets
+        if (event->data_len < 42) {
+            fprintf(stderr, "Data packet too small; can't read port info\n");
+            return -1;
+        }
+        inet_ntop(AF_INET6, &event->data[8], event->src_addr, INET6_ADDRSTRLEN);
+        inet_ntop(AF_INET6, &event->data[24], event->dst_addr, INET6_ADDRSTRLEN);
+
+        // just assume no fancy v6 header stuff for now
+        size_t next_header = (uint8_t)event->data[6];
+        if (next_header == 6 || next_header == 17 || next_header == 58) {
+            event->payload_pos = 48;
+            event->protocol = next_header;
+        } else {
+            fprintf(stderr, "Fancy IPV6 header (%u), skipping\n", next_header);
+            return -1;
+        }
+        if (event->protocol == 6 || event->protocol == 17) {
+            event->src_port = (uint8_t)event->data[40] * 255 + (uint8_t)event->data[41];
+            event->dst_port = (uint8_t)event->data[42] * 255 + (uint8_t)event->data[43];
+        }
+    } else {
+        fprintf(stderr, "Unknown IP version of data packet: %u\n", event->ip_version);
+        return -1;
+    }
 
     int result = lua_pcall(nli->L, 2, 0, 0);
     if (result != 0) {
@@ -170,7 +238,7 @@ static int setup_netlogger_loop(lua_State *L) {
         lua_pop(L, arguments - 3);
     }
 
-    // handle the lua arugments to this function
+    // handle the lua arguments to this function
     int groupnum = luaL_checknumber(L, 1);
     luaL_checktype(L, 2, LUA_TFUNCTION);
 
@@ -203,6 +271,9 @@ static int setup_netlogger_loop(lua_State *L) {
     }
     if (nflog_set_timeout(group, 1) < 0) {
         fprintf(stderr, "Could not set the group timeout\n");
+    }
+    if (nflog_set_qthresh(group, 100) < 0) {
+        fprintf(stderr, "Could not set the group threshold\n");
     }
 
     /* Get the actual FD for the netlogger entry */
@@ -239,22 +310,32 @@ static int setup_netlogger_loop(lua_State *L) {
 }
 
 
-static int handler_loop_once(lua_State *L) {
+static int handler_loop(lua_State *L) {
     int sz;
     netlogger_info* nli = (netlogger_info*) lua_touserdata(L, 1);
     char buf[nli->buffer_size];
+    int loop_count = 1, i;
+    int arguments = lua_gettop(L);
 
-    errno = 0;
-    sz = recv(nli->fd, buf, nli->buffer_size, 0);
-    if (sz < 0 && (errno == EINTR || errno == EAGAIN)) {
-        //printf("[XX] EINTR or EAGAIN\n", nli);
-        return 0;
-    } else if (sz < 0) {
-        printf("Error reading from nflog socket: %s (%d) ((bufsize %u))\n", strerror(errno), errno, nli->buffer_size);
-        return 0;
+    if (arguments > 1) {
+        loop_count = luaL_checknumber(L, 2);
     }
-    nflog_handle_packet(nli->handle, buf, sz);
-    return 0;
+
+    for (i = 0; i < loop_count; ++i) {
+        errno = 0;
+        sz = recv(nli->fd, buf, nli->buffer_size, 0);
+        if (sz < 0 && (errno == EINTR || errno == EAGAIN)) {
+            lua_pushnumber(L, i);
+            return 1;
+        } else if (sz < 0) {
+            printf("Error reading from nflog socket: %s (%d) ((bufsize %u))\n", strerror(errno), errno, nli->buffer_size);
+            lua_pushnumber(L, -1);
+            return 1;
+        }
+        nflog_handle_packet(nli->handle, buf, sz);
+    }
+    lua_pushnumber(L, i);
+    return 1;
 }
 
 static int handler_loop_forever(lua_State *L) {
@@ -284,68 +365,38 @@ static int handler_close(lua_State *L) {
     return 0;
 }
 
-static int event_get_from_addr(lua_State *L) {
+static int event_get_src_addr(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
 
-    char* data;
-    size_t datalen;
-    char ip_frm[INET6_ADDRSTRLEN];
-
-    data = NULL;
-    datalen = nflog_get_payload(event->data, &data);
-
-    if (ntohs(event->header->hw_protocol) == 0x86dd) {
-        inet_ntop(AF_INET6, &data[8], ip_frm, INET6_ADDRSTRLEN);
-    } else {
-        inet_ntop(AF_INET, &data[12], ip_frm, INET6_ADDRSTRLEN);
-    }
-
-    lua_pushstring(L, ip_frm);
+    lua_pushstring(L, event->src_addr);
     return 1;
 }
 
-static int event_get_to_addr(lua_State *L) {
+static int event_get_dst_addr(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
 
-    char* data;
-    size_t datalen;
-    char ip_to[INET6_ADDRSTRLEN];
-
-    data = NULL;
-    datalen = nflog_get_payload(event->data, &data);
-
-    if (ntohs(event->header->hw_protocol) == 0x86dd) {
-        inet_ntop(AF_INET6, &data[24], ip_to, INET6_ADDRSTRLEN);
-    } else {
-        inet_ntop(AF_INET, &data[16], ip_to, INET6_ADDRSTRLEN);
-    }
-
-    lua_pushstring(L, ip_to);
+    lua_pushstring(L, event->dst_addr);
     return 1;
 }
 
 static int event_get_payload_size(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
-    char* data = NULL;
-    size_t datalen = nflog_get_payload(event->data, &data);
-    lua_pushnumber(L, datalen);
+    lua_pushnumber(L, event->data_len);
     return 1;
 }
 
 static int event_get_payload_hex(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
-    char* data = NULL;
-    size_t datalen = nflog_get_payload(event->data, &data);
     size_t i;
     char c[3];
 
     // create a table and put it on the stack
     lua_newtable(L);
-    for (i = 0; i < datalen; i++) {
+    for (i = 0; i < event->data_len; i++) {
         // note: lua arrays begin at index 1
         lua_pushnumber(L, i+1);
         // should we prepend with 0x?
-        sprintf(c, "%02x", (uint8_t)data[i]);
+        sprintf(c, "%02x", (uint8_t)event->data[i]);
         lua_pushstring(L, c);
         lua_settable(L, -3);
     }
@@ -354,17 +405,15 @@ static int event_get_payload_hex(lua_State *L) {
 
 static int event_get_payload_dec(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
-    char* data = NULL;
-    size_t datalen = nflog_get_payload(event->data, &data);
     size_t i;
     char c[3];
 
     // create a table and put it on the stack
     lua_newtable(L);
-    for (i = 0; i < datalen; i++) {
+    for (i = 0; i < event->data_len; i++) {
         // note: lua arrays begin at index 1
         lua_pushnumber(L, i+1);
-        lua_pushnumber(L, (uint8_t)data[i]);
+        lua_pushnumber(L, (uint8_t)event->data[i]);
         lua_settable(L, -3);
     }
     return 1;
@@ -373,16 +422,7 @@ static int event_get_payload_dec(lua_State *L) {
 static int event_get_timestamp(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
 
-    struct timeval tv;
-    unsigned int timestamp;
-
-    if (nflog_get_timestamp(event->data, &tv) > 0) {
-        timestamp = tv.tv_sec;
-    } else {
-        timestamp = time(NULL);
-    }
-
-    lua_pushnumber(L, timestamp);
+    lua_pushnumber(L, event->timestamp);
     return 1;
 }
 
@@ -390,18 +430,16 @@ static int event_get_octet(lua_State *L) {
     char* err_info;
     event_info* event = (event_info*) lua_touserdata(L, 1);
     size_t i = lua_tonumber(L, 2);
-    char* data = NULL;
-    size_t datalen = nflog_get_payload(event->data, &data);
-    if (i > datalen) {
+    if (i > event->data_len) {
         lua_pushnil(L);
         err_info = malloc(1024);
-        snprintf(err_info, 1024, "octet index (%u) larger than packet size (%u)", i, datalen);
+        snprintf(err_info, 1024, "octet index (%u) larger than packet size (%u)", i, event->data_len);
         lua_pushstring(L, err_info);
         free(err_info);
         return 2;
     }
 
-    lua_pushnumber(L, (uint8_t)data[i]);
+    lua_pushnumber(L, (uint8_t)event->data[i]);
     return 1;
 }
 
@@ -409,18 +447,13 @@ static int event_get_int16(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
     size_t i = lua_tonumber(L, 2);
     uint16_t result;
-    char* data = NULL;
-    size_t datalen = nflog_get_payload(event->data, &data);
-    if (i+1 > datalen) {
+    if (i+1 > event->data_len) {
         lua_pushnil(L);
         lua_pushstring(L, "octet index larger than packet size");
         return 2;
     }
 
-    //printf("[XX] octet at %u: %02x\n", i, (uint8_t)data[i]);
-    //printf("[XX] octet at %u: %02x\n", i+1, (uint8_t)data[i+1]);
-
-    result = (uint8_t)data[i] * 255 + (uint8_t)data[i+1];
+    result = (uint8_t)event->data[i] * 255 + (uint8_t)event->data[i+1];
     lua_pushnumber(L, result);
     lua_pushnumber(L, i + 2);
     //stackdump_g(L);
@@ -433,9 +466,7 @@ static int event_get_octets(lua_State *L) {
     size_t len = lua_tonumber(L, 3);
     size_t i;
 
-    char* data = NULL;
-    size_t datalen = nflog_get_payload(event->data, &data);
-    if (start_i + len > datalen) {
+    if (start_i + len > event->data_len) {
         lua_pushnil(L);
         lua_pushstring(L, "octet index+range larger than packet size");
         return 2;
@@ -446,7 +477,7 @@ static int event_get_octets(lua_State *L) {
     for (i = 0; i < len; i++) {
         // note: lua arrays begin at index 1
         lua_pushnumber(L, i+1);
-        lua_pushnumber(L, (uint8_t)data[i+start_i]);
+        lua_pushnumber(L, (uint8_t)event->data[i+start_i]);
         lua_settable(L, -3);
     }
     return 1;
@@ -462,49 +493,24 @@ typedef struct {
 // (TODO: add for TCP as well)
 // (better TODO: do the basic general packet parsing, such as
 // port numbers, addresses and payload offset once at the start)
-static int event_get_source_port(lua_State *L) {
+static int event_get_src_port(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
-    char* data = NULL;
-    size_t datalen = nflog_get_payload(event->data, &data);
-    uint16_t result;
 
-    if (datalen < 1) {
-        lua_pushnil(L);
-        lua_pushstring(L, "Data packet too small; not even a version octet\n");
-        return 0;
-    }
-    uint8_t version = ((uint8_t)data[0] & 0xf0) >> 4;
-    if (version == 4) {
-        if (datalen < 22) {
-            lua_pushnil(L);
-            lua_pushstring(L, "Data packet too small; can't read port info\n");
-            return 0;
-        }
-        result = (uint8_t)data[20] * 255 + (uint8_t)data[21];
-    } else if (version == 6) {
-        // TODO: for v6, there may be additional headers
-        if (datalen < 42) {
-            lua_pushnil(L);
-            lua_pushstring(L, "Data packet too small; can't read port info\n");
-            return 0;
-        }
-        result = (uint8_t)data[40] * 255 + (uint8_t)data[41];
-    } else {
-        lua_pushnil(L);
-        lua_pushstring(L, "Unknown IP version of data packet\n");
-        return 0;
-    }
+    lua_pushnumber(L, event->src_port);
+    return 1;
+}
 
-    lua_pushnumber(L, result);
+static int event_get_dst_port(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+
+    lua_pushnumber(L, event->dst_port);
     return 1;
 }
 
 static int event_get_payload_dns(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
-    char* data = NULL;
-    size_t datalen = nflog_get_payload(event->data, &data);
     uint8_t version, headerlen, next_header, next_header_pos;
-    if (datalen <= 28) {
+    if (event->data_len <= 28) {
         // TODO: error
         fprintf(stderr, "[XX] error:packet too small to be dns\n");
         lua_pushnil(L);
@@ -512,51 +518,13 @@ static int event_get_payload_dns(lua_State *L) {
         return 0;
     }
 
-    // some bad assumptions here (TODO ;)); assume UDP so header length
-    // 8 octets.
-    version = ((uint8_t)data[0] & 0xf0) >> 4;
-    if (version == 4) {
-        headerlen = 8 + 4 * ((uint8_t)data[0] & 0x0f);
-    } else if (version == 6) {
-        // just assume no fancy v6 header stuff for now
-        next_header = (uint8_t)data[6];
-        if (next_header == 6 || next_header == 17) {
-            headerlen = 48;
-        } else {
-            fprintf(stderr, "[XX] error: IPv6 packet is not UDP or TCP (next header val: %02x\n", next_header);
-            lua_pushnil(L);
-            lua_pushstring(L, "IPv6 Packet is not UDP or TCP\n");
-            return 0;
-        }
-    } else {
-        fprintf(stderr, "[XX] error: unknown IP version (%u)\n", version);
-        lua_pushnil(L);
-        lua_pushstring(L, "Data packet of unknown IP version\n");
-        return 0;
-    }
-
     //fprintf(stderr, "[XX] header length: %u\n", headerlen);
     dnspacket_info* dnspacket = (dnspacket_info*) lua_newuserdata(L, sizeof(dnspacket_info));
 
-
-    // TODO: this function needs to be freed as well. add __gc?
-    if (ldns_wire2pkt(&(dnspacket->dnspacket), &data[headerlen], datalen-headerlen) == LDNS_STATUS_OK) {
+    if (ldns_wire2pkt(&(dnspacket->dnspacket), &event->data[event->payload_pos], (event->data_len)-(event->payload_pos)) == LDNS_STATUS_OK) {
         // can this be done directly? do we need to copy all data?
         // can we transfer ownership and use __gc?
 
-        //char* tmp = ldns_pkt2str(dnspacket->dnspacket);
-        //printf("[XX] PACKET at %p -> %p:\n%s\n", dnspacket, dnspacket->dnspacket, tmp);
-        //free(tmp);
-
-        //printf("[XX] CREATED DNSPACKET PTR %p\n", dnspacket);
-
-        //char* pktstr = ldns_pkt2str(dnspacket->dnspacket);
-        //printf("[XX] STR: %s\n", pktstr);
-        //free(pktstr);
-        //ldns_pkt_free(tmp_pkt);
-        // create the event object and add it to the stack
-        //ldns_pkt* event = (ldns_pkt*) lua_newuserdata(nli->L, sizeof(ldns_pkt));
-        // Make that into an actual object
         luaL_getmetatable(L, LUA_NFLOG_DNSPACKET_NAME);
         lua_setmetatable(L, -2);
         return 1;
@@ -569,6 +537,36 @@ static int event_get_payload_dns(lua_State *L) {
     }
 
     return 0;
+}
+
+static int event_get_payload_pos(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+    lua_pushnumber(L, event->payload_pos);
+    return 1;
+}
+
+static int event_get_ip_version(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+    lua_pushnumber(L, event->ip_version);
+    return 1;
+}
+
+// return the protocol (udp, tcp, icmp, icmpv6) as a string
+// returns the number of the protocol otherwise
+static int event_get_protocol(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+    if (event->protocol == 1) {
+        lua_pushstring(L, "icmp");
+    } else if (event->protocol == 6) {
+        lua_pushstring(L, "tcp");
+    } else if (event->protocol == 17) {
+        lua_pushstring(L, "udp");
+    } else if (event->protocol == 58) {
+        lua_pushstring(L, "icmpv6");
+    } else {
+        lua_pushnumber(L, event->protocol);
+    }
+    return 1;
 }
 
 static int dnspacket_gc(lua_State *L) {
@@ -589,15 +587,15 @@ static const luaL_Reg nflog_lib[] = {
 // Handler function mapping
 static const luaL_Reg handler_mapping[] = {
     {"loop_forever", handler_loop_forever},
-    {"loop_once", handler_loop_once},
+    {"loop", handler_loop},
     {"close", handler_close},
     {NULL, NULL}
 };
 
 // Event function mapping
 static const luaL_Reg event_mapping[] = {
-    {"get_from_addr", event_get_from_addr},
-    {"get_to_addr", event_get_to_addr},
+    {"get_src_addr", event_get_src_addr},
+    {"get_dst_addr", event_get_dst_addr},
     {"get_payload_size", event_get_payload_size},
     {"get_timestamp", event_get_timestamp},
     {"get_payload_hex", event_get_payload_hex},
@@ -605,8 +603,12 @@ static const luaL_Reg event_mapping[] = {
     {"get_octet", event_get_octet},
     {"get_int16", event_get_int16},
     {"get_octets", event_get_octets},
-    {"get_source_port", event_get_source_port},
+    {"get_src_port", event_get_src_port},
+    {"get_dst_port", event_get_dst_port},
     {"get_payload_dns", event_get_payload_dns},
+    {"get_payload_pos", event_get_payload_pos},
+    {"get_ip_version", event_get_ip_version},
+    {"get_protocol", event_get_protocol},
     {NULL, NULL}
 };
 

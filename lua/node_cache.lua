@@ -93,12 +93,15 @@ end
 
 function Node:shared_data(other)
   if self.mac and self.mac == other.mac then return true end
-  if self.name and self.name == other.name then return true end
   for _,ip in pairs(self.ips) do
-    if other:has_ip(ip) then return true end
+    if other:has_ip(ip) then
+      return true
+    end
   end
   for _,domain in pairs(self.domains) do
-    if other:has_domain(domain) then return true end
+    if other:has_domain(domain) then
+      return true
+    end
   end
   return false
 end
@@ -127,7 +130,7 @@ function Node:print(out)
   for _,domain in pairs(self.domains) do
     out:write("  domain: " .. domain .. "\n")
   end
-  out:write("- end of Node\n")
+  out:write("\n")
 end
 
 -- returns the raw data ready for JSON encoding
@@ -161,8 +164,6 @@ end
 
 function NodeCache:create_node()
   local n = Node_create()
-  table.insert(self.nodes, n)
-  n.id = table.getn(self.nodes)
   return n
 end
 
@@ -171,25 +172,12 @@ function NodeCache:get_by_id(id)
   return self.nodes[id]
 end
 
--- returns the first node with the given ip
 function NodeCache:get_by_ip(ip)
   --print("[XX] GET BY IP CALLED")
   for _,n in pairs(self.nodes) do
     if n:has_ip(ip) then return n end
   end
   return nil
-end
-
--- returns a list of all nodes that have the
--- given ip
-function NodeCache:get_by_ip_mult(ip)
-  local result = {}
-  for _,n in pairs(self.nodes) do
-    if n:has_ip(ip) then
-      table.insert(result, n)
-    end
-  end
-  return result
 end
 
 -- returns a list of all nodes that
@@ -252,17 +240,15 @@ function NodeCache:add_ip(ip)
   -- Now check if this node shares data with any other node
   -- if so, merge them
   for _,other in pairs(self.nodes) do
-    if other.id == n.id then break end
     if n:shared_data(other) then
-      vprint("[XX] shared data! merging nodes " .. other.id .. " into " .. n.id)
       other:merge(n)
-      self.nodes[n] = nil
       return other, true
     end
-    --vprint("[XX] no shared data; not merging nodes " .. other.id .. " and " .. n.id)
   end
   -- todo: should we have another find/merge round now that
   -- we have more information about the node?
+  table.insert(self.nodes, n)
+  n.id = table.getn(self.nodes)
   return n, true
 end
 

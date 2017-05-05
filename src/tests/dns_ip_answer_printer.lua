@@ -140,7 +140,7 @@ function get_dns_answer_info(event)
 
     if ip_address then
         info = {}
-        info.to_addr = event:get_to_addr()
+        info.to_addr = event:get_dst_addr()
         info.timestamp = event:get_timestamp()
         info.dname = dname
         info.ip_address = ip_address
@@ -151,9 +151,12 @@ end
 
 function my_cb(mydata, event)
     print("Event:")
-    print("  from: " .. event:get_from_addr())
-    print("  to:   " .. event:get_to_addr())
-    print("  source port: " .. event:get_octet(21))
+    print(" ip version: " .. event:get_ip_version())
+    print(" protocol: " .. event:get_protocol())
+    print("  from: " .. event:get_src_addr())
+    print("  to:   " .. event:get_dst_addr())
+    print("  source port: " .. event:get_src_port())
+    print("  dest port: " .. event:get_dst_port())
     print("  timestamp: " .. event:get_timestamp())
     print("  size: " .. event:get_payload_size())
     print("  hex:")
@@ -165,6 +168,11 @@ function my_cb(mydata, event)
 end
 
 local info_cache = {}
+
+function nprint_dns_cb(mydata, event)
+  print(event:get_src_addr() .. ":" .. event:get_src_port() .. " -> " .. event:get_dst_addr() .. ":" .. event:get_dst_port());
+  print("payload pos: " .. event:get_payload_pos());
+end
 
 function print_dns_cb(mydata, event)
     if event:get_octet(21) == 53 then
@@ -199,10 +207,10 @@ local mydata = {}
 mydata.foo = 123
 mydata.bar = "asdf"
 
---nl = lnflog.setup_netlogger_loop(1, my_cb, mydata)
-nl = lnflog.setup_netlogger_loop(771, print_dns_cb, mydata, 0.1, 18000000)
+nl = lnflog.setup_netlogger_loop(771, my_cb, mydata, 0.0001)
+--nl = lnflog.setup_netlogger_loop(771, print_dns_cb, mydata, 0.1, 18000000)
 --nl:loop_forever()
 for i=1,200 do
-    nl:loop_once()
+    nl:loop(3)
 end
 nl:close()

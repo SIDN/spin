@@ -11,6 +11,9 @@ local nc = require 'node_cache'
 local aggregator = require 'collect'
 local firewall = require 'spin_firewall'
 local filter = require 'filter'
+
+local signal = require 'posix.signal'
+
 filter:load(true)
 
 local verbose = true
@@ -133,7 +136,6 @@ function handle_command(command, argument)
   local response = {}
   response["command"] = command
   response["argument"] = argument
-  vprint("Got command '"..command.."' with argument '"..json.encode(argument).."'")
 
   if (command == "ip2hostname") then
     local ip = argument
@@ -171,9 +173,7 @@ function handle_command(command, argument)
   elseif command == "missingNodeInfo" then
     -- just publish it again?
     local node = node_cache:get_by_id(tonumber(argument))
-    if node then
-      publish_node_update(node)
-    end
+    publish_node_update(node)
     response = nil
   elseif command == "blockdata" then
     -- add block to iptables
@@ -222,14 +222,7 @@ function handle_command(command, argument)
     -- stop allow from iptables
   elseif command == "debugNodeById" then
     response = nil
-    local debug_response = node_cache:get_by_id(tonumber(argument));
-    if debug_response == nil then
-      debug_response = { "error:", "node " .. argument .. " not found"}
-    end
-    client:publish("SPIN/debug", json.encode(debug_response))
-  elseif command == "debugNodesByIP" then
-    response = nil
-    client:publish("SPIN/debug", json.encode(node_cache:get_by_ip_mult(argument)))
+    client:publish("SPIN/debug", json.encode(node_cache:get_by_id(tonumber(argument))))
   elseif command == "debugNodesByDNS" then
     response = nil
     client:publish("SPIN/debug", json.encode(node_cache:get_by_domain(argument)))
@@ -267,7 +260,7 @@ end
 
 function get_dns_answer_info(event)
     -- check whether this is a dns answer event (source port 53)
-    if event:get_source_port() ~= 53 then
+    if event:get_src_port() ~= 53 then
         return nil, "Event is not a DNS answer"
     end
     local dnsp = event:get_payload_dns()
@@ -299,7 +292,7 @@ function get_dns_answer_info(event)
     end
 
     info = {}
-    info.to_addr = event:get_to_addr()
+    info.to_addr = event:get_dst_addr()
     info.timestamp = event:get_timestamp()
     info.dname = dname
     info.ip_addrs = addrs
@@ -308,26 +301,35 @@ end
 
 function my_cb(mydata, event)
     vprint("Event:")
-    vprint("  from: " .. event:get_from_addr())
-    vprint("  to:   " .. event:get_to_addr())
+    vprint("  from: " .. event:get_src_addr())
+    vprint("  to:   " .. event:get_dst_addr())
     vprint("  source port: " .. event:get_octet(21))
     vprint("  timestamp: " .. event:get_timestamp())
     vprint("  size: " .. event:get_payload_size())
     vprint("  hex:")
     --print_array(event:get_payload_hex());
 
-    if event:get_source_port() == 53 then
+    if event:get_src_port() == 53 then
       vprint(get_dns_answer_info(event))
     end
 end
 
 local function publish_traffic(msg)
-  --vprint("Publish traffic data: " .. msg)
-  client:publish(TRAFFIC_CHANNEL, msg)
+  print("[XX] Publish traffic data: " .. msg)
+  local o = json.decode(msg)
+  for _,f in pairs(o.result.flows) do
+    f.from = node_cache:get_by_id(f.from)
+    f.to = node_cache:get_by_id(f.to)
+  end
+  print("[XX] NEW TRAF MSG")
+  print(json.encode(o))
+  print("[XX] END NEW TRAF MSG")
+  --client:publish(TRAFFIC_CHANNEL, msg)
+  client:publish(TRAFFIC_CHANNEL, json.encode(o))
 end
 
 function print_dns_cb(mydata, event)
-    if event:get_source_port() == 53 then
+    if event:get_src_port() == 53 then
       info, err = get_dns_answer_info(event)
       if info == nil then
         --vprint("Notice: " .. err)
@@ -354,13 +356,13 @@ function print_dns_cb(mydata, event)
 end
 
 function print_blocked_cb(mydata, event)
-  from_node, new = node_cache:add_ip(event:get_from_addr())
+  from_node, new = node_cache:add_ip(event:get_src_addr())
   if new then
     -- publish it to the traffic channel
     publish_node_update(from_node)
   end
 
-  to_node, new = node_cache:add_ip(event:get_to_addr())
+  to_node, new = node_cache:add_ip(event:get_dst_addr())
   if new then
     -- publish it to the traffic channel
     publish_node_update(to_node)
@@ -395,20 +397,22 @@ function publish_node_update(node)
 end
 
 function print_traffic_cb(mydata, event)
-  --print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_from_addr() .. " -> " .. event:get_to_addr())
+  --print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_src_addr() .. " -> " .. event:get_dst_addr())
   -- Find the node-id's of the IP addresses
-  if filter:get_filter_table()[event:get_from_addr()] or filter:get_filter_table()[event:get_to_addr()] then
-    -- filtered, skip
+  local filter_list = filter:get_filter_table()
+  if (filter_list[event:get_src_addr()] or filter_list[event:get_dst_addr()]) then
+    -- filtered out, skip
     return
   end
+
   local from_node_id, to_node_id, new
-  from_node, new = node_cache:add_ip(event:get_from_addr())
+  from_node, new = node_cache:add_ip(event:get_src_addr())
   if new then
     -- publish it to the traffic channel
     publish_node_update(from_node)
   end
 
-  to_node, new = node_cache:add_ip(event:get_to_addr())
+  to_node, new = node_cache:add_ip(event:get_dst_addr())
   if new then
     -- publish it to the traffic channel
     publish_node_update(to_node)
@@ -422,23 +426,47 @@ function print_traffic_cb(mydata, event)
   add_flow(event:get_timestamp(), from_node.id, to_node.id, 1, event:get_payload_size(), publish_traffic, filter:get_filter_table())
 end
 
+function shutdown()
+  print("Shutdown started, writing dns cache")
+  local dnsout = io.open("/tmp/dnscache.txt", "w")
+  dnscache.dnscache:print(dnsout)
+  dnsout:close()
+
+  print("writing node cache")
+  local nodeout = io.open("/tmp/nodecache.txt", "w")
+  node_cache:print(nodeout)
+  nodeout:close()
+
+end
+
+signal.signal(signal.SIGINT, function(signum)
+  shutdown()
+  print("Done, exiting\n")
+  os.exit(128 +signum);
+end)
+
+signal.signal(signal.SIGKILL, function(signum)
+  shutdown()
+  print("Done, exiting\n")
+  os.exit(128 +signum);
+end)
+
+
 vprint("SPIN experimental DNS capture tool")
 broker = arg[1] -- defaults to "localhost" if arg not set
-traffic = lnflog.setup_netlogger_loop(771, print_traffic_cb, mydata, 0.2)
-dns = lnflog.setup_netlogger_loop(772, print_dns_cb, mydata, 0.2)
-blocked = lnflog.setup_netlogger_loop(773, print_blocked_cb, nil, 0.2)
+traffic = lnflog.setup_netlogger_loop(771, print_traffic_cb, mydata, 0.1)
+dns = lnflog.setup_netlogger_loop(772, print_dns_cb, mydata, 0.1)
+blocked = lnflog.setup_netlogger_loop(773, print_blocked_cb, nil, 0.05)
 vprint("Connecting to broker")
 client:connect(broker)
---nl:loop_forever()
 vprint("Starting listen loop")
 while true do
-    dns:loop_once()
-    traffic:loop_once()
-    blocked:loop_once()
+    dns:loop(10)
+    traffic:loop(40)
+    blocked:loop(1)
     client:loop()
     -- clean data older than 15 minutes
     local clean_before = os.time() - 900
     node_cache:clean(clean_before)
     dnscache.dnscache:clean(clean_before)
 end
-nl:close()

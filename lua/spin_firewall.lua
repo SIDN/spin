@@ -70,8 +70,6 @@ function SpinFW:make_inital_rules()
       "",
       "",
       -- temp test rules as example
-      self.command .. " -A SPIN_CHECK -d 10.1.2.3 -j RETURN",
-      self.command .. " -A SPIN_CHECK -d 10.1.2.0/24 -j SPIN_BLOCKED",
       self.command .. " -A SPIN_CHECK -j RETURN",
       "",
     }
@@ -100,7 +98,7 @@ function SpinFW:read()
           end
           -- todo read the ip here
         elseif state == 3 then
-          addr = line:match(self.command .. " %-A SPIN_CHECK %-d (%S+) %-j SPIN_BLOCKED")
+          addr = line:match(self.command .. " %-I SPIN_CHECK 1 %-d (%S+) %-j SPIN_BLOCKED")
           if addr then
             table.insert(self.reject, addr)
           end
@@ -127,7 +125,8 @@ function SpinFW:write(out)
   end
   out:write("# SPIN_REJECT Specifically denied addresses go below\n")
   for _,l in pairs(self.reject) do
-    out:write(self.command .. " -A SPIN_CHECK -d " .. l .. " -j SPIN_BLOCKED\n")
+    out:write(self.command .. " -I SPIN_CHECK 1 -s " .. l .. " -j SPIN_BLOCKED\n")
+    out:write(self.command .. " -I SPIN_CHECK 1 -d " .. l .. " -j SPIN_BLOCKED\n")
   end
   out:write("# SPIN_END End of managed entries\n")
   for _,l in pairs(self.final) do
@@ -166,7 +165,8 @@ function SpinFW:save()
   end
   writer:write("# SPIN_REJECT Specifically denied addresses go below\n")
   for _,l in pairs(self.reject) do
-    writer:write(self.command .. " -A SPIN_CHECK -d " .. l .. " -j SPIN_BLOCKED\n")
+    writer:write(self.command .. " -I SPIN_CHECK 1 -d " .. l .. " -j SPIN_BLOCKED\n")
+    writer:write(self.command .. " -I SPIN_CHECK 1 -s " .. l .. " -j SPIN_BLOCKED\n")
   end
   writer:write("# SPIN_END End of managed entries\n")
   for _,l in pairs(self.final) do
