@@ -30,6 +30,7 @@ function Aggregator:same_timestamp(timestamp)
 end
 
 function Aggregator:add_flow(from_ip, to_ip, count, size)
+  print("[XX] add flow: " .. from_ip .. " -> " .. to_ip)
   local from = arp:get_hw_address(from_ip)
   if not from then
     from = from_ip
@@ -142,6 +143,7 @@ function add_flow(timestamp, from, to, count, size, callback, filter_list)
       -- todo: print intermediate empties as well?
       size = cur_aggr:size()
       if size > 0 then
+        print(cur_aggr:json())
         callback(cur_aggr:json())
       end
       cur_aggr = Aggregator:create(timestamp)

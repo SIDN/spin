@@ -133,7 +133,6 @@ function handle_command(command, argument)
   local response = {}
   response["command"] = command
   response["argument"] = argument
-  vprint("Got command '"..command.."' with argument '"..json.encode(argument).."'")
 
   if (command == "ip2hostname") then
     local ip = argument
@@ -171,9 +170,7 @@ function handle_command(command, argument)
   elseif command == "missingNodeInfo" then
     -- just publish it again?
     local node = node_cache:get_by_id(tonumber(argument))
-    if node then
-      publish_node_update(node)
-    end
+    publish_node_update(node)
     response = nil
   elseif command == "blockdata" then
     -- add block to iptables
@@ -222,14 +219,7 @@ function handle_command(command, argument)
     -- stop allow from iptables
   elseif command == "debugNodeById" then
     response = nil
-    local debug_response = node_cache:get_by_id(tonumber(argument));
-    if debug_response == nil then
-      debug_response = { "error:", "node " .. argument .. " not found"}
-    end
-    client:publish("SPIN/debug", json.encode(debug_response))
-  elseif command == "debugNodesByIP" then
-    response = nil
-    client:publish("SPIN/debug", json.encode(node_cache:get_by_ip_mult(argument)))
+    client:publish("SPIN/debug", json.encode(node_cache:get_by_id(tonumber(argument))))
   elseif command == "debugNodesByDNS" then
     response = nil
     client:publish("SPIN/debug", json.encode(node_cache:get_by_domain(argument)))
@@ -322,8 +312,17 @@ function my_cb(mydata, event)
 end
 
 local function publish_traffic(msg)
-  --vprint("Publish traffic data: " .. msg)
-  client:publish(TRAFFIC_CHANNEL, msg)
+  print("[XX] Publish traffic data: " .. msg)
+  local o = json.decode(msg)
+  for _,f in pairs(o.result.flows) do
+    f.from = node_cache:get_by_id(f.from)
+    f.to = node_cache:get_by_id(f.to)
+  end
+  print("[XX] NEW TRAF MSG")
+  print(json.encode(o))
+  print("[XX] END NEW TRAF MSG")
+  --client:publish(TRAFFIC_CHANNEL, msg)
+  client:publish(TRAFFIC_CHANNEL, json.encode(o))
 end
 
 function print_dns_cb(mydata, event)
@@ -397,10 +396,7 @@ end
 function print_traffic_cb(mydata, event)
   --print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_from_addr() .. " -> " .. event:get_to_addr())
   -- Find the node-id's of the IP addresses
-  if filter:get_filter_table()[event:get_from_addr()] or filter:get_filter_table()[event:get_to_addr()] then
-    -- filtered, skip
-    return
-  end
+  print(event:get_from_addr() .. " -> " .. event:get_to_addr())
   local from_node_id, to_node_id, new
   from_node, new = node_cache:add_ip(event:get_from_addr())
   if new then

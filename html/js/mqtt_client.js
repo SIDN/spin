@@ -1,7 +1,4 @@
 var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
-if (!client.connected) {
-    client = new Paho.MQTT.Client("192.168.1.1", 1884, "clientId");
-}
 
 var node_cache = {}
 
@@ -154,25 +151,28 @@ function handleTrafficMessage(data) {
         var f = arr[i];
         // defined in spingraph.js
         //alert("FIND NODE: " + f['from'])
+/*
         var from_node = node_cache[f['from']];
         if (!from_node) {
-            // some dummy data, ask for data update
             from_node = {};
             from_node.id = f['from'];
             sendCommand('missingNodeInfo', f['from']);
-            // what else?
         }
         var to_node = node_cache[f['to']];
         if (!to_node) {
-            // some dummy data, ask for data update
             to_node = {};
             to_node.id = f['to'];
             sendCommand('missingNodeInfo', f['to']);
-            // what else?
-            // TODO send command
         }
+*/
+        var from_node = f['from'];
+        var to_node = f['to'];
 
-        addFlow(timestamp, from_node, to_node, f['count'], f['size']);
+        if (from_node != null && to_node != null) {
+            addFlow(timestamp, from_node, to_node, f['count'], f['size']);
+        } else {
+            alert("partial message? " + JSON.stringify(data))
+        }
     }
 }
 
