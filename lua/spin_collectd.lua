@@ -257,7 +257,7 @@ end
 
 function get_dns_answer_info(event)
     -- check whether this is a dns answer event (source port 53)
-    if event:get_source_port() ~= 53 then
+    if event:get_src_port() ~= 53 then
         return nil, "Event is not a DNS answer"
     end
     local dnsp = event:get_payload_dns()
@@ -289,7 +289,7 @@ function get_dns_answer_info(event)
     end
 
     info = {}
-    info.to_addr = event:get_to_addr()
+    info.to_addr = event:get_dst_addr()
     info.timestamp = event:get_timestamp()
     info.dname = dname
     info.ip_addrs = addrs
@@ -298,15 +298,15 @@ end
 
 function my_cb(mydata, event)
     vprint("Event:")
-    vprint("  from: " .. event:get_from_addr())
-    vprint("  to:   " .. event:get_to_addr())
+    vprint("  from: " .. event:get_src_addr())
+    vprint("  to:   " .. event:get_dst_addr())
     vprint("  source port: " .. event:get_octet(21))
     vprint("  timestamp: " .. event:get_timestamp())
     vprint("  size: " .. event:get_payload_size())
     vprint("  hex:")
     --print_array(event:get_payload_hex());
 
-    if event:get_source_port() == 53 then
+    if event:get_src_port() == 53 then
       vprint(get_dns_answer_info(event))
     end
 end
@@ -326,7 +326,7 @@ local function publish_traffic(msg)
 end
 
 function print_dns_cb(mydata, event)
-    if event:get_source_port() == 53 then
+    if event:get_src_port() == 53 then
       info, err = get_dns_answer_info(event)
       if info == nil then
         --vprint("Notice: " .. err)
@@ -353,13 +353,13 @@ function print_dns_cb(mydata, event)
 end
 
 function print_blocked_cb(mydata, event)
-  from_node, new = node_cache:add_ip(event:get_from_addr())
+  from_node, new = node_cache:add_ip(event:get_src_addr())
   if new then
     -- publish it to the traffic channel
     publish_node_update(from_node)
   end
 
-  to_node, new = node_cache:add_ip(event:get_to_addr())
+  to_node, new = node_cache:add_ip(event:get_dst_addr())
   if new then
     -- publish it to the traffic channel
     publish_node_update(to_node)
@@ -394,17 +394,17 @@ function publish_node_update(node)
 end
 
 function print_traffic_cb(mydata, event)
-  --print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_from_addr() .. " -> " .. event:get_to_addr())
+  --print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_src_addr() .. " -> " .. event:get_dst_addr())
   -- Find the node-id's of the IP addresses
-  print(event:get_from_addr() .. " -> " .. event:get_to_addr())
+  print(event:get_src_addr() .. " -> " .. event:get_dst_addr())
   local from_node_id, to_node_id, new
-  from_node, new = node_cache:add_ip(event:get_from_addr())
+  from_node, new = node_cache:add_ip(event:get_src_addr())
   if new then
     -- publish it to the traffic channel
     publish_node_update(from_node)
   end
 
-  to_node, new = node_cache:add_ip(event:get_to_addr())
+  to_node, new = node_cache:add_ip(event:get_dst_addr())
   if new then
     -- publish it to the traffic channel
     publish_node_update(to_node)

@@ -140,7 +140,7 @@ function get_dns_answer_info(event)
 
     if ip_address then
         info = {}
-        info.to_addr = event:get_to_addr()
+        info.to_addr = event:get_dst_addr()
         info.timestamp = event:get_timestamp()
         info.dname = dname
         info.ip_address = ip_address
@@ -151,8 +151,8 @@ end
 
 function my_cb(mydata, event)
     print("Event:")
-    print("  from: " .. event:get_from_addr())
-    print("  to:   " .. event:get_to_addr())
+    print("  from: " .. event:get_src_addr())
+    print("  to:   " .. event:get_dst_addr())
     print("  source port: " .. event:get_octet(21))
     print("  timestamp: " .. event:get_timestamp())
     print("  size: " .. event:get_payload_size())
@@ -167,6 +167,10 @@ end
 local info_cache = {}
 
 function print_dns_cb(mydata, event)
+  print(event:get_src_addr() .. ":" .. event:get_src_port() .. " -> " .. event:get_dst_addr() .. ":" .. event:get_dst_port());
+end
+
+function oprint_dns_cb(mydata, event)
     if event:get_octet(21) == 53 then
       print_array(event:get_payload_hex());
       info, err = get_dns_answer_info(event)

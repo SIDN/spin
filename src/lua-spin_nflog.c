@@ -87,6 +87,14 @@ typedef struct {
 typedef struct {
     struct nfulnl_msg_packet_hdr* header;
     struct nflog_data *data;
+    // additional data that is repeatedly used
+    uint8_t ip_version;
+    char src_addr[INET6_ADDRSTRLEN];
+    char dst_addr[INET6_ADDRSTRLEN];
+    uint16_t src_port;
+    uint16_t dst_port;
+    // position of the actual payload in the content
+    size_t payload_pos;
 } event_info;
 
 static void print_nli(netlogger_info* nli) {
@@ -111,12 +119,54 @@ int callback_handler(struct nflog_g_handle *handle,
 
     // create the event object and add it to the stack
     event_info* event = (event_info*) lua_newuserdata(nli->L, sizeof(event_info));
+    memset(event, 0, sizeof(event_info));
     // Make that into an actual object
     luaL_getmetatable(nli->L, LUA_NFLOG_EVENT_NAME);
     lua_setmetatable(nli->L, -2);
 
     event->data = nfldata;
     event->header = nflog_get_msg_packet_hdr(nfldata);
+
+    // initial parsing of common data goes here
+    char* data = NULL;
+    size_t datalen = nflog_get_payload(event->data, &data);
+
+    if (datalen < 1) {
+        // TODO: what to do with errors?
+        return -1;
+    }
+    event->ip_version = ((uint8_t)data[0] & 0xf0) >> 4;
+    if (event->ip_version == 4) {
+        // TODO: check size again
+        event->src_port = (uint8_t)data[20] * 255 + (uint8_t)data[21];
+        event->dst_port = (uint8_t)data[22] * 255 + (uint8_t)data[23];
+        inet_ntop(AF_INET, &data[12], event->src_addr, INET6_ADDRSTRLEN);
+        inet_ntop(AF_INET, &data[16], event->dst_addr, INET6_ADDRSTRLEN);
+        event->payload_pos = 8 + 4 * ((uint8_t)data[0] & 0x0f);
+    } else if (event->ip_version == 6) {
+        // TODO: for v6, there may be additional headers
+        // do we need to parse those too or just skip such packets
+        if (datalen < 42) {
+            fprintf(stderr, "Data packet too small; can't read port info\n");
+            return -1;
+        }
+        event->src_port = (uint8_t)data[40] * 255 + (uint8_t)data[41];
+        event->dst_port = (uint8_t)data[42] * 255 + (uint8_t)data[43];
+        inet_ntop(AF_INET6, &data[8], event->src_addr, INET6_ADDRSTRLEN);
+        inet_ntop(AF_INET6, &data[24], event->dst_addr, INET6_ADDRSTRLEN);
+
+        // just assume no fancy v6 header stuff for now
+        size_t next_header = (uint8_t)data[6];
+        if (next_header == 6 || next_header == 17) {
+            event->payload_pos = 48;
+        } else {
+            fprintf(stderr, "Fancy IPV6 header, skipping\n");
+            return -1;
+        }
+    } else {
+        fprintf(stderr, "Unknown IP version of data packet: %u\n", event->ip_version);
+        return -1;
+    }
 
     int result = lua_pcall(nli->L, 2, 0, 0);
     if (result != 0) {
@@ -283,43 +333,17 @@ static int handler_close(lua_State *L) {
     return 0;
 }
 
-static int event_get_from_addr(lua_State *L) {
+static int event_get_src_addr(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
 
-    char* data;
-    size_t datalen;
-    char ip_frm[INET6_ADDRSTRLEN];
-
-    data = NULL;
-    datalen = nflog_get_payload(event->data, &data);
-
-    if (ntohs(event->header->hw_protocol) == 0x86dd) {
-        inet_ntop(AF_INET6, &data[8], ip_frm, INET6_ADDRSTRLEN);
-    } else {
-        inet_ntop(AF_INET, &data[12], ip_frm, INET6_ADDRSTRLEN);
-    }
-
-    lua_pushstring(L, ip_frm);
+    lua_pushstring(L, event->src_addr);
     return 1;
 }
 
-static int event_get_to_addr(lua_State *L) {
+static int event_get_dst_addr(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
 
-    char* data;
-    size_t datalen;
-    char ip_to[INET6_ADDRSTRLEN];
-
-    data = NULL;
-    datalen = nflog_get_payload(event->data, &data);
-
-    if (ntohs(event->header->hw_protocol) == 0x86dd) {
-        inet_ntop(AF_INET6, &data[24], ip_to, INET6_ADDRSTRLEN);
-    } else {
-        inet_ntop(AF_INET, &data[16], ip_to, INET6_ADDRSTRLEN);
-    }
-
-    lua_pushstring(L, ip_to);
+    lua_pushstring(L, event->dst_addr);
     return 1;
 }
 
@@ -461,40 +485,17 @@ typedef struct {
 // (TODO: add for TCP as well)
 // (better TODO: do the basic general packet parsing, such as
 // port numbers, addresses and payload offset once at the start)
-static int event_get_source_port(lua_State *L) {
+static int event_get_src_port(lua_State *L) {
     event_info* event = (event_info*) lua_touserdata(L, 1);
-    char* data = NULL;
-    size_t datalen = nflog_get_payload(event->data, &data);
-    uint16_t result;
 
-    if (datalen < 1) {
-        lua_pushnil(L);
-        lua_pushstring(L, "Data packet too small; not even a version octet\n");
-        return 0;
-    }
-    uint8_t version = ((uint8_t)data[0] & 0xf0) >> 4;
-    if (version == 4) {
-        if (datalen < 22) {
-            lua_pushnil(L);
-            lua_pushstring(L, "Data packet too small; can't read port info\n");
-            return 0;
-        }
-        result = (uint8_t)data[20] * 255 + (uint8_t)data[21];
-    } else if (version == 6) {
-        // TODO: for v6, there may be additional headers
-        if (datalen < 42) {
-            lua_pushnil(L);
-            lua_pushstring(L, "Data packet too small; can't read port info\n");
-            return 0;
-        }
-        result = (uint8_t)data[40] * 255 + (uint8_t)data[41];
-    } else {
-        lua_pushnil(L);
-        lua_pushstring(L, "Unknown IP version of data packet\n");
-        return 0;
-    }
+    lua_pushnumber(L, event->src_port);
+    return 1;
+}
 
-    lua_pushnumber(L, result);
+static int event_get_dst_port(lua_State *L) {
+    event_info* event = (event_info*) lua_touserdata(L, 1);
+
+    lua_pushnumber(L, event->dst_port);
     return 1;
 }
 
@@ -595,8 +596,8 @@ static const luaL_Reg handler_mapping[] = {
 
 // Event function mapping
 static const luaL_Reg event_mapping[] = {
-    {"get_from_addr", event_get_from_addr},
-    {"get_to_addr", event_get_to_addr},
+    {"get_src_addr", event_get_src_addr},
+    {"get_dst_addr", event_get_dst_addr},
     {"get_payload_size", event_get_payload_size},
     {"get_timestamp", event_get_timestamp},
     {"get_payload_hex", event_get_payload_hex},
@@ -604,7 +605,8 @@ static const luaL_Reg event_mapping[] = {
     {"get_octet", event_get_octet},
     {"get_int16", event_get_int16},
     {"get_octets", event_get_octets},
-    {"get_source_port", event_get_source_port},
+    {"get_src_port", event_get_src_port},
+    {"get_dst_port", event_get_dst_port},
     {"get_payload_dns", event_get_payload_dns},
     {NULL, NULL}
 };
