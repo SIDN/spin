@@ -390,7 +390,6 @@ function showNetwork() {
 
 function updateNodeInfo(nodeId) {
     var node = nodes.get(nodeId);
-    writeToScreen("mac", "HW addr: " + node.mac);
     writeToScreen("trafficcount", "Connections seen: " + node.count);
     writeToScreen("trafficsize", "Traffic size: " + node.size);
     writeToScreen("ipaddress", "");
@@ -413,12 +412,12 @@ function nodeSelected(event) {
             writeToScreen("mac", "");
         }
         if (node.ips) {
-            writeToScreen("ipaddress", "IP: " + node.ips.join("<br/>"));
+            writeToScreen("ipaddress", "IP: " + node.ips.join());
         } else {
             writeToScreen("ipaddress", "IP: ");
         }
         if (node.domains) {
-            writeToScreen("reversedns", "DNS: " + node.domains.join("<br/>"));
+            writeToScreen("reversedns", "DNS: " + node.domains.join());
         } else {
             writeToScreen("reversedns", "DNS: ");
         }
@@ -564,14 +563,13 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
         enode.color = colour;
         enode.blocked = blocked;
         enode.lastseen = timestamp;
-        enode.mac = node.mac;
         nodes.update(enode);
     } else {
         // it's new
         nodes.add({
             id: node.id,
             mac: node.mac,
-            addresses: node.ips ? node.ips : [],
+            ips: node.ips ? node.ips : [],
             domains: node.domains ? node.domains : [],
             label: label,
             color: colour,
@@ -732,27 +730,4 @@ function cleanNetwork() {
             nodes.update(node);
         }
     }
-}
-
-function mergeNode(to_id, from_id) {
-    // should we update the information in to?
-
-    // get all connections from from and add them to to
-    var toMove = edges.get({
-        filter: function(item) {
-            return (item.from == from_id || item.to == to_id);
-        }
-    });
-    for (var i = 0; i < toMove.length; i++) {
-        var edge = toMove[i];
-        var e = edges.get(edge);
-        if (e.from == from_id) {
-            e.from = to_id;
-        } else {
-            e.to = to_id;
-        }
-        edges.update(edge);
-    }
-
-    // todo: delete from_id node
 }

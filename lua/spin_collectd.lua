@@ -396,7 +396,12 @@ end
 function print_traffic_cb(mydata, event)
   --print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_src_addr() .. " -> " .. event:get_dst_addr())
   -- Find the node-id's of the IP addresses
-  print(event:get_src_addr() .. " -> " .. event:get_dst_addr())
+  local filter_list = filter:get_filter_table()
+  if (filter_list[event:get_src_addr()] or filter_list[event:get_dst_addr()]) then
+    -- filtered out, skip
+    return
+  end
+
   local from_node_id, to_node_id, new
   from_node, new = node_cache:add_ip(event:get_src_addr())
   if new then
@@ -420,17 +425,17 @@ end
 
 vprint("SPIN experimental DNS capture tool")
 broker = arg[1] -- defaults to "localhost" if arg not set
-traffic = lnflog.setup_netlogger_loop(771, print_traffic_cb, mydata, 0.2)
-dns = lnflog.setup_netlogger_loop(772, print_dns_cb, mydata, 0.2)
-blocked = lnflog.setup_netlogger_loop(773, print_blocked_cb, nil, 0.2)
+traffic = lnflog.setup_netlogger_loop(771, print_traffic_cb, mydata, 0.1)
+dns = lnflog.setup_netlogger_loop(772, print_dns_cb, mydata, 0.1)
+blocked = lnflog.setup_netlogger_loop(773, print_blocked_cb, nil, 0.05)
 vprint("Connecting to broker")
 client:connect(broker)
 --nl:loop_forever()
 vprint("Starting listen loop")
 while true do
-    dns:loop_once()
-    traffic:loop_once()
-    blocked:loop_once()
+    dns:loop(10)
+    traffic:loop(40)
+    blocked:loop(1)
     client:loop()
     -- clean data older than 15 minutes
     local clean_before = os.time() - 900

@@ -1,6 +1,4 @@
-var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
-
-var node_cache = {}
+var client = new Paho.MQTT.Client("192.168.1.1", 1884, "clientId");
 
 function init() {
     initGraphs();
@@ -33,6 +31,7 @@ function sendCommand(command, argument) {
 }
 
 function writeToScreen(element, message) {
+    console.log("find element " + element)
     var el = document.getElementById(element);
     el.innerHTML = message;
 }
@@ -59,7 +58,7 @@ function onTrafficMessage(msg) {
                 handleTrafficMessage(result);
                 break;
             case 'blocked':
-                console.log("Got blocked command: " + msg);
+                //console.log("Got blocked command: " + msg);
                 handleBlockedMessage(result);
                 break;
             case 'filters':
@@ -69,8 +68,8 @@ function onTrafficMessage(msg) {
                 break;
             case 'nodeUpdate':
                 console.log("Got node update command: " + msg);
-                node_cache[result.id] = result;
-                updateNode(result);
+                // just addNode?
+                //updateNode(result);
                 break;
             case 'serverRestart':
                 serverRestart();
@@ -85,7 +84,7 @@ function onTrafficMessage(msg) {
 }
 
 function onTrafficOpen(evt) {
-    // Once a connection has been made, make a subscription and send a message.
+    // Once a connection has been made, make a subscription and send a message..
     console.log("onConnect");
     client.subscribe("SPIN/traffic");
 
@@ -151,27 +150,13 @@ function handleTrafficMessage(data) {
         var f = arr[i];
         // defined in spingraph.js
         //alert("FIND NODE: " + f['from'])
-/*
-        var from_node = node_cache[f['from']];
-        if (!from_node) {
-            from_node = {};
-            from_node.id = f['from'];
-            sendCommand('missingNodeInfo', f['from']);
-        }
-        var to_node = node_cache[f['to']];
-        if (!to_node) {
-            to_node = {};
-            to_node.id = f['to'];
-            sendCommand('missingNodeInfo', f['to']);
-        }
-*/
         var from_node = f['from'];
         var to_node = f['to'];
 
         if (from_node != null && to_node != null) {
             addFlow(timestamp, from_node, to_node, f['count'], f['size']);
         } else {
-            alert("partial message? " + JSON.stringify(data))
+            console.log("partial message: " + JSON.stringify(data))
         }
     }
 }
@@ -179,23 +164,8 @@ function handleTrafficMessage(data) {
 function handleBlockedMessage(data) {
     var timestamp = data['timestamp']
 
-    var from_node = node_cache[data['from']];
-    if (!from_node) {
-        // some dummy data, ask for data update
-        from_node = {};
-        from_node.id = data['from'];
-        sendCommand('missingNodeInfo', data['from']);
-        // what else?
-    }
-    var to_node = node_cache[data['to']];
-    if (!to_node) {
-        // some dummy data, ask for data update
-        to_node = {};
-        to_node.id = data['to'];
-        sendCommand('missingNodeInfo', data['to']);
-        // what else?
-        // TODO send command
-    }
+    var from_node = data['from'];
+    var to_node = data['to'];
     addBlocked(timestamp, from_node, to_node);
 }
 

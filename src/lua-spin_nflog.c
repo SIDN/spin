@@ -271,6 +271,9 @@ static int setup_netlogger_loop(lua_State *L) {
     if (nflog_set_timeout(group, 1) < 0) {
         fprintf(stderr, "Could not set the group timeout\n");
     }
+    if (nflog_set_qthresh(group, 100) < 0) {
+        fprintf(stderr, "Could not set the group threshold\n");
+    }
 
     /* Get the actual FD for the netlogger entry */
     fd = nflog_fd(handle);
@@ -306,22 +309,32 @@ static int setup_netlogger_loop(lua_State *L) {
 }
 
 
-static int handler_loop_once(lua_State *L) {
+static int handler_loop(lua_State *L) {
     int sz;
     netlogger_info* nli = (netlogger_info*) lua_touserdata(L, 1);
     char buf[nli->buffer_size];
+    int loop_count = 1, i;
+    int arguments = lua_gettop(L);
 
-    errno = 0;
-    sz = recv(nli->fd, buf, nli->buffer_size, 0);
-    if (sz < 0 && (errno == EINTR || errno == EAGAIN)) {
-        //printf("[XX] EINTR or EAGAIN\n", nli);
-        return 0;
-    } else if (sz < 0) {
-        printf("Error reading from nflog socket: %s (%d) ((bufsize %u))\n", strerror(errno), errno, nli->buffer_size);
-        return 0;
+    if (arguments > 1) {
+        loop_count = luaL_checknumber(L, 2);
     }
-    nflog_handle_packet(nli->handle, buf, sz);
-    return 0;
+
+    for (i = 0; i < loop_count; ++i) {
+        errno = 0;
+        sz = recv(nli->fd, buf, nli->buffer_size, 0);
+        if (sz < 0 && (errno == EINTR || errno == EAGAIN)) {
+            lua_pushnumber(L, i);
+            return 1;
+        } else if (sz < 0) {
+            printf("Error reading from nflog socket: %s (%d) ((bufsize %u))\n", strerror(errno), errno, nli->buffer_size);
+            lua_pushnumber(L, -1);
+            return 1;
+        }
+        nflog_handle_packet(nli->handle, buf, sz);
+    }
+    lua_pushnumber(L, i);
+    return 1;
 }
 
 static int handler_loop_forever(lua_State *L) {
@@ -573,7 +586,7 @@ static const luaL_Reg nflog_lib[] = {
 // Handler function mapping
 static const luaL_Reg handler_mapping[] = {
     {"loop_forever", handler_loop_forever},
-    {"loop_once", handler_loop_once},
+    {"loop", handler_loop},
     {"close", handler_close},
     {NULL, NULL}
 };
