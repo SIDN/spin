@@ -46,6 +46,12 @@ function DNSCacheEntry:clean(clean_before)
   end
 end
 
+function DNSCacheEntry:print(out)
+  for domain, timestamp in pairs(self.domains) do
+    out:write("    " .. timestamp .. " " .. domain .. "\n")
+  end
+end
+
 local DNSCache = {}
 DNSCache.__index = DNSCache
 
@@ -63,7 +69,7 @@ function DNSCache:add(address, domain, timestamp)
   if entry == nil then
     entry = _M.DNSCacheEntry_create()
     self.size = self.size + 1
-    return true
+    --return true
   end
   entry:add_domain(domain, timestamp)
   self.entries[address] = entry
@@ -93,6 +99,16 @@ function DNSCache:get_domains(address)
     _M.vprint("no cache entry for " .. address)
   end
   return result
+end
+
+function DNSCache:print(out)
+  out:write("------- FULL DNS CACHE -------\n")
+  out:write("  containing " .. self.size .. " entries.\n")
+  for address, entry in pairs(self.entries) do
+    out:write(address .. "\n")
+    entry:print(out)
+  end
+  out:write("------ END OF DNS CACHE ------\n")
 end
 
 -- There is one global cache for ease of use

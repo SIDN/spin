@@ -11,6 +11,9 @@ local nc = require 'node_cache'
 local aggregator = require 'collect'
 local firewall = require 'spin_firewall'
 local filter = require 'filter'
+
+local signal = require 'posix.signal'
+
 filter:load(true)
 
 local verbose = true
@@ -423,6 +426,32 @@ function print_traffic_cb(mydata, event)
   add_flow(event:get_timestamp(), from_node.id, to_node.id, 1, event:get_payload_size(), publish_traffic, filter:get_filter_table())
 end
 
+function shutdown()
+  print("Shutdown started, writing dns cache")
+  local dnsout = io.open("/tmp/dnscache.txt", "w")
+  dnscache.dnscache:print(dnsout)
+  dnsout:close()
+
+  print("writing node cache")
+  local nodeout = io.open("/tmp/nodecache.txt", "w")
+  node_cache:print(nodeout)
+  nodeout:close()
+
+end
+
+signal.signal(signal.SIGINT, function(signum)
+  shutdown()
+  print("Done, exiting\n")
+  os.exit(128 +signum);
+end)
+
+signal.signal(signal.SIGKILL, function(signum)
+  shutdown()
+  print("Done, exiting\n")
+  os.exit(128 +signum);
+end)
+
+
 vprint("SPIN experimental DNS capture tool")
 broker = arg[1] -- defaults to "localhost" if arg not set
 traffic = lnflog.setup_netlogger_loop(771, print_traffic_cb, mydata, 0.1)
@@ -430,7 +459,6 @@ dns = lnflog.setup_netlogger_loop(772, print_dns_cb, mydata, 0.1)
 blocked = lnflog.setup_netlogger_loop(773, print_blocked_cb, nil, 0.05)
 vprint("Connecting to broker")
 client:connect(broker)
---nl:loop_forever()
 vprint("Starting listen loop")
 while true do
     dns:loop(10)
@@ -442,4 +470,3 @@ while true do
     node_cache:clean(clean_before)
     dnscache.dnscache:clean(clean_before)
 end
-nl:close()

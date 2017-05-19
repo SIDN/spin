@@ -94,10 +94,14 @@ end
 function Node:shared_data(other)
   if self.mac and self.mac == other.mac then return true end
   for _,ip in pairs(self.ips) do
-    if other:has_ip(ip) then return true end
+    if other:has_ip(ip) then
+      return true
+    end
   end
   for _,domain in pairs(self.domains) do
-    if other:has_domain(domain) then return true end
+    if other:has_domain(domain) then
+      return true
+    end
   end
   return false
 end
@@ -126,7 +130,7 @@ function Node:print(out)
   for _,domain in pairs(self.domains) do
     out:write("  domain: " .. domain .. "\n")
   end
-  out:write("- end of Node\n")
+  out:write("\n")
 end
 
 -- returns the raw data ready for JSON encoding
@@ -160,8 +164,6 @@ end
 
 function NodeCache:create_node()
   local n = Node_create()
-  table.insert(self.nodes, n)
-  n.id = table.getn(self.nodes)
   return n
 end
 
@@ -245,6 +247,8 @@ function NodeCache:add_ip(ip)
   end
   -- todo: should we have another find/merge round now that
   -- we have more information about the node?
+  table.insert(self.nodes, n)
+  n.id = table.getn(self.nodes)
   return n, true
 end
 
