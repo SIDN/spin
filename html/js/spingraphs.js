@@ -688,9 +688,18 @@ function addFlow(timestamp, from, to, count, size) {
     // filter, so ignore those
 
     // TODO ignore for now, data structure of from and to changed
-    //if (contains(filterList, from) || contains(filterList, to)) {
-    //    return;
-    //}
+    for (var i = 0; i < to.ips.length; i++) {
+      var ip = to.ips[i];
+      if (contains(filterList, ip)) {
+        return;
+      }
+    }
+    for (var i = 0; i < from.ips.length; i++) {
+      var ip = from.ips[i];
+      if (contains(filterList, ip)) {
+        return;
+      }
+    }
     addNode(timestamp, from, false, count, size, "to " + to, "source");
     addNode(timestamp, to, true, count, size, "from " + from, "traffic");
     addEdge(from, to, colour_edge);
