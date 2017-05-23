@@ -122,7 +122,8 @@ int callback_handler(struct nflog_g_handle *handle,
     if (result != 0) {
         lua_error(nli->L);
     }
-    //stackdump_g(nli->L);
+
+    return 0;
 }
 
 //
