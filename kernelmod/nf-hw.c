@@ -9,6 +9,7 @@
 #include <linux/skbuff.h>
 
 #include <linux/udp.h>
+#include <linux/tcp.h>
 #include <linux/ip.h>
 #include <linux/inet.h>
 #include <linux/kernel.h>
@@ -20,7 +21,8 @@
 static struct nf_hook_ops nfho;         //struct holding set of hook function options
 
 struct sk_buff *sock_buff;
-struct udphdr *udp_header;          //udp header struct (not used)
+struct udphdr *udp_header;
+struct tcphdr *tcp_header;
 struct iphdr *ip_header;            //ip header struct
 
 
@@ -38,17 +40,6 @@ typedef struct {
 	uint16_t payload_size;
 } packet_info;
 
-void parse_packet_v4(struct iphdr* ip_header, packet_info* pkt_info) {
-	pkt_info->family = ip_header->version;
-	pkt_info->protocol = ip_header->protocol;
-	memcpy(pkt_info->src_addr, &ip_header->saddr, 4);
-	memcpy(pkt_info->dest_addr, &ip_header->daddr, 4);
-	if (ip_header->protocol == 6 || ip_header->protocol == 17) {
-		//pkt_info->src_port = ip_header
-		// how to find ports?
-	}
-}
-
 void ntop(int fam, char* dest, const uint8_t* src, size_t max) {
 	snprintf(dest, max, "%d.%d.%d.%d", src[0], src[1], src[2], src[3]);
 }
@@ -58,31 +49,58 @@ void log_packet(packet_info* pkt_info) {
 	char da[INET6_ADDRSTRLEN];
 	ntop(AF_INET, sa, pkt_info->src_addr, INET6_ADDRSTRLEN);
 	ntop(AF_INET, da, pkt_info->dest_addr, INET6_ADDRSTRLEN);
-	printk(KERN_INFO "got packet ipv%d protocol %d from %s to %s\n",
+	printk(KERN_INFO "got packet ipv%d protocol %d from %s:%u to %s:%u size %u\n",
 	       pkt_info->family,
 		   pkt_info->protocol,
 		   sa,
-		   da);
+		   ntohs(pkt_info->src_port),
+		   da,
+		   ntohs(pkt_info->dest_port),
+		   ntohs(pkt_info->payload_size));
+}
+
+int parse_packet(struct sk_buff* sockbuff, packet_info* pkt_info) {
+    ip_header = (struct iphdr *)skb_network_header(sock_buff);
+
+    if (ip_header->protocol == 17) {
+		udp_header = (struct udphdr *)skb_transport_header(sock_buff);
+		pkt_info->src_port = udp_header->source;
+		pkt_info->dest_port = udp_header->dest;
+		pkt_info->payload_size = udp_header->len;
+	} else if (ip_header->protocol == 6) {
+		tcp_header = (struct tcphdr *)skb_transport_header(sock_buff);
+		//tcp_header= (struct tcphdr *)((__u32 *)ip_header+ ip_header->ihl);
+		pkt_info->src_port = tcp_header->source;
+		pkt_info->dest_port = tcp_header->dest;
+		pkt_info->payload_size = 1; // todo
+	} else if (ip_header->protocol != 1) {
+		return 1;
+	}
+	printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
+	
+	// rest of basic info
+	pkt_info->family = ip_header->version;
+	pkt_info->protocol = ip_header->protocol;
+	memcpy(pkt_info->src_addr, &ip_header->saddr, 4);
+	memcpy(pkt_info->dest_addr, &ip_header->daddr, 4);
+	return 0;
 }
 
 unsigned int hook_func(void* priv,
-                       struct sk_buff *skb,
-                       const struct nf_hook_state *state)
+                       struct sk_buff* skb,
+//                       const struct nf_hook_state *state)
+                       void* state, void* a, void* b)
 {
 	packet_info pkt_info;
 	memset(&pkt_info, 0, sizeof(packet_info));
     sock_buff = skb;
-    ip_header = (struct iphdr *)skb_network_header(sock_buff);
+    (void) state;
+    
     if(!sock_buff) { return NF_ACCEPT;}
-    if (ip_header->protocol == 17 || ip_header->protocol == 1 || ip_header->protocol == 6) {
-		parse_packet_v4(ip_header, &pkt_info);
-		log_packet(&pkt_info);
 
-        udp_header = (struct udphdr *)skb_transport_header(sock_buff);  //grab transport header
-        //printk(KERN_INFO "got udp packet \n");     //log we’ve got udp packet to /var/log/messages
-        return NF_ACCEPT;
-    }
-    //printk(KERN_INFO "packet allowed\n");                                             //log to var/log/messages
+	if (parse_packet(skb, &pkt_info) == 0) {
+		log_packet(&pkt_info);
+	}
     return NF_ACCEPT;
 }
 
@@ -122,7 +140,7 @@ static void hello_nl_recv_msg(struct sk_buff *skb) {
 }
 
 //This is for 3.6 kernels and above.
-struct netlink_kernel_cfg cfg = {
+struct netlink_kernel_cfg netlink_cfg = {
     .input = hello_nl_recv_msg,
 };
 
@@ -130,11 +148,11 @@ static int __init init_netfilter(void) {
 
 
     printk("Entering: %s\n",__FUNCTION__);
-    printk("init_net at %p, cfg at %p\n", init_net, &cfg);
+    //printk("init_net at %p, cfg at %p\n", init_net, &cfg);
     printk("netlink init done\n");
-    nl_sk = netlink_kernel_create(&init_net, NETLINK_USER, &cfg);
-    printk("netlink_kernel_create called\n");
+    nl_sk = netlink_kernel_create(&init_net, NETLINK_USER, &netlink_cfg);
     //nl_sk = netlink_kernel_create(&init_net, NETLINK_USER, 0, hello_nl_recv_msg,NULL,THIS_MODULE);
+    printk("netlink_kernel_create called\n");
     if(!nl_sk)
     {
         printk(KERN_ALERT "Error creating socket.\n");
@@ -146,11 +164,9 @@ static int __init init_netfilter(void) {
 }
 
 
-static void __exit exit_netfilter(void) {
+static void close_netfilter(void) {
     printk(KERN_INFO "exiting hello module\n");
-/*
     netlink_kernel_release(nl_sk);
-*/
 }
 
 
@@ -173,7 +189,7 @@ int init_module()
 //Called when module unloaded using 'rmmod'
 void cleanup_module()
 {
-    exit_netfilter();
+    close_netfilter();
     printk(KERN_INFO "Hello World (tm)(c)(patent pending) signing off!\n");
     nf_unregister_hook(&nfho);                     //cleanup – unregister hook
 }
