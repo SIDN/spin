@@ -1,0 +1,6 @@
+m4/
+Makefile
+Makefile.in
+*.o
+*.ko
+*.la

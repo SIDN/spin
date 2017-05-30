@@ -1,0 +1,34 @@
+obj-m := nf-hw.o
+PWD := $(shell pwd)
+
+KERNELPATH=@KERNELPATH@
+
+ifndef KERNELPATH
+	KERNELPATH := /lib/modules/$(shell uname -r)/build
+endif
+
+
+all: default
+
+default: client
+	echo "AAAAAAA"
+	echo "AAAAAAA"
+	echo "AAAAAAA"
+	echo "AAAAAAA"
+	env
+	echo "LINUXDIR: $(LINUX_DIR)"
+	echo "Kernel path: $(KERNELPATH)"
+	echo "AAAAAAA"
+	echo "AAAAAAA"
+	echo "AAAAAAA"
+	echo "AAAAAAA"
+	$(MAKE) V=s -C $(KERNELPATH) SUBDIRS=$(PWD) modules
+
+distclean: clean
+
+clean:
+	rm -rf *.o *.ko *.mod.* *.cmd .module* modules* Module* .*.cmd .tmp*
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+
+client:
+	gcc client.c -o client

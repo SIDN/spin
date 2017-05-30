@@ -68,14 +68,17 @@ AC_ARG_WITH(ldns,
 	]
 )
 
+AC_ARG_WITH(linux-headers,
+	AC_HELP_STRING([--with-linux-headers=PATH      specify path of linux headers]),
+	[ AC_SUBST(KERNELPATH, "$withval") ]
+)
+
 AC_CHECK_LIB(ldns, ldns_rr_new,, [
 		AC_MSG_ERROR([Can't find ldns library])dnl'
 	]
 )
 
-
-
-AC_CONFIG_FILES(Makefile src/Makefile)
+AC_CONFIG_FILES(Makefile src/Makefile kernelmod/Makefile)
 AC_OUTPUT
 
 echo "You can now run 'make' and 'make install'"
