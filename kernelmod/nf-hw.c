@@ -28,7 +28,7 @@ struct iphdr *ip_header;            //ip header struct
 
 struct sock *nl_sk = NULL;
 
-#define NETLINK_USER 53
+#define NETLINK_USER 31
 
 typedef struct {
 	uint8_t family; // 4, 6, etc
@@ -81,7 +81,7 @@ int parse_packet(struct sk_buff* sockbuff, packet_info* pkt_info) {
 	} else {
 		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff));
 	}
-	printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
+	//printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
 	
 	// rest of basic info
 	pkt_info->family = ip_header->version;
@@ -104,7 +104,7 @@ unsigned int hook_func(void* priv,
     if(!sock_buff) { return NF_ACCEPT;}
 
 	if (parse_packet(skb, &pkt_info) == 0) {
-		log_packet(&pkt_info);
+		//log_packet(&pkt_info);
 	}
     return NF_ACCEPT;
 }
@@ -133,11 +133,11 @@ static void hello_nl_recv_msg(struct sk_buff *skb) {
         return;
     }
 
-    nlh=nlmsg_put(skb_out,0,0,NLMSG_DONE,msg_size,0);
+    nlh = nlmsg_put(skb_out,0,0,NLMSG_DONE,msg_size,0);
     NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
     strncpy(nlmsg_data(nlh),msg,msg_size);
 
-    res=nlmsg_unicast(nl_sk,skb_out,pid);
+    res = nlmsg_unicast(nl_sk, skb_out, pid);
 
     if(res<0) {
         printk(KERN_INFO "Error while sending bak to user\n");

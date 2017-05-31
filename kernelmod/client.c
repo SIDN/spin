@@ -8,7 +8,9 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#define NETLINK_USER 53
+#include <errno.h>
+
+#define NETLINK_USER 31
 
 #define MAX_PAYLOAD 1024 /* maximum payload size*/
 struct sockaddr_nl src_addr, dest_addr;
@@ -19,9 +21,11 @@ struct msghdr msg;
 
 int main()
 {
-    sock_fd=socket(PF_NETLINK, SOCK_RAW, NETLINK_USER);
-    if(sock_fd<0)
-    return -1;
+    sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_USER);
+    if(sock_fd<0) {
+		fprintf(stderr, "Error connecting to socket: %s\n", strerror(errno));
+		return -1;
+	}
 
     memset(&src_addr, 0, sizeof(src_addr));
     src_addr.nl_family = AF_NETLINK;
@@ -41,7 +45,7 @@ int main()
     nlh->nlmsg_pid = getpid();
     nlh->nlmsg_flags = 0;
 
-    strcpy(NLMSG_DATA(nlh), "Hello");
+    strcpy(NLMSG_DATA(nlh), "Hello!");
 
     iov.iov_base = (void *)nlh;
     iov.iov_len = nlh->nlmsg_len;
