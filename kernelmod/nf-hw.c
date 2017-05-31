@@ -37,7 +37,7 @@ typedef struct {
 	uint8_t dest_addr[16]; // v4 just uses first 4 bytes
 	uint16_t src_port;
 	uint16_t dest_port;
-	uint16_t payload_size;
+	uint32_t payload_size;
 } packet_info;
 
 void ntop(int fam, char* dest, const uint8_t* src, size_t max) {
@@ -56,7 +56,7 @@ void log_packet(packet_info* pkt_info) {
 		   ntohs(pkt_info->src_port),
 		   da,
 		   ntohs(pkt_info->dest_port),
-		   ntohs(pkt_info->payload_size));
+		   ntohl(pkt_info->payload_size));
 }
 
 int parse_packet(struct sk_buff* sockbuff, packet_info* pkt_info) {
@@ -66,15 +66,20 @@ int parse_packet(struct sk_buff* sockbuff, packet_info* pkt_info) {
 		udp_header = (struct udphdr *)skb_transport_header(sock_buff);
 		pkt_info->src_port = udp_header->source;
 		pkt_info->dest_port = udp_header->dest;
-		pkt_info->payload_size = udp_header->len;
+		pkt_info->payload_size = htonl((uint32_t)ntohs(udp_header->len));
 	} else if (ip_header->protocol == 6) {
 		tcp_header = (struct tcphdr *)skb_transport_header(sock_buff);
-		//tcp_header= (struct tcphdr *)((__u32 *)ip_header+ ip_header->ihl);
+		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff));
+		// if size is zero, ignore tcp packet
+		if (pkt_info->payload_size == 0) {
+			return 1;
+		}
 		pkt_info->src_port = tcp_header->source;
 		pkt_info->dest_port = tcp_header->dest;
-		pkt_info->payload_size = 1; // todo
 	} else if (ip_header->protocol != 1) {
 		return 1;
+	} else {
+		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff));
 	}
 	printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
 	
