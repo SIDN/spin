@@ -10,6 +10,8 @@
 
 #include <errno.h>
 
+#include "pkt_info.h"
+
 #define NETLINK_USER 31
 
 #define MAX_PAYLOAD 1024 /* maximum payload size*/
@@ -61,7 +63,12 @@ int main()
     /* Read message from kernel */
     while (1) {
 		recvmsg(sock_fd, &msg, 0);
-		printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
+		//printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
+		pkt_info_t pkt;
+		char pkt_str[2048];
+		wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(nlh));
+		pktinfo2str(pkt_str, &pkt, 2048);
+		printf("Message from kernel: %s\n", pkt_str);
 	}
     close(sock_fd);
 }

@@ -37,13 +37,13 @@ uint32_t client_port_id = 0;
 
 #define NETLINK_USER 31
 
-void log_packet(packet_info* pkt_info) {
-	char* pkt_str = pkt2str(pkt_info);
+void log_packet(pkt_info_t* pkt_info) {
+	char pkt_str[INET6_ADDRSTRLEN];
+	pktinfo2str(pkt_str, pkt_info, INET6_ADDRSTRLEN);
 	printk("%s\n", pkt_str);
-	kfree(pkt_str);
 }
 
-int parse_packet(struct sk_buff* sockbuff, packet_info* pkt_info) {
+int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     ip_header = (struct iphdr *)skb_network_header(sock_buff);
 
     if (ip_header->protocol == 17) {
@@ -75,54 +75,42 @@ int parse_packet(struct sk_buff* sockbuff, packet_info* pkt_info) {
 	return 0;
 }
 
-void send_pkt_info(packet_info* pkt_info) {
+void send_pkt_info(pkt_info_t* pkt_info) {
 	struct nlmsghdr *nlh;
 	int msg_size;
 	struct sk_buff* skb_out;
 	int res;
 	
-	char* msg = pkt2str(pkt_info);
+	char msg[INET6_ADDRSTRLEN];
+	pktinfo2str(msg, pkt_info, INET6_ADDRSTRLEN);
 	
 	if (client_port_id == 0) {
 		printk("Client not connected, not sending\n");
 		return;
 	}
-	printk("1\n");
 
 	msg_size = strlen(msg);
-	printk("2\n");
 	skb_out = nlmsg_new(msg_size, 0);
-	printk("3\n");
 
     if(!skb_out) {
-	printk("4\n");
         printk(KERN_ERR "Failed to allocate new skb\n");
-	printk("5\n");
         return;
     }
-	printk("6\n");
 
     nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
-	printk("7\n");
     NETLINK_CB(skb_out).dst_group = 0;
-	printk("8\n");
-    strncpy(nlmsg_data(nlh),msg,msg_size);
-	printk("9\n");
+    //strncpy(nlmsg_data(nlh),msg,msg_size);
+    pktinfo2wire(nlmsg_data(nlh), pkt_info);
 
-	printk("10\n");
     res = nlmsg_unicast(nl_sk, skb_out, client_port_id);
-	printk("11\n");
 
     if(res<0) {
-	printk("14\n");
         printk(KERN_INFO "Error sending data to client: %d\n", res);
-	printk("15\n");
 		if (res == -111) {
 			printk(KERN_INFO "Client disappeared\n");
 			client_port_id = 0;
 		}
     }
-	printk("16\n");
 }
 
 
@@ -131,8 +119,8 @@ unsigned int hook_func(void* priv,
 //                       const struct nf_hook_state *state)
                        void* state, void* a, void* b)
 {
-	packet_info pkt_info;
-	memset(&pkt_info, 0, sizeof(packet_info));
+	pkt_info_t pkt_info;
+	memset(&pkt_info, 0, sizeof(pkt_info_t));
     sock_buff = skb;
     (void) state;
     
