@@ -13,6 +13,9 @@
 #include <linux/ip.h>
 #include <linux/inet.h>
 #include <linux/kernel.h>
+
+#include <linux/errno.h>
+
 //#include <arpa/inet.h>
 
 // kernel module examples from http://www.paulkiddie.com/2009/11/creating-a-netfilter-kernel-module-which-filters-udp-packets/
@@ -27,6 +30,7 @@ struct iphdr *ip_header;            //ip header struct
 
 
 struct sock *nl_sk = NULL;
+uint32_t client_port_id = 0;
 
 #define NETLINK_USER 31
 
@@ -44,19 +48,28 @@ void ntop(int fam, char* dest, const uint8_t* src, size_t max) {
 	snprintf(dest, max, "%d.%d.%d.%d", src[0], src[1], src[2], src[3]);
 }
 
-void log_packet(packet_info* pkt_info) {
+// allocs, caller must free
+char* pkt2str(packet_info* pkt_info) {
 	char sa[INET6_ADDRSTRLEN];
 	char da[INET6_ADDRSTRLEN];
+	char* str = (char*) kmalloc(1024, __GFP_WAIT);
 	ntop(AF_INET, sa, pkt_info->src_addr, INET6_ADDRSTRLEN);
 	ntop(AF_INET, da, pkt_info->dest_addr, INET6_ADDRSTRLEN);
-	printk(KERN_INFO "got packet ipv%d protocol %d from %s:%u to %s:%u size %u\n",
-	       pkt_info->family,
-		   pkt_info->protocol,
-		   sa,
-		   ntohs(pkt_info->src_port),
-		   da,
-		   ntohs(pkt_info->dest_port),
-		   ntohl(pkt_info->payload_size));
+	snprintf(str, 1024, "got packet ipv%d protocol %d from %s:%u to %s:%u size %u",
+	         pkt_info->family,
+	         pkt_info->protocol,
+	         sa,
+	         ntohs(pkt_info->src_port),
+	         da,
+	         ntohs(pkt_info->dest_port),
+	         ntohl(pkt_info->payload_size));
+	return str;
+}
+
+void log_packet(packet_info* pkt_info) {
+	char* pkt_str = pkt2str(pkt_info);
+	printk("%s\n", pkt_str);
+	kfree(pkt_str);
 }
 
 int parse_packet(struct sk_buff* sockbuff, packet_info* pkt_info) {
@@ -91,6 +104,57 @@ int parse_packet(struct sk_buff* sockbuff, packet_info* pkt_info) {
 	return 0;
 }
 
+void send_pkt_info(packet_info* pkt_info) {
+	struct nlmsghdr *nlh;
+	int msg_size;
+	struct sk_buff* skb_out;
+	int res;
+	
+	char* msg = pkt2str(pkt_info);
+	
+	if (client_port_id == 0) {
+		printk("Client not connected, not sending\n");
+		return;
+	}
+	printk("1\n");
+
+	msg_size = strlen(msg);
+	printk("2\n");
+	skb_out = nlmsg_new(msg_size, 0);
+	printk("3\n");
+
+    if(!skb_out) {
+	printk("4\n");
+        printk(KERN_ERR "Failed to allocate new skb\n");
+	printk("5\n");
+        return;
+    }
+	printk("6\n");
+
+    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
+	printk("7\n");
+    NETLINK_CB(skb_out).dst_group = 0;
+	printk("8\n");
+    strncpy(nlmsg_data(nlh),msg,msg_size);
+	printk("9\n");
+
+	printk("10\n");
+    res = nlmsg_unicast(nl_sk, skb_out, client_port_id);
+	printk("11\n");
+
+    if(res<0) {
+	printk("14\n");
+        printk(KERN_INFO "Error sending data to client: %d\n", res);
+	printk("15\n");
+		if (res == -111) {
+			printk(KERN_INFO "Client disappeared\n");
+			client_port_id = 0;
+		}
+    }
+	printk("16\n");
+}
+
+
 unsigned int hook_func(void* priv,
                        struct sk_buff* skb,
 //                       const struct nf_hook_state *state)
@@ -105,6 +169,11 @@ unsigned int hook_func(void* priv,
 
 	if (parse_packet(skb, &pkt_info) == 0) {
 		//log_packet(&pkt_info);
+		//if (netlink_has_listeners(nl_sk, 0)) {
+			send_pkt_info(&pkt_info);
+		//} else {
+		//	printk("no listeners");
+		//}
 	}
     return NF_ACCEPT;
 }
@@ -124,8 +193,9 @@ static void hello_nl_recv_msg(struct sk_buff *skb) {
 
     nlh=(struct nlmsghdr*)skb->data;
     printk(KERN_INFO "Netlink received msg payload:%s\n",(char*)nlmsg_data(nlh));
-    pid = nlh->nlmsg_pid; /*pid of sending process */
-
+    pid = nlh->nlmsg_pid; /* port id of sending process */
+	client_port_id = pid;
+	
     skb_out = nlmsg_new(msg_size,0);
 
     if(!skb_out) {
@@ -140,7 +210,7 @@ static void hello_nl_recv_msg(struct sk_buff *skb) {
     res = nlmsg_unicast(nl_sk, skb_out, pid);
 
     if(res<0) {
-        printk(KERN_INFO "Error while sending bak to user\n");
+        printk(KERN_INFO "Error sending data to client: %u\n", res);
     }
 }
 
