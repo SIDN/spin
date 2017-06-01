@@ -16,6 +16,9 @@
 
 #include <linux/errno.h>
 
+#include "messaging.h"
+#include "pkt_info.h"
+
 //#include <arpa/inet.h>
 
 // kernel module examples from http://www.paulkiddie.com/2009/11/creating-a-netfilter-kernel-module-which-filters-udp-packets/
@@ -33,38 +36,6 @@ struct sock *nl_sk = NULL;
 uint32_t client_port_id = 0;
 
 #define NETLINK_USER 31
-
-typedef struct {
-	uint8_t family; // 4, 6, etc
-	uint8_t protocol; // value for tcp/udp/icmp/etc.
-	uint8_t src_addr[16]; // v4 just uses first 4 bytes
-	uint8_t dest_addr[16]; // v4 just uses first 4 bytes
-	uint16_t src_port;
-	uint16_t dest_port;
-	uint32_t payload_size;
-} packet_info;
-
-void ntop(int fam, char* dest, const uint8_t* src, size_t max) {
-	snprintf(dest, max, "%d.%d.%d.%d", src[0], src[1], src[2], src[3]);
-}
-
-// allocs, caller must free
-char* pkt2str(packet_info* pkt_info) {
-	char sa[INET6_ADDRSTRLEN];
-	char da[INET6_ADDRSTRLEN];
-	char* str = (char*) kmalloc(1024, __GFP_WAIT);
-	ntop(AF_INET, sa, pkt_info->src_addr, INET6_ADDRSTRLEN);
-	ntop(AF_INET, da, pkt_info->dest_addr, INET6_ADDRSTRLEN);
-	snprintf(str, 1024, "got packet ipv%d protocol %d from %s:%u to %s:%u size %u",
-	         pkt_info->family,
-	         pkt_info->protocol,
-	         sa,
-	         ntohs(pkt_info->src_port),
-	         da,
-	         ntohs(pkt_info->dest_port),
-	         ntohl(pkt_info->payload_size));
-	return str;
-}
 
 void log_packet(packet_info* pkt_info) {
 	char* pkt_str = pkt2str(pkt_info);
@@ -251,6 +222,7 @@ int init_module()
     init_netfilter();
 
     printk(KERN_INFO "Hello, world!\n");
+    test();
 
     nfho.hook = hook_func;                       //function to call when conditions below met
     nfho.hooknum = NF_INET_PRE_ROUTING;            //called right after packet recieved, first hook in Netfilter

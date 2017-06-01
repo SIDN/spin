@@ -1,5 +1,6 @@
-obj-m := nf-hw.o
-PWD := $(shell pwd)
+
+obj-m := spin.o
+spin-objs := spin_kmod.o messaging.o pkt_info.o
 
 KERNELPATH=@KERNELPATH@
 
@@ -11,18 +12,7 @@ endif
 all: default
 
 default: client
-	echo "AAAAAAA"
-	echo "AAAAAAA"
-	echo "AAAAAAA"
-	echo "AAAAAAA"
-	env
-	echo "LINUXDIR: $(LINUX_DIR)"
-	echo "Kernel path: $(KERNELPATH)"
-	echo "AAAAAAA"
-	echo "AAAAAAA"
-	echo "AAAAAAA"
-	echo "AAAAAAA"
-	$(MAKE) V=s -C $(KERNELPATH) SUBDIRS=$(PWD) modules
+	$(MAKE) V=s -C $(KERNELPATH) M=$(PWD) modules
 
 distclean: clean
 
