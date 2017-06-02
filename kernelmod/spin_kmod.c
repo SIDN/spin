@@ -11,6 +11,7 @@
 #include <linux/udp.h>
 #include <linux/tcp.h>
 #include <linux/ip.h>
+#include <linux/ipv6.h>
 #include <linux/inet.h>
 #include <linux/kernel.h>
 
@@ -27,11 +28,14 @@
 
 static struct nf_hook_ops nfho1;
 static struct nf_hook_ops nfho2;
+static struct nf_hook_ops nfho3;
+static struct nf_hook_ops nfho4;
 
 struct sk_buff *sock_buff;
 struct udphdr *udp_header;
 struct tcphdr *tcp_header;
 struct iphdr *ip_header;            //ip header struct
+struct ipv6hdr *ipv6_header;            //ip header struct
 
 
 struct sock *nl_sk = NULL;
@@ -45,9 +49,45 @@ void log_packet(pkt_info_t* pkt_info) {
 	printk("%s\n", pkt_str);
 }
 
+int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
+	printk("[XX] ipv6!\n");
+    ipv6_header = (struct ipv6hdr *)ipv6_hdr(sock_buff);
+    if (ipv6_header->nexthdr == 17) {
+		udp_header = (struct udphdr *)skb_transport_header(sock_buff);
+		pkt_info->src_port = udp_header->source;
+		pkt_info->dest_port = udp_header->dest;
+		pkt_info->payload_size = htonl((uint32_t)ntohs(udp_header->len));
+	} else if (ipv6_header->nexthdr == 6) {
+		tcp_header = (struct tcphdr *)skb_transport_header(sock_buff);
+		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff));
+		// if size is zero, ignore tcp packet
+		if (pkt_info->payload_size == 0) {
+			return 1;
+		}
+		pkt_info->src_port = tcp_header->source;
+		pkt_info->dest_port = tcp_header->dest;
+	} else if (ipv6_header->nexthdr != 1) {
+		printk("[XX] unsupported IPv6 next header: %u\n", ipv6_header->nexthdr);
+		return 1;
+	} else {
+		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff));
+	}
+	//printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
+	
+	// rest of basic info
+	pkt_info->family = AF_INET6;
+	pkt_info->protocol = ipv6_header->nexthdr;
+	memcpy(pkt_info->src_addr, &ipv6_header->saddr, 16);
+	memcpy(pkt_info->dest_addr, &ipv6_header->daddr, 16);
+	return 0;
+}
+
 int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     ip_header = (struct iphdr *)skb_network_header(sock_buff);
-
+    if (ip_header->version == 6) {
+		return parse_ipv6_packet(sockbuff, pkt_info);
+	}
+	
     if (ip_header->protocol == 17) {
 		udp_header = (struct udphdr *)skb_transport_header(sock_buff);
 		pkt_info->src_port = udp_header->source;
@@ -63,6 +103,7 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 		pkt_info->src_port = tcp_header->source;
 		pkt_info->dest_port = tcp_header->dest;
 	} else if (ip_header->protocol != 1) {
+		printk("[XX] unsupported IPv4 protocol: %u\n", ip_header->protocol);
 		return 1;
 	} else {
 		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff));
@@ -70,10 +111,12 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 	//printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
 	
 	// rest of basic info
-	pkt_info->family = ip_header->version;
+	pkt_info->family = AF_INET;
 	pkt_info->protocol = ip_header->protocol;
-	memcpy(pkt_info->src_addr, &ip_header->saddr, 4);
-	memcpy(pkt_info->dest_addr, &ip_header->daddr, 4);
+	memset(pkt_info->src_addr, 0, 12);
+	memcpy(pkt_info->src_addr + 12, &ip_header->saddr, 4);
+	memset(pkt_info->dest_addr, 0, 12);
+	memcpy(pkt_info->dest_addr + 12, &ip_header->daddr, 4);
 	return 0;
 }
 
@@ -161,12 +204,14 @@ unsigned int hook_func_new(const struct nf_hook_ops *ops,
 		//} else {
 		//	printk("no listeners");
 		//}
+	} else {
+		printk("packet not parsed\n");
 	}
     return NF_ACCEPT;
 }
 
 
-static void hello_nl_recv_msg(struct sk_buff *skb) {
+static void traffic_client_connect(struct sk_buff *skb) {
     struct nlmsghdr *nlh;
     int pid;
     struct sk_buff *skb_out;
@@ -189,23 +234,11 @@ static void hello_nl_recv_msg(struct sk_buff *skb) {
         printk(KERN_ERR "Failed to allocate new skb\n");
         return;
     }
-
-/*
-    nlh = nlmsg_put(skb_out,0,0,NLMSG_DONE,msg_size,0);
-    NETLINK_CB(skb_out).dst_group = 0;
-    strncpy(nlmsg_data(nlh),msg,msg_size);
-
-    res = nlmsg_unicast(nl_sk, skb_out, pid);
-
-    if(res<0) {
-        printk(KERN_INFO "Error sending data to client: %u\n", res);
-    }
-*/
 }
 
 //This is for 3.6 kernels and above.
 struct netlink_kernel_cfg netlink_cfg = {
-    .input = hello_nl_recv_msg,
+    .input = traffic_client_connect,
 };
 
 static int __init init_netfilter(void) {
@@ -215,7 +248,7 @@ static int __init init_netfilter(void) {
     //printk("init_net at %p, cfg at %p\n", init_net, &cfg);
     printk("netlink init done\n");
     nl_sk = netlink_kernel_create(&init_net, NETLINK_USER, &netlink_cfg);
-    //nl_sk = netlink_kernel_create(&init_net, NETLINK_USER, 0, hello_nl_recv_msg,NULL,THIS_MODULE);
+    //nl_sk = netlink_kernel_create(&init_net, NETLINK_USER, 0, traffic_client_connect,NULL,THIS_MODULE);
     printk("netlink_kernel_create called\n");
     if(!nl_sk)
     {
@@ -286,6 +319,18 @@ int init_module()
     nfho2.priority = NF_IP_PRI_FIRST;
     nf_register_hook(&nfho2);
 
+    nfho3.hook = hook_func_new;
+    nfho3.hooknum = NF_INET_PRE_ROUTING;
+    nfho3.pf = PF_INET6;
+    nfho3.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho3);
+
+    nfho4.hook = hook_func_new;
+    nfho4.hooknum = NF_INET_POST_ROUTING;
+    nfho4.pf = PF_INET6;
+    nfho4.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho4);
+
 	test_ip();
     return 0;
 }
@@ -297,6 +342,8 @@ void cleanup_module()
     printk(KERN_INFO "Hello World (tm)(c)(patent pending) signing off!\n");
     nf_unregister_hook(&nfho1);                     //cleanup – unregister hook
     nf_unregister_hook(&nfho2);                     //cleanup – unregister hook
+    nf_unregister_hook(&nfho3);                     //cleanup – unregister hook
+    nf_unregister_hook(&nfho4);                     //cleanup – unregister hook
 }
 
 MODULE_LICENSE("GPL");

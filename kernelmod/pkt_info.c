@@ -15,7 +15,7 @@ void ntop(int fam, char* dest, const uint8_t* src, size_t max) {
 		snprintf(dest, max, "%d.%d.%d.%d", src[0], src[1], src[2], src[3]);
 	} else {
 		snprintf(dest, max,
-				 "%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
+				 "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
 				 src[0],
 				 src[1],
 				 src[2],
@@ -38,11 +38,19 @@ void ntop(int fam, char* dest, const uint8_t* src, size_t max) {
 void pktinfo2str(unsigned char* dest, pkt_info_t* pkt_info, size_t max_len) {
 	char sa[INET6_ADDRSTRLEN];
 	char da[INET6_ADDRSTRLEN];
-	ntop(AF_INET, sa, pkt_info->src_addr, INET6_ADDRSTRLEN);
-	ntop(AF_INET, da, pkt_info->dest_addr, INET6_ADDRSTRLEN);
+	if (pkt_info->family == AF_INET) {
+		ntop(AF_INET, sa, (pkt_info->src_addr) + 12, INET6_ADDRSTRLEN);
+		ntop(AF_INET, da, (pkt_info->dest_addr) + 12, INET6_ADDRSTRLEN);
+	} else if (pkt_info->family == AF_INET6) {
+		ntop(AF_INET6, sa, pkt_info->src_addr, INET6_ADDRSTRLEN);
+		ntop(AF_INET6, da, pkt_info->dest_addr, INET6_ADDRSTRLEN);
+	} else {
+		snprintf(dest, max_len, "<unknown ip version>");
+	}
+
 	snprintf(dest, max_len,
 	         "got packet ipv%d protocol %d from %s:%u to %s:%u size %u",
-	         pkt_info->family,
+	         pkt_info->family == AF_INET ? 4 : 6,
 	         pkt_info->protocol,
 	         sa, ntohs(pkt_info->src_port),
 	         da, ntohs(pkt_info->dest_port),
