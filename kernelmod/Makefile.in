@@ -11,7 +11,7 @@ endif
 
 all: default
 
-default: client module
+default: client config module
 
 module: spin_kmod.c messaging.c pkt_info.c spin_util.c spin_config.c
 	$(MAKE) V=s -C $(KERNELPATH) M=$(PWD) modules
@@ -27,5 +27,9 @@ clean:
 client: pkt_info_client.o client.c
 	gcc client.c pkt_info_client.o -o client
 
+config: config.c spin_config.h
+	gcc config.c -o config
+
 pkt_info_client.o: pkt_info.c
 	gcc -c pkt_info.c -o pkt_info_client.o
+

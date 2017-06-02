@@ -20,6 +20,7 @@
 #include "messaging.h"
 #include "pkt_info.h"
 #include "spin_util.h"
+#include "spin_config.h"
 
 //#include <arpa/inet.h>
 
@@ -39,9 +40,11 @@ struct udphdr *udp_header;
 struct tcphdr *tcp_header;
 struct iphdr *ip_header;            //ip header struct
 struct ipv6hdr *ipv6_header;            //ip header struct
+
 ip_store_t* ignore_ips;
 
-struct sock *nl_sk = NULL;
+struct sock *traffic_nl_sk = NULL;
+struct sock *config_nl_sk = NULL;
 uint32_t client_port_id = 0;
 
 #define NETLINK_CONFIG_PORT 30
@@ -165,7 +168,7 @@ void send_pkt_info(pkt_info_t* pkt_info) {
     //strncpy(nlmsg_data(nlh),msg,msg_size);
     pktinfo_msg2wire(nlmsg_data(nlh), pkt_info);
 
-    res = nlmsg_unicast(nl_sk, skb_out, client_port_id);
+    res = nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
 
     if(res<0) {
         printk(KERN_INFO "Error sending data to client: %d\n", res);
@@ -191,7 +194,7 @@ unsigned int hook_func(void* priv,
 
 	if (parse_packet(skb, &pkt_info) == 0) {
 		//log_packet(&pkt_info);
-		//if (netlink_has_listeners(nl_sk, 0)) {
+		//if (netlink_has_listeners(traffic_nl_sk, 0)) {
 			send_pkt_info(&pkt_info);
 		//} else {
 		//	printk("no listeners");
@@ -253,9 +256,83 @@ static void traffic_client_connect(struct sk_buff *skb) {
     }
 }
 
+void send_config_response(int port_id, config_command_t cmd, size_t msg_size, void* msg_src) {
+	struct nlmsghdr *nlh;
+	struct sk_buff *skb_out;
+	int res;
+	
+	skb_out = nlmsg_new(msg_size + 1, 0);
+	
+	if (!skb_out) {
+		printk(KERN_ERR "Failed to allocate new skb\n");
+		return;
+	}
+	
+	nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size + 1, 0);
+	
+	/* not in mcast group */
+	NETLINK_CB(skb_out).dst_group = 0;
+	
+	memcpy(nlmsg_data(nlh), (uint8_t*)&cmd, 1);
+	memcpy(nlmsg_data(nlh) + 1, msg_src, msg_size);
+	
+	res = nlmsg_unicast(config_nl_sk, skb_out, port_id);
+
+	if (res < 0) {
+		printk(KERN_INFO "Error while sending config response to user\n");
+	}
+}
+
+void send_config_response_ignore_list_callback(unsigned char ip[16], int is_ipv6, void* port_id_p) {
+	//struct nlmsghdr* nlh = (struct nlmsghdr*) nlh_p;
+	unsigned char msg[17];
+	int port_id = *(int*)port_id_p;
+	//printk("should send ip address now\n");
+	if (is_ipv6) {
+		msg[0] = (uint8_t)AF_INET6;
+		memcpy(msg + 1, ip, 16);
+		send_config_response(port_id, SPIN_CMD_GET_IGNORE, 17, msg);
+	} else {
+		msg[0] = (uint8_t)AF_INET;
+		memcpy(msg + 1, ip + 12, 4);
+		send_config_response(port_id, SPIN_CMD_GET_IGNORE, 5, msg);
+	}
+}
+
+static void config_client_connect(struct sk_buff *skb) {
+	struct nlmsghdr *nlh;
+	int pid;
+	int msg_size;
+	//char *msg="Hello from kernel";
+	char *msg = "Config command received";
+	char error_msg[1024];
+	
+	printk(KERN_INFO "Entering: %s\n", __FUNCTION__);
+	
+	msg_size = strlen(msg);
+	
+	nlh = (struct nlmsghdr *) skb->data;
+	
+	/* pid of sending process */
+	pid = nlh->nlmsg_pid;
+	
+	printk(KERN_INFO "Netlink received configuration command: %s\n", (char *) nlmsg_data(nlh));
+	
+	snprintf(error_msg, 1024, "Unknown command: %u\n", 123);
+	//send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
+	printk("[XX] CLIENT PORT ID: %u\n", pid);
+	ip_store_for_each(ignore_ips, send_config_response_ignore_list_callback, &pid);
+	send_config_response(pid, SPIN_CMD_END, 0, NULL);
+	
+}
+
+
 //This is for 3.6 kernels and above.
-struct netlink_kernel_cfg netlink_cfg = {
+struct netlink_kernel_cfg netlink_traffic_cfg = {
     .input = traffic_client_connect,
+};
+struct netlink_kernel_cfg netlink_config_cfg = {
+    .input = config_client_connect,
 };
 
 static int __init init_netfilter(void) {
@@ -263,30 +340,41 @@ static int __init init_netfilter(void) {
 
     printk("Entering: %s\n",__FUNCTION__);
     //printk("init_net at %p, cfg at %p\n", init_net, &cfg);
-    printk("netlink init done\n");
-    nl_sk = netlink_kernel_create(&init_net, NETLINK_TRAFFIC_PORT, &netlink_cfg);
-    //nl_sk = netlink_kernel_create(&init_net, NETLINK_TRAFFIC_PORT, 0, traffic_client_connect,NULL,THIS_MODULE);
-    printk("netlink_kernel_create called\n");
-    if(!nl_sk)
+
+    traffic_nl_sk = netlink_kernel_create(&init_net, NETLINK_TRAFFIC_PORT, &netlink_traffic_cfg);
+    if(!traffic_nl_sk)
     {
         printk(KERN_ALERT "Error creating socket.\n");
         return -10;
     }
+    printk("SPIN traffic port created\n");
 
-    printk(KERN_ALERT "Netlink socket created.\n");
+    config_nl_sk = netlink_kernel_create(&init_net, NETLINK_CONFIG_PORT, &netlink_config_cfg);
+    if(!config_nl_sk)
+    {
+        printk(KERN_ALERT "Error creating socket.\n");
+        return -10;
+    }
+    printk("SPIN config port created\n");
+
     return 0;
 }
 
 
 static void close_netfilter(void) {
     printk(KERN_INFO "exiting hello module\n");
-    netlink_kernel_release(nl_sk);
+    netlink_kernel_release(traffic_nl_sk);
+    netlink_kernel_release(config_nl_sk);
 }
 
-static inline void log_ip(unsigned char ip[16], void* foo) {
+static inline void log_ip(unsigned char ip[16], int is_ipv6, void* foo) {
 	char sa[INET6_ADDRSTRLEN];
 	(void) foo;
-	ntop(AF_INET6, sa, ip, INET6_ADDRSTRLEN);
+	if (is_ipv6) {
+		ntop(AF_INET6, sa, ip, INET6_ADDRSTRLEN);
+	} else {
+		ntop(AF_INET, sa, ip, INET6_ADDRSTRLEN);
+	}
 	printk("[XX] %s\n", sa);
 }
 
@@ -304,13 +392,13 @@ void test_ip(void) {
 	ip2[15] = 2;
 	ip3[15] = 3;
 	ip4[15] = 1;
-	ip_store_add_ip(ip_store, ip1);
-	ip_store_add_ip(ip_store, ip2);
-	ip_store_add_ip(ip_store, ip3);
+	ip_store_add_ip(ip_store, 1, ip1);
+	ip_store_add_ip(ip_store, 1, ip2);
+	ip_store_add_ip(ip_store, 1, ip3);
 	ip_store_remove_ip(ip_store, ip4);
 	ip_store_remove_ip(ip_store, ip4);
 	
-	log_ip(ip1, NULL);
+	log_ip(ip1, 1, NULL);
 	printk("Full store:\n");
 	ip_store_for_each(ip_store, log_ip, NULL);
 	ip_store_destroy(ip_store);
@@ -320,7 +408,14 @@ void add_default_ignore(void) {
 	unsigned char ip[16];
 	memset(ip, 0, 16);
 	ip[15] = 1;
-	ip_store_add_ip(ignore_ips, ip);
+	ip_store_add_ip(ignore_ips, 1, ip);
+	ip[15] = 2;
+	ip_store_add_ip(ignore_ips, 1, ip);
+	ip[12] = 127;
+	ip[13] = 0;
+	ip[14] = 0;
+	ip[15] = 1;
+	ip_store_add_ip(ignore_ips, 0, ip);
 }
 
 //Called when module loaded using 'insmod'
