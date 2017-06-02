@@ -18,6 +18,7 @@
 
 #include "messaging.h"
 #include "pkt_info.h"
+#include "spin_util.h"
 
 //#include <arpa/inet.h>
 
@@ -232,6 +233,38 @@ static void close_netfilter(void) {
     netlink_kernel_release(nl_sk);
 }
 
+static inline void log_ip(unsigned char ip[16], void* foo) {
+	char sa[INET6_ADDRSTRLEN];
+	(void) foo;
+	ntop(AF_INET6, sa, ip, INET6_ADDRSTRLEN);
+	printk("[XX] %s\n", sa);
+}
+
+void test_ip(void) {
+	unsigned char ip1[16];
+	unsigned char ip2[16];
+	unsigned char ip3[16];
+	unsigned char ip4[16];
+	ip_store_t* ip_store = ip_store_create();
+	memset(ip1, 0, 16);
+	memset(ip2, 0, 16);
+	memset(ip3, 0, 16);
+	memset(ip4, 0, 16);
+	ip1[15] = 1;
+	ip2[15] = 2;
+	ip3[15] = 3;
+	ip4[15] = 1;
+	ip_store_add_ip(ip_store, ip1);
+	ip_store_add_ip(ip_store, ip2);
+	ip_store_add_ip(ip_store, ip3);
+	ip_store_remove_ip(ip_store, ip4);
+	ip_store_remove_ip(ip_store, ip4);
+	
+	log_ip(ip1, NULL);
+	printk("Full store:\n");
+	ip_store_for_each(ip_store, log_ip, NULL);
+	ip_store_destroy(ip_store);
+}
 
 //Called when module loaded using 'insmod'
 int init_module()
@@ -253,6 +286,7 @@ int init_module()
     nfho2.priority = NF_IP_PRI_FIRST;
     nf_register_hook(&nfho2);
 
+	test_ip();
     return 0;
 }
 

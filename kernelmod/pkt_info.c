@@ -11,7 +11,28 @@ size_t pktinfo_wire_size() {
 }
 
 void ntop(int fam, char* dest, const uint8_t* src, size_t max) {
-	snprintf(dest, max, "%d.%d.%d.%d", src[0], src[1], src[2], src[3]);
+	if (fam == AF_INET) {
+		snprintf(dest, max, "%d.%d.%d.%d", src[0], src[1], src[2], src[3]);
+	} else {
+		snprintf(dest, max,
+				 "%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
+				 src[0],
+				 src[1],
+				 src[2],
+				 src[3],
+				 src[4],
+				 src[5],
+				 src[6],
+				 src[7],
+				 src[8],
+				 src[9],
+				 src[10],
+				 src[11],
+				 src[12],
+				 src[13],
+				 src[14],
+				 src[15]);
+	}
 }
 
 void pktinfo2str(unsigned char* dest, pkt_info_t* pkt_info, size_t max_len) {
