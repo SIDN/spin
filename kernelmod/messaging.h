@@ -2,11 +2,7 @@
 #ifndef SPIN_MESSAGING_H
 #define SPIN_MESSAGING H 1
 
-enum message_types {
-	TRAFFIC,
-	BLOCKED,
-	DNS
-};
+#define SPIN_MESSAGE_FORMAT_VERSION 1
 
 void test(void);
 

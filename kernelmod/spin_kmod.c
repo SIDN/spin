@@ -90,7 +90,7 @@ void send_pkt_info(pkt_info_t* pkt_info) {
 		return;
 	}
 
-	msg_size = strlen(msg);
+	msg_size = pktinfo_msg_size();
 	skb_out = nlmsg_new(msg_size, 0);
 
     if(!skb_out) {
@@ -101,7 +101,7 @@ void send_pkt_info(pkt_info_t* pkt_info) {
     nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
     NETLINK_CB(skb_out).dst_group = 0;
     //strncpy(nlmsg_data(nlh),msg,msg_size);
-    pktinfo2wire(nlmsg_data(nlh), pkt_info);
+    pktinfo_msg2wire(nlmsg_data(nlh), pkt_info);
 
     res = nlmsg_unicast(nl_sk, skb_out, client_port_id);
 
