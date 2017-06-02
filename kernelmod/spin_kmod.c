@@ -26,22 +26,26 @@
 // kernel module examples from http://www.paulkiddie.com/2009/11/creating-a-netfilter-kernel-module-which-filters-udp-packets/
 // netlink examples from https://gist.github.com/arunk-s/c897bb9d75a6c98733d6
 
+
+// Hooks for packet capture
 static struct nf_hook_ops nfho1;
 static struct nf_hook_ops nfho2;
 static struct nf_hook_ops nfho3;
 static struct nf_hook_ops nfho4;
+
 
 struct sk_buff *sock_buff;
 struct udphdr *udp_header;
 struct tcphdr *tcp_header;
 struct iphdr *ip_header;            //ip header struct
 struct ipv6hdr *ipv6_header;            //ip header struct
-
+ip_store_t* ignore_ips;
 
 struct sock *nl_sk = NULL;
 uint32_t client_port_id = 0;
 
-#define NETLINK_USER 31
+#define NETLINK_CONFIG_PORT 30
+#define NETLINK_TRAFFIC_PORT 31
 
 void log_packet(pkt_info_t* pkt_info) {
 	char pkt_str[INET6_ADDRSTRLEN];
@@ -50,7 +54,6 @@ void log_packet(pkt_info_t* pkt_info) {
 }
 
 int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
-	printk("[XX] ipv6!\n");
     ipv6_header = (struct ipv6hdr *)ipv6_hdr(sock_buff);
     if (ipv6_header->nexthdr == 17) {
 		udp_header = (struct udphdr *)skb_transport_header(sock_buff);
@@ -66,9 +69,13 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 		}
 		pkt_info->src_port = tcp_header->source;
 		pkt_info->dest_port = tcp_header->dest;
-	} else if (ipv6_header->nexthdr != 1) {
+	} else if (ipv6_header->nexthdr != 58) {
+		if (ipv6_header->nexthdr == 0) {
+			// ignore hop-by-hop option header
+			return 1;
+		}
 		printk("[XX] unsupported IPv6 next header: %u\n", ipv6_header->nexthdr);
-		return 1;
+		return -1;
 	} else {
 		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff));
 	}
@@ -81,7 +88,11 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 	memcpy(pkt_info->dest_addr, &ipv6_header->daddr, 16);
 	return 0;
 }
-
+// Parse packet into pkt_info structure
+// Return values:
+// 0: all ok, structure filled
+// 1: zero-size packet, structure not filled
+// -1: error
 int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     ip_header = (struct iphdr *)skb_network_header(sock_buff);
     if (ip_header->version == 6) {
@@ -104,7 +115,7 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 		pkt_info->dest_port = tcp_header->dest;
 	} else if (ip_header->protocol != 1) {
 		printk("[XX] unsupported IPv4 protocol: %u\n", ip_header->protocol);
-		return 1;
+		return -1;
 	} else {
 		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff));
 	}
@@ -129,8 +140,15 @@ void send_pkt_info(pkt_info_t* pkt_info) {
 	char msg[INET6_ADDRSTRLEN];
 	pktinfo2str(msg, pkt_info, INET6_ADDRSTRLEN);
 	
+	// Nobody's listening, carry on
 	if (client_port_id == 0) {
 		printk("Client not connected, not sending\n");
+		return;
+	}
+	
+	// Check ignore list
+	if (ip_store_contains_ip(ignore_ips, pkt_info->src_addr) ||
+	    ip_store_contains_ip(ignore_ips, pkt_info->dest_addr)) {
 		return;
 	}
 
@@ -189,6 +207,7 @@ unsigned int hook_func_new(const struct nf_hook_ops *ops,
 						   int (*okfn)(struct sk_buff *))
 {
 	pkt_info_t pkt_info;
+    int pres;
 	memset(&pkt_info, 0, sizeof(pkt_info_t));
     sock_buff = skb;
     (void)in;
@@ -197,15 +216,13 @@ unsigned int hook_func_new(const struct nf_hook_ops *ops,
     
     if(!sock_buff) { return NF_ACCEPT;}
 
-	if (parse_packet(skb, &pkt_info) == 0) {
-		//log_packet(&pkt_info);
-		//if (netlink_has_listeners(nl_sk, 0)) {
-			send_pkt_info(&pkt_info);
-		//} else {
-		//	printk("no listeners");
-		//}
+	pres = parse_packet(skb, &pkt_info);
+	if (pres == 0) {
+		send_pkt_info(&pkt_info);
 	} else {
-		printk("packet not parsed\n");
+		if (pres < 0) {
+			printk("packet not parsed\n");
+		}
 	}
     return NF_ACCEPT;
 }
@@ -247,8 +264,8 @@ static int __init init_netfilter(void) {
     printk("Entering: %s\n",__FUNCTION__);
     //printk("init_net at %p, cfg at %p\n", init_net, &cfg);
     printk("netlink init done\n");
-    nl_sk = netlink_kernel_create(&init_net, NETLINK_USER, &netlink_cfg);
-    //nl_sk = netlink_kernel_create(&init_net, NETLINK_USER, 0, traffic_client_connect,NULL,THIS_MODULE);
+    nl_sk = netlink_kernel_create(&init_net, NETLINK_TRAFFIC_PORT, &netlink_cfg);
+    //nl_sk = netlink_kernel_create(&init_net, NETLINK_TRAFFIC_PORT, 0, traffic_client_connect,NULL,THIS_MODULE);
     printk("netlink_kernel_create called\n");
     if(!nl_sk)
     {
@@ -299,6 +316,13 @@ void test_ip(void) {
 	ip_store_destroy(ip_store);
 }
 
+void add_default_ignore(void) {
+	unsigned char ip[16];
+	memset(ip, 0, 16);
+	ip[15] = 1;
+	ip_store_add_ip(ignore_ips, ip);
+}
+
 //Called when module loaded using 'insmod'
 int init_module()
 {
@@ -331,7 +355,9 @@ int init_module()
     nfho4.priority = NF_IP_PRI_FIRST;
     nf_register_hook(&nfho4);
 
-	test_ip();
+    ignore_ips = ip_store_create();
+    add_default_ignore();
+
     return 0;
 }
 
@@ -344,6 +370,8 @@ void cleanup_module()
     nf_unregister_hook(&nfho2);                     //cleanup – unregister hook
     nf_unregister_hook(&nfho3);                     //cleanup – unregister hook
     nf_unregister_hook(&nfho4);                     //cleanup – unregister hook
+    
+    ip_store_destroy(ignore_ips);
 }
 
 MODULE_LICENSE("GPL");

@@ -1,6 +1,6 @@
 
 obj-m := spin.o
-spin-objs := spin_kmod.o messaging.o pkt_info.o spin_util.o
+spin-objs := spin_kmod.o messaging.o pkt_info.o spin_util.o spin_config.o
 
 KERNELPATH=@KERNELPATH@
 
@@ -13,7 +13,7 @@ all: default
 
 default: client module
 
-module: spin_kmod.c messaging.c pkt_info.c spin_util.c
+module: spin_kmod.c messaging.c pkt_info.c spin_util.c spin_config.c
 	$(MAKE) V=s -C $(KERNELPATH) M=$(PWD) modules
 
 distclean: clean

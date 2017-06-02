@@ -12,7 +12,7 @@
 
 #include "pkt_info.h"
 
-#define NETLINK_USER 31
+#define NETLINK_TRAFFIC_PORT 31
 
 #define MAX_PAYLOAD 1024 /* maximum payload size*/
 struct sockaddr_nl src_addr, dest_addr;
@@ -23,7 +23,7 @@ struct msghdr msg;
 
 int main()
 {
-    sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_USER);
+    sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_TRAFFIC_PORT);
     if(sock_fd<0) {
 		fprintf(stderr, "Error connecting to socket: %s\n", strerror(errno));
 		return -1;
