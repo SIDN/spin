@@ -24,7 +24,8 @@
 // kernel module examples from http://www.paulkiddie.com/2009/11/creating-a-netfilter-kernel-module-which-filters-udp-packets/
 // netlink examples from https://gist.github.com/arunk-s/c897bb9d75a6c98733d6
 
-static struct nf_hook_ops nfho;         //struct holding set of hook function options
+static struct nf_hook_ops nfho1;
+static struct nf_hook_ops nfho2;
 
 struct sk_buff *sock_buff;
 struct udphdr *udp_header;
@@ -137,6 +138,32 @@ unsigned int hook_func(void* priv,
     return NF_ACCEPT;
 }
 
+unsigned int hook_func_new(const struct nf_hook_ops *ops,
+						   struct sk_buff *skb,
+						   const struct net_device *in,
+						   const struct net_device *out,
+						   int (*okfn)(struct sk_buff *))
+{
+	pkt_info_t pkt_info;
+	memset(&pkt_info, 0, sizeof(pkt_info_t));
+    sock_buff = skb;
+    (void)in;
+    (void)out;
+    (void)okfn;
+    
+    if(!sock_buff) { return NF_ACCEPT;}
+
+	if (parse_packet(skb, &pkt_info) == 0) {
+		//log_packet(&pkt_info);
+		//if (netlink_has_listeners(nl_sk, 0)) {
+			send_pkt_info(&pkt_info);
+		//} else {
+		//	printk("no listeners");
+		//}
+	}
+    return NF_ACCEPT;
+}
+
 
 static void hello_nl_recv_msg(struct sk_buff *skb) {
     struct nlmsghdr *nlh;
@@ -144,7 +171,7 @@ static void hello_nl_recv_msg(struct sk_buff *skb) {
     struct sk_buff *skb_out;
     int msg_size;
     char *msg="Hello from kernel";
-    int res;
+    //int res;
 
     printk(KERN_INFO "Entering: %s\n", __FUNCTION__);
 
@@ -162,8 +189,9 @@ static void hello_nl_recv_msg(struct sk_buff *skb) {
         return;
     }
 
+/*
     nlh = nlmsg_put(skb_out,0,0,NLMSG_DONE,msg_size,0);
-    NETLINK_CB(skb_out).dst_group = 0; /* not in mcast group */
+    NETLINK_CB(skb_out).dst_group = 0;
     strncpy(nlmsg_data(nlh),msg,msg_size);
 
     res = nlmsg_unicast(nl_sk, skb_out, pid);
@@ -171,6 +199,7 @@ static void hello_nl_recv_msg(struct sk_buff *skb) {
     if(res<0) {
         printk(KERN_INFO "Error sending data to client: %u\n", res);
     }
+*/
 }
 
 //This is for 3.6 kernels and above.
@@ -212,13 +241,19 @@ int init_module()
     printk(KERN_INFO "Hello, world!\n");
     test();
 
-    nfho.hook = hook_func;                       //function to call when conditions below met
-    nfho.hooknum = NF_INET_PRE_ROUTING;            //called right after packet recieved, first hook in Netfilter
-    nfho.pf = PF_INET;                           //IPV4 packets
-    nfho.priority = NF_IP_PRI_FIRST;             //set to highest priority over all other hook functions
-    nf_register_hook(&nfho);                     //register hook
+    nfho1.hook = hook_func_new;
+    nfho1.hooknum = NF_INET_PRE_ROUTING;
+    nfho1.pf = PF_INET;
+    nfho1.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho1);
 
-    return 0;                                    //return 0 for success
+    nfho2.hook = hook_func_new;
+    nfho2.hooknum = NF_INET_POST_ROUTING;
+    nfho2.pf = PF_INET;
+    nfho2.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho2);
+
+    return 0;
 }
 
 //Called when module unloaded using 'rmmod'
@@ -226,7 +261,8 @@ void cleanup_module()
 {
     close_netfilter();
     printk(KERN_INFO "Hello World (tm)(c)(patent pending) signing off!\n");
-    nf_unregister_hook(&nfho);                     //cleanup – unregister hook
+    nf_unregister_hook(&nfho1);                     //cleanup – unregister hook
+    nf_unregister_hook(&nfho2);                     //cleanup – unregister hook
 }
 
 MODULE_LICENSE("GPL");
