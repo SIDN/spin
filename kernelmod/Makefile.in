@@ -1,6 +1,6 @@
 
 obj-m := spin.o
-spin-objs := spin_kmod.o messaging.o pkt_info.o spin_util.o spin_config.o
+spin-objs := spin_kmod.o messaging.o pkt_info.o spin_util.o spin_cfg.o
 
 KERNELPATH=@KERNELPATH@
 
@@ -11,9 +11,9 @@ endif
 
 all: default
 
-default: client config module
+default: client spin_config module
 
-module: spin_kmod.c messaging.c pkt_info.c spin_util.c spin_config.c
+module: spin_kmod.c messaging.c pkt_info.c spin_util.c spin_cfg.c
 	$(MAKE) V=s -C $(KERNELPATH) M=$(PWD) modules
 
 distclean: clean
@@ -27,8 +27,8 @@ clean:
 client: pkt_info_client.o client.c
 	gcc client.c pkt_info_client.o -o client
 
-config: config.c spin_config.h
-	gcc config.c -o config
+spin_config: spin_config.c spin_cfg.h
+	gcc spin_config.c -o spin_config
 
 pkt_info_client.o: pkt_info.c
 	gcc -c pkt_info.c -o pkt_info_client.o

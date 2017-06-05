@@ -20,7 +20,7 @@
 #include "messaging.h"
 #include "pkt_info.h"
 #include "spin_util.h"
-#include "spin_config.h"
+#include "spin_cfg.h"
 
 //#include <arpa/inet.h>
 
