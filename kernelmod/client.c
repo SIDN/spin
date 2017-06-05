@@ -23,6 +23,7 @@ struct msghdr msg;
 
 int main()
 {
+	message_type_t type;
     sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_TRAFFIC_PORT);
     if(sock_fd<0) {
 		fprintf(stderr, "Error connecting to socket: %s\n", strerror(errno));
@@ -66,9 +67,15 @@ int main()
 		//printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
 		pkt_info_t pkt;
 		char pkt_str[2048];
-		wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(nlh));
-		pktinfo2str(pkt_str, &pkt, 2048);
-		printf("Message from kernel: %s\n", pkt_str);
+		type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(nlh));
+		if (type == SPIN_BLOCKED) {
+			pktinfo2str(pkt_str, &pkt, 2048);
+			printf("[BLOCKED] %s\n", pkt_str);
+		} else if (type == SPIN_TRAFFIC_DATA) {
+			pktinfo2str(pkt_str, &pkt, 2048);
+			printf("[TRAFFIC] %s\n", pkt_str);
+		}
+		printf("%s\n", pkt_str);
 	}
     close(sock_fd);
 }

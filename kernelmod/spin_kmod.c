@@ -136,7 +136,7 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 	return 0;
 }
 
-void send_pkt_info(pkt_info_t* pkt_info) {
+void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
 	struct nlmsghdr *nlh;
 	int msg_size;
 	struct sk_buff* skb_out;
@@ -168,7 +168,7 @@ void send_pkt_info(pkt_info_t* pkt_info) {
     nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
     NETLINK_CB(skb_out).dst_group = 0;
     //strncpy(nlmsg_data(nlh),msg,msg_size);
-    pktinfo_msg2wire(nlmsg_data(nlh), pkt_info);
+    pktinfo_msg2wire(type, nlmsg_data(nlh), pkt_info);
 
     res = nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
 
@@ -206,11 +206,11 @@ unsigned int hook_func_new(const struct nf_hook_ops *ops,
 			printk(KERN_INFO "[XX] address in block list!\n");
 			if (!ip_store_contains_ip(except_ips, pkt_info.src_addr) &&
 				!ip_store_contains_ip(except_ips, pkt_info.dest_addr)) {
-				// TODO: send message about block
+				send_pkt_info(SPIN_BLOCKED, &pkt_info);
 				return NF_DROP;
 			}
 		}
-		send_pkt_info(&pkt_info);
+		send_pkt_info(SPIN_TRAFFIC_DATA, &pkt_info);
 	} else {
 		if (pres < 0) {
 			printk("packet not parsed\n");
@@ -471,7 +471,7 @@ void test_ip(void) {
 	ip_store_destroy(ip_store);
 }
 
-void add_default_ignore(void) {
+void add_default_test_ips(void) {
 	unsigned char ip[16];
 	memset(ip, 0, 16);
 	ip[15] = 1;
@@ -483,6 +483,13 @@ void add_default_ignore(void) {
 	ip[14] = 0;
 	ip[15] = 1;
 	ip_store_add_ip(ignore_ips, 0, ip);
+
+	ip[12] = 192;
+	ip[13] = 168;
+	ip[14] = 1;
+	ip[15] = 1;
+	ip_store_add_ip(block_ips, 0, ip);
+
 }
 
 //Called when module loaded using 'insmod'
@@ -520,7 +527,7 @@ int init_module()
     ignore_ips = ip_store_create();
     block_ips = ip_store_create();
     except_ips = ip_store_create();
-    add_default_ignore();
+    add_default_test_ips();
 
     return 0;
 }

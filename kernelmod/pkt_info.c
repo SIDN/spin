@@ -49,7 +49,7 @@ void pktinfo2str(unsigned char* dest, pkt_info_t* pkt_info, size_t max_len) {
 	}
 
 	snprintf(dest, max_len,
-	         "got packet ipv%d protocol %d from %s:%u to %s:%u size %u",
+	         "ipv%d protocol %d %s:%u -> %s:%u %u bytes",
 	         pkt_info->family == AF_INET ? 4 : 6,
 	         pkt_info->protocol,
 	         sa, ntohs(pkt_info->src_port),
@@ -73,10 +73,10 @@ void pktinfo2wire(unsigned char* dest, pkt_info_t* pkt_info) {
 	memcpy(dest, pkt_info, sizeof(pkt_info_t));
 }
 
-void pktinfo_msg2wire(unsigned char* dest, pkt_info_t* pkt_info) {
+void pktinfo_msg2wire(message_type_t type, unsigned char* dest, pkt_info_t* pkt_info) {
 	//printf("Write message of type %u size %u\n", SPIN_TRAFFIC_DATA
 	// write message type first
-	dest[0] = (uint8_t) SPIN_TRAFFIC_DATA;
+	dest[0] = (uint8_t) type;
 	dest += 1;
 	
 	// write the size of the full message
@@ -86,16 +86,19 @@ void pktinfo_msg2wire(unsigned char* dest, pkt_info_t* pkt_info) {
 	pktinfo2wire(dest, pkt_info);
 }
 
-void wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src) {
+message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src) {
 	// todo: should we read message type and size earlier?
-	message_type msg_type;
+	message_type_t msg_type;
 	uint16_t msg_size;
 	
 	msg_type = src[0];
-	src++;
-	msg_size = read_int16(src);
-	src += 2;
-	// right now, we have stored everything in network order anyway
-	memcpy(pkt_info, src, sizeof(pkt_info_t));
+	if (msg_type == SPIN_TRAFFIC_DATA || msg_type == SPIN_BLOCKED) {
+		src++;
+		msg_size = read_int16(src);
+		src += 2;
+		// right now, we have stored everything in network order anyway
+		memcpy(pkt_info, src, sizeof(pkt_info_t));
+	}
+	return msg_type;
 }
 

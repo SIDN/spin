@@ -34,9 +34,8 @@
 typedef enum {
 	SPIN_TRAFFIC_DATA,
 	SPIN_DNS_ANSWER,
-	SPIN_BLOCKED_SOURCE,
-	SPIN_BLOCKED_TARGET
-} message_type;
+	SPIN_BLOCKED
+} message_type_t;
 
 
 typedef struct packet_info {
@@ -69,10 +68,12 @@ void pktinfo2wire(unsigned char* dest, pkt_info_t* pkt_info);
 
 // writes full packet info message (header + pktinfo)
 // target must have pktinfo_msg_size() bytes available
-void pktinfo_msg2wire(unsigned char* dest, pkt_info_t* pkt_info);
+void pktinfo_msg2wire(message_type_t type, unsigned char* dest, pkt_info_t* pkt_info);
 
 // Reads pkt_info data from memory at src
-void wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src);
+// Returns the message type. If the type is BLOCKED or TRAFFIC,
+// pkt_info will be filled with info about the blocked or traffic data
+message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src);
 
 
 
