@@ -42,6 +42,8 @@ struct iphdr *ip_header;            //ip header struct
 struct ipv6hdr *ipv6_header;            //ip header struct
 
 ip_store_t* ignore_ips;
+ip_store_t* block_ips;
+ip_store_t* except_ips;
 
 struct sock *traffic_nl_sk = NULL;
 struct sock *config_nl_sk = NULL;
@@ -180,29 +182,6 @@ void send_pkt_info(pkt_info_t* pkt_info) {
 }
 
 
-unsigned int hook_func(void* priv,
-                       struct sk_buff* skb,
-//                       const struct nf_hook_state *state)
-                       void* state, void* a, void* b)
-{
-	pkt_info_t pkt_info;
-	memset(&pkt_info, 0, sizeof(pkt_info_t));
-    sock_buff = skb;
-    (void) state;
-    
-    if(!sock_buff) { return NF_ACCEPT;}
-
-	if (parse_packet(skb, &pkt_info) == 0) {
-		//log_packet(&pkt_info);
-		//if (netlink_has_listeners(traffic_nl_sk, 0)) {
-			send_pkt_info(&pkt_info);
-		//} else {
-		//	printk("no listeners");
-		//}
-	}
-    return NF_ACCEPT;
-}
-
 unsigned int hook_func_new(const struct nf_hook_ops *ops,
 						   struct sk_buff *skb,
 						   const struct net_device *in,
@@ -221,6 +200,16 @@ unsigned int hook_func_new(const struct nf_hook_ops *ops,
 
 	pres = parse_packet(skb, &pkt_info);
 	if (pres == 0) {
+		if (ip_store_contains_ip(block_ips, pkt_info.src_addr) ||
+			ip_store_contains_ip(block_ips, pkt_info.dest_addr)) {
+			// block it unless it is specifically held
+			printk(KERN_INFO "[XX] address in block list!\n");
+			if (!ip_store_contains_ip(except_ips, pkt_info.src_addr) &&
+				!ip_store_contains_ip(except_ips, pkt_info.dest_addr)) {
+				// TODO: send message about block
+				return NF_DROP;
+			}
+		}
 		send_pkt_info(&pkt_info);
 	} else {
 		if (pres < 0) {
@@ -283,47 +272,125 @@ void send_config_response(int port_id, config_command_t cmd, size_t msg_size, vo
 	}
 }
 
-void send_config_response_ignore_list_callback(unsigned char ip[16], int is_ipv6, void* port_id_p) {
-	//struct nlmsghdr* nlh = (struct nlmsghdr*) nlh_p;
+void send_config_response_ip_list_callback(unsigned char ip[16], int is_ipv6, void* port_id_p) {
 	unsigned char msg[17];
 	int port_id = *(int*)port_id_p;
-	//printk("should send ip address now\n");
 	if (is_ipv6) {
 		msg[0] = (uint8_t)AF_INET6;
 		memcpy(msg + 1, ip, 16);
-		send_config_response(port_id, SPIN_CMD_GET_IGNORE, 17, msg);
+		send_config_response(port_id, SPIN_CMD_IP, 17, msg);
 	} else {
 		msg[0] = (uint8_t)AF_INET;
 		memcpy(msg + 1, ip + 12, 4);
-		send_config_response(port_id, SPIN_CMD_GET_IGNORE, 5, msg);
+		send_config_response(port_id, SPIN_CMD_IP, 5, msg);
 	}
+}
+
+// return address family (AF_INET or AF_INET6)
+int cmd_read_ip(uint8_t* databuf, unsigned char ip[16]) {
+	int family = databuf[0];
+	if (family == AF_INET) {
+		memset(ip, 0, 12);
+		memcpy(ip+12, databuf + 1, 4);
+	} else if (family == AF_INET6) {
+		memcpy(ip, databuf + 1, 16);
+	} else {
+		return -1;
+	}
+	return family;
+}
+
+int cmd_add_ip(uint8_t* databuf, ip_store_t* ip_store) {
+	unsigned char ip[16];
+	int family = cmd_read_ip(databuf, ip);
+	if (family == AF_INET6) {
+		ip_store_add_ip(ip_store, 1, ip);
+		return 1;
+	} else if (family == AF_INET) {
+		ip_store_add_ip(ip_store, 0, ip);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+int cmd_remove_ip(uint8_t* databuf, ip_store_t* ip_store) {
+	unsigned char ip[16];
+	int family = cmd_read_ip(databuf, ip);
+	if (family > 0) {
+		ip_store_remove_ip(ip_store, ip);
+		return 1;
+	}
+	return 0;
 }
 
 static void config_client_connect(struct sk_buff *skb) {
 	struct nlmsghdr *nlh;
 	int pid;
-	int msg_size;
-	//char *msg="Hello from kernel";
-	char *msg = "Config command received";
 	char error_msg[1024];
+	config_command_t cmd;
+	uint8_t* cmdbuf;
 	
 	printk(KERN_INFO "Entering: %s\n", __FUNCTION__);
 	
-	msg_size = strlen(msg);
-	
 	nlh = (struct nlmsghdr *) skb->data;
-	
+	printk(KERN_INFO "got command of size %u\n", skb->len);
+
 	/* pid of sending process */
 	pid = nlh->nlmsg_pid;
-	
-	printk(KERN_INFO "Netlink received configuration command: %s\n", (char *) nlmsg_data(nlh));
-	
-	snprintf(error_msg, 1024, "Unknown command: %u\n", 123);
-	//send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
-	printk("[XX] CLIENT PORT ID: %u\n", pid);
-	ip_store_for_each(ignore_ips, send_config_response_ignore_list_callback, &pid);
+	cmdbuf = (uint8_t*) NLMSG_DATA(nlh);
+	if (skb->len < 1) {
+		printk(KERN_INFO "got command of size 0\n");
+		snprintf(error_msg, 1024, "empty command");
+		send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
+	} else {
+		cmd = cmdbuf[0];
+		switch (cmd) {
+		case SPIN_CMD_GET_IGNORE:
+			ip_store_for_each(ignore_ips, send_config_response_ip_list_callback, &pid);
+			break;
+		case SPIN_CMD_ADD_IGNORE:
+			cmd_add_ip(cmdbuf+1, ignore_ips);
+			break;
+		case SPIN_CMD_REMOVE_IGNORE:
+			cmd_remove_ip(cmdbuf+1, ignore_ips);
+			break;
+		case SPIN_CMD_CLEAR_IGNORE:
+			ip_store_destroy(ignore_ips);
+			ignore_ips = ip_store_create();
+			break;
+		case SPIN_CMD_GET_BLOCK:
+			ip_store_for_each(block_ips, send_config_response_ip_list_callback, &pid);
+			break;
+		case SPIN_CMD_ADD_BLOCK:
+			cmd_add_ip(cmdbuf+1, block_ips);
+			break;
+		case SPIN_CMD_REMOVE_BLOCK:
+			cmd_remove_ip(cmdbuf+1, block_ips);
+			break;
+		case SPIN_CMD_CLEAR_BLOCK:
+			ip_store_destroy(block_ips);
+			block_ips = ip_store_create();
+			break;
+		case SPIN_CMD_GET_EXCEPT:
+			ip_store_for_each(except_ips, send_config_response_ip_list_callback, &pid);
+			break;
+		case SPIN_CMD_ADD_EXCEPT:
+			cmd_add_ip(cmdbuf+1, except_ips);
+			break;
+		case SPIN_CMD_REMOVE_EXCEPT:
+			cmd_remove_ip(cmdbuf+1, except_ips);
+			break;
+		case SPIN_CMD_CLEAR_EXCEPT:
+			ip_store_destroy(except_ips);
+			except_ips = ip_store_create();
+			break;
+		default:
+			snprintf(error_msg, 1024, "unknown command: %u", cmd);
+			send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
+		}
+	}
 	send_config_response(pid, SPIN_CMD_END, 0, NULL);
-	
 }
 
 
@@ -451,6 +518,8 @@ int init_module()
     nf_register_hook(&nfho4);
 
     ignore_ips = ip_store_create();
+    block_ips = ip_store_create();
+    except_ips = ip_store_create();
     add_default_ignore();
 
     return 0;
