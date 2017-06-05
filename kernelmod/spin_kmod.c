@@ -64,14 +64,14 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 		udp_header = (struct udphdr *)skb_transport_header(sock_buff);
 		pkt_info->src_port = udp_header->source;
 		pkt_info->dest_port = udp_header->dest;
-		pkt_info->payload_size = htonl((uint32_t)ntohs(udp_header->len));
-		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff));
+		pkt_info->payload_size = htonl((uint32_t)ntohs(udp_header->len)) - 8;
+		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff)) + 8;
 	} else if (ipv6_header->nexthdr == 6) {
 		tcp_header = (struct tcphdr *)skb_transport_header(sock_buff);
 		pkt_info->src_port = tcp_header->source;
 		pkt_info->dest_port = tcp_header->dest;
-		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff));
-		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff) + (4*tcp_header->doff));
+		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff) - 2);
+		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2);
 		// if size is zero, ignore tcp packet
 		if (pkt_info->payload_size == 0) {
 			return 1;
@@ -111,14 +111,14 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 		udp_header = (struct udphdr *)skb_transport_header(sock_buff);
 		pkt_info->src_port = udp_header->source;
 		pkt_info->dest_port = udp_header->dest;
-		pkt_info->payload_size = htonl((uint32_t)ntohs(udp_header->len));
-		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff));
+		pkt_info->payload_size = htonl((uint32_t)ntohs(udp_header->len) - 8);
+		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff) + 8);
 	} else if (ip_header->protocol == 6) {
 		tcp_header = (struct tcphdr *)skb_transport_header(sock_buff);
 		pkt_info->src_port = tcp_header->source;
 		pkt_info->dest_port = tcp_header->dest;
-		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff));
-		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff) + (4*tcp_header->doff));
+		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff) - 2);
+		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2);
 		// if size is zero, ignore tcp packet
 		if (pkt_info->payload_size == 0) {
 			return 1;
@@ -187,13 +187,75 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
     }
 }
 
+void hexdump_k(uint8_t* data, unsigned int offset, unsigned int size) {
+	unsigned int i;
+	printk("%02u: ", 0);
+	for (i = 0; i < size; i++) {
+		if (i > 0 && i % 10 == 0) {
+			printk("\n%02u: ", i);
+		}
+		printk("%02x ", data[i + offset]);
+	}
+	printk("\n");
+}
+
 void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 	uint16_t offset = ntohs(pkt_info->payload_offset);
-	printk("[XX] DNS answer header offset %u\n", offset);
+	uint8_t flag_bits;
+	uint8_t flag_bits2;
+	uint16_t answer_count;
+	uint16_t cur_pos;
+	uint16_t cur_pos_name;
+	uint8_t labellen;
+	unsigned char dnsname[256];
+	uint8_t* data = (uint8_t*)skb->data + ntohs(pkt_info->payload_offset);
+	
+	printk("[XX] DNS answer header offset %u packet len %u\n", offset, ntohl(pkt_info->payload_size));
 	printk("\n");
 	if (offset > skb->len) {
 		printk("[XX] error: offset (%u) larger than packet size (%u)\n", offset, skb->len);
+		return;
 	}
+	hexdump_k(skb->data, ntohs(pkt_info->payload_offset), ntohl(pkt_info->payload_size));
+	// check data size as well
+	flag_bits = data[2];
+	flag_bits2 = data[3];
+	// must be qr answer
+	if (!(flag_bits & 0x80)) {
+		printk("[XX] QR not set\n");
+		return;
+	}
+	if (!(flag_bits2 & 0x0f) == 0) {
+		printk("[XX] not NOERROR\n");
+		return;
+	}
+	answer_count = (256*(uint8_t)data[4]) + (uint8_t)data[5];
+	printk("[XX] answer count: %u\n", answer_count);
+	
+	// copy the query name
+	cur_pos = 12;
+	cur_pos_name = 0;
+	labellen = data[cur_pos++];
+
+	// skip to next, etc
+	//printk("Label len: %u\n", labellen);
+	
+	while(labellen > 0) {
+		//printk("Label len: %u\n", labellen);
+		memcpy(dnsname + cur_pos_name, data + cur_pos, labellen);
+		cur_pos += labellen;
+		cur_pos_name += labellen;
+		dnsname[cur_pos_name++] = '.';
+		labellen = data[cur_pos++];
+	}
+	// if we want trailing dot, remove deduction here
+	dnsname[--cur_pos_name] = '\0';
+	printk("DNS NAME: %s\n", dnsname);
+
+	// TODO: dns label pointers
+	// read type (skip class)
+	// then read all answer ips
+	
 }
 
 unsigned int hook_func_new(const struct nf_hook_ops *ops,
@@ -505,7 +567,7 @@ void add_default_test_ips(void) {
 
 	ip[12] = 192;
 	ip[13] = 168;
-	ip[14] = 1;
+	ip[14] = 8;
 	ip[15] = 1;
 	ip_store_add_ip(block_ips, 0, ip);
 
