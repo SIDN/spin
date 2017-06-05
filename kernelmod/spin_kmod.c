@@ -65,15 +65,17 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 		pkt_info->src_port = udp_header->source;
 		pkt_info->dest_port = udp_header->dest;
 		pkt_info->payload_size = htonl((uint32_t)ntohs(udp_header->len));
+		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff));
 	} else if (ipv6_header->nexthdr == 6) {
 		tcp_header = (struct tcphdr *)skb_transport_header(sock_buff);
+		pkt_info->src_port = tcp_header->source;
+		pkt_info->dest_port = tcp_header->dest;
 		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff));
+		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff) + (4*tcp_header->doff));
 		// if size is zero, ignore tcp packet
 		if (pkt_info->payload_size == 0) {
 			return 1;
 		}
-		pkt_info->src_port = tcp_header->source;
-		pkt_info->dest_port = tcp_header->dest;
 	} else if (ipv6_header->nexthdr != 58) {
 		if (ipv6_header->nexthdr == 0) {
 			// ignore hop-by-hop option header
@@ -83,6 +85,7 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 		return -1;
 	} else {
 		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff));
+		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff));
 	}
 	//printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
 	
@@ -109,20 +112,23 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 		pkt_info->src_port = udp_header->source;
 		pkt_info->dest_port = udp_header->dest;
 		pkt_info->payload_size = htonl((uint32_t)ntohs(udp_header->len));
+		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff));
 	} else if (ip_header->protocol == 6) {
 		tcp_header = (struct tcphdr *)skb_transport_header(sock_buff);
+		pkt_info->src_port = tcp_header->source;
+		pkt_info->dest_port = tcp_header->dest;
 		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff));
+		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff) + (4*tcp_header->doff));
 		// if size is zero, ignore tcp packet
 		if (pkt_info->payload_size == 0) {
 			return 1;
 		}
-		pkt_info->src_port = tcp_header->source;
-		pkt_info->dest_port = tcp_header->dest;
 	} else if (ip_header->protocol != 1) {
 		printk("[XX] unsupported IPv4 protocol: %u\n", ip_header->protocol);
 		return -1;
 	} else {
 		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff));
+		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff));
 	}
 	//printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
 	
@@ -181,6 +187,14 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
     }
 }
 
+void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
+	uint16_t offset = ntohs(pkt_info->payload_offset);
+	printk("[XX] DNS answer header offset %u\n", offset);
+	printk("\n");
+	if (offset > skb->len) {
+		printk("[XX] error: offset (%u) larger than packet size (%u)\n", offset, skb->len);
+	}
+}
 
 unsigned int hook_func_new(const struct nf_hook_ops *ops,
 						   struct sk_buff *skb,
@@ -209,6 +223,11 @@ unsigned int hook_func_new(const struct nf_hook_ops *ops,
 				send_pkt_info(SPIN_BLOCKED, &pkt_info);
 				return NF_DROP;
 			}
+		}
+		// if message is dns response, send DNS info as well
+		printk(KERN_INFO "SRC PORT: %u\n", ntohs(pkt_info.src_port));
+		if (ntohs(pkt_info.src_port) == 53) {
+			handle_dns_answer(&pkt_info, skb);
 		}
 		send_pkt_info(SPIN_TRAFFIC_DATA, &pkt_info);
 	} else {

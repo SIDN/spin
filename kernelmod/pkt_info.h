@@ -38,6 +38,7 @@ typedef enum {
 } message_type_t;
 
 
+// note: all values are stored in network order
 typedef struct packet_info {
 	uint8_t family; // 4, 6, etc
 	uint8_t protocol; // value for tcp/udp/icmp/etc.
@@ -46,6 +47,7 @@ typedef struct packet_info {
 	uint16_t src_port;
 	uint16_t dest_port;
 	uint32_t payload_size;
+	uint16_t payload_offset;
 } pkt_info_t;
 
 // Size of the full pktinfo wire message (header + content)
