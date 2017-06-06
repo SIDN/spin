@@ -21,6 +21,18 @@ struct iovec iov;
 int sock_fd;
 struct msghdr msg;
 
+void hexdump(uint8_t* data, unsigned int size) {
+	unsigned int i;
+	printf("00: ");
+	for (i = 0; i < size; i++) {
+		if (i > 0 && i % 10 == 0) {
+			printf("\n%u: ", i);
+		}
+		printf("%02x ", data[i]);
+	}
+	printf("\n");
+}
+
 int main()
 {
 	message_type_t type;
@@ -66,6 +78,7 @@ int main()
 		recvmsg(sock_fd, &msg, 0);
 		//printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
 		pkt_info_t pkt;
+		dns_pkt_info_t dns_pkt;
 		char pkt_str[2048];
 		type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(nlh));
 		if (type == SPIN_BLOCKED) {
@@ -74,6 +87,13 @@ int main()
 		} else if (type == SPIN_TRAFFIC_DATA) {
 			pktinfo2str(pkt_str, &pkt, 2048);
 			printf("[TRAFFIC] %s\n", pkt_str);
+		} else if (type == SPIN_DNS_ANSWER) {
+			wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(nlh));
+			dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
+			hexdump((uint8_t*)&dns_pkt, sizeof(dns_pkt_info_t));
+			printf("[DNS] %s\n", pkt_str);
+		} else {
+			printf("unknown type? %u\n", type);
 		}
 		printf("%s\n", pkt_str);
 	}

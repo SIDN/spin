@@ -142,6 +142,7 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 	return 0;
 }
 
+// TODO: refactor two functions below
 void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
 	struct nlmsghdr *nlh;
 	int msg_size;
@@ -199,6 +200,64 @@ void hexdump_k(uint8_t* data, unsigned int offset, unsigned int size) {
 	printk("\n");
 }
 
+void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
+	struct nlmsghdr *nlh;
+	int msg_size;
+	struct sk_buff* skb_out;
+	int res;
+	
+	printk("yoyoyoyoyoyoyo\n");
+	//char msg[INET6_ADDRSTRLEN];
+	//pktinfo2str(msg, pkt_info, INET6_ADDRSTRLEN);
+	
+	// Nobody's listening, carry on
+	if (client_port_id == 0) {
+		printk("Client not connected, not sending\n");
+		return;
+	}
+	
+	msg_size = dns_pktinfo_msg_size();
+	skb_out = nlmsg_new(msg_size, 0);
+
+    if(!skb_out) {
+        printk(KERN_ERR "Failed to allocate new skb\n");
+        return;
+    }
+
+    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
+    NETLINK_CB(skb_out).dst_group = 0;
+    //strncpy(nlmsg_data(nlh),msg,msg_size);
+    dns_pktinfo_msg2wire(nlmsg_data(nlh), dns_pkt_info);
+
+    res = nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
+
+    if(res<0) {
+        printk(KERN_INFO "Error sending data to client: %d\n", res);
+		if (res == -111) {
+			printk(KERN_INFO "Client disappeared\n");
+			client_port_id = 0;
+		}
+    }
+    printk("[XX] SENT!!\n");
+}
+
+static inline uint16_t read_int16(uint8_t* data) {
+	return (256*(uint8_t)data[0]) + (uint8_t)data[1];
+}
+
+unsigned int skip_dname(uint8_t* data, unsigned int cur_pos) {
+	uint8_t labellen = data[cur_pos++];
+	while (labellen > 0) {
+		if ((labellen & 0xc0) == 0xc0) {
+			// compressed, just skip it
+			return ++cur_pos;
+		}
+		cur_pos += labellen;
+		labellen = data[cur_pos++];
+	}
+	return cur_pos;
+}
+
 void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 	uint16_t offset = ntohs(pkt_info->payload_offset);
 	uint8_t flag_bits;
@@ -206,9 +265,12 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 	uint16_t answer_count;
 	uint16_t cur_pos;
 	uint16_t cur_pos_name;
+	uint16_t rr_type;
 	uint8_t labellen;
+	unsigned int i;
 	unsigned char dnsname[256];
 	uint8_t* data = (uint8_t*)skb->data + ntohs(pkt_info->payload_offset);
+	dns_pkt_info_t dpkt_info;
 	
 	printk("[XX] DNS answer header offset %u packet len %u\n", offset, ntohl(pkt_info->payload_size));
 	printk("\n");
@@ -229,7 +291,12 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 		printk("[XX] not NOERROR\n");
 		return;
 	}
-	answer_count = (256*(uint8_t)data[4]) + (uint8_t)data[5];
+	// check if there is a query message
+	if (read_int16(data + 4) != 1) {
+		printk("0 or more than 1 question rr (%u %04x), skip packet\n", read_int16(data + 4), read_int16(data + 4));
+		return;
+	}
+	answer_count = read_int16(data + 6);
 	printk("[XX] answer count: %u\n", answer_count);
 	
 	// copy the query name
@@ -252,10 +319,74 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 	dnsname[--cur_pos_name] = '\0';
 	printk("DNS NAME: %s\n", dnsname);
 
-	// TODO: dns label pointers
-	// read type (skip class)
 	// then read all answer ips
-	
+	// type should be 1 (A) or 28 (AAAA) and class should be IN (1)
+	rr_type = read_int16(data + cur_pos);
+	if (rr_type != 1 && rr_type != 28) {
+		printk("[XX] query rr type (%u) not 1 or 28, skip packet\n", rr_type);
+		return;
+	}
+	cur_pos += 2;
+	if (read_int16(data + cur_pos) != 1) {
+		printk("[XX] class not IN (%u: %u), skip packet\n", cur_pos, read_int16(data + cur_pos));
+		return;
+	}
+	cur_pos += 2;
+	// we are now at answer section, so read all of those
+	for (i = 0; i < answer_count; i++) {
+		// skip the dname
+		printk("[XX] skip dname from: %u\n", cur_pos);
+		cur_pos = skip_dname(data, cur_pos);
+		printk("[XX] dname skipped pos now: %u\n", cur_pos);
+		// read the type
+		rr_type = read_int16(data + cur_pos);
+		// skip the class
+		cur_pos += 4;
+		if (rr_type == 1) {
+			// okay send
+			printk("[XX] found A answer\n");
+			// data format:
+			// <dns type> <ip family> <ip data> <TTL> <domain name string> (null-terminated?)
+			memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
+			dpkt_info.family = 4;
+			memcpy(&dpkt_info.ttl, data + cur_pos, 4);
+			// skip ttl and size of rdata (which should be 4, check?)
+			cur_pos += 4;
+			cur_pos += 2;
+			memcpy(dpkt_info.ip + 12, data + cur_pos, 4);
+			cur_pos += 4;
+			hexdump_k((uint8_t*)&dpkt_info, 0, sizeof(dns_pkt_info_t));
+			strncpy(dpkt_info.dname, dnsname, 256);
+			send_dns_pkt_info(SPIN_DNS_ANSWER, &dpkt_info);
+		} else if (rr_type == 28) {
+			// okay send
+			printk("[XX] found AAAA answer\n");
+			// data format:
+			// <dns type> <ip family> <ip data> <TTL> <domain name string> (null-terminated?)
+			memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
+			dpkt_info.family = 6;
+			memcpy(&dpkt_info.ttl, data + cur_pos, 4);
+			// skip ttl and size of rdata (which should be 16, check?)
+			cur_pos += 4;
+			cur_pos += 2;
+			memcpy(dpkt_info.ip, data + cur_pos, 16);
+			cur_pos += 16;
+			strncpy(dpkt_info.dname, dnsname, 256);
+			send_dns_pkt_info(SPIN_DNS_ANSWER, &dpkt_info);
+		} else {
+			// skip rr data
+			// 
+			printk("[XX] not A or AAAA in answer at %u (val: %u)\n", cur_pos - 4, rr_type);
+			printk("[XX] now at %u\n", cur_pos);
+			// skip ttl
+			cur_pos += 4;
+			printk("[XX] after ttl at %u (val here: %u)\n", cur_pos, read_int16(data + cur_pos));
+			// skip rdata
+			cur_pos += read_int16(data + cur_pos) + 2;
+			printk("[XX] skip to: %u\n", cur_pos);
+			
+		}
+	}
 }
 
 unsigned int hook_func_new(const struct nf_hook_ops *ops,

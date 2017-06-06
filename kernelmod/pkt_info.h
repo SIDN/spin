@@ -50,11 +50,24 @@ typedef struct packet_info {
 	uint16_t payload_offset;
 } pkt_info_t;
 
+// note: all values are stored in network order
+// family is 4 or 6
+typedef struct dns_packet_info {
+	uint8_t family;
+	uint8_t ip[16];
+	uint32_t ttl;
+	unsigned char dname[256];
+} dns_pkt_info_t;
+
 // Size of the full pktinfo wire message (header + content)
 size_t pktinfo_msg_size(void);
 
+size_t dns_pktinfo_msg_size(void);
+
 // Size of the pktinfo wire data itself (without header)
 size_t pktinfo_wire_size(void);
+
+size_t dns_pktinfo_wire_size(void);
 
 // Writes a string representation of the given IP address (in
 // wire format) to the given destination address.
@@ -77,6 +90,9 @@ void pktinfo_msg2wire(message_type_t type, unsigned char* dest, pkt_info_t* pkt_
 // pkt_info will be filled with info about the blocked or traffic data
 message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src);
 
+void dns_pktinfo_msg2wire(unsigned char* dest, dns_pkt_info_t* pkt_info);
+void wire2dnspktinfo(dns_pkt_info_t* pkt_info, unsigned char* src);
+void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t max_len);
 
 
 #endif // SPIN_PKT_INFO

@@ -6,8 +6,17 @@ size_t pktinfo_msg_size() {
 	return pktinfo_wire_size() + 3;
 }
 
+size_t dns_pktinfo_msg_size() {
+	// msg size (2 octets), message type (1 octet), data
+	return dns_pktinfo_wire_size() + 3;
+}
+
 size_t pktinfo_wire_size() {
 	return sizeof(pkt_info_t);
+}
+
+size_t dns_pktinfo_wire_size() {
+	return sizeof(dns_pkt_info_t);
 }
 
 void ntop(int fam, char* dest, const uint8_t* src, size_t max) {
@@ -57,6 +66,31 @@ void pktinfo2str(unsigned char* dest, pkt_info_t* pkt_info, size_t max_len) {
 	         ntohl(pkt_info->payload_size));
 }
 
+/*
+uint32_t read_uint32(uint8_t* src) {
+	uint32_t result;
+	result = (src[0] << 24) + (src[1] << 16) + (src[2] << 8) + src[3];
+	return ntohl(result);
+}
+*/
+
+void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t max_len) {
+	uint32_t ttl;
+	unsigned char dname[256];
+	char ip[INET6_ADDRSTRLEN];
+	
+	ttl = ntohl(dns_pkt_info->ttl);
+	if (dns_pkt_info->family == 4) {
+		ntop(AF_INET, ip, dns_pkt_info->ip + 12, INET6_ADDRSTRLEN);
+	} else {
+		ntop(AF_INET6, ip, dns_pkt_info->ip, INET6_ADDRSTRLEN);
+	}
+	strncpy(dname, dns_pkt_info->dname, 256);
+	
+	snprintf(dest, max_len,
+			 "[DNS] %s %s %u\n", ip, dname, ttl);
+}
+
 static inline void write_int16(unsigned char* dest, uint16_t i) {
 	const uint16_t wi = htons(i);
 	memcpy(dest, &wi, 2);
@@ -102,3 +136,31 @@ message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src) {
 	return msg_type;
 }
 
+void dns_pktinfo_msg2wire(unsigned char* dest, dns_pkt_info_t* dns_pkt_info) {
+	uint16_t msg_size;
+	
+	dest[0] = SPIN_DNS_ANSWER;
+	dest += 1;
+	// spread this out into functions too?
+	msg_size = sizeof(dns_pkt_info_t);
+	write_int16(dest, htons(msg_size));
+	dest += 2;
+	// right now, we have stored everything in network order anyway
+	memcpy(dest, dns_pkt_info, sizeof(dns_pkt_info_t));
+}
+
+message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, unsigned char* src) {
+	// todo: should we read message type and size earlier?
+	message_type_t msg_type;
+	uint16_t msg_size;
+	
+	msg_type = src[0];
+	if (msg_type == SPIN_DNS_ANSWER) {
+		src++;
+		msg_size = read_int16(src);
+		src += 2;
+		// right now, we have stored everything in network order anyway
+		memcpy(dns_pkt_info, src, sizeof(dns_pkt_info_t));
+	}
+	return msg_type;
+}
