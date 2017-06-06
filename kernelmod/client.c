@@ -90,12 +90,10 @@ int main()
 		} else if (type == SPIN_DNS_ANSWER) {
 			wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(nlh));
 			dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
-			hexdump((uint8_t*)&dns_pkt, sizeof(dns_pkt_info_t));
 			printf("[DNS] %s\n", pkt_str);
 		} else {
 			printf("unknown type? %u\n", type);
 		}
-		printf("%s\n", pkt_str);
 	}
     close(sock_fd);
 }

@@ -88,7 +88,7 @@ void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t m
 	strncpy(dname, dns_pkt_info->dname, 256);
 	
 	snprintf(dest, max_len,
-			 "[DNS] %s %s %u\n", ip, dname, ttl);
+			 "%s %s %u\n", ip, dname, ttl);
 }
 
 static inline void write_int16(unsigned char* dest, uint16_t i) {
