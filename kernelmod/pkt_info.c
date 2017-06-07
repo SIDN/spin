@@ -172,6 +172,19 @@ message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src) {
 	return msg_type;
 }
 
+void dns_pktinfo2wire(unsigned char* dest, dns_pkt_info_t* dns_pkt_info) {
+	uint8_t dname_size = strlen(dns_pkt_info->dname) + 1;
+	dest[0] = dns_pkt_info->family;
+	dest += 1;
+	memcpy(dest, dns_pkt_info->ip, 16);
+	dest += 16;
+	write_int32(dest, dns_pkt_info->ttl);
+	dest += 4;
+	dest[0] = dname_size;
+	dest += 1;
+	strncpy(dest, dns_pkt_info->dname, dname_size);
+}
+
 void dns_pktinfo_msg2wire(unsigned char* dest, dns_pkt_info_t* dns_pkt_info) {
 	uint16_t msg_size;
 	
@@ -181,22 +194,31 @@ void dns_pktinfo_msg2wire(unsigned char* dest, dns_pkt_info_t* dns_pkt_info) {
 	msg_size = sizeof(dns_pkt_info_t);
 	write_int16(dest, htons(msg_size));
 	dest += 2;
-	// right now, we have stored everything in network order anyway
-	memcpy(dest, dns_pkt_info, sizeof(dns_pkt_info_t));
+	
+	dns_pktinfo2wire(dest, dns_pkt_info);
 }
 
 message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, unsigned char* src) {
 	// todo: should we read message type and size earlier?
 	message_type_t msg_type;
 	uint16_t msg_size;
+	uint8_t dname_size;
 	
 	msg_type = src[0];
 	if (msg_type == SPIN_DNS_ANSWER) {
 		src++;
 		msg_size = read_int16(src);
 		src += 2;
-		// right now, we have stored everything in network order anyway
-		memcpy(dns_pkt_info, src, sizeof(dns_pkt_info_t));
+		
+		dns_pkt_info->family = src[0];
+		src += 1;
+		memcpy(dns_pkt_info->ip, src, 16);
+		src += 16;
+		dns_pkt_info->ttl = read_int32(src);
+		src += 4;
+		dname_size = src[0];
+		src += 1;
+		strncpy(dns_pkt_info->dname, src, dname_size);
 	}
 	return msg_type;
 }
