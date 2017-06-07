@@ -194,6 +194,28 @@ function PktInfo:print()
 	      " size " .. self.payload_size)
 end
 
+local DnsPktInfo = {}
+DnsPktInfo.__index = DnsPktInfo
+
+function DnsPktInfo_create()
+	local d = {}
+	setmetatable(d, DnsPktInfo)
+	d.family = 0
+	d.ip = ""
+	d.ttl = 0
+	d.dname = ""
+	return d
+end
+
+function DnsPktInfo:print()
+    io.stdout:write(self.ip)
+    io.stdout:write(" ")
+    io.stdout:write(self.dname)
+    io.stdout:write(" ")
+    io.stdout:write(self.ttl)
+    io.stdout:write("\n")
+end
+
 function printbytes2(data)
     local i
     for i = 1,data:len() do
@@ -224,6 +246,20 @@ function read_spin_pkt_info(data)
 	return pkt_info
 end
 
+function read_dns_pkt_info(data)
+	local dns_pkt_info = DnsPktInfo_create()
+	dns_pkt_info.family = data:byte(1)
+	if (dns_pkt_info.family == posix.AF_INET) then
+		dns_pkt_info.ip = ntop_v4(data:sub(14, 17))
+	elseif (dns_pkt_info.family == posix.AF_INET) then
+		dns_pkt_info.ip = ntop_v6(data:sub(2, 17))
+	end
+	dns_pkt_info.ttl = bytes_to_int32_bigendian(data:byte(18, 21))
+	local dname_size = data:byte(22)
+	dns_pkt_info.dname = data:sub(23, 23 + dname_size - 1)
+	return dns_pkt_info
+end
+
 function spin_read_message_type(data)
 	local spin_msg_type = data:byte(1)
 	local spin_msg_size = bytes_to_int16_bigendian(data:byte(2,3))
@@ -232,7 +268,9 @@ function spin_read_message_type(data)
 	  local pkt_info = read_spin_pkt_info(data:sub(4))
 	  pkt_info:print()
 	elseif spin_msg_type == spin_message_types.SPIN_DNS_ANSWER then
-	  print("[DNS]")
+	  io.stdout:write("[DNS] ")
+	  local dns_pkt_info = read_dns_pkt_info(data:sub(4))
+	  dns_pkt_info:print()
 	elseif spin_msg_type == spin_message_types.SPIN_BLOCKED then
 	  io.stdout:write("[BLOCKED] ")
 	  local pkt_info = read_spin_pkt_info(data:sub(4))
@@ -246,8 +284,6 @@ end
 if posix.AF_NETLINK ~= nil then
 	local fd, err = posix.socket(posix.AF_NETLINK, posix.SOCK_DGRAM, 31)
 	assert(fd, err)
-	print("connected fd " .. fd)
-	print("my pid: " .. posix.getpid("pid"))
 
 	local ok, err = posix.bind(fd, { family = posix.AF_NETLINK,
 	                             --pid = posix.getpid("pid"),
@@ -260,7 +296,6 @@ if posix.AF_NETLINK ~= nil then
 	end
 	msg_str = "Hello!"
 	hdr_str = create_netlink_header(msg_str, 0, 0, 0, posix.getpid("pid"))
-	printbytes(hdr_str .. msg_str)
 	
 	posix.send(fd, hdr_str .. msg_str);
 

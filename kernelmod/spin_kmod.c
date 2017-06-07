@@ -351,8 +351,9 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 			// data format:
 			// <dns type> <ip family> <ip data> <TTL> <domain name string> (null-terminated?)
 			memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
-			dpkt_info.family = 4;
+			dpkt_info.family = AF_INET;
 			memcpy(&dpkt_info.ttl, data + cur_pos, 4);
+			dpkt_info.ttl = ntohl(dpkt_info.ttl);
 			// skip ttl and size of rdata (which should be 4, check?)
 			cur_pos += 4;
 			cur_pos += 2;
@@ -367,8 +368,9 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 			// data format:
 			// <dns type> <ip family> <ip data> <TTL> <domain name string> (null-terminated?)
 			memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
-			dpkt_info.family = 6;
+			dpkt_info.family = AF_INET6;
 			memcpy(&dpkt_info.ttl, data + cur_pos, 4);
+			dpkt_info.ttl = ntohl(dpkt_info.ttl);
 			// skip ttl and size of rdata (which should be 16, check?)
 			cur_pos += 4;
 			cur_pos += 2;

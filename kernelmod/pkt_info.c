@@ -71,8 +71,8 @@ void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t m
 	unsigned char dname[256];
 	char ip[INET6_ADDRSTRLEN];
 	
-	ttl = ntohl(dns_pkt_info->ttl);
-	if (dns_pkt_info->family == 4) {
+	ttl = dns_pkt_info->ttl;
+	if (dns_pkt_info->family == AF_INET) {
 		ntop(AF_INET, ip, dns_pkt_info->ip + 12, INET6_ADDRSTRLEN);
 	} else {
 		ntop(AF_INET6, ip, dns_pkt_info->ip, INET6_ADDRSTRLEN);
