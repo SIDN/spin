@@ -7,6 +7,7 @@
 #include <linux/netfilter_ipv4.h>
 #include <linux/netlink.h>
 #include <linux/skbuff.h>
+#include <linux/version.h>
 
 #include <linux/udp.h>
 #include <linux/tcp.h>
@@ -21,6 +22,8 @@
 #include "pkt_info.h"
 #include "spin_util.h"
 #include "spin_cfg.h"
+
+#include "nf_hook_def.h"
 
 //#include <arpa/inet.h>
 
@@ -394,11 +397,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 	}
 }
 
-unsigned int hook_func_new(const struct nf_hook_ops *ops,
-						   struct sk_buff *skb,
-						   const struct net_device *in,
-						   const struct net_device *out,
-						   int (*okfn)(struct sk_buff *))
+NF_CALLBACK(hook_func_new, skb)
 {
 	pkt_info_t pkt_info;
     int pres;
@@ -719,6 +718,7 @@ int init_module()
     init_netfilter();
 
     printk(KERN_INFO "Hello, world!\n");
+    printk("%d\n", LINUX_VERSION_CODE);
     test();
 
     nfho1.hook = hook_func_new;
