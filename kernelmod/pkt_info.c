@@ -12,7 +12,7 @@ size_t dns_pktinfo_msg_size() {
 }
 
 size_t pktinfo_wire_size() {
-	return sizeof(pkt_info_t);
+	return 44;
 }
 
 size_t dns_pktinfo_wire_size() {
@@ -63,7 +63,7 @@ void pktinfo2str(unsigned char* dest, pkt_info_t* pkt_info, size_t max_len) {
 	         pkt_info->protocol,
 	         sa, ntohs(pkt_info->src_port),
 	         da, ntohs(pkt_info->dest_port),
-	         ntohl(pkt_info->payload_size));
+	         pkt_info->payload_size);
 }
 
 /*
@@ -96,15 +96,43 @@ static inline void write_int16(unsigned char* dest, uint16_t i) {
 	memcpy(dest, &wi, 2);
 }
 
+static inline void write_int32(unsigned char* dest, uint32_t i) {
+	const uint32_t wi = htonl(i);
+	memcpy(dest, &wi, 4);
+}
+
 static inline uint16_t read_int16(unsigned char* src) {
 	uint16_t wi;
 	memcpy(&wi, src, 2);
 	return ntohs(wi);
 }
 
+static inline uint32_t read_int32(unsigned char* src) {
+	uint32_t wi;
+	memcpy(&wi, src, 4);
+	return ntohl(wi);
+}
+
+
 void pktinfo2wire(unsigned char* dest, pkt_info_t* pkt_info) {
-	// right now, we have stored everything in network order anyway
-	memcpy(dest, pkt_info, sizeof(pkt_info_t));
+	dest[0] = pkt_info->family;
+	dest += 1;
+	dest[0] = pkt_info->protocol;
+	dest += 1;
+	memcpy(dest, pkt_info->src_addr, 16);
+	dest += 16;
+	memcpy(dest, pkt_info->src_addr, 16);
+	dest += 16;
+
+	write_int16(dest, pkt_info->src_port);
+	dest += 2;
+	write_int16(dest, pkt_info->dest_port);
+	dest += 2;
+	
+	write_int32(dest, pkt_info->payload_size);
+	dest += 4;
+	
+	write_int16(dest, pkt_info->payload_offset);
 }
 
 void pktinfo_msg2wire(message_type_t type, unsigned char* dest, pkt_info_t* pkt_info) {
@@ -132,6 +160,22 @@ message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src) {
 		src += 2;
 		// right now, we have stored everything in network order anyway
 		memcpy(pkt_info, src, sizeof(pkt_info_t));
+		pkt_info->family = src[0];
+		src += 1;
+		pkt_info->protocol = src[0];
+		src += 1;
+		memcpy(pkt_info->src_addr, src, 16);
+		src += 16;
+		memcpy(pkt_info->dest_addr, src, 16);
+		src += 16;
+		pkt_info->src_port = read_int16(src);
+		src += 2;
+		pkt_info->dest_port = read_int16(src);
+		src += 2;
+		pkt_info->payload_size = read_int32(src);
+		src += 4;
+		pkt_info->payload_offset = read_int16(src);
+		src += 2;
 	}
 	return msg_type;
 }

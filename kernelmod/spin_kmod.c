@@ -62,16 +62,16 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     ipv6_header = (struct ipv6hdr *)ipv6_hdr(sock_buff);
     if (ipv6_header->nexthdr == 17) {
 		udp_header = (struct udphdr *)skb_transport_header(sock_buff);
-		pkt_info->src_port = udp_header->source;
-		pkt_info->dest_port = udp_header->dest;
-		pkt_info->payload_size = htonl((uint32_t)ntohs(udp_header->len)) - 8;
-		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff)) + 8;
+		pkt_info->src_port = ntohs(udp_header->source);
+		pkt_info->dest_port =ntohs(udp_header->dest);
+		pkt_info->payload_size = (uint32_t)ntohs(udp_header->len) - 8;
+		pkt_info->payload_offset = skb_network_header_len(sockbuff) + 8;
 	} else if (ipv6_header->nexthdr == 6) {
 		tcp_header = (struct tcphdr *)skb_transport_header(sock_buff);
-		pkt_info->src_port = tcp_header->source;
-		pkt_info->dest_port = tcp_header->dest;
-		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff) - 2);
-		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2);
+		pkt_info->src_port = ntohs(tcp_header->source);
+		pkt_info->dest_port = ntohs(tcp_header->dest);
+		pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff) - 2;
+		pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
 		// if size is zero, ignore tcp packet
 		if (pkt_info->payload_size == 0) {
 			return 1;
@@ -84,8 +84,8 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 		printk("[XX] unsupported IPv6 next header: %u\n", ipv6_header->nexthdr);
 		return -1;
 	} else {
-		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff));
-		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff));
+		pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff);
+		pkt_info->payload_offset = skb_network_header_len(sockbuff);
 	}
 	//printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
 	
@@ -109,16 +109,16 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 	
     if (ip_header->protocol == 17) {
 		udp_header = (struct udphdr *)skb_transport_header(sock_buff);
-		pkt_info->src_port = udp_header->source;
-		pkt_info->dest_port = udp_header->dest;
-		pkt_info->payload_size = htonl((uint32_t)ntohs(udp_header->len) - 8);
-		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff) + 8);
+		pkt_info->src_port = ntohs(udp_header->source);
+		pkt_info->dest_port = ntohs(udp_header->dest);
+		pkt_info->payload_size = (uint32_t)ntohs(udp_header->len) - 8;
+		pkt_info->payload_offset = skb_network_header_len(sockbuff) + 8;
 	} else if (ip_header->protocol == 6) {
 		tcp_header = (struct tcphdr *)skb_transport_header(sock_buff);
-		pkt_info->src_port = tcp_header->source;
-		pkt_info->dest_port = tcp_header->dest;
-		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff) - 2);
-		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2);
+		pkt_info->src_port = ntohs(tcp_header->source);
+		pkt_info->dest_port = ntohs(tcp_header->dest);
+		pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff) - 2;
+		pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
 		// if size is zero, ignore tcp packet
 		if (pkt_info->payload_size == 0) {
 			return 1;
@@ -127,8 +127,8 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 		printk("[XX] unsupported IPv4 protocol: %u\n", ip_header->protocol);
 		return -1;
 	} else {
-		pkt_info->payload_size = htonl((uint32_t)sockbuff->len - skb_network_header_len(sockbuff));
-		pkt_info->payload_offset = htons(skb_network_header_len(sockbuff));
+		pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff);
+		pkt_info->payload_offset = skb_network_header_len(sockbuff);
 	}
 	//printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
 	
@@ -140,6 +140,18 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 	memset(pkt_info->dest_addr, 0, 12);
 	memcpy(pkt_info->dest_addr + 12, &ip_header->daddr, 4);
 	return 0;
+}
+
+void hexdump_k(uint8_t* data, unsigned int offset, unsigned int size) {
+	unsigned int i;
+	printk("%02u: ", 0);
+	for (i = 0; i < size; i++) {
+		if (i > 0 && i % 10 == 0) {
+			printk("\n%02u: ", i);
+		}
+		printk("%02x ", data[i + offset]);
+	}
+	printk("\n");
 }
 
 // TODO: refactor two functions below
@@ -176,6 +188,9 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
     NETLINK_CB(skb_out).dst_group = 0;
     //strncpy(nlmsg_data(nlh),msg,msg_size);
     pktinfo_msg2wire(type, nlmsg_data(nlh), pkt_info);
+    printk("[XX] SEND SPIN MESSAGE:\n");
+    hexdump_k(nlmsg_data(nlh), 0, msg_size);
+    printk("[XX]  END SPIN MESSAGE\n");
 
     res = nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
 
@@ -186,18 +201,6 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
 			client_port_id = 0;
 		}
     }
-}
-
-void hexdump_k(uint8_t* data, unsigned int offset, unsigned int size) {
-	unsigned int i;
-	printk("%02u: ", 0);
-	for (i = 0; i < size; i++) {
-		if (i > 0 && i % 10 == 0) {
-			printk("\n%02u: ", i);
-		}
-		printk("%02x ", data[i + offset]);
-	}
-	printk("\n");
 }
 
 void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
@@ -445,8 +448,12 @@ static void traffic_client_connect(struct sk_buff *skb) {
     msg_size=strlen(msg);
 
     nlh=(struct nlmsghdr*)skb->data;
+    printk(KERN_INFO "socket buff len: %u\n", skb->len);
+	hexdump_k(skb->data, 0, skb->len);
+    printk(KERN_INFO "Netlink received message of size %d\n", nlmsg_len(nlh));
     printk(KERN_INFO "Netlink received msg payload:%s\n",(char*)nlmsg_data(nlh));
     pid = nlh->nlmsg_pid; /* port id of sending process */
+	printk(KERN_INFO "Client port: %u\n", pid);
 	client_port_id = pid;
 	
     skb_out = nlmsg_new(msg_size,0);
@@ -698,7 +705,7 @@ void add_default_test_ips(void) {
 
 	ip[12] = 192;
 	ip[13] = 168;
-	ip[14] = 8;
+	ip[14] = 9;
 	ip[15] = 1;
 	ip_store_add_ip(block_ips, 0, ip);
 

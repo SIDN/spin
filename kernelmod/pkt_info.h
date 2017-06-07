@@ -32,9 +32,9 @@
 #endif // __KERNEL
 
 typedef enum {
-	SPIN_TRAFFIC_DATA,
-	SPIN_DNS_ANSWER,
-	SPIN_BLOCKED
+	SPIN_TRAFFIC_DATA = 1,
+	SPIN_DNS_ANSWER = 2,
+	SPIN_BLOCKED = 3
 } message_type_t;
 
 
