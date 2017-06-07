@@ -1,15 +1,6 @@
 local posix = require "posix"
 --local socket = require "socket"
 
-print("[XX]")
-print("[XX]")
-print("[XX]")
-print(posix.AF_INET)
-print("[XX]")
-print("[XX]")
-print("[XX]")
-print("[XX]")
-
 local MAX_NL_MSG_SIZE = 2048
 
 --
@@ -149,18 +140,11 @@ end
 function read_netlink_message(sock_fd)
   -- read size first (it's in system endianness)
   local nlh, err = posix.recv(sock_fd, MAX_NL_MSG_SIZE)
-  print("read header: " .. nlh:len() .. " bytes")
-  printbytes2(nlh)
   local nl_size = bytes_to_int32_systemendian(nlh:byte(1,4))
   local nl_type = bytes_to_int16_systemendian(nlh:byte(5,6))
   local nl_flags = bytes_to_int16_systemendian(nlh:byte(7,8))
   local nl_seq = bytes_to_int32_systemendian(nlh:byte(9,12))
   local nl_pid = bytes_to_int32_systemendian(nlh:byte(13,16))
-  print("RECV SIZE BYTES: " .. nl_size)
-  print("RECV SIZE TYPE: " .. nl_type)
-  print("RECV SIZE FLAGS: " .. nl_flags)
-  print("RECV SIZE SEQ: " .. nl_seq)
-  print("RECV SIZE PID: " .. nl_pid)
   return nlh:sub(17, nl_size)
 end
 
@@ -221,8 +205,6 @@ end
 -- read wire format packet info
 -- note: this format is in network byte order
 function read_spin_pkt_info(data)
-    print("[XX] read data of len " .. data:len())
-    printbytes2(data)
 	local pkt_info = PktInfo_create()
 	pkt_info.family = data:byte(1)
 	pkt_info.protocol = data:byte(2)
@@ -243,14 +225,10 @@ function read_spin_pkt_info(data)
 end
 
 function spin_read_message_type(data)
-    print("size: " .. data:len())
-    print("data: " .. data)
-	--msg_type = data:byte(1,1)
-	--print(msg_type)
 	local spin_msg_type = data:byte(1)
 	local spin_msg_size = bytes_to_int16_bigendian(data:byte(2,3))
 	if spin_msg_type == spin_message_types.SPIN_TRAFFIC_DATA then
-	  io.stdout:write("[TRAFFIC] " .. spin_msg_size)
+	  io.stdout:write("[TRAFFIC] ")
 	  local pkt_info = read_spin_pkt_info(data:sub(4))
 	  pkt_info:print()
 	elseif spin_msg_type == spin_message_types.SPIN_DNS_ANSWER then
@@ -289,15 +267,6 @@ if posix.AF_NETLINK ~= nil then
 	while true do
 	    local spin_msg = read_netlink_message(fd)
 	    spin_read_message_type(spin_msg)
-		--print("call recv")
-		--local data, err = posix.recv(fd, 10)
-		--print("recv done")
-		--assert(data, err)
-		--print(data)
-		--for k, v in data:gmatch("%z(%u+)=([^%z]+)") do
-		--	print(k, v)
-		--end
-		print("\n")
 	end
 else
 	print("no posix.AF_NETLINK")

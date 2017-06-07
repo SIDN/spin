@@ -66,14 +66,6 @@ void pktinfo2str(unsigned char* dest, pkt_info_t* pkt_info, size_t max_len) {
 	         pkt_info->payload_size);
 }
 
-/*
-uint32_t read_uint32(uint8_t* src) {
-	uint32_t result;
-	result = (src[0] << 24) + (src[1] << 16) + (src[2] << 8) + src[3];
-	return ntohl(result);
-}
-*/
-
 void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t max_len) {
 	uint32_t ttl;
 	unsigned char dname[256];

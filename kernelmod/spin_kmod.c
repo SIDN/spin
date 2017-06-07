@@ -262,7 +262,7 @@ unsigned int skip_dname(uint8_t* data, unsigned int cur_pos) {
 }
 
 void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
-	uint16_t offset = ntohs(pkt_info->payload_offset);
+	uint16_t offset = pkt_info->payload_offset;
 	uint8_t flag_bits;
 	uint8_t flag_bits2;
 	uint16_t answer_count;
@@ -272,16 +272,16 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 	uint8_t labellen;
 	unsigned int i;
 	unsigned char dnsname[256];
-	uint8_t* data = (uint8_t*)skb->data + ntohs(pkt_info->payload_offset);
+	uint8_t* data = (uint8_t*)skb->data + pkt_info->payload_offset;
 	dns_pkt_info_t dpkt_info;
 	
-	printk("[XX] DNS answer header offset %u packet len %u\n", offset, ntohl(pkt_info->payload_size));
+	printk("[XX] DNS answer header offset %u packet len %u\n", offset, pkt_info->payload_size);
 	printk("\n");
 	if (offset > skb->len) {
 		printk("[XX] error: offset (%u) larger than packet size (%u)\n", offset, skb->len);
 		return;
 	}
-	hexdump_k(skb->data, ntohs(pkt_info->payload_offset), ntohl(pkt_info->payload_size));
+	hexdump_k(skb->data, pkt_info->payload_offset, pkt_info->payload_size);
 	// check data size as well
 	flag_bits = data[2];
 	flag_bits2 = data[3];
@@ -421,8 +421,8 @@ unsigned int hook_func_new(const struct nf_hook_ops *ops,
 			}
 		}
 		// if message is dns response, send DNS info as well
-		printk(KERN_INFO "SRC PORT: %u\n", ntohs(pkt_info.src_port));
-		if (ntohs(pkt_info.src_port) == 53) {
+		printk(KERN_INFO "SRC PORT: %u\n", pkt_info.src_port);
+		if (pkt_info.src_port == 53) {
 			handle_dns_answer(&pkt_info, skb);
 		}
 		send_pkt_info(SPIN_TRAFFIC_DATA, &pkt_info);
