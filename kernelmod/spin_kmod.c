@@ -91,7 +91,7 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 		pkt_info->payload_offset = skb_network_header_len(sockbuff);
 	}
 	//printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
-	
+
 	// rest of basic info
 	pkt_info->family = AF_INET6;
 	pkt_info->protocol = ipv6_header->nexthdr;
@@ -109,7 +109,7 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     if (ip_header->version == 6) {
 		return parse_ipv6_packet(sockbuff, pkt_info);
 	}
-	
+
     if (ip_header->protocol == 17) {
 		udp_header = (struct udphdr *)skb_transport_header(sock_buff);
 		pkt_info->src_port = ntohs(udp_header->source);
@@ -134,7 +134,7 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 		pkt_info->payload_offset = skb_network_header_len(sockbuff);
 	}
 	//printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
-	
+
 	// rest of basic info
 	pkt_info->family = AF_INET;
 	pkt_info->protocol = ip_header->protocol;
@@ -163,16 +163,16 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
 	int msg_size;
 	struct sk_buff* skb_out;
 	int res;
-	
+
 	char msg[INET6_ADDRSTRLEN];
 	pktinfo2str(msg, pkt_info, INET6_ADDRSTRLEN);
-	
+
 	// Nobody's listening, carry on
 	if (client_port_id == 0) {
 		printk("Client not connected, not sending\n");
 		return;
 	}
-	
+
 	// Check ignore list
 	if (ip_store_contains_ip(ignore_ips, pkt_info->src_addr) ||
 	    ip_store_contains_ip(ignore_ips, pkt_info->dest_addr)) {
@@ -211,17 +211,17 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
 	int msg_size;
 	struct sk_buff* skb_out;
 	int res;
-	
+
 	printk("yoyoyoyoyoyoyo\n");
 	//char msg[INET6_ADDRSTRLEN];
 	//pktinfo2str(msg, pkt_info, INET6_ADDRSTRLEN);
-	
+
 	// Nobody's listening, carry on
 	if (client_port_id == 0) {
 		printk("Client not connected, not sending\n");
 		return;
 	}
-	
+
 	msg_size = dns_pktinfo_msg_size();
 	skb_out = nlmsg_new(msg_size, 0);
 
@@ -277,7 +277,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 	unsigned char dnsname[256];
 	uint8_t* data = (uint8_t*)skb->data + pkt_info->payload_offset;
 	dns_pkt_info_t dpkt_info;
-	
+
 	printk("[XX] DNS answer header offset %u packet len %u\n", offset, pkt_info->payload_size);
 	printk("\n");
 	if (offset > skb->len) {
@@ -304,7 +304,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 	}
 	answer_count = read_int16(data + 6);
 	printk("[XX] answer count: %u\n", answer_count);
-	
+
 	// copy the query name
 	cur_pos = 12;
 	cur_pos_name = 0;
@@ -312,7 +312,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 
 	// skip to next, etc
 	//printk("Label len: %u\n", labellen);
-	
+
 	while(labellen > 0) {
 		//printk("Label len: %u\n", labellen);
 		memcpy(dnsname + cur_pos_name, data + cur_pos, labellen);
@@ -383,7 +383,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 			send_dns_pkt_info(SPIN_DNS_ANSWER, &dpkt_info);
 		} else {
 			// skip rr data
-			// 
+			//
 			printk("[XX] not A or AAAA in answer at %u (val: %u)\n", cur_pos - 4, rr_type);
 			printk("[XX] now at %u\n", cur_pos);
 			// skip ttl
@@ -392,7 +392,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 			// skip rdata
 			cur_pos += read_int16(data + cur_pos) + 2;
 			printk("[XX] skip to: %u\n", cur_pos);
-			
+
 		}
 	}
 }
@@ -403,10 +403,7 @@ NF_CALLBACK(hook_func_new, skb)
     int pres;
 	memset(&pkt_info, 0, sizeof(pkt_info_t));
     sock_buff = skb;
-    (void)in;
-    (void)out;
-    (void)okfn;
-    
+
     if(!sock_buff) { return NF_ACCEPT;}
 
 	pres = parse_packet(skb, &pkt_info);
@@ -456,7 +453,7 @@ static void traffic_client_connect(struct sk_buff *skb) {
     pid = nlh->nlmsg_pid; /* port id of sending process */
 	printk(KERN_INFO "Client port: %u\n", pid);
 	client_port_id = pid;
-	
+
     skb_out = nlmsg_new(msg_size,0);
 
     if(!skb_out) {
@@ -469,22 +466,22 @@ void send_config_response(int port_id, config_command_t cmd, size_t msg_size, vo
 	struct nlmsghdr *nlh;
 	struct sk_buff *skb_out;
 	int res;
-	
+
 	skb_out = nlmsg_new(msg_size + 1, 0);
-	
+
 	if (!skb_out) {
 		printk(KERN_ERR "Failed to allocate new skb\n");
 		return;
 	}
-	
+
 	nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size + 1, 0);
-	
+
 	/* not in mcast group */
 	NETLINK_CB(skb_out).dst_group = 0;
-	
+
 	memcpy(nlmsg_data(nlh), (uint8_t*)&cmd, 1);
 	memcpy(nlmsg_data(nlh) + 1, msg_src, msg_size);
-	
+
 	res = nlmsg_unicast(config_nl_sk, skb_out, port_id);
 
 	if (res < 0) {
@@ -550,9 +547,9 @@ static void config_client_connect(struct sk_buff *skb) {
 	char error_msg[1024];
 	config_command_t cmd;
 	uint8_t* cmdbuf;
-	
+
 	printk(KERN_INFO "Entering: %s\n", __FUNCTION__);
-	
+
 	nlh = (struct nlmsghdr *) skb->data;
 	printk(KERN_INFO "got command of size %u\n", skb->len);
 
@@ -684,7 +681,7 @@ void test_ip(void) {
 	ip_store_add_ip(ip_store, 1, ip3);
 	ip_store_remove_ip(ip_store, ip4);
 	ip_store_remove_ip(ip_store, ip4);
-	
+
 	log_ip(ip1, 1, NULL);
 	printk("Full store:\n");
 	ip_store_for_each(ip_store, log_ip, NULL);
@@ -762,7 +759,7 @@ void cleanup_module()
     nf_unregister_hook(&nfho2);                     //cleanup – unregister hook
     nf_unregister_hook(&nfho3);                     //cleanup – unregister hook
     nf_unregister_hook(&nfho4);                     //cleanup – unregister hook
-    
+
     ip_store_destroy(ignore_ips);
 }
 

@@ -29,4 +29,8 @@ void ip_store_for_each(ip_store_t* ip_store,
 					   void(*cb)(unsigned char[16], int is_ipv6, void* data),
 					   void* data);
 
+#ifndef __GFP_WAIT
+#define __GFP_WAIT __GFP_RECLAIM
+#endif
+
 #endif // SPIN_UTIL_H
