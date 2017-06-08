@@ -21,6 +21,8 @@ struct iovec iov;
 int sock_fd;
 struct msghdr msg;
 
+int verbosity = 0;
+
 typedef enum {
 	IGNORE,
 	BLOCK,
@@ -98,7 +100,7 @@ int send_command(size_t cmdbuf_size, unsigned char* cmdbuf)
 			inet_ntop(ipv, NLMSG_DATA(nlh) + 2, ip_str, INET6_ADDRSTRLEN);
 			printf("%s\n", ip_str);
 		} else {
-			printf("unknown command response type received from kernel, stopping\n");
+			printf("unknown command response type received from kernel (%u), stopping\n", cmd);
 			break;
 		}
 	}

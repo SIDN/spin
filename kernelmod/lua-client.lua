@@ -104,6 +104,10 @@ function ntop_v4(bytes)
   return string.format("%d.%d.%d.%d", bytes:byte(1,4))
 end
 
+function ntop_v6(bytes)
+  return string.format("%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x", bytes:byte(1,16))
+end
+
 function printbytes(bytes)
   for b in string.gfind(bytes, ".") do
 	io.write(string.format("%02X ", string.byte(b)))

@@ -283,7 +283,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 		printk("[XX] error: offset (%u) larger than packet size (%u)\n", offset, skb->len);
 		return;
 	}
-	hexdump_k(skb->data, pkt_info->payload_offset, pkt_info->payload_size);
+	//hexdump_k(skb->data, pkt_info->payload_offset, pkt_info->payload_size);
 	// check data size as well
 	flag_bits = data[2];
 	flag_bits2 = data[3];
@@ -361,7 +361,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 			cur_pos += 2;
 			memcpy(dpkt_info.ip + 12, data + cur_pos, 4);
 			cur_pos += 4;
-			hexdump_k((uint8_t*)&dpkt_info, 0, sizeof(dns_pkt_info_t));
+			//hexdump_k((uint8_t*)&dpkt_info, 0, sizeof(dns_pkt_info_t));
 			strncpy(dpkt_info.dname, dnsname, 256);
 			send_dns_pkt_info(SPIN_DNS_ANSWER, &dpkt_info);
 		} else if (rr_type == 28) {
@@ -446,7 +446,7 @@ static void traffic_client_connect(struct sk_buff *skb) {
 
     nlh=(struct nlmsghdr*)skb->data;
     //printk(KERN_INFO "socket buff len: %u\n", skb->len);
-	hexdump_k(skb->data, 0, skb->len);
+	//hexdump_k(skb->data, 0, skb->len);
     //printk(KERN_INFO "Netlink received message of size %d\n", nlmsg_len(nlh));
     //printk(KERN_INFO "Netlink received msg payload:%s\n",(char*)nlmsg_data(nlh));
     pid = nlh->nlmsg_pid; /* port id of sending process */

@@ -24,12 +24,12 @@ clean:
 
 # the pkt_info contains a few shared pkt_info format functions
 # jump a small hoop here to keep that code in one file
-client: pkt_info_client.o client.c
-	gcc client.c pkt_info_client.o -o client
+#client: pkt_info_client.o client.c
+#	gcc client.c pkt_info_client.o -o client
 
-spin_config: spin_config.c spin_cfg.h
-	gcc spin_config.c -o spin_config
+#spin_config: spin_config.c spin_cfg.h
+#	gcc spin_config.c -o spin_config
 
-pkt_info_client.o: pkt_info.c
-	gcc -c pkt_info.c -o pkt_info_client.o
+#pkt_info_client.o: pkt_info.c
+#	gcc -c pkt_info.c -o pkt_info_client.o
 
