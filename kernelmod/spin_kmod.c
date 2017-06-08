@@ -83,6 +83,9 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
         if (ipv6_header->nexthdr == 0) {
             // ignore hop-by-hop option header
             return 1;
+        } else if (ipv6_header->nexthdr == 44) {
+            // what to do with fragments?
+            return 1;
         }
         printk("[XX] unsupported IPv6 next header: %u\n", ipv6_header->nexthdr);
         return -1;
@@ -126,7 +129,10 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
         if (pkt_info->payload_size == 0) {
             return 1;
         }
-    } else if (ip_header->protocol != 1) {
+    /* ignore some protocols */
+    } else if (ip_header->protocol != 1 &&
+               ip_header->protocol != 2
+              ) {
         printk("[XX] unsupported IPv4 protocol: %u\n", ip_header->protocol);
         return -1;
     } else {
