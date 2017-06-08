@@ -479,8 +479,9 @@ void send_config_response(int port_id, config_command_t cmd, size_t msg_size, vo
 
     /* not in mcast group */
     NETLINK_CB(skb_out).dst_group = 0;
-
     *((uint8_t*)nlmsg_data(nlh)) = (uint8_t)cmd;
+
+    //memcpy(nlmsg_data(nlh), (uint8_t*)&cmd, 1);
     memcpy(nlmsg_data(nlh) + 1, msg_src, msg_size);
 
     hexdump_k(nlmsg_data(nlh), 0, msg_size + 1);

@@ -70,7 +70,7 @@ void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t m
 	uint32_t ttl;
 	unsigned char dname[256];
 	char ip[INET6_ADDRSTRLEN];
-	
+
 	ttl = dns_pkt_info->ttl;
 	if (dns_pkt_info->family == AF_INET) {
 		ntop(AF_INET, ip, dns_pkt_info->ip + 12, INET6_ADDRSTRLEN);
@@ -78,7 +78,7 @@ void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t m
 		ntop(AF_INET6, ip, dns_pkt_info->ip, INET6_ADDRSTRLEN);
 	}
 	strncpy(dname, dns_pkt_info->dname, 256);
-	
+
 	snprintf(dest, max_len,
 			 "%s %s %u\n", ip, dname, ttl);
 }
@@ -113,17 +113,17 @@ void pktinfo2wire(unsigned char* dest, pkt_info_t* pkt_info) {
 	dest += 1;
 	memcpy(dest, pkt_info->src_addr, 16);
 	dest += 16;
-	memcpy(dest, pkt_info->src_addr, 16);
+	memcpy(dest, pkt_info->dest_addr, 16);
 	dest += 16;
 
 	write_int16(dest, pkt_info->src_port);
 	dest += 2;
 	write_int16(dest, pkt_info->dest_port);
 	dest += 2;
-	
+
 	write_int32(dest, pkt_info->payload_size);
 	dest += 4;
-	
+
 	write_int16(dest, pkt_info->payload_offset);
 }
 
@@ -132,11 +132,11 @@ void pktinfo_msg2wire(message_type_t type, unsigned char* dest, pkt_info_t* pkt_
 	// write message type first
 	dest[0] = (uint8_t) type;
 	dest += 1;
-	
+
 	// write the size of the full message
 	write_int16(dest, pktinfo_wire_size());
 	dest += 2;
-	
+
 	pktinfo2wire(dest, pkt_info);
 }
 
@@ -144,7 +144,7 @@ message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src) {
 	// todo: should we read message type and size earlier?
 	message_type_t msg_type;
 	uint16_t msg_size;
-	
+
 	msg_type = src[0];
 	if (msg_type == SPIN_TRAFFIC_DATA || msg_type == SPIN_BLOCKED) {
 		src++;
@@ -187,14 +187,14 @@ void dns_pktinfo2wire(unsigned char* dest, dns_pkt_info_t* dns_pkt_info) {
 
 void dns_pktinfo_msg2wire(unsigned char* dest, dns_pkt_info_t* dns_pkt_info) {
 	uint16_t msg_size;
-	
+
 	dest[0] = SPIN_DNS_ANSWER;
 	dest += 1;
 	// spread this out into functions too?
 	msg_size = sizeof(dns_pkt_info_t);
 	write_int16(dest, htons(msg_size));
 	dest += 2;
-	
+
 	dns_pktinfo2wire(dest, dns_pkt_info);
 }
 
@@ -203,13 +203,13 @@ message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, unsigned char* src
 	message_type_t msg_type;
 	uint16_t msg_size;
 	uint8_t dname_size;
-	
+
 	msg_type = src[0];
 	if (msg_type == SPIN_DNS_ANSWER) {
 		src++;
 		msg_size = read_int16(src);
 		src += 2;
-		
+
 		dns_pkt_info->family = src[0];
 		src += 1;
 		memcpy(dns_pkt_info->ip, src, 16);
