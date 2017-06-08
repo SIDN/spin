@@ -5,14 +5,20 @@
 #ifndef SPIN_UTIL_H
 #define SPIN_UTIL_H 1
 
-#include <linux/btree.h>
 #include <linux/cache.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/module.h>
 
+typedef struct ip_store_el {
+	u64 k1;
+	u64 k2;
+	char* val;
+	struct ip_store_el* next;
+} ip_store_el_t;
+
 typedef struct  {
-	struct btree_head128* tree;
+	ip_store_el_t* elements;
 } ip_store_t;
 
 ip_store_t* ip_store_create(void);
