@@ -169,7 +169,6 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
 
 	// Nobody's listening, carry on
 	if (client_port_id == 0) {
-		printk("Client not connected, not sending\n");
 		return;
 	}
 
@@ -191,9 +190,9 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
     NETLINK_CB(skb_out).dst_group = 0;
     //strncpy(nlmsg_data(nlh),msg,msg_size);
     pktinfo_msg2wire(type, nlmsg_data(nlh), pkt_info);
-    printk("[XX] SEND SPIN MESSAGE:\n");
-    hexdump_k(nlmsg_data(nlh), 0, msg_size);
-    printk("[XX]  END SPIN MESSAGE\n");
+    //printk("[XX] SEND SPIN MESSAGE:\n");
+    //hexdump_k(nlmsg_data(nlh), 0, msg_size);
+    //printk("[XX]  END SPIN MESSAGE\n");
 
     res = nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
 
@@ -212,13 +211,13 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
 	struct sk_buff* skb_out;
 	int res;
 
-	printk("yoyoyoyoyoyoyo\n");
+	//printk("yoyoyoyoyoyoyo\n");
 	//char msg[INET6_ADDRSTRLEN];
 	//pktinfo2str(msg, pkt_info, INET6_ADDRSTRLEN);
 
 	// Nobody's listening, carry on
 	if (client_port_id == 0) {
-		printk("Client not connected, not sending\n");
+		//printk("Client not connected, not sending\n");
 		return;
 	}
 
@@ -244,7 +243,7 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
 			client_port_id = 0;
 		}
     }
-    printk("[XX] SENT!!\n");
+    //printk("[XX] SENT!!\n");
 }
 
 static inline uint16_t read_int16(uint8_t* data) {
@@ -278,8 +277,8 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 	uint8_t* data = (uint8_t*)skb->data + pkt_info->payload_offset;
 	dns_pkt_info_t dpkt_info;
 
-	printk("[XX] DNS answer header offset %u packet len %u\n", offset, pkt_info->payload_size);
-	printk("\n");
+	//printk("[XX] DNS answer header offset %u packet len %u\n", offset, pkt_info->payload_size);
+	//printk("\n");
 	if (offset > skb->len) {
 		printk("[XX] error: offset (%u) larger than packet size (%u)\n", offset, skb->len);
 		return;
@@ -290,20 +289,20 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 	flag_bits2 = data[3];
 	// must be qr answer
 	if (!(flag_bits & 0x80)) {
-		printk("[XX] QR not set\n");
+		//printk("[XX] QR not set\n");
 		return;
 	}
 	if (!(flag_bits2 & 0x0f) == 0) {
-		printk("[XX] not NOERROR\n");
+		//printk("[XX] not NOERROR\n");
 		return;
 	}
 	// check if there is a query message
 	if (read_int16(data + 4) != 1) {
-		printk("0 or more than 1 question rr (%u %04x), skip packet\n", read_int16(data + 4), read_int16(data + 4));
+		//printk("0 or more than 1 question rr (%u %04x), skip packet\n", read_int16(data + 4), read_int16(data + 4));
 		return;
 	}
 	answer_count = read_int16(data + 6);
-	printk("[XX] answer count: %u\n", answer_count);
+	//printk("[XX] answer count: %u\n", answer_count);
 
 	// copy the query name
 	cur_pos = 12;
@@ -323,34 +322,34 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 	}
 	// if we want trailing dot, remove deduction here
 	dnsname[--cur_pos_name] = '\0';
-	printk("DNS NAME: %s\n", dnsname);
+	//printk("DNS NAME: %s\n", dnsname);
 
 	// then read all answer ips
 	// type should be 1 (A) or 28 (AAAA) and class should be IN (1)
 	rr_type = read_int16(data + cur_pos);
 	if (rr_type != 1 && rr_type != 28) {
-		printk("[XX] query rr type (%u) not 1 or 28, skip packet\n", rr_type);
+		//printk("[XX] query rr type (%u) not 1 or 28, skip packet\n", rr_type);
 		return;
 	}
 	cur_pos += 2;
 	if (read_int16(data + cur_pos) != 1) {
-		printk("[XX] class not IN (%u: %u), skip packet\n", cur_pos, read_int16(data + cur_pos));
+		//printk("[XX] class not IN (%u: %u), skip packet\n", cur_pos, read_int16(data + cur_pos));
 		return;
 	}
 	cur_pos += 2;
 	// we are now at answer section, so read all of those
 	for (i = 0; i < answer_count; i++) {
 		// skip the dname
-		printk("[XX] skip dname from: %u\n", cur_pos);
+		//printk("[XX] skip dname from: %u\n", cur_pos);
 		cur_pos = skip_dname(data, cur_pos);
-		printk("[XX] dname skipped pos now: %u\n", cur_pos);
+		//printk("[XX] dname skipped pos now: %u\n", cur_pos);
 		// read the type
 		rr_type = read_int16(data + cur_pos);
 		// skip the class
 		cur_pos += 4;
 		if (rr_type == 1) {
 			// okay send
-			printk("[XX] found A answer\n");
+			//printk("[XX] found A answer\n");
 			// data format:
 			// <dns type> <ip family> <ip data> <TTL> <domain name string> (null-terminated?)
 			memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
@@ -367,7 +366,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 			send_dns_pkt_info(SPIN_DNS_ANSWER, &dpkt_info);
 		} else if (rr_type == 28) {
 			// okay send
-			printk("[XX] found AAAA answer\n");
+			//printk("[XX] found AAAA answer\n");
 			// data format:
 			// <dns type> <ip family> <ip data> <TTL> <domain name string> (null-terminated?)
 			memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
@@ -384,14 +383,14 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 		} else {
 			// skip rr data
 			//
-			printk("[XX] not A or AAAA in answer at %u (val: %u)\n", cur_pos - 4, rr_type);
-			printk("[XX] now at %u\n", cur_pos);
+			//printk("[XX] not A or AAAA in answer at %u (val: %u)\n", cur_pos - 4, rr_type);
+			//printk("[XX] now at %u\n", cur_pos);
 			// skip ttl
 			cur_pos += 4;
-			printk("[XX] after ttl at %u (val here: %u)\n", cur_pos, read_int16(data + cur_pos));
+			//printk("[XX] after ttl at %u (val here: %u)\n", cur_pos, read_int16(data + cur_pos));
 			// skip rdata
 			cur_pos += read_int16(data + cur_pos) + 2;
-			printk("[XX] skip to: %u\n", cur_pos);
+			//printk("[XX] skip to: %u\n", cur_pos);
 
 		}
 	}
@@ -419,7 +418,7 @@ NF_CALLBACK(hook_func_new, skb)
 			}
 		}
 		// if message is dns response, send DNS info as well
-		printk(KERN_INFO "SRC PORT: %u\n", pkt_info.src_port);
+		//printk(KERN_INFO "SRC PORT: %u\n", pkt_info.src_port);
 		if (pkt_info.src_port == 53) {
 			handle_dns_answer(&pkt_info, skb);
 		}
@@ -441,17 +440,17 @@ static void traffic_client_connect(struct sk_buff *skb) {
     char *msg="Hello from kernel";
     //int res;
 
-    printk(KERN_INFO "Entering: %s\n", __FUNCTION__);
+    //printk(KERN_INFO "Entering: %s\n", __FUNCTION__);
 
     msg_size=strlen(msg);
 
     nlh=(struct nlmsghdr*)skb->data;
-    printk(KERN_INFO "socket buff len: %u\n", skb->len);
+    //printk(KERN_INFO "socket buff len: %u\n", skb->len);
 	hexdump_k(skb->data, 0, skb->len);
-    printk(KERN_INFO "Netlink received message of size %d\n", nlmsg_len(nlh));
-    printk(KERN_INFO "Netlink received msg payload:%s\n",(char*)nlmsg_data(nlh));
+    //printk(KERN_INFO "Netlink received message of size %d\n", nlmsg_len(nlh));
+    //printk(KERN_INFO "Netlink received msg payload:%s\n",(char*)nlmsg_data(nlh));
     pid = nlh->nlmsg_pid; /* port id of sending process */
-	printk(KERN_INFO "Client port: %u\n", pid);
+	//printk(KERN_INFO "Client port: %u\n", pid);
 	client_port_id = pid;
 
     skb_out = nlmsg_new(msg_size,0);
@@ -548,16 +547,16 @@ static void config_client_connect(struct sk_buff *skb) {
 	config_command_t cmd;
 	uint8_t* cmdbuf;
 
-	printk(KERN_INFO "Entering: %s\n", __FUNCTION__);
+	//printk(KERN_INFO "Entering: %s\n", __FUNCTION__);
 
 	nlh = (struct nlmsghdr *) skb->data;
-	printk(KERN_INFO "got command of size %u\n", skb->len);
+	//printk(KERN_INFO "got command of size %u\n", skb->len);
 
 	/* pid of sending process */
 	pid = nlh->nlmsg_pid;
 	cmdbuf = (uint8_t*) NLMSG_DATA(nlh);
 	if (skb->len < 1) {
-		printk(KERN_INFO "got command of size 0\n");
+		//printk(KERN_INFO "got command of size 0\n");
 		snprintf(error_msg, 1024, "empty command");
 		send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
 	} else {
@@ -622,7 +621,7 @@ struct netlink_kernel_cfg netlink_config_cfg = {
 static int __init init_netfilter(void) {
 
 
-    printk("Entering: %s\n",__FUNCTION__);
+    //printk("Entering: %s\n",__FUNCTION__);
     //printk("init_net at %p, cfg at %p\n", init_net, &cfg);
 
     traffic_nl_sk = netlink_kernel_create(&init_net, NETLINK_TRAFFIC_PORT, &netlink_traffic_cfg);
@@ -646,7 +645,7 @@ static int __init init_netfilter(void) {
 
 
 static void close_netfilter(void) {
-    printk(KERN_INFO "exiting hello module\n");
+    printk(KERN_INFO "exiting module\n");
     netlink_kernel_release(traffic_nl_sk);
     netlink_kernel_release(config_nl_sk);
 }
