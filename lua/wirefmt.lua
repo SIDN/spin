@@ -108,7 +108,56 @@ function _M.ntop_v4(bytestring)
   return string.format("%d.%d.%d.%d", bytestring:byte(1,4))
 end
 
+local function strjoin(delimiter, list)
+   local len = 0
+   if list then len = table.getn(list) end
+   if len == 0 then
+      return ""
+   elseif len == 1 then
+      return list[1]
+   else
+     local string = list[1]
+     for i = 2, len do
+        string = string .. delimiter .. list[i]
+     end
+     return string
+   end
+end
+
 function _M.ntop_v6(bytestring)
+  -- split the address into 8 groups
+  local parts = {}
+  local i
+  -- get the number value of each field
+  for i=1,16,2 do
+    local n = 256*bytestring:byte(i) + bytestring:byte(i+1)
+    table.insert(parts, n)
+  end
+  -- replace the first repeating occurrence of zeroes with ::
+  -- okay this can probably be done better
+  local repl_done = false
+  local parts2 = {}
+  local i = 1
+  while i <= #parts do
+    p = parts[i]
+    if not repl_done and p == 0 and parts[i+1] == 0 then
+      while parts[i+1] == 0 do
+        i = i + 1
+      end
+      table.insert(parts2, "")
+      repl_done = true
+    else
+	  table.insert(parts2, string.format("%x", p))
+    end
+    i = i + 1
+  end
+  if parts2[1] == "" then parts2[1] = ":" end
+  if parts2[#parts2] == "" then parts2[#parts2] = ":" end
+
+  return strjoin(":", parts2)
+end
+
+function _M.old_ntop_v6(bytestring)
   return string.format("%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x", bytestring:byte(1,16))
 end
 
@@ -145,6 +194,26 @@ local function split_string(str, sep)
   return result
 end
 
+local function v6_part_bytes(str)
+  bytes = ""
+  for _,hex_str in pairs(split_string(str, ":")) do
+    if string.len(hex_str) > 4 then
+      return nil
+    else
+      while string.len(hex_str) < 4 do
+        hex_str = "0" .. hex_str
+      end
+    end
+    local num1 = tonumber(string.sub(hex_str, 1, 2), 16)
+    if num1 == nil then return nil end
+    local num2 = tonumber(string.sub(hex_str, 3, 4), 16)
+    if num2 == nil then return nil end
+    bytes = bytes .. string.char(num1) .. string.char(num2)
+  end
+  return bytes
+end
+
+-- returns bytestring of ipv6 address, if valid, nil otherwise
 function _M.pton_v6(str)
   -- first, split the string into the two parts separated by ::
   local parts = split_string(str, "::")
@@ -152,33 +221,11 @@ function _M.pton_v6(str)
   if #parts == 0 or #parts > 2 then
     return nil
   end
-  local head = parts[1]
-  local tail = parts[2]
-  -- split parts up into hex blocks
-  local head_bytes = ""
-  local tail_bytes = ""
-  for _,hex_str in pairs(split_string(head, ":")) do
-    if string.len(hex_str) > 4 then
-      return nil
-    else
-      while string.len(hex_str) < 4 do
-        hex_str = "0" .. hex_str
-      end
-    end
-    head_bytes = head_bytes .. string.char(tonumber(string.sub(hex_str, 1, 2), 16))
-    head_bytes = head_bytes .. string.char(tonumber(string.sub(hex_str, 3, 4), 16))
-  end
-  for _,hex_str in pairs(split_string(tail, ":")) do
-    if string.len(hex_str) > 4 then
-      return nil
-    else
-      while string.len(hex_str) < 4 do
-        hex_str = "0" .. hex_str
-      end
-    end
-    tail_bytes = tail_bytes .. string.char(tonumber(string.sub(hex_str, 1, 2), 16))
-    tail_bytes = tail_bytes .. string.char(tonumber(string.sub(hex_str, 3, 4), 16))
-  end
+  -- convert the two parts into bytestrings
+  local head_bytes = v6_part_bytes(parts[1])
+  if head_bytes == nil then return nil end
+  local tail_bytes = v6_part_bytes(parts[2])
+  if head_bytes == nil then return nil end
   local i
   -- if there was no :: the length must be 16; otherwise fill it up
   local cur_size = string.len(head_bytes) + string.len(tail_bytes)

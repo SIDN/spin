@@ -14,6 +14,9 @@ local wirefmt = require "wirefmt"
 
 local _M = {}
 
+local NETLINK_TRAFFIC_PORT = 31
+local NETLINK_CONFIG_PORT = 30
+
 _M.MAX_NL_MSG_SIZE = 2048
 
 --
@@ -217,9 +220,26 @@ function _M.get_process_id()
 	end
 end
 
-function _M.connect()
+function _M.connect_traffic()
     print("connecting")
-    local fd, err = posix.socket(posix.AF_NETLINK, posix.SOCK_DGRAM, 31)
+    local fd, err = posix.socket(posix.AF_NETLINK, posix.SOCK_DGRAM, NETLINK_TRAFFIC_PORT)
+    assert(fd, err)
+
+    local ok, err = posix.bind(fd, { family = posix.AF_NETLINK,
+                                     pid = 0,
+                                     groups = 0 }) 
+    assert(ok, err)
+    if (not ok) then
+        print("error")
+        return nil, err
+    end
+    print("connected. fd: " .. fd)
+    return fd
+end
+
+function _M.connect_config()
+    print("connecting")
+    local fd, err = posix.socket(posix.AF_NETLINK, posix.SOCK_DGRAM, NETLINK_CONFIG_PORT)
     assert(fd, err)
 
     local ok, err = posix.bind(fd, { family = posix.AF_NETLINK,
