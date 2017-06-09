@@ -163,21 +163,36 @@ void hexdump_k(uint8_t* data, unsigned int offset, unsigned int size) {
     printk("\n");
 }
 
+int send_netlink_message(int msg_size, void* msg_data, uint32_t client_port_id) {
+    struct nlmsghdr *nlh;
+    struct sk_buff* skb_out;
+
+    skb_out = nlmsg_new(msg_size, 0);
+    if(!skb_out) {
+        printk(KERN_ERR "Failed to allocate new skb\n");
+        return -255;
+    }
+
+    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
+    NETLINK_CB(skb_out).dst_group = 0;
+
+	memcpy(nlmsg_data(nlh), msg_data, msg_size);
+
+	return nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
+}
+
+#define PACKET_SIZE 1024
 // TODO: refactor two functions below
 void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
-    struct nlmsghdr *nlh;
     int msg_size;
-    struct sk_buff* skb_out;
     int res;
-
-    char msg[INET6_ADDRSTRLEN];
-    pktinfo2str(msg, pkt_info, INET6_ADDRSTRLEN);
+    unsigned char data[PACKET_SIZE];
 
     // Nobody's listening, carry on
     if (client_port_id == 0) {
         return;
     }
-
+    
     // Check ignore list
     if (ip_store_contains_ip(ignore_ips, pkt_info->src_addr) ||
         ip_store_contains_ip(ignore_ips, pkt_info->dest_addr)) {
@@ -185,40 +200,35 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
     }
 
     msg_size = pktinfo_msg_size();
-    skb_out = nlmsg_new(msg_size, 0);
+    
+    if (msg_size > PACKET_SIZE) {
+		printk("message too large, skipping\n");
+		return;
+	}
+    
+    pktinfo_msg2wire(type, data, pkt_info);
 
-    if(!skb_out) {
-        printk(KERN_ERR "Failed to allocate new skb\n");
-        return;
-    }
-
-    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
-    NETLINK_CB(skb_out).dst_group = 0;
-    //strncpy(nlmsg_data(nlh),msg,msg_size);
-    pktinfo_msg2wire(type, nlmsg_data(nlh), pkt_info);
-    //printk("[XX] SEND SPIN MESSAGE:\n");
-    //hexdump_k(nlmsg_data(nlh), 0, msg_size);
-    //printk("[XX]  END SPIN MESSAGE\n");
-
-    res = nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
+	res = send_netlink_message(msg_size, data, client_port_id);
     // if res == -11, try again
-    xxxx
-
     if(res<0) {
         printk(KERN_INFO "Error sending data to client: %d\n", res);
-        if (res == -111) {
-            printk(KERN_INFO "Client disappeared\n");
-        }
-        // assume client is gone
-        client_port_id = 0;
+		if (res == -11) {
+			printk("attempt again?\n");
+			// this will just fail again; any way to wait for the process to clear out the buffer/
+			// perhaps use ack on all?...
+			//res = send_netlink_message(msg_size, data, client_port_id);
+			//printk("attempt %d result: %d\n", i, res);
+		} else {
+			// assume client is gone
+			client_port_id = 0;
+		}
     }
 }
 
 void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
-    struct nlmsghdr *nlh;
     int msg_size;
-    struct sk_buff* skb_out;
     int res;
+    unsigned char data[PACKET_SIZE];
 
     //printk("yoyoyoyoyoyoyo\n");
     //char msg[INET6_ADDRSTRLEN];
@@ -231,29 +241,28 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
     }
 
     msg_size = dns_pktinfo_msg_size();
-    skb_out = nlmsg_new(msg_size, 0);
+    if (msg_size > PACKET_SIZE) {
+		printk("message too large, skipping\n");
+		return;
+	}
 
-    if(!skb_out) {
-        printk(KERN_ERR "Failed to allocate new skb\n");
-        return;
-    }
+    dns_pktinfo_msg2wire(data, dns_pkt_info);
 
-    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
-    NETLINK_CB(skb_out).dst_group = 0;
-    //strncpy(nlmsg_data(nlh),msg,msg_size);
-    dns_pktinfo_msg2wire(nlmsg_data(nlh), dns_pkt_info);
-
-    res = nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
+    res = send_netlink_message(msg_size, data, client_port_id);
 
     if(res<0) {
+		// what to do with full buffer here?
         printk(KERN_INFO "Error sending data to client: %d\n", res);
-        if (res == -111) {
-            printk(KERN_INFO "Client disappeared\n");
-        }
-        // assume client is gone
-        client_port_id = 0;
+		if (res == -11) {
+			printk("attempt again?\n");
+			// this will just fail again; any way to wait for the process to clear out the buffer/
+			// perhaps use ack on all?...
+			//res = send_netlink_message(msg_size, data, client_port_id);
+			//printk("attempt %d result: %d\n", i, res);
+		} else {
+			client_port_id = 0;
+		}
     }
-    //printk("[XX] SENT!!\n");
 }
 
 static inline uint16_t read_int16(uint8_t* data) {

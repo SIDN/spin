@@ -39,10 +39,10 @@ end
 -- (type, flags, seq and pid are ignored for now)
 function _M.read_netlink_message(sock_fd)
   -- read size first (it's in system endianness)
-  local nlh, err = posix.recv(sock_fd, _M.MAX_NL_MSG_SIZE)
+  local nlh, err, errno = posix.recv(sock_fd, _M.MAX_NL_MSG_SIZE)
   if nlh == nil then
       print(err)
-      return nil, err
+      return nil, err, errno
   end
   local nl_size = wirefmt.bytes_to_int32_systemendian(nlh:byte(1,4))
   local nl_type = wirefmt.bytes_to_int16_systemendian(nlh:byte(5,6))
@@ -211,11 +211,16 @@ if posix.AF_NETLINK ~= nil then
 	posix.send(fd, hdr_str .. msg_str);
 
 	while true do
-	    local spin_msg = _M.read_netlink_message(fd)
+	    local spin_msg, err, errno = _M.read_netlink_message(fd)
             if spin_msg then
                 _M.spin_read_message_type(spin_msg)
             else
-                fd = _M.connect()
+                print("[XX] err from read_netlink_message: " .. err .. " errno: " .. errno)
+                if (errno == 105) then
+                  -- try again
+                else
+					fd = _M.connect()
+				end
             end
 	end
 else
