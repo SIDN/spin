@@ -156,24 +156,35 @@ function _M.read_dns_pkt_info(data)
 	return dns_pkt_info
 end
 
-function _M.print_message(data)
-	local spin_msg_type = data:byte(1)
-	local spin_msg_size = wirefmt.bytes_to_int16_bigendian(data:byte(2,3))
-	if spin_msg_type == _M.spin_message_types.SPIN_TRAFFIC_DATA then
-	  io.stdout:write("[TRAFFIC] ")
-	  local pkt_info = _M.read_spin_pkt_info(data:sub(4))
-	  pkt_info:print()
-	elseif spin_msg_type == _M.spin_message_types.SPIN_DNS_ANSWER then
-	  io.stdout:write("[DNS] ")
-	  local dns_pkt_info = _M.read_dns_pkt_info(data:sub(4))
-	  dns_pkt_info:print()
-	elseif spin_msg_type == _M.spin_message_types.SPIN_BLOCKED then
-	  io.stdout:write("[BLOCKED] ")
-	  local pkt_info = _M.read_spin_pkt_info(data:sub(4))
-	  pkt_info:print()
+-- returns 3-tuple: msg_type, msg_size, [dns_]pkt_info
+function _M.parse_message(data)
+	local msg_type = data:byte(1)
+	local msg_size = wirefmt.bytes_to_int16_bigendian(data:byte(2,3))
+	if msg_type == _M.spin_message_types.SPIN_TRAFFIC_DATA then
+		return msg_type, msg_size, _M.read_spin_pkt_info(data:sub(4))
+	elseif msg_type == _M.spin_message_types.SPIN_DNS_ANSWER then
+		return msg_type, msg_size, _M.read_dns_pkt_info(data:sub(4))
+	elseif msg_type == _M.spin_message_types.SPIN_BLOCKED then
+		return msg_type, msg_size, _M.read_spin_pkt_info(data:sub(4))
 	else
-	  print("unknown spin message type: " .. type)
+		return msg_type, msg_size, nil, "unknown spin message type: " .. msg_type
 	end
+end
+
+function _M.print_message(data)
+	local msg_type, msg_size, pkt_info
+	msg_type, msg_size, pkt_info, err = _M.parse_message(data)
+	if msg_type == _M.spin_message_types.SPIN_TRAFFIC_DATA then
+	  io.stdout:write("[TRAFFIC] ")
+	elseif msg_type == _M.spin_message_types.SPIN_DNS_ANSWER then
+	  io.stdout:write("[DNS] ")
+	elseif msg_type == _M.spin_message_types.SPIN_BLOCKED then
+	  io.stdout:write("[BLOCKED] ")
+	else
+	  print("unknown spin message type: " .. msg_type)
+	  return
+	end
+    pkt_info:print()
 end
 
 function _M.get_process_id()
