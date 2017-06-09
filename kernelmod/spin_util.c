@@ -8,7 +8,6 @@ ip_store_t* ip_store_create() {
 	ip_store_t* ip_store = (ip_store_t*) kmalloc(sizeof(ip_store_t), __GFP_WAIT);
 	ip_store->elements = NULL;
 
-	printk("[XX] created ip store at %p\n", ip_store);
 	return ip_store;
 }
 
@@ -45,11 +44,9 @@ void ip_store_add_ip(ip_store_t* ip_store, int ipv6, unsigned char ip[16]) {
 	ip_store_el_t* el;
 	ip_store_el_t* el_new;
 
-	printk("[XX] add to ip store\n");
 	if (!ip_store_contains_ip(ip_store, ip)) {
 		split_key(ip, &k1, &k2);
 		el_new = (ip_store_el_t*)kmalloc(sizeof(ip_store_el_t), __GFP_WAIT);
-		printk("[XX] new el: %p\n", el_new);
 		el_new->k1 = k1;
 		el_new->k2 = k2;
 		el_new->val = ipv;

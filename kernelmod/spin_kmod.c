@@ -73,12 +73,14 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
         tcp_header = (struct tcphdr *)skb_transport_header(sock_buff);
         pkt_info->src_port = ntohs(tcp_header->source);
         pkt_info->dest_port = ntohs(tcp_header->dest);
-        pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff) - 2;
-        pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
-        // if size is zero, ignore tcp packet
-        if (pkt_info->payload_size == 0) {
-            return 1;
-        }
+        pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff);
+        if (pkt_info->payload_size > 2) {
+			pkt_info->payload_size = pkt_info->payload_size - 2;
+			pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
+		} else {
+			// if size is zero, ignore tcp packet
+			return 1;
+		}
     } else if (ipv6_header->nexthdr != 58) {
         if (ipv6_header->nexthdr == 0) {
             // ignore hop-by-hop option header
@@ -123,12 +125,14 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
         tcp_header = (struct tcphdr *)skb_transport_header(sock_buff);
         pkt_info->src_port = ntohs(tcp_header->source);
         pkt_info->dest_port = ntohs(tcp_header->dest);
-        pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff) - 2;
-        pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
-        // if size is zero, ignore tcp packet
-        if (pkt_info->payload_size == 0) {
-            return 1;
-        }
+        pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff);
+        if (pkt_info->payload_size > 2) {
+			pkt_info->payload_size = pkt_info->payload_size - 2;
+			pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
+		} else {
+			// if size is zero, ignore tcp packet
+			return 1;
+		}
     /* ignore some protocols */
     } else if (ip_header->protocol != 1 &&
                ip_header->protocol != 2
@@ -166,6 +170,8 @@ void hexdump_k(uint8_t* data, unsigned int offset, unsigned int size) {
 int send_netlink_message(int msg_size, void* msg_data, uint32_t client_port_id) {
     struct nlmsghdr *nlh;
     struct sk_buff* skb_out;
+
+	//hexdump_k(msg_data, 0, msg_size);
 
     skb_out = nlmsg_new(msg_size, 0);
     if(!skb_out) {
@@ -670,7 +676,6 @@ static int __init init_netfilter(void) {
 
 
 static void close_netfilter(void) {
-    printk(KERN_INFO "exiting module\n");
     netlink_kernel_release(traffic_nl_sk);
     netlink_kernel_release(config_nl_sk);
 }
@@ -738,9 +743,7 @@ int init_module()
 {
     init_netfilter();
 
-    printk(KERN_INFO "Hello, world!\n");
-    printk("%d\n", LINUX_VERSION_CODE);
-    test();
+    printk(KERN_INFO "SPIN module loaded\n");
 
     nfho1.hook = hook_func_new;
     nfho1.hooknum = NF_INET_PRE_ROUTING;
@@ -778,7 +781,7 @@ int init_module()
 void cleanup_module()
 {
     close_netfilter();
-    printk(KERN_INFO "Hello World (tm)(c)(patent pending) signing off!\n");
+    printk(KERN_INFO "SPIN module signing off!\n");
     nf_unregister_hook(&nfho1);                     //cleanup – unregister hook
     nf_unregister_hook(&nfho2);                     //cleanup – unregister hook
     nf_unregister_hook(&nfho3);                     //cleanup – unregister hook

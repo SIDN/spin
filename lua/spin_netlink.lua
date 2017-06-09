@@ -156,7 +156,7 @@ function _M.read_dns_pkt_info(data)
 	return dns_pkt_info
 end
 
-function _M.spin_read_message_type(data)
+function _M.print_message(data)
 	local spin_msg_type = data:byte(1)
 	local spin_msg_size = wirefmt.bytes_to_int16_bigendian(data:byte(2,3))
 	if spin_msg_type == _M.spin_message_types.SPIN_TRAFFIC_DATA then
@@ -203,27 +203,4 @@ function _M.connect()
     return fd
 end
 
-if posix.AF_NETLINK ~= nil then
-	local fd, err = _M.connect()
-	msg_str = "Hello!"
-	hdr_str = _M.create_netlink_header(msg_str, 0, 0, 0, _M.get_process_id())
-	
-	posix.send(fd, hdr_str .. msg_str);
-
-	while true do
-	    local spin_msg, err, errno = _M.read_netlink_message(fd)
-            if spin_msg then
-                _M.spin_read_message_type(spin_msg)
-            else
-                print("[XX] err from read_netlink_message: " .. err .. " errno: " .. errno)
-                if (errno == 105) then
-                  -- try again
-                else
-					fd = _M.connect()
-				end
-            end
-	end
-else
-	print("no posix.AF_NETLINK")
-end
-
+return _M
