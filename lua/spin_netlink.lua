@@ -40,6 +40,10 @@ end
 function _M.read_netlink_message(sock_fd)
   -- read size first (it's in system endianness)
   local nlh, err = posix.recv(sock_fd, _M.MAX_NL_MSG_SIZE)
+  if nlh == nil then
+      print(err)
+      return nil, err
+  end
   local nl_size = wirefmt.bytes_to_int32_systemendian(nlh:byte(1,4))
   local nl_type = wirefmt.bytes_to_int16_systemendian(nlh:byte(5,6))
   local nl_flags = wirefmt.bytes_to_int16_systemendian(nlh:byte(7,8))
@@ -172,28 +176,47 @@ function _M.spin_read_message_type(data)
 	end
 end
 
+function _M.get_process_id()
+	local pid = posix.getpid()
+	-- can be a table or an integer
+	if (type(pid) == "table") then
+		return pid["pid"]
+	else
+		return pid
+	end
+end
+
+function _M.connect()
+    print("connecting")
+    local fd, err = posix.socket(posix.AF_NETLINK, posix.SOCK_DGRAM, 31)
+    assert(fd, err)
+
+    local ok, err = posix.bind(fd, { family = posix.AF_NETLINK,
+                                     pid = 0,
+                                     groups = 0 }) 
+    assert(ok, err)
+    if (not ok) then
+        print("error")
+        return nil, err
+    end
+    print("connected. fd: " .. fd)
+    return fd
+end
 
 if posix.AF_NETLINK ~= nil then
-	local fd, err = posix.socket(posix.AF_NETLINK, posix.SOCK_DGRAM, 31)
-	assert(fd, err)
-
-	local ok, err = posix.bind(fd, { family = posix.AF_NETLINK,
-	                             --pid = posix.getpid(),
-	                             pid = 0,
-	                             groups = 0 })
-	assert(ok, err)
-	if (not ok) then
-		print("error")
-		return
-	end
+	local fd, err = _M.connect()
 	msg_str = "Hello!"
-	hdr_str = _M.create_netlink_header(msg_str, 0, 0, 0, posix.getpid("pid"))
+	hdr_str = _M.create_netlink_header(msg_str, 0, 0, 0, _M.get_process_id())
 	
 	posix.send(fd, hdr_str .. msg_str);
 
 	while true do
 	    local spin_msg = _M.read_netlink_message(fd)
-	    _M.spin_read_message_type(spin_msg)
+            if spin_msg then
+                _M.spin_read_message_type(spin_msg)
+            else
+                fd = _M.connect()
+            end
 	end
 else
 	print("no posix.AF_NETLINK")

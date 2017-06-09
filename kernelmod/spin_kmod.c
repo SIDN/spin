@@ -201,6 +201,8 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
     //printk("[XX]  END SPIN MESSAGE\n");
 
     res = nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
+    // if res == -11, try again
+    xxxx
 
     if(res<0) {
         printk(KERN_INFO "Error sending data to client: %d\n", res);
@@ -463,6 +465,8 @@ static void traffic_client_connect(struct sk_buff *skb) {
 
     skb_out = nlmsg_new(msg_size,0);
 
+    printk(KERN_INFO "Client (pid %u) connected to traffic port\n", pid);
+
     if(!skb_out) {
         printk(KERN_ERR "Failed to allocate new skb\n");
         return;
@@ -565,6 +569,7 @@ static void config_client_connect(struct sk_buff *skb) {
 
     /* pid of sending process */
     pid = nlh->nlmsg_pid;
+    printk(KERN_INFO "Client (pid %u) connected to config port\n", pid);
     cmdbuf = (uint8_t*) NLMSG_DATA(nlh);
     if (skb->len < 1) {
         //printk(KERN_INFO "got command of size 0\n");
