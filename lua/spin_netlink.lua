@@ -147,7 +147,7 @@ function _M.read_dns_pkt_info(data)
 	dns_pkt_info.family = data:byte(1)
 	if (dns_pkt_info.family == posix.AF_INET) then
 		dns_pkt_info.ip = wirefmt.ntop_v4(data:sub(14, 17))
-	elseif (dns_pkt_info.family == posix.AF_INET) then
+	elseif (dns_pkt_info.family == posix.AF_INET6) then
 		dns_pkt_info.ip = wirefmt.ntop_v6(data:sub(2, 17))
 	end
 	dns_pkt_info.ttl = wirefmt.bytes_to_int32_bigendian(data:byte(18, 21))
