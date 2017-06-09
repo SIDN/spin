@@ -104,12 +104,95 @@ function _M.bytes_to_int16_systemendian(b1, b2)
   end
 end
 
-function _M.ntop_v4(bytes)
-  return string.format("%d.%d.%d.%d", bytes:byte(1,4))
+function _M.ntop_v4(bytestring)
+  return string.format("%d.%d.%d.%d", bytestring:byte(1,4))
 end
 
-function _M.ntop_v6(bytes)
-  return string.format("%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x", bytes:byte(1,16))
+function _M.ntop_v6(bytestring)
+  return string.format("%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x", bytestring:byte(1,16))
+end
+
+-- returns bytestring of ip address, if valid, nil otherwise
+function _M.pton_v4(str)
+  local ret = ""
+  for c in string.gmatch(str, "[0-9]+") do
+    if (c+0 > 255) then
+        return nil
+    end
+    ret = ret .. string.char(c+0)
+  end
+  if string.len(ret) ~= 4 then
+      return nil
+  end
+  return ret  
+end
+
+local function split_string(str, sep)
+  local result = {}
+  if not str then return result end
+  while true do
+	  local s,e = string.find(str, sep)
+	  if s then
+		table.insert(result, str:sub(1, s - 1))
+		str = str:sub(e + 1)
+	  else
+	    break
+	  end
+  end
+  if string.len(str) > 0 then
+    table.insert(result, str)
+  end
+  return result
+end
+
+function _M.pton_v6(str)
+  -- first, split the string into the two parts separated by ::
+  local parts = split_string(str, "::")
+  -- must be of length one or two
+  if #parts == 0 or #parts > 2 then
+    return nil
+  end
+  local head = parts[1]
+  local tail = parts[2]
+  -- split parts up into hex blocks
+  local head_bytes = ""
+  local tail_bytes = ""
+  for _,hex_str in pairs(split_string(head, ":")) do
+    if string.len(hex_str) > 4 then
+      return nil
+    else
+      while string.len(hex_str) < 4 do
+        hex_str = "0" .. hex_str
+      end
+    end
+    head_bytes = head_bytes .. string.char(tonumber(string.sub(hex_str, 1, 2), 16))
+    head_bytes = head_bytes .. string.char(tonumber(string.sub(hex_str, 3, 4), 16))
+  end
+  for _,hex_str in pairs(split_string(tail, ":")) do
+    if string.len(hex_str) > 4 then
+      return nil
+    else
+      while string.len(hex_str) < 4 do
+        hex_str = "0" .. hex_str
+      end
+    end
+    tail_bytes = tail_bytes .. string.char(tonumber(string.sub(hex_str, 1, 2), 16))
+    tail_bytes = tail_bytes .. string.char(tonumber(string.sub(hex_str, 3, 4), 16))
+  end
+  local i
+  -- if there was no :: the length must be 16; otherwise fill it up
+  local cur_size = string.len(head_bytes) + string.len(tail_bytes)
+  if #parts == 2 then
+    if cur_size > 15 then return nil end
+    for i=1,16 - string.len(head_bytes) - string.len(tail_bytes) do
+      head_bytes = head_bytes .. string.char(0)
+    end
+  else
+    if cur_size ~= 16 then
+      return nil
+    end
+  end
+  return head_bytes .. tail_bytes
 end
 
 return _M

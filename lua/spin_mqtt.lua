@@ -433,7 +433,7 @@ function handle_dns_message(dns_pkt_info)
 	update = dnscache.dnscache:add(dns_pkt_info.ip, dns_pkt_info.dname, timestamp)
 	if update then
 		-- update the node cache, and publish if it changed
-		local updated_node = node_cache:add_domain_to_ip(addr, info.dname)
+		local updated_node = node_cache:add_domain_to_ip(addr, dns_pkt_info.dname)
 		if updated_node then publish_node_update(updated_node) end
 	end
 end

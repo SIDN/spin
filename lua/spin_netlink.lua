@@ -63,6 +63,26 @@ _M.spin_message_types = {
 	SPIN_BLOCKED = 3
 }
 
+_M.spin_config_command_types = {
+	-- commands from client to kernelmod
+	SPIN_CMD_GET_IGNORE = 1,
+	SPIN_CMD_ADD_IGNORE = 2,
+	SPIN_CMD_REMOVE_IGNORE = 3,
+	SPIN_CMD_CLEAR_IGNORE = 4,
+	SPIN_CMD_GET_BLOCK = 5,
+	SPIN_CMD_ADD_BLOCK = 6,
+	SPIN_CMD_REMOVE_BLOCK = 7,
+	SPIN_CMD_CLEAR_BLOCK = 8,
+	SPIN_CMD_GET_EXCEPT = 9,
+	SPIN_CMD_ADD_EXCEPT = 10,
+	SPIN_CMD_REMOVE_EXCEPT = 11,
+	SPIN_CMD_CLEAR_EXCEPT = 12,
+	-- commands from kernelmod to client
+	SPIN_CMD_IP = 100,
+	SPIN_CMD_END = 200,
+	SPIN_CMD_ERR = 400
+}
+
 local PktInfo = {}
 PktInfo.__index = PktInfo
 
@@ -212,6 +232,14 @@ function _M.connect()
     end
     print("connected. fd: " .. fd)
     return fd
+end
+
+--
+-- config command functions
+--
+
+function _M.cfg_send_command()
+
 end
 
 return _M
