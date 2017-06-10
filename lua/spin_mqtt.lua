@@ -109,34 +109,14 @@ function add_filters_for_node(node_id)
   if not node then return end
   filter:load()
   for _,ip in pairs(node.ips) do
-    ip_bytes = wirefmt.pton_v6(ip)
-    if not ip_bytes then ip_bytes = wirefmt.pton_v4(ip) end
-    if ip_bytes then
-        local response, err = netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_ADD_IGNORE, ip_bytes)
-        if response then
-            filter:add_filter(ip)
-        else
-            vprint("Error sending config command: " .. err)
-        end
-    end
+      filter:add_filter(ip)
   end
   filter:save()
 end
 
 function remove_filters_for_ip(ip)
-    ip_bytes = wirefmt.pton_v6(ip)
-    if not ip_bytes then ip_bytes = wirefmt.pton_v4(ip) end
     filter:load()
-    if ip_bytes then
-        local response, err = netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_REMOVE_IGNORE, ip_bytes)
-        if response then
-            filter:remove_filter(ip)
-        else
-            vprint("Error sending config command: " .. err)
-        end
-    else
-        print("[XX] error converting to bytes")
-    end
+    filter:remove_filter(ip)
     filter:save()
 end
 
@@ -145,16 +125,7 @@ function add_block_for_node(node_id)
   if not node then return end
   filter:load()
   for _,ip in pairs(node.ips) do
-    ip_bytes = wirefmt.pton_v6(ip)
-    if not ip_bytes then ip_bytes = wirefmt.pton_v4(ip) end
-    if ip_bytes then
-        local response, err = netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_ADD_BLOCK, ip_bytes)
-        if response then
-            filter:add_block(ip)
-        else
-            vprint("Error sending config command: " .. err)
-        end
-    end
+    filter:add_block(ip)
   end
   filter:save()
 end
@@ -164,16 +135,7 @@ function remove_block_for_node(node_id)
   if not node then return end
   filter:load()
   for _,ip in pairs(node.ips) do
-    ip_bytes = wirefmt.pton_v6(ip)
-    if not ip_bytes then ip_bytes = wirefmt.pton_v4(ip) end
-    if ip_bytes then
-        local response, err = netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_REMOVE_BLOCK, ip_bytes)
-        if response then
-            filter:remove_block(ip)
-        else
-            vprint("Error sending config command: " .. err)
-        end
-    end
+    filter:remove_block(ip)
   end
   filter:save()
 end
@@ -217,10 +179,9 @@ function handle_command(command, argument)
     -- don't send direct response, but send a 'new list' update
     response = create_filter_list_command()
   elseif (command == "reset_filters") then
-    -- TODO: these need to be sent as netlink commands too
-    -- hmm. do that from filter module?
     filter:remove_all_filters()
     filter:add_own_ips()
+    filter:apply_current_to_kernel()
     filter:save()
     response = create_filter_list_command()
   elseif (command == "get_names") then
@@ -337,12 +298,12 @@ function my_cb(mydata, event)
 end
 
 local function publish_traffic(msg)
-  print("[XX] Publish traffic data: " .. msg)
   local o = json.decode(msg)
   for _,f in pairs(o.result.flows) do
     f.from = node_cache:get_by_id(f.from)
     f.to = node_cache:get_by_id(f.to)
   end
+  print("[XX] Publish traffic data: " .. json.encode(o))
   --print("[XX] NEW TRAF MSG")
   --print(json.encode(o))
   --print("[XX] END NEW TRAF MSG")

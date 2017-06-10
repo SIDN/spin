@@ -9,7 +9,7 @@ local _M = {}
 -- returns true if the current system is little-endian
 --         false otherwise
 function _M.system_littleendian()
-	return string.dump(function() end):byte(7) == 1
+    return string.dump(function() end):byte(7) == 1
 end
 
 -- returns the given 16-bit integer as a big-endian byte-string
@@ -147,7 +147,7 @@ function _M.ntop_v6(bytestring)
       table.insert(parts2, "")
       repl_done = true
     else
-	  table.insert(parts2, string.format("%x", p))
+      table.insert(parts2, string.format("%x", p))
     end
     i = i + 1
   end
@@ -180,13 +180,13 @@ local function split_string(str, sep)
   local result = {}
   if not str then return result end
   while true do
-	  local s,e = string.find(str, sep)
-	  if s then
-		table.insert(result, str:sub(1, s - 1))
-		str = str:sub(e + 1)
-	  else
-	    break
-	  end
+      local s,e = string.find(str, sep)
+      if s then
+        table.insert(result, str:sub(1, s - 1))
+        str = str:sub(e + 1)
+      else
+        break
+      end
   end
   if string.len(str) > 0 then
     table.insert(result, str)
@@ -242,6 +242,12 @@ function _M.pton_v6(str)
   return head_bytes .. tail_bytes
 end
 
+function _M.pton(ip)
+    local bytes = _M.pton_v6(ip)
+    if not bytes then bytes = _M.pton_v4(ip) end
+    return bytes
+end
+
 function _M.hexdump(data)
     local i
     io.stdout:write("00: ")
@@ -249,7 +255,7 @@ function _M.hexdump(data)
         if (i>1 and (i-1)%10 == 0) then
           io.stdout:write(string.format("\n%2d: ", i-1))
         end
-		io.stdout:write(string.format("%02x ", string.byte(data:sub(i))))
+        io.stdout:write(string.format("%02x ", string.byte(data:sub(i))))
     end
     io.stdout:write("\n")
 end

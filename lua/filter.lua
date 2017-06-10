@@ -11,6 +11,9 @@
 
 local util = require 'util'
 local arp = require 'arp'
+local netlink = require 'spin_netlink'
+local wirefmt = require 'wirefmt'
+
 
 local filter = {}
 filter.filename = "/etc/spin/spin_userdata.cfg"
@@ -86,9 +89,12 @@ function filter:add_filter(address)
   local ips = arp:get_ip_addresses(address)
   if #ips > 0 then
     for i,ip in pairs(ips) do
+      -- relay back any errors?
+      self:send_cmd_to_kernel(netlink.spin_config_command_types.SPIN_CMD_ADD_IGNORE, ip)
       filter.data.filters[ip] = true
     end
   else
+    self:send_cmd_to_kernel(netlink.spin_config_command_types.SPIN_CMD_ADD_IGNORE, address)
     filter.data.filters[address] = true
   end
 end
@@ -99,9 +105,11 @@ function filter:add_block(address)
   local ips = arp:get_ip_addresses(address)
   if #ips > 0 then
     for i,ip in pairs(ips) do
+      self:send_cmd_to_kernel(netlink.spin_config_command_types.SPIN_CMD_ADD_BLOCK, ip)
       filter.data.blocks[ip] = true
     end
   else
+    self:send_cmd_to_kernel(netlink.spin_config_command_types.SPIN_CMD_ADD_BLOCK, address)
     filter.data.blocks[address] = true
   end
 end
@@ -110,15 +118,18 @@ function filter:add_own_ips()
   util:merge_tables(self.data.filters, util:get_all_bound_ip_addresses())
 end
 
-function filter:remove_filter(address)
-  filter.data.filters[address] = nil
+function filter:remove_filter(ip)
+  self:send_cmd_to_kernel(netlink.spin_config_command_types.SPIN_CMD_REMOVE_IGNORE, ip)
+  filter.data.filters[ip] = nil
 end
 
-function filter:remove_block(address)
-  filter.data.blocks[address] = nil
+function filter:remove_block(ip)
+  self:send_cmd_to_kernel(netlink.spin_config_command_types.SPIN_CMD_REMOVE_BLOCK, ip)
+  filter.data.blocks[ip] = nil
 end
 
 function filter:remove_all_filters()
+  netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_CLEAR_IGNORE)
   filter.data.filters = {}
 end
 
@@ -144,6 +155,29 @@ end
 
 function filter:get_name_list()
   return filter.data.names
+end
+
+function filter:send_cmd_to_kernel(cmd, ip)
+    ip_bytes = wirefmt.pton(ip)
+    if ip_bytes then
+        return netlink.send_cfg_command(cmd, ip_bytes)
+    end
+    return nil, "Bad IP address: " .. ip
+end
+
+-- assumes filter:load() is called first!
+-- clears all filters and all blocks from the kernel, and replaces
+-- them with the values we have (either user-set or read from config)
+function filter:apply_current_to_kernel()
+  netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_CLEAR_IGNORE)
+  for ip,_ in pairs(self.data.filters) do
+    print("[XX] TRY " .. ip)
+    self:send_cmd_to_kernel(netlink.spin_config_command_types.SPIN_CMD_ADD_IGNORE, ip)
+  end
+  netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_CLEAR_BLOCK)
+  for ip,_ in pairs(self.data.blocks) do
+    self:send_cmd_to_kernel(netlink.spin_config_command_types.SPIN_CMD_ADD_BLOCK, ip)
+  end
 end
 
 return filter
