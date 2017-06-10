@@ -7,7 +7,6 @@ local json = require 'json'
 local dnscache = require 'dns_cache'
 local arp = require 'arp'
 local nc = require 'node_cache'
--- tmp: treat DNS traffic as actual traffic
 local aggregator = require 'collect'
 local firewall = require 'spin_firewall'
 local filter = require 'filter'
@@ -17,13 +16,10 @@ local posix = require 'posix'
 local netlink = require 'spin_netlink'
 local wirefmt = require 'wirefmt'
 
+-- load the 'spin_userdata.cfg' containing user-set names
 filter:load(true)
 
 local verbose = true
---
--- A simple DNS cache for answered queries
---
-
 --
 -- mqtt-related things
 --
@@ -144,6 +140,44 @@ function remove_filters_for_ip(ip)
     filter:save()
 end
 
+function add_block_for_node(node_id)
+  local node = node_cache:get_by_id(node_id)
+  if not node then return end
+  filter:load()
+  for _,ip in pairs(node.ips) do
+    ip_bytes = wirefmt.pton_v6(ip)
+    if not ip_bytes then ip_bytes = wirefmt.pton_v4(ip) end
+    if ip_bytes then
+        local response, err = netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_ADD_BLOCK, ip_bytes)
+        if response then
+            filter:add_block(ip)
+        else
+            vprint("Error sending config command: " .. err)
+        end
+    end
+  end
+  filter:save()
+end
+
+function remove_block_for_node(node_id)
+  local node = node_cache:get_by_id(node_id)
+  if not node then return end
+  filter:load()
+  for _,ip in pairs(node.ips) do
+    ip_bytes = wirefmt.pton_v6(ip)
+    if not ip_bytes then ip_bytes = wirefmt.pton_v4(ip) end
+    if ip_bytes then
+        local response, err = netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_REMOVE_BLOCK, ip_bytes)
+        if response then
+            filter:remove_block(ip)
+        else
+            vprint("Error sending config command: " .. err)
+        end
+    end
+  end
+  filter:save()
+end
+
 function add_name_for_node(node_id, name)
   local node = node_cache:get_by_id(node_id)
   if not node then return end
@@ -175,18 +209,16 @@ function handle_command(command, argument)
     response = create_filter_list_command()
   elseif (command == "add_filter") then
     -- response necessary? resend the filter list?
-    vprint("add filter for node " .. argument)
     add_filters_for_node(argument)
     -- don't send direct response, but send a 'new list' update
     response = create_filter_list_command()
   elseif (command == "remove_filter") then
-    --filter:load()
-    --filter:remove_filter(argument)
-    --filter:save()
     remove_filters_for_ip(argument)
     -- don't send direct response, but send a 'new list' update
     response = create_filter_list_command()
   elseif (command == "reset_filters") then
+    -- TODO: these need to be sent as netlink commands too
+    -- hmm. do that from filter module?
     filter:remove_all_filters()
     filter:add_own_ips()
     filter:save()
@@ -203,46 +235,9 @@ function handle_command(command, argument)
     publish_node_update(node)
     response = nil
   elseif command == "blockdata" then
-    -- add block to iptables
-    response = nil
-    local fw = firewall.SpinFW_create(false)
-    local fw6 = firewall.SpinFW_create(true)
-    fw:read()
-    fw6:read()
-    local node = node_cache:get_by_id(argument)
-    if node then
-      for _,ip in pairs(node.ips) do
-        print("[XX] ADDING BLOCK FOR IP: " .. ip)
-        if is_ipv6_ip(ip) then
-          print("[XX] IS IPV6")
-          fw6:add_block_ip(ip)
-        else
-          print("[XX] IS ipv4")
-          fw:add_block_ip(ip)
-        end
-      end
-      fw:commit()
-      fw6:commit()
-    end
+    add_block_for_node(argument)
   elseif command == "stopblockdata" then
-    -- remove block from iptables
-    response = nil
-    local fw = firewall.SpinFW_create(false)
-    local fw6 = firewall.SpinFW_create(true)
-    fw:read()
-    fw6:read()
-    local node = node_cache:get_by_id(argument)
-    if node then
-      for _,ip in pairs(node.ips) do
-        if is_ipv6_ip(ip) then
-          fw6:remove_block_ip(ip)
-        else
-          fw:remove_block_ip(ip)
-        end
-      end
-      fw:commit()
-      fw6:commit()
-    end
+    remove_block_for_node(argument)
   elseif command == "allowdata" then
     -- add allow to iptables
   elseif command == "stopallowdata" then
@@ -381,33 +376,6 @@ function print_dns_cb(mydata, event)
     end
 end
 
-function print_blocked_cb(mydata, event)
-  from_node, new = node_cache:add_ip(event:get_src_addr())
-  if new then
-    -- publish it to the traffic channel
-    publish_node_update(from_node)
-  end
-
-  to_node, new = node_cache:add_ip(event:get_dst_addr())
-  if new then
-    -- publish it to the traffic channel
-    publish_node_update(to_node)
-  end
-
-  -- put internal nodes as the source
-  if to_node.mac then
-    from_node, to_node = to_node, from_node
-  end
-
-  msg = { command = "blocked", argument = "", result = {
-              timestamp = event:get_timestamp(),
-              from = from_node.id,
-              to = to_node.id
-          }
-        }
-  client:publish(TRAFFIC_CHANNEL, json.encode(msg))
-end
-
 function publish_node_update(node)
   if node == nil then
     error("nil node")
@@ -484,8 +452,8 @@ function handle_blocked_message(pkt_info)
     local timestamp = os.time()
     msg = { command = "blocked", argument = "", result = {
               timestamp = timestamp,
-              from = from_node.id,
-              to = to_node.id
+              from = from_node,
+              to = to_node
             }
           }
     client:publish(TRAFFIC_CHANNEL, json.encode(msg))

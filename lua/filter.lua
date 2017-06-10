@@ -19,6 +19,7 @@ filter.data = {}
 function filter:load(add_own_if_new)
   filter.data = {}
   filter.data.filters = {}
+  filter.data.blocks = {}
   filter.data.names = {}
 
   -- just ignore it for now if we can't read it
@@ -43,6 +44,9 @@ function filter:load(add_own_if_new)
   for rfilter in string.gmatch(s, "filter:%s+([^\r\n]+)") do
     filter.data.filters[rfilter] = true
   end
+  for rfilter in string.gmatch(s, "block:%s+([^\r\n]+)") do
+    filter.data.blocks[rfilter] = true
+  end
 end
 
 function filter:save()
@@ -58,6 +62,9 @@ function filter:save()
   for ffilter,v in pairs(filter.data.filters) do
     f:write("filter: " .. ffilter .. "\n")
   end
+  for block,v in pairs(filter.data.blocks) do
+    f:write("block: " .. block .. "\n")
+  end
   f:close()
 end
 
@@ -67,6 +74,9 @@ function filter:print()
   end
   for ffilter,v in pairs(filter.data.filters) do
     print("filter: " .. ffilter .. "\n")
+  end
+  for block,v in pairs(filter.data.blocks) do
+    print("filter: " .. blocks .. "\n")
   end
 end
 
@@ -83,12 +93,29 @@ function filter:add_filter(address)
   end
 end
 
+function filter:add_block(address)
+  -- address might be a mac address, if so, find the
+  -- associated IPs
+  local ips = arp:get_ip_addresses(address)
+  if #ips > 0 then
+    for i,ip in pairs(ips) do
+      filter.data.blocks[ip] = true
+    end
+  else
+    filter.data.blocks[address] = true
+  end
+end
+
 function filter:add_own_ips()
   util:merge_tables(self.data.filters, util:get_all_bound_ip_addresses())
 end
 
 function filter:remove_filter(address)
   filter.data.filters[address] = nil
+end
+
+function filter:remove_block(address)
+  filter.data.blocks[address] = nil
 end
 
 function filter:remove_all_filters()
