@@ -164,7 +164,7 @@ end
 -- now send the command
 if #ips > 0 then
 	for _,ip in pairs(ips) do
-		local response_lines, err = send_command(cmd, ip)
+		local response_lines, err = netlink.send_cfg_command(cmd, ip)
 		if response_lines then
 			for _,line in pairs(response_lines) do
 			    print(line)
@@ -172,7 +172,7 @@ if #ips > 0 then
 		end
 	end
 else
-    local response_lines, err = send_command(cmd)
+    local response_lines, err = netlink.send_cfg_command(cmd)
 	if response_lines then
 		for _,line in pairs(response_lines) do
 			print(line)

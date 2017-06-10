@@ -15,6 +15,7 @@ local filter = require 'filter'
 local signal = require 'posix.signal'
 local posix = require 'posix'
 local netlink = require 'spin_netlink'
+local wirefmt = require 'wirefmt'
 
 filter:load(true)
 
@@ -36,7 +37,7 @@ node_cache:set_filter_tool(filter)
 
 function vprint(msg)
     if verbose then
-        print("[SPIN/DNS] " .. msg)
+        print("[SPIN/mqtt] " .. msg)
     end
 end
 
@@ -87,6 +88,14 @@ function create_filter_list_command()
   local update  = {}
   update ["command"] = "filters"
   update ["argument"] = ""
+  update ["result"] = netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_GET_IGNORE)
+  return update
+end
+
+function old_create_filter_list_command()
+  local update  = {}
+  update ["command"] = "filters"
+  update ["argument"] = ""
   update ["result"] = filter:get_filter_list()
   return update
 end
@@ -102,6 +111,44 @@ end
 function add_filters_for_node(node_id)
   local node = node_cache:get_by_id(node_id)
   if not node then return end
+  --filter:load()
+  for _,ip in pairs(node.ips) do
+    ip_bytes = wirefmt.pton_v6(ip)
+    if not ip_bytes then ip_bytes = wirefmt.pton_v4(ip) end
+    if ip_bytes then
+        local response, err = netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_ADD_IGNORE, ip_bytes)
+        if not response then
+            vprint("Error sending config command: " .. err)
+        end
+    end
+    --filter:add_filter(ip)
+    -- TODO: persist
+  end
+  --filter:save()
+end
+
+function remove_filters_for_ip(ip)
+    --for _,ip in pairs(node.ips) do
+        print("[XX] send remove command for ip " .. ip)
+        ip_bytes = wirefmt.pton_v6(ip)
+        if not ip_bytes then ip_bytes = wirefmt.pton_v4(ip) end
+        if ip_bytes then
+            local response, err = netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_REMOVE_IGNORE, ip_bytes)
+            if not response then
+                vprint("Error sending config command: " .. err)
+            end
+        else
+            print("[XX] error converting to bytes")
+        end
+        --filter:add_filter(ip)
+        -- TODO: persist
+    --end
+    --filter:save()
+end
+
+function old_add_filters_for_node(node_id)
+  local node = node_cache:get_by_id(node_id)
+  if not node then return end
   filter:load()
   for _,ip in pairs(node.ips) do
     filter:add_filter(ip)
@@ -109,15 +156,16 @@ function add_filters_for_node(node_id)
   filter:save()
 end
 
-function remove_filters_for_node(node_id)
-  local node = node_cache:get_by_id(node_id)
-  if not node then return end
-  filter:load()
-  for _,ip in pairs(node.ips) do
-    filter:remove_filter(ip)
-  end
-  filter:save()
-end
+
+--function remove_filters_for_node(node_id)
+--  local node = node_cache:get_by_id(node_id)
+--  if not node then return end
+--  filter:load()
+--  for _,ip in pairs(node.ips) do
+--    filter:remove_filter(ip)
+--  end
+--  filter:save()
+--end
 
 function add_name_for_node(node_id, name)
 
@@ -138,7 +186,6 @@ function handle_command(command, argument)
   local response = {}
   response["command"] = command
   response["argument"] = argument
-
   if (command == "ip2hostname") then
     local ip = argument
     --local names = get_dnames_from_cache(ip)
@@ -152,13 +199,15 @@ function handle_command(command, argument)
     response = create_filter_list_command()
   elseif (command == "add_filter") then
     -- response necessary? resend the filter list?
+    vprint("add filter for node " .. argument)
     add_filters_for_node(argument)
     -- don't send direct response, but send a 'new list' update
     response = create_filter_list_command()
   elseif (command == "remove_filter") then
-    filter:load()
-    filter:remove_filter(argument)
-    filter:save()
+    --filter:load()
+    --filter:remove_filter(argument)
+    --filter:save()
+    remove_filters_for_ip(argument)
     -- don't send direct response, but send a 'new list' update
     response = create_filter_list_command()
   elseif (command == "reset_filters") then
@@ -430,23 +479,23 @@ end
 function handle_dns_message(dns_pkt_info)
     -- TODO TTL and timestamp
     timestamp = os.time()
-	update = dnscache.dnscache:add(dns_pkt_info.ip, dns_pkt_info.dname, timestamp)
-	if update then
-		-- update the node cache, and publish if it changed
-		local updated_node = node_cache:add_domain_to_ip(addr, dns_pkt_info.dname)
-		if updated_node then publish_node_update(updated_node) end
-	end
+    update = dnscache.dnscache:add(dns_pkt_info.ip, dns_pkt_info.dname, timestamp)
+    if update then
+        -- update the node cache, and publish if it changed
+        local updated_node = node_cache:add_domain_to_ip(dns_pkt_info.ip, dns_pkt_info.dname)
+        if updated_node then publish_node_update(updated_node) end
+    end
 end
 
 function handle_blocked_message(pkt_info)
-	from_node, new = node_cache:add_ip(pkt_info.src_addr)
-	if new then
-	  -- publish it to the traffic channel
-	  publish_node_update(from_node)
-	end
+    from_node, new = node_cache:add_ip(pkt_info.src_addr)
+    if new then
+      -- publish it to the traffic channel
+      publish_node_update(from_node)
+    end
 
-	to_node, new = node_cache:add_ip(pkt_info.dest_addr)
-	if new then
+    to_node, new = node_cache:add_ip(pkt_info.dest_addr)
+    if new then
         -- publish it to the traffic channel
         publish_node_update(to_node)
     end
@@ -456,8 +505,8 @@ function handle_blocked_message(pkt_info)
         from_node, to_node = to_node, from_node
     end
 
-	-- todo: timestamp
-	local timestamp = os.time()
+    -- todo: timestamp
+    local timestamp = os.time()
     msg = { command = "blocked", argument = "", result = {
               timestamp = timestamp,
               from = from_node.id,
@@ -468,19 +517,19 @@ function handle_blocked_message(pkt_info)
 end
 
 function handle_spin_message(spin_msg)
-	-- filter list handled by kernel module now
-  	msg_type, msg_size, pkt_info, err = netlink.parse_message(spin_msg)
-	if msg_type == netlink.spin_message_types.SPIN_TRAFFIC_DATA then
-	  handle_traffic_message(pkt_info)
-	elseif msg_type == netlink.spin_message_types.SPIN_DNS_ANSWER then
-	  handle_dns_message(pkt_info)
-	elseif msg_type == netlink.spin_message_types.SPIN_BLOCKED then
-	  handle_blocked_message(pkt_info)
-	else
-	  print("unknown spin message type: " .. msg_type)
-	  return
-	end
-	io.stdout:write("\n")
+    -- filter list handled by kernel module now
+      msg_type, msg_size, pkt_info, err = netlink.parse_message(spin_msg)
+    if msg_type == netlink.spin_message_types.SPIN_TRAFFIC_DATA then
+      handle_traffic_message(pkt_info)
+    elseif msg_type == netlink.spin_message_types.SPIN_DNS_ANSWER then
+      handle_dns_message(pkt_info)
+    elseif msg_type == netlink.spin_message_types.SPIN_BLOCKED then
+      handle_blocked_message(pkt_info)
+    else
+      print("unknown spin message type: " .. msg_type)
+      return
+    end
+    io.stdout:write("\n")
 end
 
 function shutdown()
@@ -515,29 +564,31 @@ client:connect(broker)
 vprint("connected")
 
 if posix.AF_NETLINK ~= nil then
-	local fd, err = netlink.connect_traffic()
-	msg_str = "Hello!"
-	hdr_str = netlink.create_netlink_header(msg_str, 0, 0, 0, netlink.get_process_id())
-	
-	posix.send(fd, hdr_str .. msg_str);
+    local fd, err = netlink.connect_traffic()
+    msg_str = "Hello!"
+    hdr_str = netlink.create_netlink_header(msg_str, 0, 0, 0, netlink.get_process_id())
+    
+    posix.send(fd, hdr_str .. msg_str);
 
-	while true do
-	    local spin_msg, err, errno = netlink.read_netlink_message(fd)
-		if spin_msg then
-			--hexdump(spin_msg)
-			--netlink.print_message(spin_msg)
-			handle_spin_message(spin_msg);
-		else
-			print("[XX] err from read_netlink_message: " .. err .. " errno: " .. errno)
-			if (errno == 105) then
-			  -- try again
-			else
-				fd = netlink.connect()
-			end
-		end
-		client:loop()
-	end
+    while true do
+        if posix.rpoll(fd, 10) > 0 then
+            local spin_msg, err, errno = netlink.read_netlink_message(fd)
+            if spin_msg then
+                --hexdump(spin_msg)
+                --netlink.print_message(spin_msg)
+                handle_spin_message(spin_msg);
+            else
+                print("[XX] err from read_netlink_message: " .. err .. " errno: " .. errno)
+                if (errno == 105) then
+                  -- try again
+                else
+                    fd = netlink.connect()
+                end
+            end
+        end
+        client:loop()
+    end
 else
-	print("no posix.AF_NETLINK")
+    print("no posix.AF_NETLINK")
 end
 

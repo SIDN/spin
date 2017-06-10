@@ -509,7 +509,8 @@ void send_config_response(int port_id, config_command_t cmd, size_t msg_size, vo
     //memcpy(nlmsg_data(nlh), (uint8_t*)&cmd, 1);
     memcpy(nlmsg_data(nlh) + 1, msg_src, msg_size);
 
-    hexdump_k(nlmsg_data(nlh), 0, msg_size + 1);
+    //hexdump_k(nlmsg_data(nlh), 0, msg_size + 1);
+    hexdump_k(skb_out->data, 0, msg_size + 1 + 16);
 
     res = nlmsg_unicast(config_nl_sk, skb_out, port_id);
 
@@ -592,6 +593,7 @@ static void config_client_connect(struct sk_buff *skb) {
         send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
     } else {
         cmd = cmdbuf[0];
+        printk("Got command %u\n", cmd);
         switch (cmd) {
         case SPIN_CMD_GET_IGNORE:
             ip_store_for_each(ignore_ips, send_config_response_ip_list_callback, &pid);
@@ -637,7 +639,9 @@ static void config_client_connect(struct sk_buff *skb) {
             send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
         }
     }
+    printk("Sending SPIN_CMD_END response\n");
     send_config_response(pid, SPIN_CMD_END, 0, NULL);
+    printk("SPIN_CMD_END response sent\n");
 }
 
 

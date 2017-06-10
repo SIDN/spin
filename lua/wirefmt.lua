@@ -242,4 +242,16 @@ function _M.pton_v6(str)
   return head_bytes .. tail_bytes
 end
 
+function _M.hexdump(data)
+    local i
+    io.stdout:write("00: ")
+    for i=1,#data do
+        if (i>1 and (i-1)%10 == 0) then
+          io.stdout:write(string.format("\n%2d: ", i-1))
+        end
+		io.stdout:write(string.format("%02x ", string.byte(data:sub(i))))
+    end
+    io.stdout:write("\n")
+end
+
 return _M
