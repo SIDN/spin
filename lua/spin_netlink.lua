@@ -230,7 +230,6 @@ function _M.get_process_id()
 end
 
 function _M.connect_traffic()
-    print("connecting to traffic port")
     local fd, err = posix.socket(posix.AF_NETLINK, posix.SOCK_DGRAM, NETLINK_TRAFFIC_PORT)
     assert(fd, err)
 
@@ -242,12 +241,10 @@ function _M.connect_traffic()
         print("error")
         return nil, err
     end
-    print("connected to traffic port. fd: " .. fd)
     return fd
 end
 
 function _M.connect_config()
-    print("connecting to config port")
     local fd, err = posix.socket(posix.AF_NETLINK, posix.SOCK_RAW, NETLINK_CONFIG_PORT)
     assert(fd, err)
 
@@ -259,12 +256,10 @@ function _M.connect_config()
         print("error")
         return nil, err
     end
-    print("connected to config port. fd: " .. fd)
     return fd
 end
 
 function _M.close_connection(fd)
-    print("[XX] Closing socket " .. fd)
     posix.close(fd)
 end
 

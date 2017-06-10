@@ -52,9 +52,8 @@ end
 -- returns nil if file not found
 function util:read_dhcp_config_hosts(filename)
   local result = {}
-  print("[XX] OPEN FILE: " .. filename)
   local f = io.open(filename, "r")
-  if not f then return nil end
+  if not f then return result end
   s = f:read("*all")
   f:close()
   -- err, we probably need a somewhat decent parser here; the order is not fixed

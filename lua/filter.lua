@@ -33,7 +33,7 @@ function filter:load(add_own_if_new)
       filter:add_own_ips()
       -- read names from dhcp config
       filter.data.names = util:read_dhcp_config_hosts("/etc/config/dhcp")
-      filter:save()
+      filter.save()
     end
     return
   end
@@ -53,11 +53,16 @@ function filter:load(add_own_if_new)
 end
 
 function filter:save()
-  if not filter.data.names then return end
+  if filter.data.filters == nil then
+    return
+  end
 
   -- just ignore it for now if we can't write it
-  local f = io.open(filter.filename, "w")
-  if not f then return end
+  local f, err = io.open(filter.filename, "w")
+  if not f then
+    print(err)
+    return err
+  end
 
   for address,name in pairs(filter.data.names) do
     f:write("name: " .. address .. " " .. name .. "\n")
@@ -171,7 +176,6 @@ end
 function filter:apply_current_to_kernel()
   netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_CLEAR_IGNORE)
   for ip,_ in pairs(self.data.filters) do
-    print("[XX] TRY " .. ip)
     self:send_cmd_to_kernel(netlink.spin_config_command_types.SPIN_CMD_ADD_IGNORE, ip)
   end
   netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_CLEAR_BLOCK)

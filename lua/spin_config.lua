@@ -1,3 +1,5 @@
+#!/usr/bin/lua
+
 --
 -- lua version of spin_config
 --
@@ -12,6 +14,7 @@ function help()
     print("- ignore: show or modify the list of addresses that are ignored");
     print("- block:  show or modify the list of addresses that are blocked");
     print("- except: show or modify the list of addresses that are not blocked");
+    print("- apply_config: apply the config file /etc/spin/spin_userdata.cfg")
     print("Commands:");
     print("- show:   show the addresses in the list");
     print("- add:    add address to list");
@@ -44,6 +47,14 @@ for i=1,#arg do
         cmd_str = val
     else
         table.insert(ip_strs, val)
+    end
+end
+
+if type_str == "apply_config" then
+    if cmd_str then
+        help()
+    else
+        cmd_str = ""
     end
 end
 
@@ -94,6 +105,11 @@ elseif type_str == "except" then
     else
         help()
     end
+elseif type_str == "apply_config" then
+    local filter = require "filter"
+    filter:load(true)
+    filter:apply_current_to_kernel()
+    os.exit(0)
 else
     help()
 end
