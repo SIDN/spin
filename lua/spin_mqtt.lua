@@ -111,64 +111,40 @@ end
 function add_filters_for_node(node_id)
   local node = node_cache:get_by_id(node_id)
   if not node then return end
-  --filter:load()
+  filter:load()
   for _,ip in pairs(node.ips) do
     ip_bytes = wirefmt.pton_v6(ip)
     if not ip_bytes then ip_bytes = wirefmt.pton_v4(ip) end
     if ip_bytes then
         local response, err = netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_ADD_IGNORE, ip_bytes)
-        if not response then
+        if response then
+            filter:add_filter(ip)
+        else
             vprint("Error sending config command: " .. err)
         end
     end
-    --filter:add_filter(ip)
-    -- TODO: persist
-  end
-  --filter:save()
-end
-
-function remove_filters_for_ip(ip)
-    --for _,ip in pairs(node.ips) do
-        print("[XX] send remove command for ip " .. ip)
-        ip_bytes = wirefmt.pton_v6(ip)
-        if not ip_bytes then ip_bytes = wirefmt.pton_v4(ip) end
-        if ip_bytes then
-            local response, err = netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_REMOVE_IGNORE, ip_bytes)
-            if not response then
-                vprint("Error sending config command: " .. err)
-            end
-        else
-            print("[XX] error converting to bytes")
-        end
-        --filter:add_filter(ip)
-        -- TODO: persist
-    --end
-    --filter:save()
-end
-
-function old_add_filters_for_node(node_id)
-  local node = node_cache:get_by_id(node_id)
-  if not node then return end
-  filter:load()
-  for _,ip in pairs(node.ips) do
-    filter:add_filter(ip)
   end
   filter:save()
 end
 
-
---function remove_filters_for_node(node_id)
---  local node = node_cache:get_by_id(node_id)
---  if not node then return end
---  filter:load()
---  for _,ip in pairs(node.ips) do
---    filter:remove_filter(ip)
---  end
---  filter:save()
---end
+function remove_filters_for_ip(ip)
+    ip_bytes = wirefmt.pton_v6(ip)
+    if not ip_bytes then ip_bytes = wirefmt.pton_v4(ip) end
+    filter:load()
+    if ip_bytes then
+        local response, err = netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_REMOVE_IGNORE, ip_bytes)
+        if response then
+            filter:remove_filter(ip)
+        else
+            vprint("Error sending config command: " .. err)
+        end
+    else
+        print("[XX] error converting to bytes")
+    end
+    filter:save()
+end
 
 function add_name_for_node(node_id, name)
-
   local node = node_cache:get_by_id(node_id)
   if not node then return end
   filter:load()
@@ -372,10 +348,9 @@ local function publish_traffic(msg)
     f.from = node_cache:get_by_id(f.from)
     f.to = node_cache:get_by_id(f.to)
   end
-  print("[XX] NEW TRAF MSG")
-  print(json.encode(o))
-  print("[XX] END NEW TRAF MSG")
-  --client:publish(TRAFFIC_CHANNEL, msg)
+  --print("[XX] NEW TRAF MSG")
+  --print(json.encode(o))
+  --print("[XX] END NEW TRAF MSG")
   client:publish(TRAFFIC_CHANNEL, json.encode(o))
 end
 
@@ -453,7 +428,7 @@ end
 
 function handle_traffic_message(pkt_info)
   local from_node_id, to_node_id, new
-  print("[XX] add node " .. pkt_info.src_addr)
+  --print("[XX] add node " .. pkt_info.src_addr)
   from_node, new = node_cache:add_ip(pkt_info.src_addr)
   if new then
     -- publish it to the traffic channel
@@ -529,7 +504,6 @@ function handle_spin_message(spin_msg)
       print("unknown spin message type: " .. msg_type)
       return
     end
-    io.stdout:write("\n")
 end
 
 function shutdown()
@@ -589,6 +563,7 @@ if posix.AF_NETLINK ~= nil then
         client:loop()
     end
 else
-    print("no posix.AF_NETLINK")
+    print("no posix.AF_NETLINK, can't connect to kernel module, aborting")
+    os.exit(1)
 end
 

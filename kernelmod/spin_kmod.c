@@ -75,12 +75,12 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
         pkt_info->dest_port = ntohs(tcp_header->dest);
         pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff);
         if (pkt_info->payload_size > 2) {
-			pkt_info->payload_size = pkt_info->payload_size - 2;
-			pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
-		} else {
-			// if size is zero, ignore tcp packet
-			return 1;
-		}
+            pkt_info->payload_size = pkt_info->payload_size - 2;
+            pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
+        } else {
+            // if size is zero, ignore tcp packet
+            return 1;
+        }
     } else if (ipv6_header->nexthdr != 58) {
         if (ipv6_header->nexthdr == 0) {
             // ignore hop-by-hop option header
@@ -127,12 +127,12 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
         pkt_info->dest_port = ntohs(tcp_header->dest);
         pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff);
         if (pkt_info->payload_size > 2) {
-			pkt_info->payload_size = pkt_info->payload_size - 2;
-			pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
-		} else {
-			// if size is zero, ignore tcp packet
-			return 1;
-		}
+            pkt_info->payload_size = pkt_info->payload_size - 2;
+            pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
+        } else {
+            // if size is zero, ignore tcp packet
+            return 1;
+        }
     /* ignore some protocols */
     } else if (ip_header->protocol != 1 &&
                ip_header->protocol != 2
@@ -171,7 +171,7 @@ int send_netlink_message(int msg_size, void* msg_data, uint32_t client_port_id) 
     struct nlmsghdr *nlh;
     struct sk_buff* skb_out;
 
-	//hexdump_k(msg_data, 0, msg_size);
+    //hexdump_k(msg_data, 0, msg_size);
 
     skb_out = nlmsg_new(msg_size, 0);
     if(!skb_out) {
@@ -182,9 +182,9 @@ int send_netlink_message(int msg_size, void* msg_data, uint32_t client_port_id) 
     nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
     NETLINK_CB(skb_out).dst_group = 0;
 
-	memcpy(nlmsg_data(nlh), msg_data, msg_size);
+    memcpy(nlmsg_data(nlh), msg_data, msg_size);
 
-	return nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
+    return nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
 }
 
 #define PACKET_SIZE 1024
@@ -208,26 +208,26 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
     msg_size = pktinfo_msg_size();
     
     if (msg_size > PACKET_SIZE) {
-		printk("message too large, skipping\n");
-		return;
-	}
+        printk("message too large, skipping\n");
+        return;
+    }
     
     pktinfo_msg2wire(type, data, pkt_info);
 
-	res = send_netlink_message(msg_size, data, client_port_id);
+    res = send_netlink_message(msg_size, data, client_port_id);
     // if res == -11, try again
     if(res<0) {
         printk(KERN_INFO "Error sending data to client: %d\n", res);
-		if (res == -11) {
-			printk("attempt again?\n");
-			// this will just fail again; any way to wait for the process to clear out the buffer/
-			// perhaps use ack on all?...
-			//res = send_netlink_message(msg_size, data, client_port_id);
-			//printk("attempt %d result: %d\n", i, res);
-		} else {
-			// assume client is gone
-			client_port_id = 0;
-		}
+        if (res == -11) {
+            printk("attempt again?\n");
+            // this will just fail again; any way to wait for the process to clear out the buffer/
+            // perhaps use ack on all?...
+            //res = send_netlink_message(msg_size, data, client_port_id);
+            //printk("attempt %d result: %d\n", i, res);
+        } else {
+            // assume client is gone
+            client_port_id = 0;
+        }
     }
 }
 
@@ -248,26 +248,26 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
 
     msg_size = dns_pktinfo_msg_size();
     if (msg_size > PACKET_SIZE) {
-		printk("message too large, skipping\n");
-		return;
-	}
+        printk("message too large, skipping\n");
+        return;
+    }
 
     dns_pktinfo_msg2wire(data, dns_pkt_info);
 
     res = send_netlink_message(msg_size, data, client_port_id);
 
     if(res<0) {
-		// what to do with full buffer here?
+        // what to do with full buffer here?
         printk(KERN_INFO "Error sending data to client: %d\n", res);
-		if (res == -11) {
-			printk("attempt again?\n");
-			// this will just fail again; any way to wait for the process to clear out the buffer/
-			// perhaps use ack on all?...
-			//res = send_netlink_message(msg_size, data, client_port_id);
-			//printk("attempt %d result: %d\n", i, res);
-		} else {
-			client_port_id = 0;
-		}
+        if (res == -11) {
+            printk("attempt again?\n");
+            // this will just fail again; any way to wait for the process to clear out the buffer/
+            // perhaps use ack on all?...
+            //res = send_netlink_message(msg_size, data, client_port_id);
+            //printk("attempt %d result: %d\n", i, res);
+        } else {
+            client_port_id = 0;
+        }
     }
 }
 
@@ -510,7 +510,7 @@ void send_config_response(int port_id, config_command_t cmd, size_t msg_size, vo
     memcpy(nlmsg_data(nlh) + 1, msg_src, msg_size);
 
     //hexdump_k(nlmsg_data(nlh), 0, msg_size + 1);
-    hexdump_k(skb_out->data, 0, msg_size + 1 + 16);
+    //hexdump_k(skb_out->data, 0, msg_size + 1 + 16);
 
     res = nlmsg_unicast(config_nl_sk, skb_out, port_id);
 
@@ -593,7 +593,7 @@ static void config_client_connect(struct sk_buff *skb) {
         send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
     } else {
         cmd = cmdbuf[0];
-        printk("Got command %u\n", cmd);
+        //printk("Got command %u\n", cmd);
         switch (cmd) {
         case SPIN_CMD_GET_IGNORE:
             ip_store_for_each(ignore_ips, send_config_response_ip_list_callback, &pid);
@@ -639,9 +639,7 @@ static void config_client_connect(struct sk_buff *skb) {
             send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
         }
     }
-    printk("Sending SPIN_CMD_END response\n");
     send_config_response(pid, SPIN_CMD_END, 0, NULL);
-    printk("SPIN_CMD_END response sent\n");
 }
 
 

@@ -50,8 +50,8 @@ function _M.read_netlink_message(sock_fd)
   --local nlh, err, errno = posix.recv(sock_fd, size-2)
   local nlh, err, errno = posix.recv(sock_fd, 1024)
   --nlh = ss .. nlh
-  print("[XX] received data")
-  wirefmt.hexdump(nlh)
+  --print("[XX] received data")
+  --wirefmt.hexdump(nlh)
   if nlh == nil then
       print(err)
       return nil, err, errno
@@ -289,20 +289,15 @@ function _M.send_cfg_command(cmd, ip)
     end
     local hdr_str = _M.create_netlink_header(msg_str, 0, 0, 0, _M.get_process_id())
     
-    print("[XX] sending command to kernel fd " .. fd .. ": " .. cmd)
     posix.send(fd, hdr_str .. msg_str);
-    print("[XX] command sent")
 
     while true do
-        print("[XX] waiting for response from kernel fd " .. fd)
         local response, err = _M.read_netlink_message(fd)
-        print("[XX] received some response")
         if response == nil then
             print("Error sending command to kernel module: " .. err)
             return nil, err
         end
         local response_type = string.byte(string.sub(response, 1, 1))
-        print("[XX] response type: " .. response_type)
         if response_type == _M.spin_config_command_types.SPIN_CMD_IP then
             local family = string.byte(string.sub(response, 2, 2))
             local ip_str
@@ -315,7 +310,6 @@ function _M.send_cfg_command(cmd, ip)
             end
             table.insert(response_lines, ip_str)
         elseif response_type == _M.spin_config_command_types.SPIN_CMD_END then
-            print("[XX] got END response")
             -- all good, done
             break
         elseif response_type == _M.spin_config_command_types.SPIN_CMD_ERR then
@@ -327,7 +321,6 @@ function _M.send_cfg_command(cmd, ip)
         end
     end
     _M.close_connection(fd)
-    print("[XX] got response (" .. #response_lines .. " lines)")
     return response_lines
 end
 

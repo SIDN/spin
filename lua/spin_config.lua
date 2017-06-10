@@ -7,7 +7,7 @@ local wirefmt = require "wirefmt"
 local posix = require "posix"
 
 function help()
-	print("usage: spin_config.lua <type> <command> [args]")
+    print("usage: spin_config.lua <type> <command> [args]")
     print("Types:");
     print("- ignore: show or modify the list of addresses that are ignored");
     print("- block:  show or modify the list of addresses that are blocked");
@@ -35,7 +35,7 @@ local ips = {}
 
 local i
 for i=1,#arg do
-	local val = arg[i]
+    local val = arg[i]
     if val == "-h" or val == "-help" then
         help()
     elseif not type_str then
@@ -100,83 +100,83 @@ end
 
 -- convert all ip addresses to bytestrings
 for _,ip_str in pairs(ip_strs) do
-	print("trying: " .. ip_str)
-	local ip = wirefmt.pton_v6(ip_str)
-	if not ip then
-		ip = wirefmt.pton_v4(ip_str)
-		if not ip then
-			print("Invalid IP address: " .. ip_str)
-			print("Aborting")
-			os.exit(1)
-		end
-	end
-	table.insert(ips, ip)
+    print("trying: " .. ip_str)
+    local ip = wirefmt.pton_v6(ip_str)
+    if not ip then
+        ip = wirefmt.pton_v4(ip_str)
+        if not ip then
+            print("Invalid IP address: " .. ip_str)
+            print("Aborting")
+            os.exit(1)
+        end
+    end
+    table.insert(ips, ip)
 end
 
 -- sends command to the config port of the spin kernel module
 -- returns list of response lines, or (nil, error)
 function send_command(cmd, ip)
     local response_lines = {}
-	local fd = netlink.connect_config()
-	local msg_str = ""
-	msg_str = msg_str .. string.char(cmd)
-	if ip then
-		if string.len(ip) == 4 then
-			msg_str = msg_str .. string.char(posix.AF_INET) .. ip
-		else
-			msg_str = msg_str .. string.char(posix.AF_INET6) .. ip
-		end
-	end
-	local hdr_str = netlink.create_netlink_header(msg_str, 0, 0, 0, netlink.get_process_id())
-	
-	posix.send(fd, hdr_str .. msg_str);
+    local fd = netlink.connect_config()
+    local msg_str = ""
+    msg_str = msg_str .. string.char(cmd)
+    if ip then
+        if string.len(ip) == 4 then
+            msg_str = msg_str .. string.char(posix.AF_INET) .. ip
+        else
+            msg_str = msg_str .. string.char(posix.AF_INET6) .. ip
+        end
+    end
+    local hdr_str = netlink.create_netlink_header(msg_str, 0, 0, 0, netlink.get_process_id())
+    
+    posix.send(fd, hdr_str .. msg_str);
 
-	while true do
-		local response, err = netlink.read_netlink_message(fd)
-		if response == nil then
-		    print("Error sending command to kernel module: " .. err)
-		    return nil, err
-		end
-		local response_type = string.byte(string.sub(response, 1, 1))
-		if response_type == netlink.spin_config_command_types.SPIN_CMD_IP then
-		    local family = string.byte(string.sub(response, 2, 2))
-		    local ip_str
-		    if family == posix.AF_INET then
-		        ip_str = wirefmt.ntop_v4(string.sub(response, 3, 6))
-		    elseif family == posix.AF_INET6 then
-		        ip_str = wirefmt.ntop_v6(string.sub(response, 3, 18))
-		    else
-		        print("Bad inet family: " .. family)
-		    end
-		    table.insert(response_lines, ip_str)
-		elseif response_type == netlink.spin_config_command_types.SPIN_CMD_END then
-			-- all good, done
-			break
-		elseif response_type == netlink.spin_config_command_types.SPIN_CMD_ERR then
-		    return nil, "error from kernel module: " .. string.sub(response, 2)
-		else
-		    return nil, "Unknown response command type from kernel module: " .. response_type
-		end
-	end
-	return response_lines
+    while true do
+        local response, err = netlink.read_netlink_message(fd)
+        if response == nil then
+            print("Error sending command to kernel module: " .. err)
+            return nil, err
+        end
+        local response_type = string.byte(string.sub(response, 1, 1))
+        if response_type == netlink.spin_config_command_types.SPIN_CMD_IP then
+            local family = string.byte(string.sub(response, 2, 2))
+            local ip_str
+            if family == posix.AF_INET then
+                ip_str = wirefmt.ntop_v4(string.sub(response, 3, 6))
+            elseif family == posix.AF_INET6 then
+                ip_str = wirefmt.ntop_v6(string.sub(response, 3, 18))
+            else
+                print("Bad inet family: " .. family)
+            end
+            table.insert(response_lines, ip_str)
+        elseif response_type == netlink.spin_config_command_types.SPIN_CMD_END then
+            -- all good, done
+            break
+        elseif response_type == netlink.spin_config_command_types.SPIN_CMD_ERR then
+            return nil, "error from kernel module: " .. string.sub(response, 2)
+        else
+            return nil, "Unknown response command type from kernel module: " .. response_type
+        end
+    end
+    return response_lines
 end
 
 -- now send the command
 if #ips > 0 then
-	for _,ip in pairs(ips) do
-		local response_lines, err = netlink.send_cfg_command(cmd, ip)
-		if response_lines then
-			for _,line in pairs(response_lines) do
-			    print(line)
-			end
-		end
-	end
+    for _,ip in pairs(ips) do
+        local response_lines, err = netlink.send_cfg_command(cmd, ip)
+        if response_lines then
+            for _,line in pairs(response_lines) do
+                print(line)
+            end
+        end
+    end
 else
     local response_lines, err = netlink.send_cfg_command(cmd)
-	if response_lines then
-		for _,line in pairs(response_lines) do
-			print(line)
-		end
-	end
+    if response_lines then
+        for _,line in pairs(response_lines) do
+            print(line)
+        end
+    end
 end
 
