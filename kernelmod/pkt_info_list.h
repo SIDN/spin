@@ -5,6 +5,7 @@
 #include <linux/kernel.h>
 
 #include "pkt_info.h"
+#include "spin_util.h"
 
 // stores a collection of packet infos
 typedef struct {
@@ -13,8 +14,6 @@ typedef struct {
     unsigned int max_size;
     uint32_t timestamp;
 } pkt_info_list_t;
-
-
 
 // Creates a new pkt_info_list structure of the given size
 pkt_info_list_t* pkt_info_list_create(unsigned int size);
