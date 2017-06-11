@@ -1,6 +1,6 @@
 
 obj-m := spin.o
-spin-objs := spin_kmod.o messaging.o pkt_info.o spin_util.o spin_cfg.o
+spin-objs := spin_kmod.o messaging.o pkt_info.o pkt_info_list.o spin_util.o spin_cfg.o
 
 KERNELPATH=@KERNELPATH@
 

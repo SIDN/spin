@@ -15,7 +15,6 @@
 #include <linux/tcp.h>
 #include <linux/inet.h>
 #include <linux/ip.h>
-#include <linux/kernel.h>
 
 #else
 
@@ -93,6 +92,5 @@ message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src);
 void dns_pktinfo_msg2wire(unsigned char* dest, dns_pkt_info_t* pkt_info);
 void wire2dnspktinfo(dns_pkt_info_t* pkt_info, unsigned char* src);
 void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t max_len);
-
 
 #endif // SPIN_PKT_INFO

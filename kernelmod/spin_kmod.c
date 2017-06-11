@@ -14,12 +14,12 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/inet.h>
-#include <linux/kernel.h>
 
 #include <linux/errno.h>
 
 #include "messaging.h"
 #include "pkt_info.h"
+#include "pkt_info_list.h"
 #include "spin_util.h"
 #include "spin_cfg.h"
 
@@ -51,6 +51,10 @@ ip_store_t* except_ips;
 struct sock *traffic_nl_sk = NULL;
 struct sock *config_nl_sk = NULL;
 uint32_t client_port_id = 0;
+
+// storage of pkt_infos so we do not have to send every single packet
+// (this should solve a lot when we have large streams)
+pkt_info_list_t* pkt_info_list = NULL;
 
 #define NETLINK_CONFIG_PORT 30
 #define NETLINK_TRAFFIC_PORT 31
@@ -421,6 +425,10 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     }
 }
 
+void add_pkt_info(pkt_info_t* pkt_info) {
+    send_pkt_info(SPIN_TRAFFIC_DATA, pkt_info);
+}
+
 NF_CALLBACK(hook_func_new, skb)
 {
     pkt_info_t pkt_info;
@@ -447,7 +455,8 @@ NF_CALLBACK(hook_func_new, skb)
         if (pkt_info.src_port == 53) {
             handle_dns_answer(&pkt_info, skb);
         }
-        send_pkt_info(SPIN_TRAFFIC_DATA, &pkt_info);
+        add_pkt_info(&pkt_info);
+        //send_pkt_info(SPIN_TRAFFIC_DATA, &pkt_info);
     } else {
         if (pres < 0) {
             printk("packet not parsed\n");
@@ -743,6 +752,8 @@ void add_default_test_ips(void) {
 //Called when module loaded using 'insmod'
 int init_module()
 {
+    pkt_info_list = pkt_info_list_create(1024);
+    
     init_netfilter();
 
     printk(KERN_INFO "SPIN module loaded\n");
@@ -782,6 +793,7 @@ int init_module()
 //Called when module unloaded using 'rmmod'
 void cleanup_module()
 {
+    pkt_info_list_destroy(pkt_info_list);
     close_netfilter();
     printk(KERN_INFO "SPIN module signing off!\n");
     nf_unregister_hook(&nfho1);                     //cleanup – unregister hook
