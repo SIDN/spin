@@ -1,5 +1,5 @@
-//var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
-var client = new Paho.MQTT.Client("127.0.0.1", 1884, "clientId");
+var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
+//var client = new Paho.MQTT.Client("127.0.0.1", 1884, "clientId");
 
 function init() {
     initGraphs();
