@@ -139,8 +139,10 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
             return 1;
         }
     /* ignore some protocols */
+    // TODO: de-capsulate encapsulated ipv6?
     } else if (ip_header->protocol != 1 &&
-               ip_header->protocol != 2
+               ip_header->protocol != 2 &&
+               ip_header->protocol != 41
               ) {
         printk("[XX] unsupported IPv4 protocol: %u\n", ip_header->protocol);
         return -1;
