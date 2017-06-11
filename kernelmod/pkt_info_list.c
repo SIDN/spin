@@ -53,10 +53,6 @@ void pkt_info_list_clear(pkt_info_list_t* pkt_info_list, uint32_t timestamp) {
     pkt_info_list->timestamp = timestamp;
 }
 
-static inline int pkt_info_equal(pkt_info_t* a, pkt_info_t* b) {
-    return false;
-}
-
 void pkt_info_list_add(pkt_info_list_t* pkt_info_list, pkt_info_t* pkt_info) {
     unsigned int i;
     pkt_info_t* cur_pkt_info = NULL;
@@ -68,9 +64,11 @@ void pkt_info_list_add(pkt_info_list_t* pkt_info_list, pkt_info_t* pkt_info) {
         }
     }
     if (cur_pkt_info == NULL) {
+        //printk("[XX] new pkt_info at ts %u (size %u)\n", pkt_info_list->timestamp, pkt_info->payload_size);
         cur_pkt_info = pkt_info_list_getnew(pkt_info_list);
         memcpy(cur_pkt_info, pkt_info, sizeof(pkt_info_t));
     } else {
+        //printk("[XX] add size %u to existing\n", pkt_info->payload_size);
         cur_pkt_info->payload_size += pkt_info->payload_size;
     }
 }

@@ -37,7 +37,8 @@ typedef enum {
 } message_type_t;
 
 
-// note: all values are stored in network order
+// Note: when changing this structure, check pkt_info_equals,
+// which assumes all equality data is in the first 38 bytes
 typedef struct packet_info {
 	uint8_t family; // 4, 6, etc
 	uint8_t protocol; // value for tcp/udp/icmp/etc.
@@ -79,6 +80,10 @@ void pktinfo2str(unsigned char* dest, pkt_info_t* pkt_info, size_t max_len);
 // writes packet info data to target in wire format
 // target must have pktinfo_wire_size() bytes available
 void pktinfo2wire(unsigned char* dest, pkt_info_t* pkt_info);
+
+// returns true if the packets are considered equal
+// (same family, protocol, addresses and ports)
+int pkt_info_equal(pkt_info_t* a, pkt_info_t* b);
 
 // writes full packet info message (header + pktinfo)
 // target must have pktinfo_msg_size() bytes available

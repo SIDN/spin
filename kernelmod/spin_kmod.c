@@ -14,6 +14,7 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/inet.h>
+#include <linux/time.h>
 
 #include <linux/errno.h>
 
@@ -426,7 +427,18 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 }
 
 void add_pkt_info(pkt_info_t* pkt_info) {
-    send_pkt_info(SPIN_TRAFFIC_DATA, pkt_info);
+    
+    struct timeval tv;
+    unsigned int i;
+    do_gettimeofday(&tv);
+    if (!pkt_info_list_check_timestamp(pkt_info_list, tv.tv_sec)) {
+        // send all and clear
+        for (i = 0; i < pkt_info_list->cur_size; i++) {
+            send_pkt_info(SPIN_TRAFFIC_DATA, pkt_info_list->pkt_infos[i]);
+        }
+        pkt_info_list_clear(pkt_info_list, tv.tv_sec);
+    }
+    pkt_info_list_add(pkt_info_list, pkt_info);
 }
 
 NF_CALLBACK(hook_func_new, skb)
