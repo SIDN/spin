@@ -43,13 +43,6 @@ end
 -- data sequence (as a string)
 -- (type, flags, seq and pid are ignored for now)
 function _M.read_netlink_message(sock_fd)
-  -- read size first (it's in system endianness)
-  --local ss = posix.recv(sock_fd, 2)
-  --print("[XX] byte 1: " .. string.byte(ss,1))
-  --print("[XX] byte 2: " .. string.byte(ss,2))
-  --local size = wirefmt.bytes_to_int16_littleendian(string.byte(ss,1), string.byte(ss,2))
-  --print("[XX] RECV SIZE: " .. size)
-  --local nlh, err, errno = posix.recv(sock_fd, size-2)
   local nlh, err, errno = posix.recv(sock_fd, 1024)
   --nlh = ss .. nlh
   --wirefmt.hexdump(nlh)
@@ -57,7 +50,7 @@ function _M.read_netlink_message(sock_fd)
       print(err)
       return nil, err, errno
   end
-  print("[XX] received " .. string.len(nlh) .. " bytes of data. Counter: " .. xx_recv_counter)
+  --print("[XX] received " .. string.len(nlh) .. " bytes of data. Counter: " .. xx_recv_counter)
   xx_recv_counter = xx_recv_counter + 1
   local nl_size = wirefmt.bytes_to_int32_systemendian(nlh:byte(1,4))
   local nl_type = wirefmt.bytes_to_int16_systemendian(nlh:byte(5,6))

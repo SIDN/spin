@@ -23,6 +23,7 @@ end
 
 function Aggregator:add_flow(from_ip, to_ip, count, size)
   local from = arp:get_hw_address(from_ip)
+  --print("[XX] GET FROM HW ADDR: '" .. from_ip .."'")
   if not from then
     from = from_ip
   end

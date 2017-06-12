@@ -376,6 +376,7 @@ end
 function handle_dns_message(dns_pkt_info)
     -- TODO TTL and timestamp
     timestamp = os.time()
+    --print("[XX] DNS INFO PACKET: " .. dns_pkt_info.dname .. " (eop)")
     update = dnscache.dnscache:add(dns_pkt_info.ip, dns_pkt_info.dname, timestamp)
     if update then
         -- update the node cache, and publish if it changed

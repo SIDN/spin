@@ -1,4 +1,5 @@
 
+local wirefmt = require "wirefmt"
 local util = {}
 
 --
@@ -36,7 +37,8 @@ function parse_ip_neigh_output(s)
   local result = {}
   for l in s do
     local tokens = util:line_to_tokens(l)
-    result[tokens[1]] = tokens[5]
+    -- normalize the ip address
+    result[wirefmt.ntop(wirefmt.pton(tokens[1]))] = tokens[5]
   end
   return result
 end

@@ -157,6 +157,15 @@ function _M.ntop_v6(bytestring)
   return strjoin(":", parts2)
 end
 
+function _M.ntop(bytestring)
+  if bytestring == nil then return nil end
+  if string.len(bytestring) == 16 then
+    return _M.ntop_v6(bytestring)
+  else
+    return _M.ntop_v4(bytestring)
+  end
+end
+
 function _M.old_ntop_v6(bytestring)
   return string.format("%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x", bytestring:byte(1,16))
 end
