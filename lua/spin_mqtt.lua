@@ -1,7 +1,6 @@
 #!/usr/bin/lua
 
 local mqtt = require 'mosquitto'
-local lnflog = require 'lua-spin_nflog'
 local bit = require 'bit'
 local json = require 'json'
 local dnscache = require 'dns_cache'
@@ -221,9 +220,6 @@ end
 -- dns-related things
 --
 
-
---vprint(lnflog.sin(lnflog.pi))
-
 function print_array(arr)
     vwrite("0:   ")
     for i,x in pairs(arr) do
@@ -303,10 +299,7 @@ local function publish_traffic(msg)
     f.from = node_cache:get_by_id(f.from)
     f.to = node_cache:get_by_id(f.to)
   end
-  print("[XX] Publish traffic data: " .. json.encode(o))
-  --print("[XX] NEW TRAF MSG")
-  --print(json.encode(o))
-  --print("[XX] END NEW TRAF MSG")
+  --print("[XX] Publish traffic data: " .. json.encode(o))
   client:publish(TRAFFIC_CHANNEL, json.encode(o))
 end
 
@@ -470,7 +463,7 @@ if posix.AF_NETLINK ~= nil then
     local fd, err = netlink.connect_traffic()
     msg_str = "Hello!"
     hdr_str = netlink.create_netlink_header(msg_str, 0, 0, 0, netlink.get_process_id())
-    
+
     posix.send(fd, hdr_str .. msg_str);
 
     while true do
@@ -481,18 +474,17 @@ if posix.AF_NETLINK ~= nil then
                 --netlink.print_message(spin_msg)
                 handle_spin_message(spin_msg);
             else
-                print("[XX] err from read_netlink_message: " .. err .. " errno: " .. errno)
                 if (errno == 105) then
                   -- try again
                 else
-                    fd = netlink.connect()
+                    posix.close(fd)
+                    fd = netlink.connect_traffic()
                 end
             end
         end
-        client:loop()
+        client:loop(10)
     end
 else
     print("no posix.AF_NETLINK, can't connect to kernel module, aborting")
     os.exit(1)
 end
-

@@ -17,12 +17,14 @@ local _M = {}
 local NETLINK_TRAFFIC_PORT = 31
 local NETLINK_CONFIG_PORT = 30
 
+local xx_recv_counter = 0
+
 _M.MAX_NL_MSG_SIZE = 1024
 
 --
 -- Netlink functions
 --
-function _M.create_netlink_header(payload, 
+function _M.create_netlink_header(payload,
                                type,
                                flags,
                                sequence,
@@ -50,12 +52,13 @@ function _M.read_netlink_message(sock_fd)
   --local nlh, err, errno = posix.recv(sock_fd, size-2)
   local nlh, err, errno = posix.recv(sock_fd, 1024)
   --nlh = ss .. nlh
-  --print("[XX] received data")
   --wirefmt.hexdump(nlh)
   if nlh == nil then
       print(err)
       return nil, err, errno
   end
+  print("[XX] received " .. string.len(nlh) .. " bytes of data. Counter: " .. xx_recv_counter)
+  xx_recv_counter = xx_recv_counter + 1
   local nl_size = wirefmt.bytes_to_int32_systemendian(nlh:byte(1,4))
   local nl_type = wirefmt.bytes_to_int16_systemendian(nlh:byte(5,6))
   local nl_flags = wirefmt.bytes_to_int16_systemendian(nlh:byte(7,8))
@@ -184,7 +187,7 @@ function _M.read_dns_pkt_info(data)
     end
     dns_pkt_info.ttl = wirefmt.bytes_to_int32_bigendian(data:byte(18, 21))
     local dname_size = data:byte(22)
-    dns_pkt_info.dname = data:sub(23, 23 + dname_size - 1)
+    dns_pkt_info.dname = data:sub(23, 23 + dname_size - 2)
     return dns_pkt_info
 end
 
@@ -235,7 +238,7 @@ function _M.connect_traffic()
 
     local ok, err = posix.bind(fd, { family = posix.AF_NETLINK,
                                      pid = 0,
-                                     groups = 0 }) 
+                                     groups = 0 })
     assert(ok, err)
     if (not ok) then
         print("error")
@@ -250,7 +253,7 @@ function _M.connect_config()
 
     local ok, err = posix.bind(fd, { family = posix.AF_NETLINK,
                                      pid = 0,
-                                     groups = 0 }) 
+                                     groups = 0 })
     assert(ok, err)
     if (not ok) then
         print("error")
@@ -283,7 +286,7 @@ function _M.send_cfg_command(cmd, ip)
         end
     end
     local hdr_str = _M.create_netlink_header(msg_str, 0, 0, 0, _M.get_process_id())
-    
+
     posix.send(fd, hdr_str .. msg_str);
 
     while true do

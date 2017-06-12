@@ -53,6 +53,8 @@ struct sock *traffic_nl_sk = NULL;
 struct sock *config_nl_sk = NULL;
 uint32_t client_port_id = 0;
 
+uint32_t xx_send_counter = 0;
+
 // storage of pkt_infos so we do not have to send every single packet
 // (this should solve a lot when we have large streams)
 pkt_info_list_t* pkt_info_list = NULL;
@@ -67,7 +69,15 @@ void log_packet(pkt_info_t* pkt_info) {
 }
 
 int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
+    uint8_t* b;
     ipv6_header = (struct ipv6hdr *)ipv6_hdr(sock_buff);
+
+    // hard-code a number of things to ignore; such as broadcasts (for now)
+    b = (uint8_t*)(&ipv6_header->daddr);
+    if (*b == 255) {
+        return -1;
+    }
+
     if (ipv6_header->nexthdr == 17) {
         udp_header = (struct udphdr *)skb_transport_header(sock_buff);
         pkt_info->src_port = ntohs(udp_header->source);
@@ -115,9 +125,18 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 // 1: zero-size packet, structure not filled
 // -1: error
 int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
+    uint8_t* b;
     ip_header = (struct iphdr *)skb_network_header(sock_buff);
     if (ip_header->version == 6) {
         return parse_ipv6_packet(sockbuff, pkt_info);
+    }
+
+    // hard-code a number of things to ignore; such as broadcasts (for now)
+    b = (uint8_t*)(&ip_header->daddr);
+    if (*b == 255 ||
+        *b == 224 ||
+        *b == 239) {
+        return -1;
     }
 
     if (ip_header->protocol == 17) {
@@ -186,11 +205,12 @@ int send_netlink_message(int msg_size, void* msg_data, uint32_t client_port_id) 
         return -255;
     }
 
-    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, 0);
+    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, NLM_F_ACK);
     NETLINK_CB(skb_out).dst_group = 0;
 
     memcpy(nlmsg_data(nlh), msg_data, msg_size);
 
+    //printk("[XX] Sending %u bytes of data to client. Counter: %u\n", msg_size, xx_send_counter++);
     return nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
 }
 
@@ -205,7 +225,7 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
     if (client_port_id == 0) {
         return;
     }
-    
+
     // Check ignore list
     if (ip_store_contains_ip(ignore_ips, pkt_info->src_addr) ||
         ip_store_contains_ip(ignore_ips, pkt_info->dest_addr)) {
@@ -213,12 +233,12 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
     }
 
     msg_size = pktinfo_msg_size();
-    
+
     if (msg_size > PACKET_SIZE) {
         printk("message too large, skipping\n");
         return;
     }
-    
+
     pktinfo_msg2wire(type, data, pkt_info);
 
     res = send_netlink_message(msg_size, data, client_port_id);
@@ -231,6 +251,7 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
             // perhaps use ack on all?...
             //res = send_netlink_message(msg_size, data, client_port_id);
             //printk("attempt %d result: %d\n", i, res);
+            client_port_id = 0;
         } else {
             // assume client is gone
             client_port_id = 0;
@@ -429,7 +450,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 }
 
 void add_pkt_info(pkt_info_t* pkt_info) {
-    
+
     struct timeval tv;
     unsigned int i;
     do_gettimeofday(&tv);
@@ -472,7 +493,7 @@ NF_CALLBACK(hook_func_new, skb)
         add_pkt_info(&pkt_info);
         //send_pkt_info(SPIN_TRAFFIC_DATA, &pkt_info);
     } else {
-        if (pres < 0) {
+        if (pres < -1) {
             printk("packet not parsed\n");
         }
     }
@@ -767,11 +788,12 @@ void add_default_test_ips(void) {
 int init_module()
 {
     pkt_info_list = pkt_info_list_create(1024);
-    
+
     init_netfilter();
 
     printk(KERN_INFO "SPIN module loaded\n");
 
+/*
     nfho1.hook = hook_func_new;
     nfho1.hooknum = NF_INET_PRE_ROUTING;
     nfho1.pf = PF_INET;
@@ -795,11 +817,37 @@ int init_module()
     nfho4.pf = PF_INET6;
     nfho4.priority = NF_IP_PRI_FIRST;
     nf_register_hook(&nfho4);
+*/
+
+    nfho1.hook = hook_func_new;
+    nfho1.hooknum = NF_INET_LOCAL_OUT;
+    nfho1.pf = PF_INET;
+    nfho1.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho1);
+
+    nfho2.hook = hook_func_new;
+    nfho2.hooknum = NF_INET_FORWARD;
+    nfho2.pf = PF_INET;
+    nfho2.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho2);
+
+    nfho3.hook = hook_func_new;
+    nfho3.hooknum = NF_INET_LOCAL_OUT;
+    nfho3.pf = PF_INET6;
+    nfho3.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho3);
+
+    nfho4.hook = hook_func_new;
+    nfho4.hooknum = NF_INET_FORWARD;
+    nfho4.pf = PF_INET6;
+    nfho4.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho4);
+
+
 
     ignore_ips = ip_store_create();
     block_ips = ip_store_create();
     except_ips = ip_store_create();
-    add_default_test_ips();
 
     return 0;
 }
