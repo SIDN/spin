@@ -14,6 +14,69 @@ This is a prototype of the SPIN platform.
 [History]
 
 
+
+[Compilation]
+
+The SPIN prototype is meant to be run on an OpenWRT device, but can also be compiled and run on a Linux system.
+
+[[On (Linux) PC]]
+
+Build dependencies:
+
+- gcc
+- make
+- autoconf
+- libnfnetlink-dev
+- linux-headers-<version>
+
+    apt-get install gcc make autoconf libnfnetlink-dev
+
+Library dependencies:
+
+- libnfnetlink0
+
+    apt-get install libnfnetlink0
+
+Lua dependencies (for client tooling and message broker):
+
+- libmosquitto-dev
+- lua 5.1 (and luarocks for easy install of libs below)
+- lua-mosquitto
+- lua-posix
+- luabitop
+- luaposix
+
+    apt-get install libmosquitto-dev
+    luarocks install mosquitto lua-bitop luaposix
+
+
+Runtime dependencies:
+- mosquitto (for spin_mqtt.lua)
+
+
+Run in the source dir:
+    autoreconf --install
+    ./configure
+    make
+
+After this step is complete, the following files are available:
+- kernelmod/spin.ko
+A loadable linux kernel module
+- src/spin_print
+A test tool that prints messages sent by the kernel module
+- src/spin_config
+A simple configuration tool for the kernel module (note: there is a lua version that has more features)
+
+The lua/ directory has a number of lua tools and programs:
+- spin_mqtt.lua
+This is the main SPIN daemon; it reads data from the kernel module and passes it on to the topic SPIN/traffic on the message broker running on localhost
+- spin_config.lua
+A config tool similar to the C version in src/, but has a few more features.
+- spin_print.lua
+A print test tool similar to the C version in src/.
+
+
+-----
 The software contains three parts
 
 - a collector that reads conntrack output (through a named pipe) and aggregates it. It serves the aggregated data on a websocket

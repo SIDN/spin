@@ -14,12 +14,6 @@ dnl Checks for programs.
 AC_PROG_MAKE_SET
 AC_PROG_CC
 AC_PROG_INSTALL
-AC_DISABLE_STATIC
-AC_PROG_LIBTOOL
-
-#dnl Checks for libraries.
-#AC_SEARCH_LIBS([dlopen], [dl], [libdl_LIBS="$LIBS"; LIBS=""])
-#AC_SUBST([libdl_LIBS])
 
 dnl Checks for header files.
 AC_HEADER_DIRENT
@@ -41,18 +35,7 @@ AC_SUBST([regular_CFLAGS])
 
 dnl Check for the right nfnetlink version
 PKG_CHECK_MODULES([libnfnetlink], [libnfnetlink >= 1.0.1])
-PKG_CHECK_MODULES([libnetfilter_log], [libnetfilter_log >= 1.0.0])
 
-AX_PROG_LUA(5.1)
-AX_LUA_HEADERS([], AC_MSG_ERROR([Lua headers not found]))
-AX_LUA_LIBS([], AC_MSG_ERROR([Lua library not found]))
-
-#AC_CHECK_HEADER(lua.h, , AC_MSG_ERROR([can not find lua.h; try --with-lua* arguments]))
-#AC_CHECK_LIB([lua], [lua_pushnumber],
-#	[lua_LIBS="-llua"],
-#	AC_ERROR([Misssing Lua dev library]))
-
-# check for ldns
 AC_ARG_WITH(linux-headers,
 	AC_HELP_STRING([--with-linux-headers=PATH      specify path of linux headers]),
 	[ AC_SUBST(KERNELPATH, "$withval") ]
