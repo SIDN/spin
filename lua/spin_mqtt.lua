@@ -7,7 +7,6 @@ local dnscache = require 'dns_cache'
 local arp = require 'arp'
 local nc = require 'node_cache'
 local aggregator = require 'collect'
-local firewall = require 'spin_firewall'
 local filter = require 'filter'
 
 local signal = require 'posix.signal'

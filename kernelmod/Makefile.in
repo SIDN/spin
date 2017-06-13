@@ -11,7 +11,7 @@ endif
 
 all: default
 
-default: client spin_config module
+default: module
 
 module: spin_kmod.c messaging.c pkt_info.c spin_util.c spin_cfg.c
 	$(MAKE) V=s -C $(KERNELPATH) M=$(PWD) modules
@@ -21,15 +21,3 @@ distclean: clean
 clean:
 	rm -rf *.o *.ko *.mod.* *.cmd .module* modules* Module* .*.cmd .tmp*
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
-
-# the pkt_info contains a few shared pkt_info format functions
-# jump a small hoop here to keep that code in one file
-#client: pkt_info_client.o client.c
-#	gcc client.c pkt_info_client.o -o client
-
-#spin_config: spin_config.c spin_cfg.h
-#	gcc spin_config.c -o spin_config
-
-#pkt_info_client.o: pkt_info.c
-#	gcc -c pkt_info.c -o pkt_info_client.o
-

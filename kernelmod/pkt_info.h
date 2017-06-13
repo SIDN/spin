@@ -95,7 +95,7 @@ void pktinfo_msg2wire(message_type_t type, unsigned char* dest, pkt_info_t* pkt_
 message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src);
 
 void dns_pktinfo_msg2wire(unsigned char* dest, dns_pkt_info_t* pkt_info);
-void wire2dnspktinfo(dns_pkt_info_t* pkt_info, unsigned char* src);
 void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t max_len);
+message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, unsigned char* src);
 
 #endif // SPIN_PKT_INFO

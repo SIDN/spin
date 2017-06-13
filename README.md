@@ -1,20 +1,27 @@
 
-This is an early prototype of the SPIN platform.
+This is a prototype of the SPIN platform.
 
-As of right now, it consists of two very basic modules:
+[what is SPIN]
+
+[High-level technical overview]
+
+[Compilation]
+
+   [general]
+   [Computer]
+   [for openwrt device]
+
+[History]
+
+
+The software contains three parts
+
 - a collector that reads conntrack output (through a named pipe) and aggregates it. It serves the aggregated data on a websocket
 - a few html pages to process that data
 
 
 Prerequisites:
 Software:
-- conntrack binary
-- luaposix
-- luasec
-- luabitop
-- lua-coxpcall
-- lua-copas
-- lua-socket
 
 Kernel modules:
 - nf_conntrack
