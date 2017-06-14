@@ -553,7 +553,7 @@ void send_config_response(int port_id, config_command_t cmd, size_t msg_size, vo
 
     memcpy(nlmsg_data(nlh) + 2, msg_src, msg_size);
 
-    hexdump_k(nlmsg_data(nlh), 0, msg_size + 2);
+    //hexdump_k(nlmsg_data(nlh), 0, msg_size + 2);
     //hexdump_k(skb_out->data, 0, msg_size + 1 + 16);
 
     res = nlmsg_unicast(config_nl_sk, skb_out, port_id);
@@ -629,7 +629,8 @@ static void config_client_connect(struct sk_buff *skb) {
 
     /* pid of sending process */
     pid = nlh->nlmsg_pid;
-    printk(KERN_INFO "Client (pid %u) connected to config port\n", pid);
+    //printk(KERN_INFO "Client (pid %u) connected to config port\n", pid);
+
     cmdbuf = (uint8_t*) NLMSG_DATA(nlh);
     if (skb->len < 1) {
         //printk(KERN_INFO "got command of size 0\n");

@@ -19,7 +19,7 @@ typedef enum {
 	// commands from kernelmod to client
 	SPIN_CMD_IP = 100,
 	SPIN_CMD_END = 200,
-	SPIN_CMD_ERR = 400
+	SPIN_CMD_ERR = 250
 } config_command_t;
 
 void config_test(void);

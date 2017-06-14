@@ -37,6 +37,7 @@ typedef enum {
 int send_command(size_t cmdbuf_size, unsigned char* cmdbuf)
 {
 	config_command_t cmd;
+	uint8_t version;
 	
     sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_CONFIG_PORT);
     if(sock_fd<0) {
@@ -51,18 +52,22 @@ int send_command(size_t cmdbuf_size, unsigned char* cmdbuf)
     bind(sock_fd, (struct sockaddr*)&src_addr, sizeof(src_addr));
 
     memset(&dest_addr, 0, sizeof(dest_addr));
-    memset(&dest_addr, 0, sizeof(dest_addr));
     dest_addr.nl_family = AF_NETLINK;
     dest_addr.nl_pid = 0; /* For Linux Kernel */
     dest_addr.nl_groups = 0; /* unicast */
 
+/*
     nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_PAYLOAD));
     memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
     nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
+*/
+    nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(cmdbuf_size));
+    memset(nlh, 0, NLMSG_SPACE(cmdbuf_size));
+    nlh->nlmsg_len = NLMSG_SPACE(cmdbuf_size);
+
     nlh->nlmsg_pid = getpid();
     nlh->nlmsg_flags = 0;
 
-    //strcpy(NLMSG_DATA(nlh), "Hello!");
     memcpy(NLMSG_DATA(nlh), cmdbuf, cmdbuf_size);
 
     iov.iov_base = (void *)nlh;
@@ -80,7 +85,12 @@ int send_command(size_t cmdbuf_size, unsigned char* cmdbuf)
     // Last message should always be SPIN_CMD_END with no data
     while (1) {
 		recvmsg(sock_fd, &msg, 0);
-		cmd = ((uint8_t*)NLMSG_DATA(nlh))[0];
+		version = ((uint8_t*)NLMSG_DATA(nlh))[0];
+		if (version != 1) {
+			printf("protocol mismatch from kernel module: got %u, expected %u\n", version, SPIN_NETLINK_PROTOCOL_VERSION);
+			break;
+		}
+		cmd = ((uint8_t*)NLMSG_DATA(nlh))[1];
 		
 		if (cmd == SPIN_CMD_END) {
 			break;
@@ -88,15 +98,18 @@ int send_command(size_t cmdbuf_size, unsigned char* cmdbuf)
 			//printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
 			pkt_info_t pkt;
 			char err_str[MAX_PAYLOAD];
-			strncpy(err_str, (char *)NLMSG_DATA(nlh) + 1, MAX_PAYLOAD);
+			strncpy(err_str, (char *)NLMSG_DATA(nlh) + 2, MAX_PAYLOAD);
 			printf("Error message from kernel: %s\n", err_str);
 		} else if (cmd == SPIN_CMD_IP) {
 			// TODO: check message size
 			// first octet is ip version (AF_INET or AF_INET6)
-			uint8_t ipv = ((uint8_t*)NLMSG_DATA(nlh))[1];
+			uint8_t ipv = ((uint8_t*)NLMSG_DATA(nlh))[2];
 			unsigned char ip_str[INET6_ADDRSTRLEN];
-			inet_ntop(ipv, NLMSG_DATA(nlh) + 2, ip_str, INET6_ADDRSTRLEN);
+			inet_ntop(ipv, NLMSG_DATA(nlh) + 3, ip_str, INET6_ADDRSTRLEN);
 			printf("%s\n", ip_str);
+		} else if (cmd == SPIN_CMD_ERR) {
+			printf("Error response from kernel\n");
+			break;
 		} else {
 			printf("unknown command response type received from kernel, stopping\n");
 			break;
@@ -121,83 +134,86 @@ void help(int rcode) {
 }
 
 void execute_no_arg(cmd_types_t type, cmd_t cmd) {
-	unsigned char cmdbuf[1];
+	unsigned char cmdbuf[2];
+	cmdbuf[0] = SPIN_NETLINK_PROTOCOL_VERSION;
 	switch (type) {
 	case IGNORE:
 		switch (cmd) {
 		case SHOW:
-			cmdbuf[0] = SPIN_CMD_GET_IGNORE;
+			cmdbuf[1] = SPIN_CMD_GET_IGNORE;
 			break;
 		case CLEAR:
-			cmdbuf[0] = SPIN_CMD_CLEAR_IGNORE;
+			cmdbuf[1] = SPIN_CMD_CLEAR_IGNORE;
 			break;
 		}
 		break;
 	case BLOCK:
 		switch (cmd) {
 		case SHOW:
-			cmdbuf[0] = SPIN_CMD_GET_BLOCK;
+			cmdbuf[1] = SPIN_CMD_GET_BLOCK;
 			break;
 		case CLEAR:
-			cmdbuf[0] = SPIN_CMD_CLEAR_BLOCK;
+			cmdbuf[1] = SPIN_CMD_CLEAR_BLOCK;
 			break;
 		}
 		break;
 	case EXCEPT:
 		switch (cmd) {
 		case SHOW:
-			cmdbuf[0] = SPIN_CMD_GET_EXCEPT;
+			cmdbuf[1] = SPIN_CMD_GET_EXCEPT;
 			break;
 		case CLEAR:
-			cmdbuf[0] = SPIN_CMD_CLEAR_EXCEPT;
+			cmdbuf[1] = SPIN_CMD_CLEAR_EXCEPT;
 			break;
 		}
 		break;
 	}
-	send_command(1, cmdbuf);
+	send_command(2, cmdbuf);
 }
 
 void execute_arg(cmd_types_t type, cmd_t cmd, const char* ip_str) {
-	unsigned char cmdbuf[18];
-	size_t cmdsize = 18;
+	unsigned char cmdbuf[19];
+	size_t cmdsize = 19;
+
+	cmdbuf[0] = SPIN_NETLINK_PROTOCOL_VERSION;
 
 	switch (type) {
 	case IGNORE:
 		switch (cmd) {
 		case ADD:
-			cmdbuf[0] = SPIN_CMD_ADD_IGNORE;
+			cmdbuf[1] = SPIN_CMD_ADD_IGNORE;
 			break;
 		case REMOVE:
-			cmdbuf[0] = SPIN_CMD_REMOVE_IGNORE;
+			cmdbuf[1] = SPIN_CMD_REMOVE_IGNORE;
 			break;
 		}
 		break;
 	case BLOCK:
 		switch (cmd) {
 		case ADD:
-			cmdbuf[0] = SPIN_CMD_ADD_BLOCK;
+			cmdbuf[1] = SPIN_CMD_ADD_BLOCK;
 			break;
 		case REMOVE:
-			cmdbuf[0] = SPIN_CMD_REMOVE_BLOCK;
+			cmdbuf[1] = SPIN_CMD_REMOVE_BLOCK;
 			break;
 		}
 		break;
 	case EXCEPT:
 		switch (cmd) {
 		case ADD:
-			cmdbuf[0] = SPIN_CMD_ADD_EXCEPT;
+			cmdbuf[1] = SPIN_CMD_ADD_EXCEPT;
 			break;
 		case REMOVE:
-			cmdbuf[0] = SPIN_CMD_REMOVE_EXCEPT;
+			cmdbuf[1] = SPIN_CMD_REMOVE_EXCEPT;
 			break;
 		}
 	}
 
 	if (inet_pton(AF_INET6, ip_str, cmdbuf+2) == 1) {
-		cmdbuf[1] = AF_INET6;
+		cmdbuf[2] = AF_INET6;
 	} else if (inet_pton(AF_INET, ip_str, cmdbuf+2) == 1) {
-		cmdbuf[1] = AF_INET;
-		cmdsize = 6;
+		cmdbuf[2] = AF_INET;
+		cmdsize = 7;
 	}
 
 	send_command(cmdsize, cmdbuf);
