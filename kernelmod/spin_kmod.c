@@ -636,17 +636,21 @@ static void config_client_connect(struct sk_buff *skb) {
         snprintf(error_msg, 1024, "empty command");
         send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
     } else {
-        cmd = cmdbuf[0];
+        if (cmdbuf[0] != SPIN_NETLINK_PROTOCOL_VERSION) {
+            printk(KERN_ERR, "Bad protocol version from client: %u\n", cmdbuf[0]);
+            return;
+        }
+        cmd = cmdbuf[1];
         //printk("Got command %u\n", cmd);
         switch (cmd) {
         case SPIN_CMD_GET_IGNORE:
             ip_store_for_each(ignore_ips, send_config_response_ip_list_callback, &pid);
             break;
         case SPIN_CMD_ADD_IGNORE:
-            cmd_add_ip(cmdbuf+1, ignore_ips);
+            cmd_add_ip(cmdbuf+2, ignore_ips);
             break;
         case SPIN_CMD_REMOVE_IGNORE:
-            cmd_remove_ip(cmdbuf+1, ignore_ips);
+            cmd_remove_ip(cmdbuf+2, ignore_ips);
             break;
         case SPIN_CMD_CLEAR_IGNORE:
             ip_store_destroy(ignore_ips);
@@ -656,10 +660,10 @@ static void config_client_connect(struct sk_buff *skb) {
             ip_store_for_each(block_ips, send_config_response_ip_list_callback, &pid);
             break;
         case SPIN_CMD_ADD_BLOCK:
-            cmd_add_ip(cmdbuf+1, block_ips);
+            cmd_add_ip(cmdbuf+2, block_ips);
             break;
         case SPIN_CMD_REMOVE_BLOCK:
-            cmd_remove_ip(cmdbuf+1, block_ips);
+            cmd_remove_ip(cmdbuf+2, block_ips);
             break;
         case SPIN_CMD_CLEAR_BLOCK:
             ip_store_destroy(block_ips);
@@ -669,10 +673,10 @@ static void config_client_connect(struct sk_buff *skb) {
             ip_store_for_each(except_ips, send_config_response_ip_list_callback, &pid);
             break;
         case SPIN_CMD_ADD_EXCEPT:
-            cmd_add_ip(cmdbuf+1, except_ips);
+            cmd_add_ip(cmdbuf+2, except_ips);
             break;
         case SPIN_CMD_REMOVE_EXCEPT:
-            cmd_remove_ip(cmdbuf+1, except_ips);
+            cmd_remove_ip(cmdbuf+2, except_ips);
             break;
         case SPIN_CMD_CLEAR_EXCEPT:
             ip_store_destroy(except_ips);

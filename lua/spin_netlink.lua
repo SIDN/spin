@@ -273,7 +273,7 @@ end
 function _M.send_cfg_command(cmd, ip)
     local response_lines = {}
     local fd = _M.connect_config()
-    local msg_str = ""
+    local msg_str = string.char(SPIN_NETLINK_PROTOCOL_VERSION)
     msg_str = msg_str .. string.char(cmd)
     if ip then
         if string.len(ip) == 4 then
