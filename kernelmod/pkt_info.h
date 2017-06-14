@@ -30,10 +30,13 @@
 #include <netinet/in.h>
 #endif // __KERNEL
 
+#define SPIN_NETLINK_PROTOCOL_VERSION 1
+
 typedef enum {
 	SPIN_TRAFFIC_DATA = 1,
 	SPIN_DNS_ANSWER = 2,
-	SPIN_BLOCKED = 3
+	SPIN_BLOCKED = 3,
+	SPIN_ERR_BADVERSION = 250
 } message_type_t;
 
 
@@ -47,7 +50,9 @@ typedef struct packet_info {
 	uint16_t src_port;
 	uint16_t dest_port;
 	uint32_t payload_size;
-	uint16_t payload_offset;
+	uint16_t packet_count; // amount of packets for this set of
+	                       // fam, proto, source, dest, and ports
+	uint16_t payload_offset; // only relevant if packet_count == 1
 } pkt_info_t;
 
 // note: all values are stored in network order

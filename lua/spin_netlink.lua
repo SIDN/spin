@@ -4,7 +4,7 @@
 -- this modules allows applications to exchange data
 -- with the SPIN kernel module
 --
--- see <todo> for information about the data exchange
+-- see README.md for information about the data exchange
 -- protocol
 
 
@@ -14,10 +14,10 @@ local wirefmt = require "wirefmt"
 
 local _M = {}
 
-local NETLINK_TRAFFIC_PORT = 31
-local NETLINK_CONFIG_PORT = 30
+local SPIN_NETLINK_PROTOCOL_VERSION = 1
 
-local xx_recv_counter = 0
+local NETLINK_CONFIG_PORT = 30
+local NETLINK_TRAFFIC_PORT = 31
 
 _M.MAX_NL_MSG_SIZE = 1024
 
@@ -50,8 +50,7 @@ function _M.read_netlink_message(sock_fd)
       print(err)
       return nil, err, errno
   end
-  --print("[XX] received " .. string.len(nlh) .. " bytes of data. Counter: " .. xx_recv_counter)
-  xx_recv_counter = xx_recv_counter + 1
+  -- netlink headers
   local nl_size = wirefmt.bytes_to_int32_systemendian(nlh:byte(1,4))
   local nl_type = wirefmt.bytes_to_int16_systemendian(nlh:byte(5,6))
   local nl_flags = wirefmt.bytes_to_int16_systemendian(nlh:byte(7,8))
@@ -68,7 +67,8 @@ end
 _M.spin_message_types = {
     SPIN_TRAFFIC_DATA = 1,
     SPIN_DNS_ANSWER = 2,
-    SPIN_BLOCKED = 3
+    SPIN_BLOCKED = 3,
+    SPIN_ERR_BADVERSION = 250
 }
 
 _M.spin_config_command_types = {
@@ -186,14 +186,18 @@ end
 
 -- returns 3-tuple: msg_type, msg_size, [dns_]pkt_info
 function _M.parse_message(data)
-    local msg_type = data:byte(1)
-    local msg_size = wirefmt.bytes_to_int16_bigendian(data:byte(2,3))
+    local msg_protocol_version = data:byte(1)
+    if msg_protocol_version ~= SPIN_NETLINK_PROTOCOL_VERSION
+        return nil, nil, nil, "Kernel protocol version mismatch"
+    end
+    local msg_type = data:byte(2)
+    local msg_size = wirefmt.bytes_to_int16_bigendian(data:byte(3,4))
     if msg_type == _M.spin_message_types.SPIN_TRAFFIC_DATA then
-        return msg_type, msg_size, _M.read_spin_pkt_info(data:sub(4))
+        return msg_type, msg_size, _M.read_spin_pkt_info(data:sub(5))
     elseif msg_type == _M.spin_message_types.SPIN_DNS_ANSWER then
-        return msg_type, msg_size, _M.read_dns_pkt_info(data:sub(4))
+        return msg_type, msg_size, _M.read_dns_pkt_info(data:sub(5))
     elseif msg_type == _M.spin_message_types.SPIN_BLOCKED then
-        return msg_type, msg_size, _M.read_spin_pkt_info(data:sub(4))
+        return msg_type, msg_size, _M.read_spin_pkt_info(data:sub(5))
     else
         return msg_type, msg_size, nil, "unknown spin message type: " .. msg_type
     end
@@ -288,14 +292,18 @@ function _M.send_cfg_command(cmd, ip)
             print("Error sending command to kernel module: " .. err)
             return nil, err
         end
-        local response_type = string.byte(string.sub(response, 1, 1))
+        local response_version = string.byte(string.sub(response, 1, 1))
+        if response_version ~= SPIN_NETLINK_PROTOCOL_VERSION then
+            return nil, "Kernel protocol version mismatch"
+        end
+        local response_type = string.byte(string.sub(response, 2, 2))
         if response_type == _M.spin_config_command_types.SPIN_CMD_IP then
-            local family = string.byte(string.sub(response, 2, 2))
+            local family = string.byte(string.sub(response, 3, 3))
             local ip_str
             if family == posix.AF_INET then
-                ip_str = wirefmt.ntop_v4(string.sub(response, 3, 6))
+                ip_str = wirefmt.ntop_v4(string.sub(response, 4, 7))
             elseif family == posix.AF_INET6 then
-                ip_str = wirefmt.ntop_v6(string.sub(response, 3, 18))
+                ip_str = wirefmt.ntop_v6(string.sub(response, 4, 19))
             else
                 print("Bad inet family: " .. family)
             end

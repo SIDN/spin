@@ -132,12 +132,16 @@ int pkt_info_equal(pkt_info_t* a, pkt_info_t* b) {
 }
 
 void pktinfo_msg2wire(message_type_t type, unsigned char* dest, pkt_info_t* pkt_info) {
+    dest[0] = (uint8_t) SPIN_NETLINK_PROTOCOL_VERSION;
+    dest += 1;
+
     //printf("Write message of type %u size %u\n", SPIN_TRAFFIC_DATA
     // write message type first
     dest[0] = (uint8_t) type;
     dest += 1;
 
     // write the size of the full message
+    // TODO: do we need this?
     write_int16(dest, pktinfo_wire_size());
     dest += 2;
 
@@ -149,6 +153,10 @@ message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src) {
     message_type_t msg_type;
     uint16_t msg_size;
 
+    if (src[0] != SPIN_NETLINK_PROTOCOL_VERSION) {
+        return SPIN_ERR_BADVERSION;
+    }
+    src++;
     msg_type = src[0];
     if (msg_type == SPIN_TRAFFIC_DATA || msg_type == SPIN_BLOCKED) {
         src++;
@@ -192,6 +200,9 @@ void dns_pktinfo2wire(unsigned char* dest, dns_pkt_info_t* dns_pkt_info) {
 void dns_pktinfo_msg2wire(unsigned char* dest, dns_pkt_info_t* dns_pkt_info) {
     uint16_t msg_size;
 
+    dest[0] = SPIN_NETLINK_PROTOCOL_VERSION;
+    dest += 1;
+
     dest[0] = SPIN_DNS_ANSWER;
     dest += 1;
     // spread this out into functions too?
@@ -207,6 +218,10 @@ message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, unsigned char* src
     message_type_t msg_type;
     uint16_t msg_size;
     uint8_t dname_size;
+
+    if (src[0] != SPIN_NETLINK_PROTOCOL_VERSION) {
+        return SPIN_ERR_BADVERSION;
+    }
 
     msg_type = src[0];
     if (msg_type == SPIN_DNS_ANSWER) {

@@ -3,17 +3,7 @@ This is a prototype of the SPIN platform.
 
 [what is SPIN]
 
-[High-level technical overview]
-
-[Compilation]
-
-   [general]
-   [Computer]
-   [for openwrt device]
-
-[History]
-
-
+TODO
 
 [Compilation]
 
@@ -76,34 +66,43 @@ A config tool similar to the C version in src/, but has a few more features.
 A print test tool similar to the C version in src/.
 
 
------
-The software contains three parts
+[[For OpenWRT]]
 
-- a collector that reads conntrack output (through a named pipe) and aggregates it. It serves the aggregated data on a websocket
-- a few html pages to process that data
+If you have a build environment for OpenWRT (see https://wiki.openwrt.org/doc/howto/build), you can add the following feed to the feeds.conf file:
+src-git sidn https://github.com/SIDN/sidn_openwrt_pkgs
 
+After running scripts/feeds update and scripts/feeds install, you can select the spin package in menuconfig under Network->SIDN->spin.
 
-Prerequisites:
-Software:
+Running make package/spin/compile and make package/spin install will result in a spin-<version>.ipk file in bin/<architecture>.
 
-Kernel modules:
-- nf_conntrack
-- nf_conntrack_ipv4
-- nf_conntrack_ipv6
-
-(not right now, but soon we'll need _acct as well, by setting
-the sysctl setting net.netfilter.nf_conntrack_acct to 1)
+This package has an extra file in addition to the ones described in the
+previous section: a startup script /etc/init.d/spin; this script will
+load the kernel module and start the spin_mqtt.lua daemon.
 
 
-Running:
 
-make sure conntrack has output (try sudo conntrack -E for a bit)
-run ./test_server.sh
-This creates a named pipe, starts conntrack (will ask for sudo password), and start the websocket server.
-Then open html/print.html in a browser to see data is getting through.
-For the visual representation, open html/graph.html.
+[High-level technical overview]
 
-# Notes:
-For the DNS output, we need a logging rule NFLOG (group 1 atm); on openwrt
-we add these lines to /etc/firewall.user:
-iptables -I OUTPUT -p udp --source-port 53 -j NFLOG --nflog-group 1
+The software contains three parts:
+
+- a kernel module collector that reads packet traffic data
+- a user-space daemon that aggregates that data, sends it to an mqtt broker, and controls the kernel module
+- a html/javascript front-end for the user
+
+The kernel module
+
+[Data protocols]
+
+[[kernel to userspace]]
+
+The kernel module users netlink to talk to the user-space daemon. It
+opens 2 ports: 30 for configuration commands, and 31 to send network
+information traffic to.
+
+This is the description of protocol version 1
+
+[[Configuration commands]]
+Configuration commands are of the form
+
+
++-----
