@@ -105,4 +105,75 @@ This is the description of protocol version 1
 Configuration commands are of the form
 
 
-+-----
+                                    1  1  1  1  1  1
+      0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |   PROTOCOL VERSION    |       COMMAND         |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |       ARG TYPE        |                       |
+    |--+--+--+--+--+--+--+--+                       |
+    |                                               |
+    /                                               /
+    /                  ARG DATA                     /
+    /                                               /
+    /                                               /
+    |                                               |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
+The PROTOCOL VERSION value is 1.
+
+COMMAND is one of:
+
+* SPIN_CMD_GET_IGNORE = 1
+* SPIN_CMD_ADD_IGNORE = 2
+* SPIN_CMD_REMOVE_IGNORE = 3
+* SPIN_CMD_CLEAR_IGNORE = 4
+* SPIN_CMD_GET_BLOCK = 5
+* SPIN_CMD_ADD_BLOCK = 6
+* SPIN_CMD_REMOVE_BLOCK = 7
+* SPIN_CMD_CLEAR_BLOCK = 8
+* SPIN_CMD_GET_EXCEPT = 9
+* SPIN_CMD_ADD_EXCEPT = 10
+* SPIN_CMD_REMOVE_EXCEPT = 11
+* SPIN_CMD_CLEAR_EXCEPT = 12
+
+Each command either retrieves, adds to, remove from, or clears one of
+the three internal lists (ignore, block or except).
+
+Currently, ARG_TYPE is either AF_INET or AF_INET6, and depending on
+that, ARG DATA is either 4 or 16 bytes of data.
+
+
+[[Configuration response]]
+
+                                    1  1  1  1  1  1
+      0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |   PROTOCOL VERSION    |       RESPONSE        |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    |                                               |
+    |                                               |
+    |                                               |
+    /                                               /
+    /                  ARG DATA                     /
+    /                                               /
+    /                                               /
+    |                                               |
+    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
+The PROTOCOL VERSION value is 1.
+
+RESPONSE is one of:
+* SPIN_CMD_IP = 100
+* SPIN_CMD_END = 200
+* SPIN_CMD_ERR = 250
+
+ARG DATA depends on the RESPONSE value:
+In the case of SPIN_CMD_IP, ARG DATA will contain one byte with the value of either AF_INET or AF_INET6 , followed by 4 or 16 bytes of address data.
+In the case of SPIN_CMD_END there is no argument data (this signals the transmission is over).
+In the case of SPIN_CMD_ERR, ARG DATA will be a string with an error message.
+
+Currently, ARG_TYPE is either AF_INET or AF_INET6, and depending on
+that, ARG DATA is either 4 or 16 bytes of data.
+
+[[traffic message]]
