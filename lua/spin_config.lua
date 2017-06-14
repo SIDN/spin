@@ -185,6 +185,8 @@ if #ips > 0 then
             for _,line in pairs(response_lines) do
                 print(line)
             end
+        else
+            print(err)
         end
     end
 else
@@ -193,6 +195,8 @@ else
         for _,line in pairs(response_lines) do
             print(line)
         end
+    else
+        print(err)
     end
 end
 

@@ -187,7 +187,7 @@ end
 -- returns 3-tuple: msg_type, msg_size, [dns_]pkt_info
 function _M.parse_message(data)
     local msg_protocol_version = data:byte(1)
-    if msg_protocol_version ~= SPIN_NETLINK_PROTOCOL_VERSION
+    if msg_protocol_version ~= SPIN_NETLINK_PROTOCOL_VERSION then
         return nil, nil, nil, "Kernel protocol version mismatch"
     end
     local msg_type = data:byte(2)
@@ -294,7 +294,7 @@ function _M.send_cfg_command(cmd, ip)
         end
         local response_version = string.byte(string.sub(response, 1, 1))
         if response_version ~= SPIN_NETLINK_PROTOCOL_VERSION then
-            return nil, "Kernel protocol version mismatch"
+            return nil, "Kernel protocol version mismatch (expected " .. SPIN_NETLINK_PROTOCOL_VERSION .. " got: " .. response_version
         end
         local response_type = string.byte(string.sub(response, 2, 2))
         if response_type == _M.spin_config_command_types.SPIN_CMD_IP then

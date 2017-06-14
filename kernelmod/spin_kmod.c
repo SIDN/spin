@@ -537,23 +537,23 @@ void send_config_response(int port_id, config_command_t cmd, size_t msg_size, vo
     struct sk_buff *skb_out;
     int res;
 
-    skb_out = nlmsg_new(msg_size + 1, 0);
+    skb_out = nlmsg_new(msg_size + 2, 0);
 
     if (!skb_out) {
         printk(KERN_ERR "Failed to allocate new skb\n");
         return;
     }
 
-    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size + 1, 0);
+    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size + 2, 0);
 
     /* not in mcast group */
     NETLINK_CB(skb_out).dst_group = 0;
-    *((uint8_t*)nlmsg_data(nlh)) = (uint8_t)cmd;
+    *((uint8_t*)nlmsg_data(nlh)) = (uint8_t)SPIN_NETLINK_PROTOCOL_VERSION;
+    *((uint8_t*)nlmsg_data(nlh) + 1) = (uint8_t)cmd;
 
-    //memcpy(nlmsg_data(nlh), (uint8_t*)&cmd, 1);
-    memcpy(nlmsg_data(nlh) + 1, msg_src, msg_size);
+    memcpy(nlmsg_data(nlh) + 2, msg_src, msg_size);
 
-    //hexdump_k(nlmsg_data(nlh), 0, msg_size + 1);
+    hexdump_k(nlmsg_data(nlh), 0, msg_size + 2);
     //hexdump_k(skb_out->data, 0, msg_size + 1 + 16);
 
     res = nlmsg_unicast(config_nl_sk, skb_out, port_id);
@@ -637,7 +637,7 @@ static void config_client_connect(struct sk_buff *skb) {
         send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
     } else {
         if (cmdbuf[0] != SPIN_NETLINK_PROTOCOL_VERSION) {
-            printk(KERN_ERR, "Bad protocol version from client: %u\n", cmdbuf[0]);
+            printk(KERN_ERR "Bad protocol version from client: %u\n", cmdbuf[0]);
             return;
         }
         cmd = cmdbuf[1];

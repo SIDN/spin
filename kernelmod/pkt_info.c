@@ -2,8 +2,8 @@
 #include "pkt_info.h"
 
 size_t pktinfo_msg_size() {
-    // msg size (2 octets), message type (1 octet), data
-    return pktinfo_wire_size() + 3;
+    // version (1 octet), msg size (2 octets), message type (1 octet), data
+    return pktinfo_wire_size() + 4;
 }
 
 size_t dns_pktinfo_msg_size() {
@@ -12,7 +12,7 @@ size_t dns_pktinfo_msg_size() {
 }
 
 size_t pktinfo_wire_size() {
-    return 44;
+    return 45;
 }
 
 size_t dns_pktinfo_wire_size() {
