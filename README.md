@@ -30,13 +30,13 @@ Build dependencies:
 - libnfnetlink-dev
 - linux-headers-<version>
 
-    apt-get install gcc make autoconf libnfnetlink-dev
+    `apt-get install gcc make autoconf libnfnetlink-dev`
 
 Library dependencies:
 
 - libnfnetlink0
 
-    apt-get install libnfnetlink0
+    `apt-get install libnfnetlink0`
 
 Lua dependencies (for client tooling and message broker):
 
@@ -47,8 +47,8 @@ Lua dependencies (for client tooling and message broker):
 - luabitop
 - luaposix
 
-    apt-get install libmosquitto-dev
-    luarocks install mosquitto lua-bitop luaposix
+    `apt-get install libmosquitto-dev`
+    `luarocks install mosquitto lua-bitop luaposix`
 
 
 Runtime dependencies:
@@ -56,9 +56,12 @@ Runtime dependencies:
 
 
 Run in the source dir:
+
+```
     autoreconf --install
     ./configure
     make
+```
 
 After this step is complete, the following files are available:
 - kernelmod/spin.ko
