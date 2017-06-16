@@ -3,6 +3,7 @@
 --
 
 local util = require 'util'
+local wirefmt = require 'wirefmt'
 
 local arp = {}
 
@@ -11,6 +12,8 @@ local arp = {}
 
 function arp:get_hw_address(ip_address)
   -- load if not loaded, or if ip is not in currently loaded table
+  -- normalize the ip address
+  ip_address = wirefmt.ntop(wirefmt.pton(ip_address))
   if not arp.arptable or not arp.arptable[ip_address] then
     arp.arptable = util:get_arp_table()
   end

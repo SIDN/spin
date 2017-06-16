@@ -1,4 +1,5 @@
 
+local wirefmt = require "wirefmt"
 local util = {}
 
 --
@@ -36,7 +37,8 @@ function parse_ip_neigh_output(s)
   local result = {}
   for l in s do
     local tokens = util:line_to_tokens(l)
-    result[tokens[1]] = tokens[5]
+    -- normalize the ip address
+    result[wirefmt.ntop(wirefmt.pton(tokens[1]))] = tokens[5]
   end
   return result
 end
@@ -52,9 +54,8 @@ end
 -- returns nil if file not found
 function util:read_dhcp_config_hosts(filename)
   local result = {}
-  print("[XX] OPEN FILE: " .. filename)
   local f = io.open(filename, "r")
-  if not f then return nil end
+  if not f then return result end
   s = f:read("*all")
   f:close()
   -- err, we probably need a somewhat decent parser here; the order is not fixed

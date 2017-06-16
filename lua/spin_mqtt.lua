@@ -1,26 +1,23 @@
 #!/usr/bin/lua
 
 local mqtt = require 'mosquitto'
-local lnflog = require 'lua-spin_nflog'
 local bit = require 'bit'
 local json = require 'json'
 local dnscache = require 'dns_cache'
 local arp = require 'arp'
 local nc = require 'node_cache'
--- tmp: treat DNS traffic as actual traffic
 local aggregator = require 'collect'
-local firewall = require 'spin_firewall'
 local filter = require 'filter'
 
 local signal = require 'posix.signal'
+local posix = require 'posix'
+local netlink = require 'spin_netlink'
+local wirefmt = require 'wirefmt'
 
+-- load the 'spin_userdata.cfg' containing user-set names
 filter:load(true)
 
 local verbose = true
---
--- A simple DNS cache for answered queries
---
-
 --
 -- mqtt-related things
 --
@@ -34,7 +31,13 @@ node_cache:set_filter_tool(filter)
 
 function vprint(msg)
     if verbose then
-        print("[SPIN/DNS] " .. msg)
+        print("[SPIN/mqtt] " .. msg)
+    end
+end
+
+function vwrite(msg)
+    if verbose then
+        io.write(msg)
     end
 end
 
@@ -85,6 +88,14 @@ function create_filter_list_command()
   local update  = {}
   update ["command"] = "filters"
   update ["argument"] = ""
+  update ["result"] = netlink.send_cfg_command(netlink.spin_config_command_types.SPIN_CMD_GET_IGNORE)
+  return update
+end
+
+function old_create_filter_list_command()
+  local update  = {}
+  update ["command"] = "filters"
+  update ["argument"] = ""
   update ["result"] = filter:get_filter_list()
   return update
 end
@@ -102,23 +113,38 @@ function add_filters_for_node(node_id)
   if not node then return end
   filter:load()
   for _,ip in pairs(node.ips) do
-    filter:add_filter(ip)
+      filter:add_filter(ip)
   end
   filter:save()
 end
 
-function remove_filters_for_node(node_id)
+function remove_filters_for_ip(ip)
+    filter:load()
+    filter:remove_filter(ip)
+    filter:save()
+end
+
+function add_block_for_node(node_id)
   local node = node_cache:get_by_id(node_id)
   if not node then return end
   filter:load()
   for _,ip in pairs(node.ips) do
-    filter:remove_filter(ip)
+    filter:add_block(ip)
+  end
+  filter:save()
+end
+
+function remove_block_for_node(node_id)
+  local node = node_cache:get_by_id(node_id)
+  if not node then return end
+  filter:load()
+  for _,ip in pairs(node.ips) do
+    filter:remove_block(ip)
   end
   filter:save()
 end
 
 function add_name_for_node(node_id, name)
-
   local node = node_cache:get_by_id(node_id)
   if not node then return end
   filter:load()
@@ -136,7 +162,6 @@ function handle_command(command, argument)
   local response = {}
   response["command"] = command
   response["argument"] = argument
-
   if (command == "ip2hostname") then
     local ip = argument
     --local names = get_dnames_from_cache(ip)
@@ -154,14 +179,13 @@ function handle_command(command, argument)
     -- don't send direct response, but send a 'new list' update
     response = create_filter_list_command()
   elseif (command == "remove_filter") then
-    filter:load()
-    filter:remove_filter(argument)
-    filter:save()
+    remove_filters_for_ip(argument)
     -- don't send direct response, but send a 'new list' update
     response = create_filter_list_command()
   elseif (command == "reset_filters") then
     filter:remove_all_filters()
     filter:add_own_ips()
+    filter:apply_current_to_kernel()
     filter:save()
     response = create_filter_list_command()
   elseif (command == "get_names") then
@@ -176,46 +200,9 @@ function handle_command(command, argument)
     publish_node_update(node)
     response = nil
   elseif command == "blockdata" then
-    -- add block to iptables
-    response = nil
-    local fw = firewall.SpinFW_create(false)
-    local fw6 = firewall.SpinFW_create(true)
-    fw:read()
-    fw6:read()
-    local node = node_cache:get_by_id(argument)
-    if node then
-      for _,ip in pairs(node.ips) do
-        print("[XX] ADDING BLOCK FOR IP: " .. ip)
-        if is_ipv6_ip(ip) then
-          print("[XX] IS IPV6")
-          fw6:add_block_ip(ip)
-        else
-          print("[XX] IS ipv4")
-          fw:add_block_ip(ip)
-        end
-      end
-      fw:commit()
-      fw6:commit()
-    end
+    add_block_for_node(argument)
   elseif command == "stopblockdata" then
-    -- remove block from iptables
-    response = nil
-    local fw = firewall.SpinFW_create(false)
-    local fw6 = firewall.SpinFW_create(true)
-    fw:read()
-    fw6:read()
-    local node = node_cache:get_by_id(argument)
-    if node then
-      for _,ip in pairs(node.ips) do
-        if is_ipv6_ip(ip) then
-          fw6:remove_block_ip(ip)
-        else
-          fw:remove_block_ip(ip)
-        end
-      end
-      fw:commit()
-      fw6:commit()
-    end
+    remove_block_for_node(argument)
   elseif command == "allowdata" then
     -- add allow to iptables
   elseif command == "stopallowdata" then
@@ -237,9 +224,6 @@ end
 --
 -- dns-related things
 --
-
-
---vprint(lnflog.sin(lnflog.pi))
 
 function print_array(arr)
     vwrite("0:   ")
@@ -315,16 +299,12 @@ function my_cb(mydata, event)
 end
 
 local function publish_traffic(msg)
-  print("[XX] Publish traffic data: " .. msg)
   local o = json.decode(msg)
   for _,f in pairs(o.result.flows) do
     f.from = node_cache:get_by_id(f.from)
     f.to = node_cache:get_by_id(f.to)
   end
-  print("[XX] NEW TRAF MSG")
-  print(json.encode(o))
-  print("[XX] END NEW TRAF MSG")
-  --client:publish(TRAFFIC_CHANNEL, msg)
+  --print("[XX] Publish traffic data: " .. json.encode(o))
   client:publish(TRAFFIC_CHANNEL, json.encode(o))
 end
 
@@ -355,33 +335,6 @@ function print_dns_cb(mydata, event)
     end
 end
 
-function print_blocked_cb(mydata, event)
-  from_node, new = node_cache:add_ip(event:get_src_addr())
-  if new then
-    -- publish it to the traffic channel
-    publish_node_update(from_node)
-  end
-
-  to_node, new = node_cache:add_ip(event:get_dst_addr())
-  if new then
-    -- publish it to the traffic channel
-    publish_node_update(to_node)
-  end
-
-  -- put internal nodes as the source
-  if to_node.mac then
-    from_node, to_node = to_node, from_node
-  end
-
-  msg = { command = "blocked", argument = "", result = {
-              timestamp = event:get_timestamp(),
-              from = from_node.id,
-              to = to_node.id
-          }
-        }
-  client:publish(TRAFFIC_CHANNEL, json.encode(msg))
-end
-
 function publish_node_update(node)
   if node == nil then
     error("nil node")
@@ -397,22 +350,19 @@ function publish_node_update(node)
 end
 
 function print_traffic_cb(mydata, event)
-  --print("[XX] " .. event:get_timestamp() .. " " .. event:get_payload_size() .. " bytes " .. event:get_src_addr() .. " -> " .. event:get_dst_addr())
-  -- Find the node-id's of the IP addresses
-  local filter_list = filter:get_filter_table()
-  if (filter_list[event:get_src_addr()] or filter_list[event:get_dst_addr()]) then
-    -- filtered out, skip
-    return
-  end
+  -- TODO remove
+end
 
+function handle_traffic_message(pkt_info)
   local from_node_id, to_node_id, new
-  from_node, new = node_cache:add_ip(event:get_src_addr())
+  --print("[XX] add node " .. pkt_info.src_addr)
+  from_node, new = node_cache:add_ip(pkt_info.src_addr)
   if new then
     -- publish it to the traffic channel
     publish_node_update(from_node)
   end
 
-  to_node, new = node_cache:add_ip(event:get_dst_addr())
+  to_node, new = node_cache:add_ip(pkt_info.dest_addr)
   if new then
     -- publish it to the traffic channel
     publish_node_update(to_node)
@@ -423,7 +373,65 @@ function print_traffic_cb(mydata, event)
     from_node, to_node = to_node, from_node
   end
 
-  add_flow(event:get_timestamp(), from_node.id, to_node.id, 1, event:get_payload_size(), publish_traffic, filter:get_filter_table())
+  -- timestamp now for not
+  local timestamp = os.time()
+  add_flow(timestamp, from_node.id, to_node.id, 1, pkt_info.payload_size, publish_traffic, filter:get_filter_table())
+end
+
+function handle_dns_message(dns_pkt_info)
+    -- TODO TTL and timestamp
+    timestamp = os.time()
+    --print("[XX] DNS INFO PACKET: " .. dns_pkt_info.dname .. " (eop)")
+    update = dnscache.dnscache:add(dns_pkt_info.ip, dns_pkt_info.dname, timestamp)
+    if update then
+        -- update the node cache, and publish if it changed
+        local updated_node = node_cache:add_domain_to_ip(dns_pkt_info.ip, dns_pkt_info.dname)
+        if updated_node then publish_node_update(updated_node) end
+    end
+end
+
+function handle_blocked_message(pkt_info)
+    from_node, new = node_cache:add_ip(pkt_info.src_addr)
+    if new then
+      -- publish it to the traffic channel
+      publish_node_update(from_node)
+    end
+
+    to_node, new = node_cache:add_ip(pkt_info.dest_addr)
+    if new then
+        -- publish it to the traffic channel
+        publish_node_update(to_node)
+    end
+
+    -- put internal nodes as the source
+    if to_node.mac then
+        from_node, to_node = to_node, from_node
+    end
+
+    -- todo: timestamp
+    local timestamp = os.time()
+    msg = { command = "blocked", argument = "", result = {
+              timestamp = timestamp,
+              from = from_node,
+              to = to_node
+            }
+          }
+    client:publish(TRAFFIC_CHANNEL, json.encode(msg))
+end
+
+function handle_spin_message(spin_msg)
+    -- filter list handled by kernel module now
+      msg_type, msg_size, pkt_info, err = netlink.parse_message(spin_msg)
+    if msg_type == netlink.spin_message_types.SPIN_TRAFFIC_DATA then
+      handle_traffic_message(pkt_info)
+    elseif msg_type == netlink.spin_message_types.SPIN_DNS_ANSWER then
+      handle_dns_message(pkt_info)
+    elseif msg_type == netlink.spin_message_types.SPIN_BLOCKED then
+      handle_blocked_message(pkt_info)
+    else
+      print("unknown spin message type: " .. msg_type)
+      return
+    end
 end
 
 function shutdown()
@@ -452,21 +460,37 @@ signal.signal(signal.SIGKILL, function(signum)
 end)
 
 
-vprint("SPIN experimental DNS capture tool")
+vprint("SPIN mqtt daemon")
 broker = arg[1] -- defaults to "localhost" if arg not set
-traffic = lnflog.setup_netlogger_loop(771, print_traffic_cb, mydata, 0.1)
-dns = lnflog.setup_netlogger_loop(772, print_dns_cb, mydata, 0.1)
-blocked = lnflog.setup_netlogger_loop(773, print_blocked_cb, nil, 0.05)
-vprint("Connecting to broker")
 client:connect(broker)
-vprint("Starting listen loop")
-while true do
-    dns:loop(10)
-    traffic:loop(40)
-    blocked:loop(1)
-    client:loop()
-    -- clean data older than 15 minutes
-    local clean_before = os.time() - 900
-    node_cache:clean(clean_before)
-    dnscache.dnscache:clean(clean_before)
+vprint("connected")
+
+if posix.AF_NETLINK ~= nil then
+    local fd, err = netlink.connect_traffic()
+    msg_str = "Hello!"
+    hdr_str = netlink.create_netlink_header(msg_str, 0, 0, 0, netlink.get_process_id())
+
+    posix.send(fd, hdr_str .. msg_str);
+
+    while true do
+        if posix.rpoll(fd, 10) > 0 then
+            local spin_msg, err, errno = netlink.read_netlink_message(fd)
+            if spin_msg then
+                --hexdump(spin_msg)
+                --netlink.print_message(spin_msg)
+                handle_spin_message(spin_msg);
+            else
+                if (errno == 105) then
+                  -- try again
+                else
+                    posix.close(fd)
+                    fd = netlink.connect_traffic()
+                end
+            end
+        end
+        client:loop(10)
+    end
+else
+    print("no posix.AF_NETLINK, can't connect to kernel module, aborting")
+    os.exit(1)
 end
