@@ -1,9 +1,6 @@
 
 This is a prototype of the SPIN platform.
 
-* auto-gen TOC:
-{:toc}
-
 # What is SPIN
 
 SPIN stands for Security and Privacy for In-home Networks, it is a
