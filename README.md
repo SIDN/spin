@@ -94,6 +94,27 @@ previous section: a startup script /etc/init.d/spin; this script will
 load the kernel module and start the spin_mqtt.lua daemon.
 
 
+# Running SPIN
+
+(NOTE: in the current version, the IP address of the router/server is
+hardcoded to be 192.168.8.1; this is also the address used in this
+example. We are working on deriving this address automatically, or at
+the very least make it a configuration option).
+
+When the OpenWRT package is installed, SPIN should start automatically
+after a reboot. Simply use a browser to go to
+http://192.168.8.1/www/spin/graph.html to see it in action.
+
+When installed locally, a few manual steps are required:
+
+1. Configure and start an MQTT service; this needs to listen to port 1883 (mqtt) and 1884 (websockets protocol).
+2. Load the kernel module `insmod kernelmod/spin.ko`
+3. (optional) configure the kernel module with `lua/spin_config.lua`
+4. Start the spin daemon `lua/spin_mqtt.lua`
+5. Edit `html/js/mqtt_client.js` and change the ip address on the first line to `127.0.0.1`
+6. Open `html/graph.html` in a browser
+
+
 
 # High-level technical overview
 
@@ -347,7 +368,15 @@ On the SPIN/traffic topic, commands can be one of:
 * "nodeUpdate": Updates information about nodes that were seen earlier
   (such as an additional domain name that resolved to the same IP
   address, or a new IP address that is matched to an ARP address that has
-  been seen before)
+  been seen before). See below for the format.
+* "serverRestart": Tells the client that the server has restarted and
+  it should drop its local cache of nodes. argument and result are empty.
+* "filters": result is a list of strings containing IP addresses that are
+  currently filtered (not shown) by the SPIN system.
+* "names": result is a map containing IP address -> domain name values;
+  these are user-set names.
+
+
 
 ### Traffic information
 
@@ -444,9 +473,48 @@ Here is an example of a full traffic message:
        }
     }
 
+### Node update
 
-* Traffic
-* DNS information
+A node update contains the same information as a node element from the
+previous section; it contains (additional) information about a node
+that has been seen earlier.
 
+### Node update example
+
+    {
+       "command":"nodeUpdate",
+       "argument":"",
+       "result":{
+          "id":11,
+          "lastseen":1497623925,
+          "ips":[
+             "192.0.2.1"
+          ],
+          "domains":[
+             "example.com",
+             "example.nl"
+          ]
+       }
+    }
 
 ### Configuration commands
+
+The client can send commands to the SPIN daemon on the 'SPIN/commands'
+topic. These usually have no "result" value, but often do contain an
+"argument" section.
+
+The following commands can be issued:
+
+* "get_filters": Triggers a new "filters" message to be sent to SPIN/traffic
+* "add_filter": argument is a string containing an IP address, which will be added to the list of IP addresses to be filtered.
+* "remove_filter": argument is a string containing an IP address, which will be removed from the list of IP addresses to be filtered.
+* "reset_filters": All filters are removed, and replaced by the IP addresses of the system that SPIN is running on.
+* "get_names": Triggers a new "names" message to be sent to SPIN/traffic
+* "add_name": Sets a user-set name to a node. The argument is a map containing "node_id" (int) with the ID of the node, and "name" (string) with the name to be set.
+* "blockdata": Tells the SPIN system to block all traffic from and to a node; argument is the node id (int)
+* "stopblockdata": Tells the SPIN system to stop blocking traffic to and from a node; argument is the node id (int)
+* "allowdata": Tells the SPIN system to accept all traffic from and to a node, even though this traffic would be blocked otherwise (for instance, if the traffic is from a node that was blocked); argument is the node id (int)
+* "stopallowdata": Tells the SPIN system to no longer accept all traffic from and to a node, even though this traffic would be blocked otherwise (for instance, if the traffic is from a node that was blocked); argument is the node id (int)
+
+
+
