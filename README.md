@@ -398,13 +398,13 @@ Here is an example of a full traffic message:
                       "ff02::2"
                    ],
                    "domains":[
-
+                      "www.example.nl"
                    ]
                 },
                 "from":{
-                   "mac":"b4:75:0e:15:39:9d",
+                   "mac":"e4:11:e0:1a:11:6b",
                    "ips":[
-                      "fe80::b675:eff:fe15:399d"
+                      "fe80::b123:1fa:1e15:329a"
                    ],
                    "id":9,
                    "domains":[
@@ -420,7 +420,7 @@ Here is an example of a full traffic message:
                    "id":12,
                    "lastseen":1497622512,
                    "ips":[
-                      "2001:470:1f15:17ba::53"
+                      "2001:170:2a00:11be::12"
                    ],
                    "domains":[
 
@@ -430,7 +430,7 @@ Here is an example of a full traffic message:
                    "id":11,
                    "lastseen":1497622512,
                    "ips":[
-                      "2a02:348:28:cf34::1"
+                      "2a02:249:13:ac43::1"
                    ],
                    "domains":[
 
