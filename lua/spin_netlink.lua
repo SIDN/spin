@@ -167,7 +167,7 @@ function _M.read_spin_pkt_info(data)
     end
     pkt_info.src_port = wirefmt.bytes_to_int16_bigendian(data:byte(35,36))
     pkt_info.dest_port = wirefmt.bytes_to_int16_bigendian(data:byte(37,38))
-    pkt_info.packet_count = wirefmt.bytes_to_int32_bigendian(data:byte(39,40))
+    pkt_info.packet_count = wirefmt.bytes_to_int16_bigendian(data:byte(39,40))
     pkt_info.payload_size = wirefmt.bytes_to_int32_bigendian(data:byte(41,44))
     pkt_info.payload_offset = wirefmt.bytes_to_int16_bigendian(data:byte(45,46))
     return pkt_info
