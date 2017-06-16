@@ -12,7 +12,7 @@ size_t dns_pktinfo_msg_size() {
 }
 
 size_t pktinfo_wire_size() {
-    return 45;
+    return 47;
 }
 
 size_t dns_pktinfo_wire_size() {
@@ -58,11 +58,12 @@ void pktinfo2str(unsigned char* dest, pkt_info_t* pkt_info, size_t max_len) {
     }
 
     snprintf(dest, max_len,
-             "ipv%d protocol %d %s:%u -> %s:%u %u bytes",
+             "ipv%d protocol %d %s:%u -> %s:%u %u packets %u bytes",
              pkt_info->family == AF_INET ? 4 : 6,
              pkt_info->protocol,
              sa, ntohs(pkt_info->src_port),
              da, ntohs(pkt_info->dest_port),
+             pkt_info->packet_count,
              pkt_info->payload_size);
 }
 
@@ -121,6 +122,9 @@ void pktinfo2wire(unsigned char* dest, pkt_info_t* pkt_info) {
     write_int16(dest, pkt_info->dest_port);
     dest += 2;
 
+    write_int16(dest, pkt_info->packet_count);
+    dest += 2;
+
     write_int32(dest, pkt_info->payload_size);
     dest += 4;
 
@@ -175,6 +179,8 @@ message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src) {
         pkt_info->src_port = read_int16(src);
         src += 2;
         pkt_info->dest_port = read_int16(src);
+        src += 2;
+        pkt_info->packet_count = read_int16(src);
         src += 2;
         pkt_info->payload_size = read_int32(src);
         src += 4;

@@ -24,7 +24,7 @@ void pkt_info_list_destroy(pkt_info_list_t* pkt_info_list) {
     }
     kfree(pkt_info_list->pkt_infos);
     kfree(pkt_info_list);
-    
+
 }
 
 pkt_info_t* pkt_info_list_getnew(pkt_info_list_t* pkt_info_list) {
@@ -56,7 +56,7 @@ void pkt_info_list_clear(pkt_info_list_t* pkt_info_list, uint32_t timestamp) {
 void pkt_info_list_add(pkt_info_list_t* pkt_info_list, pkt_info_t* pkt_info) {
     unsigned int i;
     pkt_info_t* cur_pkt_info = NULL;
-    
+
     for (i=0; i<pkt_info_list->cur_size; i++) {
         if (pkt_info_equal(pkt_info_list->pkt_infos[i], pkt_info)) {
             cur_pkt_info = pkt_info_list->pkt_infos[i];
@@ -69,6 +69,7 @@ void pkt_info_list_add(pkt_info_list_t* pkt_info_list, pkt_info_t* pkt_info) {
         memcpy(cur_pkt_info, pkt_info, sizeof(pkt_info_t));
     } else {
         //printk("[XX] add size %u to existing\n", pkt_info->payload_size);
+        cur_pkt_info->packet_count += 1;
         cur_pkt_info->payload_size += pkt_info->payload_size;
     }
 }

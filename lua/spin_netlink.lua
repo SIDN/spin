@@ -103,6 +103,7 @@ function _M.PktInfo_create()
   p.dest_addr = nil
   p.src_port = nil
   p.dest_port = nil
+  p.packet_count = nil
   p.payload_size = nil
   p.payload_offset = nil
   return p
@@ -123,6 +124,7 @@ function PktInfo:print()
           ":" .. self.src_port ..
           " " .. self.dest_addr ..
           ":" .. self.dest_port ..
+          " count " .. self.packet_count ..
           " size " .. self.payload_size)
 end
 
@@ -165,8 +167,9 @@ function _M.read_spin_pkt_info(data)
     end
     pkt_info.src_port = wirefmt.bytes_to_int16_bigendian(data:byte(35,36))
     pkt_info.dest_port = wirefmt.bytes_to_int16_bigendian(data:byte(37,38))
-    pkt_info.payload_size = wirefmt.bytes_to_int32_bigendian(data:byte(39,42))
-    pkt_info.payload_offset = wirefmt.bytes_to_int16_bigendian(data:byte(43,44))
+    pkt_info.packet_count = wirefmt.bytes_to_int32_bigendian(data:byte(39,40))
+    pkt_info.payload_size = wirefmt.bytes_to_int32_bigendian(data:byte(41,44))
+    pkt_info.payload_offset = wirefmt.bytes_to_int16_bigendian(data:byte(45,46))
     return pkt_info
 end
 

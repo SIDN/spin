@@ -113,6 +113,7 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     //printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
 
     // rest of basic info
+    pkt_info->packet_count = 1;
     pkt_info->family = AF_INET6;
     pkt_info->protocol = ipv6_header->nexthdr;
     memcpy(pkt_info->src_addr, &ipv6_header->saddr, 16);
@@ -172,6 +173,7 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     //printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
 
     // rest of basic info
+    pkt_info->packet_count = 1;
     pkt_info->family = AF_INET;
     pkt_info->protocol = ip_header->protocol;
     memset(pkt_info->src_addr, 0, 12);
