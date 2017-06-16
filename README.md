@@ -333,7 +333,117 @@ DOMAIN NAME is the string-representation of the domain name.
 The spin_mqtt.lua daemon will send traffic infromation to the topic
 SPIN/traffic. It will listen on the topic SPIN/commands for commands.
 
+All messages are of the format
+
+    {
+       "command": <command name (string)>,
+       "argument": <argument(s) (dynamic)>,
+       "result": <result(s) (dynamic)>
+    }
+
+On the SPIN/traffic topic, commands can be one of:
+
+* "traffic": Traffic flow information, see next section
+* "nodeUpdate": Updates information about nodes that were seen earlier
+  (such as an additional domain name that resolved to the same IP
+  address, or a new IP address that is matched to an ARP address that has
+  been seen before)
+
 ### Traffic information
+
+The 'result' section of traffic information is a map containing the
+following elements:
+
+* "timestamp": (int) timestamp of the first message seen in this time interval
+* "total_size": (int) total size of the packets seen in this time interval
+* "total_count": (int) total number of packets seen in this time interval
+* "flows": A list of flows.
+
+Each flow element is a map containing the following elements:
+
+* "size": (int) Size of the packets in this flow
+* "count": (int) Number of packets in this flow
+* "from": Information about the source of the traffic
+* "to": Information about the destination of the traffic
+
+The 'from' and 'to' elements represent more than single addresses; they
+contain all information known about the source or destination; in this
+context we call it a node. A node is represented by a map containing
+the following information:
+
+* "id": (int) internal identifier for the node
+* "lastseen": (int) timestamp of the last time this node was seen in the traffic data
+* "ips": (list of strings) A list of the addresses known to belong to this node (in string format)
+* "domains": (list of strings) A list of the domain names known to resolve to one of the addresses of this node
+* "mac": (string, optional) MAC address that for this node, if relevant and known
+
+
+### Example Traffic information
+
+
+Here is an example of a full traffic message:
+
+    {
+       "command":"traffic",
+       "argument":"",
+       "result":{
+          "flows":[
+             {
+                "size":16,
+                "count":1,
+                "to":{
+                   "id":10,
+                   "lastseen":1497622511,
+                   "ips":[
+                      "ff02::2"
+                   ],
+                   "domains":[
+
+                   ]
+                },
+                "from":{
+                   "mac":"b4:75:0e:15:39:9d",
+                   "ips":[
+                      "fe80::b675:eff:fe15:399d"
+                   ],
+                   "id":9,
+                   "domains":[
+
+                   ],
+                   "lastseen":1497622511
+                }
+             },
+             {
+                "size":101,
+                "count":1,
+                "to":{
+                   "id":12,
+                   "lastseen":1497622512,
+                   "ips":[
+                      "2001:470:1f15:17ba::53"
+                   ],
+                   "domains":[
+
+                   ]
+                },
+                "from":{
+                   "id":11,
+                   "lastseen":1497622512,
+                   "ips":[
+                      "2a02:348:28:cf34::1"
+                   ],
+                   "domains":[
+
+                   ]
+                }
+             }
+          ],
+          "timestamp":1497622538,
+          "total_size":117,
+          "total_count":2
+       }
+    }
+
 
 * Traffic
 * DNS information
