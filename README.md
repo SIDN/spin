@@ -1,6 +1,9 @@
 
 This is a prototype of the SPIN platform.
 
+* auto-gen TOC:
+{:toc}
+
 # What is SPIN
 
 SPIN stands for Security and Privacy for In-home Networks, it is a
@@ -329,6 +332,9 @@ DOMAIN NAME SIZE (1 byte) is the size of the domain name.
 DOMAIN NAME is the string-representation of the domain name.
 
 ## MQTT message formats
+
+The spin_mqtt.lua daemon will send traffic infromation to the topic
+SPIN/traffic. It will listen on the topic SPIN/commands for commands.
 
 ### Traffic information
 
