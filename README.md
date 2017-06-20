@@ -13,7 +13,7 @@ run on either a Linux system or an OpenWRT-based router; it can show
 network activity in a graphical interface, and has the option to block
 traffic on top of existing firewall functionality.
 
-For a screenshot, see [[here]].
+For a screenshot, see [[doc/prototype-20170103.png]].
 
 
 # Building the source code
