@@ -1,7 +1,7 @@
 
 This is a prototype of the SPIN platform.
 
-# What is SPIN
+# What is SPIN?
 
 SPIN stands for Security and Privacy for In-home Networks, it is a
 traffic visualization tool (and in the future analyzer) intended to
