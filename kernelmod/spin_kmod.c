@@ -305,13 +305,22 @@ static inline uint16_t read_int16(uint8_t* data) {
     return (256*(uint8_t)data[0]) + (uint8_t)data[1];
 }
 
-unsigned int skip_dname(uint8_t* data, unsigned int cur_pos) {
-    uint8_t labellen = data[cur_pos++];
+unsigned int skip_dname(uint8_t* data, unsigned int cur_pos, size_t payload_size) {
+	uint8_t labellen;
+	if (cur_pos + 1 > payload_size) {
+		printk("[XX] error: unexpected end of payload when trying to read label\n");
+		return -1;
+	}
+    labellen = data[cur_pos++];
     while (labellen > 0) {
         if ((labellen & 0xc0) == 0xc0) {
             // compressed, just skip it
             return ++cur_pos;
         }
+		if (cur_pos + labellen > payload_size) {
+			printk("[XX] error: label len (%u at %u) past payload (%u)\n", (unsigned int)labellen, (unsigned int)cur_pos - 1, (unsigned int)payload_size);
+			return -1;
+		}
         cur_pos += labellen;
         labellen = data[cur_pos++];
     }
@@ -330,6 +339,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     unsigned int i;
     unsigned char dnsname[256];
     uint8_t* data = (uint8_t*)skb->data + pkt_info->payload_offset;
+    size_t payload_size;
     dns_pkt_info_t dpkt_info;
 
     //printk("[XX] DNS answer header offset %u packet len %u\n", offset, pkt_info->payload_size);
@@ -337,9 +347,15 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     if (offset > skb->len) {
         printk("[XX] error: offset (%u) larger than packet size (%u)\n", offset, skb->len);
         return;
-    }
+    } else {
+		payload_size = skb->len - offset;
+	}
     //hexdump_k(skb->data, pkt_info->payload_offset, pkt_info->payload_size);
     // check data size as well
+    if (payload_size < 12) {
+		printk("[XX] error: packet not large enough to be a DNS packet\n");
+		return;
+	}
     flag_bits = data[2];
     flag_bits2 = data[3];
     // must be qr answer
@@ -368,6 +384,10 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     //printk("Label len: %u\n", labellen);
 
     while(labellen > 0) {
+		if (cur_pos + labellen > payload_size) {
+			printk("[XX] Error: label len larger than packet payload\n");
+			return;
+		}
         //printk("Label len: %u\n", labellen);
         memcpy(dnsname + cur_pos_name, data + cur_pos, labellen);
         cur_pos += labellen;
@@ -381,6 +401,10 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 
     // then read all answer ips
     // type should be 1 (A) or 28 (AAAA) and class should be IN (1)
+	if (cur_pos + 4 > payload_size) {
+		printk("[XX] Error: unexpected end of payload when reading question RR\n");
+		return;
+	}
     rr_type = read_int16(data + cur_pos);
     if (rr_type != 1 && rr_type != 28) {
         //printk("[XX] query rr type (%u) not 1 or 28, skip packet\n", rr_type);
@@ -396,7 +420,13 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     for (i = 0; i < answer_count; i++) {
         // skip the dname
         //printk("[XX] skip dname from: %u\n", cur_pos);
-        cur_pos = skip_dname(data, cur_pos);
+        cur_pos = skip_dname(data, cur_pos, payload_size);
+        if (cur_pos < 0) {
+			return;
+		}
+		if (cur_pos + 4 > payload_size) {
+			printk("[XX] error: unexpected end of payload while reading answer RR\n");
+		}
         //printk("[XX] dname skipped pos now: %u\n", cur_pos);
         // read the type
         rr_type = read_int16(data + cur_pos);
@@ -407,6 +437,9 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             //printk("[XX] found A answer\n");
             // data format:
             // <dns type> <ip family> <ip data> <TTL> <domain name string> (null-terminated?)
+			if (cur_pos + 10 > payload_size) {
+				printk("[XX] error: unexpected end of payload while reading answer A RR\n");
+			}
             memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
             dpkt_info.family = AF_INET;
             memcpy(&dpkt_info.ttl, data + cur_pos, 4);
@@ -424,6 +457,9 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             //printk("[XX] found AAAA answer\n");
             // data format:
             // <dns type> <ip family> <ip data> <TTL> <domain name string> (null-terminated?)
+			if (cur_pos + 22 > payload_size) {
+				printk("[XX] error: unexpected end of payload while reading answer AAAA RR\n");
+			}
             memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
             dpkt_info.family = AF_INET6;
             memcpy(&dpkt_info.ttl, data + cur_pos, 4);
@@ -441,11 +477,17 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             //printk("[XX] not A or AAAA in answer at %u (val: %u)\n", cur_pos - 4, rr_type);
             //printk("[XX] now at %u\n", cur_pos);
             // skip ttl
+			if (cur_pos + 6 > payload_size) {
+				printk("[XX] error: unexpected end of payload while reading answer RR size\n");
+			}
             cur_pos += 4;
             //printk("[XX] after ttl at %u (val here: %u)\n", cur_pos, read_int16(data + cur_pos));
             // skip rdata
             cur_pos += read_int16(data + cur_pos) + 2;
             //printk("[XX] skip to: %u\n", cur_pos);
+			if (cur_pos > payload_size) {
+				printk("[XX] error: unexpected end of payload while skipping answer RR\n");
+			}
 
         }
     }
@@ -488,7 +530,7 @@ NF_CALLBACK(hook_func_new, skb)
             }
         }
         // if message is dns response, send DNS info as well
-        //printk(KERN_INFO "SRC PORT: %u\n", pkt_info.src_port);
+        printk(KERN_INFO "SRC PORT: %u\n", pkt_info.src_port);
         if (pkt_info.src_port == 53) {
             handle_dns_answer(&pkt_info, skb);
         }

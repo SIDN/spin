@@ -4,7 +4,7 @@ local wirefmt = require "wirefmt"
 local netlink = require "spin_netlink"
 
 if posix.AF_NETLINK ~= nil then
-    local fd, err = netlink.connect()
+    local fd, err = netlink.connect_traffic()
     msg_str = "Hello!"
     hdr_str = netlink.create_netlink_header(msg_str, 0, 0, 0, netlink.get_process_id())
     
