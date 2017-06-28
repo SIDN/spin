@@ -51,9 +51,47 @@ ip_store_t* except_ips;
 
 struct sock *traffic_nl_sk = NULL;
 struct sock *config_nl_sk = NULL;
-uint32_t client_port_id = 0;
 
-uint32_t xx_send_counter = 0;
+#define MAX_CLIENTS 10
+uint32_t traffic_client_port_ids[MAX_CLIENTS];
+int traffic_client_count = 0;
+
+int add_traffic_client(uint32_t client_port_id) {
+	int i;
+	printk("add traffic client %u\n", client_port_id);
+	for (i = 0; i < traffic_client_count; i++) {
+		if (traffic_client_port_ids[i] == client_port_id) {
+			return 1;
+		}
+	}
+	if (traffic_client_count < MAX_CLIENTS) {
+		traffic_client_port_ids[traffic_client_count++] = client_port_id;
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+int remove_traffic_client(uint32_t client_port_id) {
+	int found = 0;
+	int i;
+	printk("remove traffic client %u\n", client_port_id);
+	for (i = 0; i < traffic_client_count; i++) {
+		if (!found) {
+			if (traffic_client_port_ids[i] == client_port_id) {
+				found = 1;
+				if (i < traffic_client_count) {
+				    traffic_client_port_ids[i] = traffic_client_port_ids[i+1];
+			    }
+			    traffic_client_count--;
+			}
+		} else {
+			// move to prev
+			traffic_client_port_ids[i-1] = traffic_client_port_ids[i];
+		}
+	}
+	return found;
+}
 
 // storage of pkt_infos so we do not have to send every single packet
 // (this should solve a lot when we have large streams)
@@ -212,7 +250,6 @@ int send_netlink_message(int msg_size, void* msg_data, uint32_t client_port_id) 
 
     memcpy(nlmsg_data(nlh), msg_data, msg_size);
 
-    //printk("[XX] Sending %u bytes of data to client. Counter: %u\n", msg_size, xx_send_counter++);
     return nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
 }
 
@@ -222,9 +259,11 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
     int msg_size;
     int res;
     unsigned char data[PACKET_SIZE];
+    int i;
+    uint32_t port_id;
 
     // Nobody's listening, carry on
-    if (client_port_id == 0) {
+    if (traffic_client_count == 0) {
         return;
     }
 
@@ -243,35 +282,44 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
 
     pktinfo_msg2wire(type, data, pkt_info);
 
-    res = send_netlink_message(msg_size, data, client_port_id);
-    // if res == -11, try again
-    if(res<0) {
-        printk(KERN_INFO "Error sending data to client: %d\n", res);
-        if (res == -11) {
-            printk("attempt again?\n");
-            // this will just fail again; any way to wait for the process to clear out the buffer/
-            // perhaps use ack on all?...
-            //res = send_netlink_message(msg_size, data, client_port_id);
-            //printk("attempt %d result: %d\n", i, res);
-            client_port_id = 0;
-        } else {
-            // assume client is gone
-            client_port_id = 0;
-        }
-    }
+	for (i = 0; i < traffic_client_count; i++) {
+		port_id = traffic_client_port_ids[i];
+		res = send_netlink_message(msg_size, data, port_id);
+		// if res == -11, try again?
+		if(res<0) {
+			printk(KERN_INFO "Error sending data to client: %d\n", res);
+			if (res == -11) {
+				printk("attempt again?\n");
+				// this will just fail again; any way to wait for the process to clear out the buffer/
+				// perhaps use ack on all?...
+				//res = send_netlink_message(msg_size, data, client_port_id);
+				//printk("attempt %d result: %d\n", i, res);
+				if (remove_traffic_client(port_id)) {
+					i--;
+				}
+			} else {
+				// assume client is gone
+				if (remove_traffic_client(port_id)) {
+					i--;
+				}
+			}
+		}
+	}
 }
 
 void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
     int msg_size;
     int res;
     unsigned char data[PACKET_SIZE];
+    int i;
+    uint32_t port_id;
 
     //printk("yoyoyoyoyoyoyo\n");
     //char msg[INET6_ADDRSTRLEN];
     //pktinfo2str(msg, pkt_info, INET6_ADDRSTRLEN);
 
     // Nobody's listening, carry on
-    if (client_port_id == 0) {
+    if (traffic_client_count == 0) {
         //printk("Client not connected, not sending\n");
         return;
     }
@@ -284,21 +332,29 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
 
     dns_pktinfo_msg2wire(data, dns_pkt_info);
 
-    res = send_netlink_message(msg_size, data, client_port_id);
+	for (i = 0; i < traffic_client_count; i++) {
+		port_id = traffic_client_port_ids[i];
+		res = send_netlink_message(msg_size, data, port_id);
 
-    if(res<0) {
-        // what to do with full buffer here?
-        printk(KERN_INFO "Error sending data to client: %d\n", res);
-        if (res == -11) {
-            printk("attempt again?\n");
-            // this will just fail again; any way to wait for the process to clear out the buffer/
-            // perhaps use ack on all?...
-            //res = send_netlink_message(msg_size, data, client_port_id);
-            //printk("attempt %d result: %d\n", i, res);
-        } else {
-            client_port_id = 0;
-        }
-    }
+		if(res<0) {
+			// what to do with full buffer here?
+			printk(KERN_INFO "Error sending data to client: %d\n", res);
+			if (res == -11) {
+				printk("attempt again?\n");
+				// this will just fail again; any way to wait for the process to clear out the buffer/
+				// perhaps use ack on all?...
+				//res = send_netlink_message(msg_size, data, client_port_id);
+				//printk("attempt %d result: %d\n", i, res);
+				if (remove_traffic_client(port_id)) {
+					i--;
+				}
+			} else {
+				if (remove_traffic_client(port_id)) {
+					i--;
+				}
+			}
+		}
+	}
 }
 
 static inline uint16_t read_int16(uint8_t* data) {
@@ -564,7 +620,7 @@ static void traffic_client_connect(struct sk_buff *skb) {
     //printk(KERN_INFO "Netlink received msg payload:%s\n",(char*)nlmsg_data(nlh));
     pid = nlh->nlmsg_pid; /* port id of sending process */
     //printk(KERN_INFO "Client port: %u\n", pid);
-    client_port_id = pid;
+    add_traffic_client(pid);
 
     skb_out = nlmsg_new(msg_size,0);
 
@@ -842,7 +898,7 @@ int init_module()
 
     printk(KERN_INFO "SPIN module loaded\n");
 
-
+/*
     nfho1.hook = hook_func_new;
     nfho1.hooknum = NF_INET_PRE_ROUTING;
     nfho1.pf = PF_INET;
@@ -866,8 +922,8 @@ int init_module()
     nfho4.pf = PF_INET6;
     nfho4.priority = NF_IP_PRI_FIRST;
     nf_register_hook(&nfho4);
+*/
 
-/*
     nfho1.hook = hook_func_new;
     nfho1.hooknum = NF_INET_LOCAL_OUT;
     nfho1.pf = PF_INET;
@@ -891,8 +947,6 @@ int init_module()
     nfho4.pf = PF_INET6;
     nfho4.priority = NF_IP_PRI_FIRST;
     nf_register_hook(&nfho4);
-*/
-
 
     ignore_ips = ip_store_create();
     block_ips = ip_store_create();
