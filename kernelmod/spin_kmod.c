@@ -842,7 +842,7 @@ int init_module()
 
     printk(KERN_INFO "SPIN module loaded\n");
 
-/*
+
     nfho1.hook = hook_func_new;
     nfho1.hooknum = NF_INET_PRE_ROUTING;
     nfho1.pf = PF_INET;
@@ -866,8 +866,8 @@ int init_module()
     nfho4.pf = PF_INET6;
     nfho4.priority = NF_IP_PRI_FIRST;
     nf_register_hook(&nfho4);
-*/
 
+/*
     nfho1.hook = hook_func_new;
     nfho1.hooknum = NF_INET_LOCAL_OUT;
     nfho1.pf = PF_INET;
@@ -891,7 +891,7 @@ int init_module()
     nfho4.pf = PF_INET6;
     nfho4.priority = NF_IP_PRI_FIRST;
     nf_register_hook(&nfho4);
-
+*/
 
 
     ignore_ips = ip_store_create();

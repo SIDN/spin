@@ -1,6 +1,8 @@
 
 #include "pkt_info.h"
 
+#include <stdarg.h>
+
 size_t pktinfo_msg_size() {
     // version (1 octet), msg size (2 octets), message type (1 octet), data
     return pktinfo_wire_size() + 4;
@@ -81,7 +83,7 @@ void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t m
     strncpy(dname, dns_pkt_info->dname, 256);
 
     snprintf(dest, max_len,
-             "%s %s %u\n", ip, dname, ttl);
+             "%s %s %u", ip, dname, ttl);
 }
 
 static inline void write_int16(unsigned char* dest, uint16_t i) {
@@ -228,13 +230,13 @@ message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, unsigned char* src
     if (src[0] != SPIN_NETLINK_PROTOCOL_VERSION) {
         return SPIN_ERR_BADVERSION;
     }
-
+	src++;
+	
     msg_type = src[0];
     if (msg_type == SPIN_DNS_ANSWER) {
         src++;
         msg_size = read_int16(src);
         src += 2;
-
         dns_pkt_info->family = src[0];
         src += 1;
         memcpy(dns_pkt_info->ip, src, 16);
