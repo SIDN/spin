@@ -586,8 +586,6 @@ NF_CALLBACK(hook_func_new, skb)
             }
         }
         // if message is dns response, send DNS info as well
-        printk(KERN_INFO "SRC PORT: %u\n", pkt_info.src_port);
-        printk(KERN_INFO "DST PORT: %u\n", pkt_info.dest_port);
         if (pkt_info.src_port == 53) {
             handle_dns_answer(&pkt_info, skb);
         }
@@ -890,16 +888,33 @@ void add_default_test_ips(void) {
 
 }
 
-//Called when module loaded using 'insmod'
-int init_module()
-{
-    pkt_info_list = pkt_info_list_create(1024);
+void init_local(void) {
+    nfho1.hook = hook_func_new;
+    nfho1.hooknum = NF_INET_LOCAL_IN;
+    nfho1.pf = PF_INET;
+    nfho1.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho1);
 
-    init_netfilter();
+    nfho2.hook = hook_func_new;
+    nfho2.hooknum = NF_INET_LOCAL_OUT;
+    nfho2.pf = PF_INET;
+    nfho2.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho2);
 
-    printk(KERN_INFO "SPIN module loaded\n");
+    nfho3.hook = hook_func_new;
+    nfho3.hooknum = NF_INET_LOCAL_IN;
+    nfho3.pf = PF_INET6;
+    nfho3.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho3);
 
-/*
+    nfho4.hook = hook_func_new;
+    nfho4.hooknum = NF_INET_LOCAL_OUT;
+    nfho4.pf = PF_INET6;
+    nfho4.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho4);
+}
+
+void init_forward(void) {
     nfho1.hook = hook_func_new;
     nfho1.hooknum = NF_INET_PRE_ROUTING;
     nfho1.pf = PF_INET;
@@ -923,31 +938,18 @@ int init_module()
     nfho4.pf = PF_INET6;
     nfho4.priority = NF_IP_PRI_FIRST;
     nf_register_hook(&nfho4);
-*/
+}
 
-    nfho1.hook = hook_func_new;
-    nfho1.hooknum = NF_INET_LOCAL_OUT;
-    nfho1.pf = PF_INET;
-    nfho1.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho1);
+//Called when module loaded using 'insmod'
+int init_module()
+{
+    pkt_info_list = pkt_info_list_create(1024);
 
-    nfho2.hook = hook_func_new;
-    nfho2.hooknum = NF_INET_FORWARD;
-    nfho2.pf = PF_INET;
-    nfho2.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho2);
+    init_netfilter();
 
-    nfho3.hook = hook_func_new;
-    nfho3.hooknum = NF_INET_LOCAL_OUT;
-    nfho3.pf = PF_INET6;
-    nfho3.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho3);
+    printk(KERN_INFO "SPIN module loaded\n");
 
-    nfho4.hook = hook_func_new;
-    nfho4.hooknum = NF_INET_FORWARD;
-    nfho4.pf = PF_INET6;
-    nfho4.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho4);
+	init_local();
 
     ignore_ips = ip_store_create();
     block_ips = ip_store_create();
