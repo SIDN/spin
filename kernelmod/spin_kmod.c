@@ -185,7 +185,7 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
         pkt_info->payload_size = (uint32_t)ntohs(udp_header->len) - 8;
         pkt_info->payload_offset = skb_network_header_len(sockbuff) + 8;
     } else if (ip_header->protocol == 6) {
-        tcp_header = (struct tcphdr *)skb_transport_header(sock_buff);
+		tcp_header = (struct tcphdr*)((char*)ip_header + (ip_header->ihl * 4));
         pkt_info->src_port = ntohs(tcp_header->source);
         pkt_info->dest_port = ntohs(tcp_header->dest);
         pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff);
@@ -587,6 +587,7 @@ NF_CALLBACK(hook_func_new, skb)
         }
         // if message is dns response, send DNS info as well
         printk(KERN_INFO "SRC PORT: %u\n", pkt_info.src_port);
+        printk(KERN_INFO "DST PORT: %u\n", pkt_info.dest_port);
         if (pkt_info.src_port == 53) {
             handle_dns_answer(&pkt_info, skb);
         }

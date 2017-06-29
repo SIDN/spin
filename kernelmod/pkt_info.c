@@ -63,8 +63,8 @@ void pktinfo2str(unsigned char* dest, pkt_info_t* pkt_info, size_t max_len) {
              "ipv%d protocol %d %s:%u -> %s:%u %u packets %u bytes",
              pkt_info->family == AF_INET ? 4 : 6,
              pkt_info->protocol,
-             sa, ntohs(pkt_info->src_port),
-             da, ntohs(pkt_info->dest_port),
+             sa, pkt_info->src_port,
+             da, pkt_info->dest_port,
              pkt_info->packet_count,
              pkt_info->payload_size);
 }
@@ -134,7 +134,7 @@ void pktinfo2wire(unsigned char* dest, pkt_info_t* pkt_info) {
 }
 
 int pkt_info_equal(pkt_info_t* a, pkt_info_t* b) {
-    return (memcmp(a, b, 36) == 0);
+    return (memcmp(a, b, 38) == 0);
 }
 
 void pktinfo_msg2wire(message_type_t type, unsigned char* dest, pkt_info_t* pkt_info) {
