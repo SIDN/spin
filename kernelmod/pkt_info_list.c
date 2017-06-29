@@ -53,9 +53,24 @@ void pkt_info_list_clear(pkt_info_list_t* pkt_info_list, uint32_t timestamp) {
     pkt_info_list->timestamp = timestamp;
 }
 
+void pkt_info_list_resize(pkt_info_list_t* pkt_info_list, unsigned int new_size) {
+	unsigned int i;
+	if (new_size < pkt_info_list->max_size) {
+		return;
+	}
+	pkt_info_list->pkt_infos = (pkt_info_t**)krealloc(pkt_info_list->pkt_infos, sizeof(pkt_info_t*) * new_size, __GFP_WAIT);
+    for (i = pkt_info_list->max_size; i < new_size; i++) {
+        pkt_info_list->pkt_infos[i] = (pkt_info_t*)kmalloc(sizeof(pkt_info_t), __GFP_WAIT);
+    }
+    pkt_info_list->max_size = new_size;
+}
+
 void pkt_info_list_add(pkt_info_list_t* pkt_info_list, pkt_info_t* pkt_info) {
     unsigned int i;
     pkt_info_t* cur_pkt_info = NULL;
+    if (pkt_info_list->cur_size == pkt_info_list->max_size) {
+		pkt_info_list_resize(pkt_info_list, pkt_info_list->max_size + 1024);
+	}
 
     for (i=0; i<pkt_info_list->cur_size; i++) {
         if (pkt_info_equal(pkt_info_list->pkt_infos[i], pkt_info)) {
