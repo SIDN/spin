@@ -12,6 +12,8 @@
 
 #include "pkt_info.h"
 
+#include <poll.h>
+
 #define NETLINK_TRAFFIC_PORT 31
 
 #define MAX_PAYLOAD 1024 /* maximum payload size*/
@@ -35,12 +37,21 @@ void hexdump(uint8_t* data, unsigned int size) {
 
 int main()
 {
+	ssize_t c = 0;
+	int rs;
     message_type_t type;
+	struct timeval tv;
+    struct pollfd fds[1];
+
     sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_TRAFFIC_PORT);
     if(sock_fd<0) {
         fprintf(stderr, "Error connecting to socket: %s\n", strerror(errno));
         return -1;
     }
+
+	tv.tv_sec = 0;
+	tv.tv_usec = 500;
+	setsockopt(sock_fd, 270, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
 
     memset(&src_addr, 0, sizeof(src_addr));
     src_addr.nl_family = AF_NETLINK;
@@ -73,9 +84,24 @@ int main()
     sendmsg(sock_fd,&msg,0);
     printf("Waiting for message from kernel\n");
 
+    fds[0].fd = sock_fd;
+    fds[0].events = POLLIN;
+
     /* Read message from kernel */
     while (1) {
-        recvmsg(sock_fd, &msg, 0);
+		rs = poll(fds, 1, 500);
+		//printf("[XX] POLL RESULT: %d %04x\n", rs, fds[0].revents);
+		if (rs == 0) {
+			continue;
+		}
+
+		//printf("[XX] waiting for new msg after %u\n", c);
+        rs = recvmsg(sock_fd, &msg, 0);
+        if (rs < 0) {
+			continue;
+		}
+        c++;
+        //printf("C: %u RS: %u\n", c, rs);
         //printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
         pkt_info_t pkt;
         dns_pkt_info_t dns_pkt;

@@ -10,6 +10,6 @@ else
   echo "Module not loaded yet"
 fi
 echo "Loading module"
-sudo insmod spin.ko
+sudo insmod spin.ko mode=local
 echo "Module loaded"
 

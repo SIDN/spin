@@ -31,6 +31,10 @@
 // kernel module examples from http://www.paulkiddie.com/2009/11/creating-a-netfilter-kernel-module-which-filters-udp-packets/
 // netlink examples from https://gist.github.com/arunk-s/c897bb9d75a6c98733d6
 
+// Module parameters
+static char* mode = "forward";
+module_param(mode, charp, 0000);
+MODULE_PARM_DESC(mode, "Run mode (local or forward, defaults to forward)");
 
 // Hooks for packet capture
 static struct nf_hook_ops nfho1;
@@ -39,8 +43,6 @@ static struct nf_hook_ops nfho3;
 static struct nf_hook_ops nfho4;
 
 
-struct sk_buff *sock_buff;
-struct udphdr *udp_header;
 struct tcphdr *tcp_header;
 struct iphdr *ip_header;            //ip header struct
 struct ipv6hdr *ipv6_header;            //ip header struct
@@ -90,6 +92,7 @@ int remove_traffic_client(uint32_t client_port_id) {
 			traffic_client_port_ids[i-1] = traffic_client_port_ids[i];
 		}
 	}
+	printk("traffic client count now %u\n", traffic_client_count);
 	return found;
 }
 
@@ -108,7 +111,9 @@ void log_packet(pkt_info_t* pkt_info) {
 
 int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     uint8_t* b;
-    ipv6_header = (struct ipv6hdr *)ipv6_hdr(sock_buff);
+    struct udphdr *udp_header;
+
+    ipv6_header = (struct ipv6hdr *)ipv6_hdr(sockbuff);
 
     // hard-code a number of things to ignore; such as broadcasts (for now)
     b = (uint8_t*)(&ipv6_header->daddr);
@@ -117,13 +122,13 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     }
 
     if (ipv6_header->nexthdr == 17) {
-        udp_header = (struct udphdr *)skb_transport_header(sock_buff);
+        udp_header = (struct udphdr *)skb_transport_header(sockbuff);
         pkt_info->src_port = ntohs(udp_header->source);
         pkt_info->dest_port =ntohs(udp_header->dest);
         pkt_info->payload_size = (uint32_t)ntohs(udp_header->len) - 8;
         pkt_info->payload_offset = skb_network_header_len(sockbuff) + 8;
     } else if (ipv6_header->nexthdr == 6) {
-        tcp_header = (struct tcphdr *)skb_transport_header(sock_buff);
+        tcp_header = (struct tcphdr *)skb_transport_header(sockbuff);
         pkt_info->src_port = ntohs(tcp_header->source);
         pkt_info->dest_port = ntohs(tcp_header->dest);
         pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff);
@@ -165,7 +170,9 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 // -1: error
 int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     uint8_t* b;
-    ip_header = (struct iphdr *)skb_network_header(sock_buff);
+    struct udphdr *udp_header;
+
+    ip_header = (struct iphdr *)skb_network_header(sockbuff);
     if (ip_header->version == 6) {
         return parse_ipv6_packet(sockbuff, pkt_info);
     }
@@ -179,7 +186,7 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     }
 
     if (ip_header->protocol == 17) {
-        udp_header = (struct udphdr *)skb_transport_header(sock_buff);
+        udp_header = (struct udphdr *)skb_transport_header(sockbuff);
         pkt_info->src_port = ntohs(udp_header->source);
         pkt_info->dest_port = ntohs(udp_header->dest);
         pkt_info->payload_size = (uint32_t)ntohs(udp_header->len) - 8;
@@ -245,7 +252,7 @@ int send_netlink_message(int msg_size, void* msg_data, uint32_t client_port_id) 
         return -255;
     }
 
-    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, NLM_F_ACK);
+    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, NLM_F_REQUEST);
     NETLINK_CB(skb_out).dst_group = 0;
 
     memcpy(nlmsg_data(nlh), msg_data, msg_size);
@@ -284,23 +291,32 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
 
 	for (i = 0; i < traffic_client_count; i++) {
 		port_id = traffic_client_port_ids[i];
+		//printk("[XX] send message to traffic client number %u\n", i);
 		res = send_netlink_message(msg_size, data, port_id);
+		wake_up_interruptible(&(traffic_nl_sk->sk_wq->wait));
+
 		// if res == -11, try again?
 		if(res<0) {
 			printk(KERN_INFO "Error sending data to client: %d\n", res);
 			if (res == -11) {
-				printk("attempt again?\n");
+				printk("attempt again? a\n");
 				// this will just fail again; any way to wait for the process to clear out the buffer/
 				// perhaps use ack on all?...
 				//res = send_netlink_message(msg_size, data, client_port_id);
 				//printk("attempt %d result: %d\n", i, res);
-				if (remove_traffic_client(port_id)) {
-					i--;
-				}
+				//if (remove_traffic_client(port_id)) {
+				//	i--;
+				//	if (traffic_client_count == 0) {
+				//		break;
+				//	}
+				//}
 			} else {
 				// assume client is gone
 				if (remove_traffic_client(port_id)) {
 					i--;
+					if (traffic_client_count == 0) {
+						break;
+					}
 				}
 			}
 		}
@@ -313,10 +329,6 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
     unsigned char data[PACKET_SIZE];
     int i;
     uint32_t port_id;
-
-    //printk("yoyoyoyoyoyoyo\n");
-    //char msg[INET6_ADDRSTRLEN];
-    //pktinfo2str(msg, pkt_info, INET6_ADDRSTRLEN);
 
     // Nobody's listening, carry on
     if (traffic_client_count == 0) {
@@ -335,6 +347,7 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
 	for (i = 0; i < traffic_client_count; i++) {
 		port_id = traffic_client_port_ids[i];
 		res = send_netlink_message(msg_size, data, port_id);
+		wake_up_interruptible(&(traffic_nl_sk->sk_wq->wait));
 
 		if(res<0) {
 			// what to do with full buffer here?
@@ -343,14 +356,20 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
 				printk("attempt again?\n");
 				// this will just fail again; any way to wait for the process to clear out the buffer/
 				// perhaps use ack on all?...
-				//res = send_netlink_message(msg_size, data, client_port_id);
+				//res = send_nemantlink_message(msg_size, data, client_port_id);
 				//printk("attempt %d result: %d\n", i, res);
-				if (remove_traffic_client(port_id)) {
-					i--;
-				}
+				//if (remove_traffic_client(port_id)) {
+				//	i--;
+				//	if (traffic_client_count == 0) {
+				//		break;
+				//	}
+				//}
 			} else {
 				if (remove_traffic_client(port_id)) {
 					i--;
+					if (traffic_client_count == 0) {
+						break;
+					}
 				}
 			}
 		}
@@ -382,6 +401,13 @@ unsigned int skip_dname(uint8_t* data, unsigned int cur_pos, size_t payload_size
     }
     return cur_pos;
 }
+
+static inline void print_pkt_info(pkt_info_t* pkt_info) {
+       char p[1024];
+       pktinfo2str(p, pkt_info, 1024);
+       printk("[XX] pkt: %s\n", p);
+}
+
 
 void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     uint16_t offset = pkt_info->payload_offset;
@@ -550,10 +576,10 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 }
 
 void add_pkt_info(pkt_info_t* pkt_info) {
-
     struct timeval tv;
     unsigned int i;
     do_gettimeofday(&tv);
+
     if (!pkt_info_list_check_timestamp(pkt_info_list, tv.tv_sec)) {
         // send all and clear
         for (i = 0; i < pkt_info_list->cur_size; i++) {
@@ -566,8 +592,10 @@ void add_pkt_info(pkt_info_t* pkt_info) {
 
 NF_CALLBACK(hook_func_new, skb)
 {
+    struct sk_buff *sock_buff;
     pkt_info_t pkt_info;
     int pres;
+
     memset(&pkt_info, 0, sizeof(pkt_info_t));
     sock_buff = skb;
 
@@ -589,7 +617,10 @@ NF_CALLBACK(hook_func_new, skb)
         if (pkt_info.src_port == 53) {
             handle_dns_answer(&pkt_info, skb);
         }
+        //printk("[XX] add pkt info: ");
+        //print_pkt_info(&pkt_info);
         add_pkt_info(&pkt_info);
+        //printk("added\n");
         //send_pkt_info(SPIN_TRAFFIC_DATA, &pkt_info);
     } else {
         if (pres < -1) {
@@ -889,6 +920,8 @@ void add_default_test_ips(void) {
 }
 
 void init_local(void) {
+	printk(KERN_INFO "SPIN initializing local mode\n");
+
     nfho1.hook = hook_func_new;
     nfho1.hooknum = NF_INET_LOCAL_IN;
     nfho1.pf = PF_INET;
@@ -915,6 +948,8 @@ void init_local(void) {
 }
 
 void init_forward(void) {
+	printk(KERN_INFO "SPIN initializing forward mode\n");
+
     nfho1.hook = hook_func_new;
     nfho1.hooknum = NF_INET_PRE_ROUTING;
     nfho1.pf = PF_INET;
@@ -949,7 +984,15 @@ int init_module()
 
     printk(KERN_INFO "SPIN module loaded\n");
 
-	init_local();
+	if (strncmp(mode, "local", 6) == 0) {
+		init_local();
+	} else if (strncmp(mode, "forward", 8) == 0) {
+		init_forward();
+	} else {
+		pkt_info_list_destroy(pkt_info_list);
+		close_netfilter();
+		return -ENODEV;
+	}
 
     ignore_ips = ip_store_create();
     block_ips = ip_store_create();
