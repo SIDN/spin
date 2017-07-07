@@ -470,10 +470,6 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     cur_pos = 12;
     cur_pos_name = 0;
     labellen = data[cur_pos++];
-
-    // skip to next, etc
-    //printk("Label len: %u\n", labellen);
-
     while(labellen > 0) {
 		if (cur_pos + labellen > payload_size) {
 			printk(KERN_WARNING "Error: label len larger than packet payload\n");
@@ -483,15 +479,14 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 			printk(KERN_WARNING "Error: domain name over 255 octets\n");
 			return;
 		}
+		dnsname[cur_pos_name++] = labellen;
         memcpy(dnsname + cur_pos_name, data + cur_pos, labellen);
         cur_pos += labellen;
         cur_pos_name += labellen;
-        dnsname[cur_pos_name++] = '.';
         labellen = data[cur_pos++];
     }
     // if we want trailing dot, remove deduction here
-    dnsname[--cur_pos_name] = '\0';
-    //printk("DNS NAME: %s\n", dnsname);
+    dnsname[cur_pos_name] = '\0';
 
     // then read all answer ips
     // type should be 1 (A) or 28 (AAAA) and class should be IN (1)
@@ -501,12 +496,12 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 	}
     rr_type = read_int16(data + cur_pos);
     if (rr_type != 1 && rr_type != 28) {
-        //printk("[XX] query rr type (%u) not 1 or 28, skip packet\n", rr_type);
+        printk("[XX] query rr type (%u) not 1 or 28, skip packet\n", rr_type);
         return;
     }
     cur_pos += 2;
     if (read_int16(data + cur_pos) != 1) {
-        //printk("[XX] class not IN (%u: %u), skip packet\n", cur_pos, read_int16(data + cur_pos));
+        printk("[XX] class not IN (%u: %u), skip packet\n", cur_pos, read_int16(data + cur_pos));
         return;
     }
     cur_pos += 2;
@@ -530,7 +525,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             // okay send
             //printk("[XX] found A answer\n");
             // data format:
-            // <dns type> <ip family> <ip data> <TTL> <domain name string> (null-terminated?)
+            // <dns type> <ip family> <ip data> <TTL> <domain name wire format>
 			if (cur_pos + 10 > payload_size) {
 				printk(KERN_WARNING "unexpected end of payload while reading answer A RR\n");
 			}
@@ -550,7 +545,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             // okay send
             //printk("[XX] found AAAA answer\n");
             // data format:
-            // <dns type> <ip family> <ip data> <TTL> <domain name string> (null-terminated?)
+            // <dns type> <ip family> <ip data> <TTL> <domain name wire format>
 			if (cur_pos + 22 > payload_size) {
 				printk(KERN_WARNING "unexpected end of payload while reading answer AAAA RR\n");
 			}

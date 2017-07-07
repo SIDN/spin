@@ -347,7 +347,7 @@ in the DNS ansewr.
 
 DOMAIN NAME SIZE (1 byte) is the size of the domain name.
 
-DOMAIN NAME is the string-representation of the domain name.
+DOMAIN NAME is the the domain name in DNS wire format (RFC1035).
 
 ## MQTT message formats
 

@@ -11,6 +11,7 @@
 #include <linux/netfilter_ipv4.h>
 #include <linux/netlink.h>
 
+#include <linux/ctype.h>
 #include <linux/udp.h>
 #include <linux/tcp.h>
 #include <linux/inet.h>
@@ -28,6 +29,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <ctype.h>
 #endif // __KERNEL
 
 #define SPIN_NETLINK_PROTOCOL_VERSION 1

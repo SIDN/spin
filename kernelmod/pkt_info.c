@@ -71,8 +71,12 @@ void pktinfo2str(unsigned char* dest, pkt_info_t* pkt_info, size_t max_len) {
 
 void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t max_len) {
     uint32_t ttl;
-    unsigned char dname[256];
+    unsigned char dname[1024];
     char ip[INET6_ADDRSTRLEN];
+    uint8_t labellen, c;
+    size_t pos = 0, strpos = 0, lpos;
+
+    memset(dname, 0, 1024);
 
     ttl = dns_pkt_info->ttl;
     if (dns_pkt_info->family == AF_INET) {
@@ -80,8 +84,32 @@ void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t m
     } else {
         ntop(AF_INET6, ip, dns_pkt_info->ip, INET6_ADDRSTRLEN);
     }
-    strncpy(dname, dns_pkt_info->dname, 256);
 
+    labellen = dns_pkt_info->dname[pos++];
+    if (labellen == 0) {
+		dname[strpos++] = '.';
+	} else {
+		while (labellen > 0) {
+			for (lpos = 0; lpos < labellen; lpos++) {
+				c = dns_pkt_info->dname[lpos + pos];
+				if(c == '.' || c == ';' ||
+				   c == '(' || c == ')' ||
+				   c == '\\') {
+					dname[strpos++] = '\\';
+					dname[strpos++] = c;
+				} else if (!(isascii(c) && isgraph(c))) {
+					sprintf(&dname[strpos], "\\%03u", c);
+					strpos += 4;
+				} else {
+					dname[strpos++] = c;
+				}
+			}
+			pos += labellen;
+			labellen = dns_pkt_info->dname[pos++];
+			dname[strpos++] = '.';
+		}
+	}
+    dname[strpos] = '\0';
     snprintf(dest, max_len,
              "%s %s %u", ip, dname, ttl);
 }
@@ -231,7 +259,7 @@ message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, unsigned char* src
         return SPIN_ERR_BADVERSION;
     }
 	src++;
-	
+
     msg_type = src[0];
     if (msg_type == SPIN_DNS_ANSWER) {
         src++;

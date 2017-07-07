@@ -6,6 +6,8 @@
 
 local _M = {}
 
+local ctype = require 'posix.ctype'
+
 -- returns true if the current system is little-endian
 --         false otherwise
 function _M.system_littleendian()
@@ -182,7 +184,7 @@ function _M.pton_v4(str)
   if string.len(ret) ~= 4 then
       return nil
   end
-  return ret  
+  return ret
 end
 
 local function split_string(str, sep)
@@ -267,6 +269,34 @@ function _M.hexdump(data)
         io.stdout:write(string.format("%02x ", string.byte(data:sub(i))))
     end
     io.stdout:write("\n")
+end
+
+function _M.dname_wire2str(dname)
+    local str = ""
+    local labellen
+    local pos = 1
+    local c, i
+
+	labellen = string.byte(dname, pos)
+	while labellen ~= 0 and labellen ~= nil do
+		for i=1,labellen do
+			c = string.sub(dname, pos + i, pos + i)
+			if(c == '.' or c == ';' or
+			   c == '(' or c == ')' or
+			   c == '\\') then
+			    str = str .. "\\" .. c
+			elseif not ctype.isgraph(c) then
+			    str = str .. string.format("\\%03u", string.byte(c))
+			else
+				str = str .. c
+			end
+		end
+		str = str .. "."
+		pos = pos + labellen + 1
+		labellen = string.byte(dname, pos)
+	end
+
+    return str
 end
 
 return _M

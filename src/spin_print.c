@@ -106,6 +106,7 @@ int main()
         pkt_info_t pkt;
         dns_pkt_info_t dns_pkt;
         char pkt_str[2048];
+        printf("XX got packet\n");
         type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(nlh));
         if (type == SPIN_BLOCKED) {
             pktinfo2str(pkt_str, &pkt, 2048);
@@ -116,6 +117,7 @@ int main()
         } else if (type == SPIN_DNS_ANSWER) {
             // note: bad version would have been caught in wire2pktinfo
             // in this specific case
+            printf("[XX] got dns packet\n");
             wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(nlh));
             dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
             printf("[DNS] %s\n", pkt_str);

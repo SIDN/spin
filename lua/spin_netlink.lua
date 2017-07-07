@@ -183,7 +183,7 @@ function _M.read_dns_pkt_info(data)
     end
     dns_pkt_info.ttl = wirefmt.bytes_to_int32_bigendian(data:byte(18, 21))
     local dname_size = data:byte(22)
-    dns_pkt_info.dname = data:sub(23, 23 + dname_size - 2)
+    dns_pkt_info.dname = wirefmt.dname_wire2str(data:sub(23, 23 + dname_size - 2))
     return dns_pkt_info
 end
 
