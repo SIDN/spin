@@ -467,10 +467,13 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 
     while(labellen > 0) {
 		if (cur_pos + labellen > payload_size) {
-			printk("[XX] Error: label len larger than packet payload\n");
+			printk(KERN_WARNING "Error: label len larger than packet payload\n");
 			return;
 		}
-        //printk("Label len: %u\n", labellen);
+		if (cur_pos_name + labellen > 255) {
+			printk(KERN_WARNING "Error: domain name over 255 octets\n");
+			return;
+		}
         memcpy(dnsname + cur_pos_name, data + cur_pos, labellen);
         cur_pos += labellen;
         cur_pos_name += labellen;
@@ -484,7 +487,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     // then read all answer ips
     // type should be 1 (A) or 28 (AAAA) and class should be IN (1)
 	if (cur_pos + 4 > payload_size) {
-		printk("[XX] Error: unexpected end of payload when reading question RR\n");
+		printk(KERN_WARNING "unexpected end of payload when reading question RR\n");
 		return;
 	}
     rr_type = read_int16(data + cur_pos);
@@ -507,7 +510,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 			return;
 		}
 		if (cur_pos + 4 > payload_size) {
-			printk("[XX] error: unexpected end of payload while reading answer RR\n");
+			printk(KERN_WARNING "unexpected end of payload while reading answer RR\n");
 		}
         //printk("[XX] dname skipped pos now: %u\n", cur_pos);
         // read the type
@@ -520,7 +523,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             // data format:
             // <dns type> <ip family> <ip data> <TTL> <domain name string> (null-terminated?)
 			if (cur_pos + 10 > payload_size) {
-				printk("[XX] error: unexpected end of payload while reading answer A RR\n");
+				printk(KERN_WARNING "unexpected end of payload while reading answer A RR\n");
 			}
             memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
             dpkt_info.family = AF_INET;
@@ -540,7 +543,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             // data format:
             // <dns type> <ip family> <ip data> <TTL> <domain name string> (null-terminated?)
 			if (cur_pos + 22 > payload_size) {
-				printk("[XX] error: unexpected end of payload while reading answer AAAA RR\n");
+				printk(KERN_WARNING "unexpected end of payload while reading answer AAAA RR\n");
 			}
             memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
             dpkt_info.family = AF_INET6;
@@ -560,7 +563,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             //printk("[XX] now at %u\n", cur_pos);
             // skip ttl
 			if (cur_pos + 6 > payload_size) {
-				printk("[XX] error: unexpected end of payload while reading answer RR size\n");
+				printk(KERN_WARNING "unexpected end of payload while reading answer RR size\n");
 			}
             cur_pos += 4;
             //printk("[XX] after ttl at %u (val here: %u)\n", cur_pos, read_int16(data + cur_pos));
@@ -568,7 +571,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             cur_pos += read_int16(data + cur_pos) + 2;
             //printk("[XX] skip to: %u\n", cur_pos);
 			if (cur_pos > payload_size) {
-				printk("[XX] error: unexpected end of payload while skipping answer RR\n");
+				printk(KERN_WARNING "unexpected end of payload while skipping answer RR\n");
 			}
 
         }
@@ -606,7 +609,6 @@ NF_CALLBACK(hook_func_new, skb)
         if (ip_store_contains_ip(block_ips, pkt_info.src_addr) ||
             ip_store_contains_ip(block_ips, pkt_info.dest_addr)) {
             // block it unless it is specifically held
-            printk(KERN_INFO "[XX] address in block list!\n");
             if (!ip_store_contains_ip(except_ips, pkt_info.src_addr) &&
                 !ip_store_contains_ip(except_ips, pkt_info.dest_addr)) {
                 send_pkt_info(SPIN_BLOCKED, &pkt_info);
@@ -624,7 +626,7 @@ NF_CALLBACK(hook_func_new, skb)
         //send_pkt_info(SPIN_TRAFFIC_DATA, &pkt_info);
     } else {
         if (pres < -1) {
-            printk("packet not parsed\n");
+            printk(KERN_DEBUG "packet not parsed\n");
         }
     }
     return NF_ACCEPT;
