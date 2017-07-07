@@ -58,6 +58,15 @@ struct sock *config_nl_sk = NULL;
 uint32_t traffic_client_port_ids[MAX_CLIENTS];
 int traffic_client_count = 0;
 
+#include <linux/interrupt.h>
+#include <linux/hrtimer.h>
+#include <linux/sched.h>
+
+// structures for the timer to clear the pkt_info_list when there was no
+// new traffic
+static struct hrtimer htimer;
+static ktime_t kt_periode;
+
 int add_traffic_client(uint32_t client_port_id) {
 	int i;
 	printk("add traffic client %u\n", client_port_id);
@@ -578,7 +587,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     }
 }
 
-void add_pkt_info(pkt_info_t* pkt_info) {
+void check_pkt_info_timestamp(void) {
     struct timeval tv;
     unsigned int i;
     do_gettimeofday(&tv);
@@ -590,6 +599,10 @@ void add_pkt_info(pkt_info_t* pkt_info) {
         }
         pkt_info_list_clear(pkt_info_list, tv.tv_sec);
     }
+}
+
+void add_pkt_info(pkt_info_t* pkt_info) {
+	check_pkt_info_timestamp();
     pkt_info_list_add(pkt_info_list, pkt_info);
 }
 
@@ -871,8 +884,31 @@ static inline void log_ip(unsigned char ip[16], int is_ipv6, void* foo) {
     } else {
         ntop(AF_INET, sa, ip, INET6_ADDRSTRLEN);
     }
-    printk("[XX] %s\n", sa);
+    printk(KERN_INFO "IP: %s\n", sa);
 }
+
+static void timer_cleanup(void)
+{
+    hrtimer_cancel(& htimer);
+}
+
+static enum hrtimer_restart timer_function(struct hrtimer * timer)
+{
+    check_pkt_info_timestamp();
+
+    hrtimer_forward_now(timer, kt_periode);
+    return HRTIMER_RESTART;
+}
+
+static void timer_init(void)
+{
+    kt_periode = ktime_set(1, 0); //seconds,nanoseconds
+    hrtimer_init (& htimer, CLOCK_REALTIME, HRTIMER_MODE_REL);
+    htimer.function = timer_function;
+    hrtimer_start(& htimer, kt_periode, HRTIMER_MODE_REL);
+}
+
+
 
 void test_ip(void) {
     unsigned char ip1[16];
@@ -999,6 +1035,7 @@ int init_module()
     ignore_ips = ip_store_create();
     block_ips = ip_store_create();
     except_ips = ip_store_create();
+	timer_init();
 
     return 0;
 }
@@ -1006,6 +1043,7 @@ int init_module()
 //Called when module unloaded using 'rmmod'
 void cleanup_module()
 {
+    timer_cleanup();
     pkt_info_list_destroy(pkt_info_list);
     close_netfilter();
     printk(KERN_INFO "SPIN module signing off!\n");
