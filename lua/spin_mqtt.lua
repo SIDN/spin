@@ -147,6 +147,7 @@ end
 function add_name_for_node(node_id, name)
   local node = node_cache:get_by_id(node_id)
   if not node then return end
+  node:set_name(name)
   filter:load()
   for _,ip in pairs(node.ips) do
     filter:add_name(ip, name)

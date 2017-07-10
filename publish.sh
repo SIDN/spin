@@ -3,5 +3,4 @@ PACKAGE="spin"
 VERSION="0.4"
 FNAME="${PACKAGE}-${VERSION}.tar.gz"
 
-scp -4 /tmp/${FNAME} tjeb.nl:/var/www/tjeb.nl/
-
+scp -4 /tmp/${FNAME} valibox.sidnlabs.nl:/var/www-valibox/downloads/src/spin/
