@@ -156,7 +156,7 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
             // what to do with fragments?
             return 1;
         }
-        printk("[XX] unsupported IPv6 next header: %u\n", ipv6_header->nexthdr);
+        printk(KERN_DEBUG "unsupported IPv6 next header: %u\n", ipv6_header->nexthdr);
         return -1;
     } else {
         pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff);
@@ -218,7 +218,7 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
                ip_header->protocol != 2 &&
                ip_header->protocol != 41
               ) {
-        printk("[XX] unsupported IPv4 protocol: %u\n", ip_header->protocol);
+        printk(KERN_DEBUG "unsupported IPv4 protocol: %u\n", ip_header->protocol);
         return -1;
     } else {
         pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff);
@@ -392,7 +392,7 @@ static inline uint16_t read_int16(uint8_t* data) {
 unsigned int skip_dname(uint8_t* data, unsigned int cur_pos, size_t payload_size) {
 	uint8_t labellen;
 	if (cur_pos + 1 > payload_size) {
-		printk("[XX] error: unexpected end of payload when trying to read label\n");
+		printk(KERN_WARNING "unexpected end of payload when trying to read label\n");
 		return -1;
 	}
     labellen = data[cur_pos++];
@@ -402,7 +402,7 @@ unsigned int skip_dname(uint8_t* data, unsigned int cur_pos, size_t payload_size
             return ++cur_pos;
         }
 		if (cur_pos + labellen > payload_size) {
-			printk("[XX] error: label len (%u at %u) past payload (%u)\n", (unsigned int)labellen, (unsigned int)cur_pos - 1, (unsigned int)payload_size);
+			printk(KERN_WARNING "label len (%u at %u) past payload (%u)\n", (unsigned int)labellen, (unsigned int)cur_pos - 1, (unsigned int)payload_size);
 			return -1;
 		}
         cur_pos += labellen;
@@ -414,7 +414,7 @@ unsigned int skip_dname(uint8_t* data, unsigned int cur_pos, size_t payload_size
 static inline void print_pkt_info(pkt_info_t* pkt_info) {
        char p[1024];
        pktinfo2str(p, pkt_info, 1024);
-       printk("[XX] pkt: %s\n", p);
+       printk("Packet info: %s\n", p);
 }
 
 
@@ -436,7 +436,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     //printk("[XX] DNS answer header offset %u packet len %u\n", offset, pkt_info->payload_size);
     //printk("\n");
     if (offset > skb->len) {
-        printk("[XX] error: offset (%u) larger than packet size (%u)\n", offset, skb->len);
+        //printk("[XX] error: offset (%u) larger than packet size (%u)\n", offset, skb->len);
         return;
     } else {
 		payload_size = skb->len - offset;
@@ -444,7 +444,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     //hexdump_k(skb->data, pkt_info->payload_offset, pkt_info->payload_size);
     // check data size as well
     if (payload_size < 12) {
-		printk("[XX] error: packet not large enough to be a DNS packet\n");
+		//printk("[XX] error: packet not large enough to be a DNS packet\n");
 		return;
 	}
     flag_bits = data[2];
@@ -496,12 +496,12 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 	}
     rr_type = read_int16(data + cur_pos);
     if (rr_type != 1 && rr_type != 28) {
-        printk("[XX] query rr type (%u) not 1 or 28, skip packet\n", rr_type);
+        //printk("[XX] query rr type (%u) not 1 or 28, skip packet\n", rr_type);
         return;
     }
     cur_pos += 2;
     if (read_int16(data + cur_pos) != 1) {
-        printk("[XX] class not IN (%u: %u), skip packet\n", cur_pos, read_int16(data + cur_pos));
+        //printk("[XX] class not IN (%u: %u), skip packet\n", cur_pos, read_int16(data + cur_pos));
         return;
     }
     cur_pos += 2;

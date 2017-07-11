@@ -305,7 +305,6 @@ local function publish_traffic(msg)
     f.from = node_cache:get_by_id(f.from)
     f.to = node_cache:get_by_id(f.to)
   end
-  --print("[XX] Publish traffic data: " .. json.encode(o))
   client:publish(TRAFFIC_CHANNEL, json.encode(o))
 end
 
@@ -345,8 +344,6 @@ function publish_node_update(node)
   msg.argument = ""
   msg.result = node
   local msg_json = json.encode(msg)
-  --print("[XX] publish to " .. TRAFFIC_CHANNEL .. ":")
-  --print(msg_json)
   client:publish(TRAFFIC_CHANNEL, msg_json)
 end
 
@@ -356,7 +353,6 @@ end
 
 function handle_traffic_message(pkt_info)
   local from_node_id, to_node_id, new
-  --print("[XX] add node " .. pkt_info.src_addr)
   from_node, new = node_cache:add_ip(pkt_info.src_addr)
   if new then
     -- publish it to the traffic channel
@@ -382,7 +378,6 @@ end
 function handle_dns_message(dns_pkt_info)
     -- TODO TTL and timestamp
     timestamp = os.time()
-    --print("[XX] DNS INFO PACKET: " .. dns_pkt_info.dname .. " (eop)")
     update = dnscache.dnscache:add(dns_pkt_info.ip, dns_pkt_info.dname, timestamp)
     if update then
         -- update the node cache, and publish if it changed
@@ -482,7 +477,7 @@ if posix.AF_NETLINK ~= nil then
                 handle_spin_message(spin_msg);
             else
                 if (errno == 105) then
-                  -- try again
+                    -- try again
                 else
                     posix.close(fd)
                     fd = netlink.connect_traffic()

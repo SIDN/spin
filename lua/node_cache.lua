@@ -75,7 +75,6 @@ function Node:add_ip(ip)
 end
 
 function Node:set_mac(mac)
-  if mac then print("[XX] SETTING MAC TO " .. mac) end
   self.mac = mac
 end
 
@@ -168,12 +167,10 @@ function NodeCache:create_node()
 end
 
 function NodeCache:get_by_id(id)
-  --print("[XX] GET BY ID CALLED")
   return self.nodes[id]
 end
 
 function NodeCache:get_by_ip(ip)
-  --print("[XX] GET BY IP CALLED")
   for _,n in pairs(self.nodes) do
     if n:has_ip(ip) then return n end
   end

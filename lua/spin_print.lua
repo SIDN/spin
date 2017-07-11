@@ -16,7 +16,6 @@ if posix.AF_NETLINK ~= nil then
                 --wirefmt.hexdump(spin_msg)
                 netlink.print_message(spin_msg)
             else
-                print("[XX] err from read_netlink_message: " .. err .. " errno: " .. errno)
                 if (errno == 105) then
                   -- try again
                 else
