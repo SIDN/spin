@@ -23,6 +23,8 @@ struct iovec iov;
 int sock_fd;
 struct msghdr msg;
 
+int ack_counter;
+
 void hexdump(uint8_t* data, unsigned int size) {
     unsigned int i;
     printf("00: ");
@@ -35,6 +37,36 @@ void hexdump(uint8_t* data, unsigned int size) {
     printf("\n");
 }
 
+void send_ack()
+{
+    nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_PAYLOAD));
+    memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
+    nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
+    nlh->nlmsg_pid = getpid();
+    nlh->nlmsg_flags = 0;
+
+    strcpy(NLMSG_DATA(nlh), "Hello!");
+
+    iov.iov_base = (void *)nlh;
+    iov.iov_len = nlh->nlmsg_len;
+    msg.msg_name = (void *)&dest_addr;
+    msg.msg_namelen = sizeof(dest_addr);
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+
+    printf("Sending ACK to kernel\n");
+    sendmsg(sock_fd,&msg,0);
+}
+
+#define MESSAGES_BEFORE_WAIT 50
+void check_send_ack() {
+	ack_counter++;
+	if (ack_counter > MESSAGES_BEFORE_WAIT) {
+		send_ack();
+		ack_counter = 0;
+	}
+}
+
 int main()
 {
 	ssize_t c = 0;
@@ -42,6 +74,8 @@ int main()
     message_type_t type;
 	struct timeval tv;
     struct pollfd fds[1];
+
+	ack_counter = 0;
 
     sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_TRAFFIC_PORT);
     if(sock_fd<0) {
@@ -64,7 +98,7 @@ int main()
     dest_addr.nl_family = AF_NETLINK;
     dest_addr.nl_pid = 0; /* For Linux Kernel */
     dest_addr.nl_groups = 0; /* unicast */
-
+/*
     nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_PAYLOAD));
     memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
     nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
@@ -83,6 +117,8 @@ int main()
     printf("Sending message to kernel\n");
     sendmsg(sock_fd,&msg,0);
     printf("Waiting for message from kernel\n");
+*/
+	send_ack();
 
     fds[0].fd = sock_fd;
     fds[0].events = POLLIN;
@@ -108,15 +144,18 @@ int main()
         if (type == SPIN_BLOCKED) {
             pktinfo2str(pkt_str, &pkt, 2048);
             printf("[BLOCKED] %s\n", pkt_str);
+	check_send_ack();
         } else if (type == SPIN_TRAFFIC_DATA) {
             pktinfo2str(pkt_str, &pkt, 2048);
             printf("[TRAFFIC] %s\n", pkt_str);
+	check_send_ack();
         } else if (type == SPIN_DNS_ANSWER) {
             // note: bad version would have been caught in wire2pktinfo
             // in this specific case
             wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(nlh));
             dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
             printf("[DNS] %s\n", pkt_str);
+	check_send_ack();
         } else if (type == SPIN_ERR_BADVERSION) {
             printf("Error: version mismatch between client and kernel module\n");
         } else {

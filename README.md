@@ -144,6 +144,21 @@ information traffic to.
 
 This is the description of protocol version 1
 
+A user-space client on the config port sends a command (see below) to 
+port 31, and will get one or more responses per command, ending with an 
+'end' response type.
+
+A user-space client on the traffic port announces itself by sending a 
+netlink message (content ignored) to port 31; the connection will stay 
+alive as long as the client is listening. However, every once in a 
+while, the client must send a keep-alive ping (again, content ignored) 
+to let the kernel know it is still listening. The kernel module will 
+severely lower the amount of packets sent if it has not received a 
+keepalive ping after 100 messages, so as not to overflow the netlink 
+buffer. A recommended interval to send a keepalive ping is every 50 
+messages.
+
+
 
 ### Configuration commands
 

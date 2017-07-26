@@ -14,6 +14,9 @@ local posix = require 'posix'
 local netlink = require 'spin_netlink'
 local wirefmt = require 'wirefmt'
 
+
+local counter = 0
+
 -- load the 'spin_userdata.cfg' containing user-set names
 filter:load(true)
 
@@ -455,6 +458,13 @@ signal.signal(signal.SIGKILL, function(signum)
   os.exit(128 +signum);
 end)
 
+function send_message(fd)
+    msg_str = "Hello!"
+    hdr_str = netlink.create_netlink_header(msg_str, 0, 0, 0, netlink.get_process_id())
+
+    posix.send(fd, hdr_str .. msg_str);
+end
+local ack_counter = 0
 
 vprint("SPIN mqtt daemon")
 broker = arg[1] -- defaults to "localhost" if arg not set
@@ -474,7 +484,14 @@ if posix.AF_NETLINK ~= nil then
             if spin_msg then
                 --hexdump(spin_msg)
                 --netlink.print_message(spin_msg)
+                counter = counter + 1
+                print("[XX] received message counter: " .. counter)
                 handle_spin_message(spin_msg);
+                ack_counter = ack_counter + 1
+                if ack_counter > 50 then
+                  send_message(fd)
+                  ack_counter = 0
+                end
             else
                 if (errno == 105) then
                     -- try again

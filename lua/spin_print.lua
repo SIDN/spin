@@ -5,6 +5,7 @@ local netlink = require "spin_netlink"
 
 if posix.AF_NETLINK ~= nil then
     local fd, err = netlink.connect_traffic()
+    local recv_count = 0
     msg_str = "Hello!"
     hdr_str = netlink.create_netlink_header(msg_str, 0, 0, 0, netlink.get_process_id())
     
@@ -22,6 +23,11 @@ if posix.AF_NETLINK ~= nil then
                     fd = netlink.connect()
                 end
             end
+            recv_count = recv_count + 1
+            if recv_count > 50 then
+				posix.send(fd, hdr_str .. msg_str);
+				recv_count = 0
+			end
     end
 else
     print("no posix.AF_NETLINK")

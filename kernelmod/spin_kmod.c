@@ -26,6 +26,8 @@
 
 #include "nf_hook_def.h"
 
+#include "spin_traffic_send_thread.h"
+
 //#include <arpa/inet.h>
 
 // kernel module examples from http://www.paulkiddie.com/2009/11/creating-a-netfilter-kernel-module-which-filters-udp-packets/
@@ -54,10 +56,10 @@ ip_store_t* except_ips;
 struct sock *traffic_nl_sk = NULL;
 struct sock *config_nl_sk = NULL;
 
-#define MAX_CLIENTS 10
-uint32_t traffic_client_port_ids[MAX_CLIENTS];
-int traffic_client_count = 0;
+//handler_info_t* handler_info;
+traffic_clients_t* traffic_clients;
 
+#include <linux/wait.h>
 #include <linux/interrupt.h>
 #include <linux/hrtimer.h>
 #include <linux/sched.h>
@@ -66,44 +68,6 @@ int traffic_client_count = 0;
 // new traffic
 static struct hrtimer htimer;
 static ktime_t kt_periode;
-
-int add_traffic_client(uint32_t client_port_id) {
-	int i;
-	printk("add traffic client %u\n", client_port_id);
-	for (i = 0; i < traffic_client_count; i++) {
-		if (traffic_client_port_ids[i] == client_port_id) {
-			return 1;
-		}
-	}
-	if (traffic_client_count < MAX_CLIENTS) {
-		traffic_client_port_ids[traffic_client_count++] = client_port_id;
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-int remove_traffic_client(uint32_t client_port_id) {
-	int found = 0;
-	int i;
-	printk("remove traffic client %u\n", client_port_id);
-	for (i = 0; i < traffic_client_count; i++) {
-		if (!found) {
-			if (traffic_client_port_ids[i] == client_port_id) {
-				found = 1;
-				if (i < traffic_client_count) {
-				    traffic_client_port_ids[i] = traffic_client_port_ids[i+1];
-			    }
-			    traffic_client_count--;
-			}
-		} else {
-			// move to prev
-			traffic_client_port_ids[i-1] = traffic_client_port_ids[i];
-		}
-	}
-	printk("traffic client count now %u\n", traffic_client_count);
-	return found;
-}
 
 // storage of pkt_infos so we do not have to send every single packet
 // (this should solve a lot when we have large streams)
@@ -249,37 +213,22 @@ void hexdump_k(uint8_t* data, unsigned int offset, unsigned int size) {
     printk("\n");
 }
 
-int send_netlink_message(int msg_size, void* msg_data, uint32_t client_port_id) {
-    struct nlmsghdr *nlh;
-    struct sk_buff* skb_out;
-
-    //hexdump_k(msg_data, 0, msg_size);
-
-    skb_out = nlmsg_new(msg_size, 0);
-    if(!skb_out) {
-        printk(KERN_ERR "Failed to allocate new skb\n");
-        return -255;
-    }
-
-    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, msg_size, NLM_F_REQUEST);
-    NETLINK_CB(skb_out).dst_group = 0;
-
-    memcpy(nlmsg_data(nlh), msg_data, msg_size);
-
-    return nlmsg_unicast(traffic_nl_sk, skb_out, client_port_id);
-}
+/*int send_netlink_message(int msg_size, void* msg_data, uint32_t client_port_id) {
+	traffic_clients_send(traffic_clients, msg_size, msg_data, client
+	send_queue_add(handler_info->send_queue, msg_size, msg_data, client_port_id);
+	return 1;
+}*/
 
 #define PACKET_SIZE 1024
 // TODO: refactor two functions below
 void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
     int msg_size;
-    int res;
     unsigned char data[PACKET_SIZE];
-    int i;
-    uint32_t port_id;
+    //int i;
+    //uint32_t port_id;
 
     // Nobody's listening, carry on
-    if (traffic_client_count == 0) {
+    if (traffic_clients_count(traffic_clients) == 0) {
         return;
     }
 
@@ -298,49 +247,18 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
 
     pktinfo_msg2wire(type, data, pkt_info);
 
-	for (i = 0; i < traffic_client_count; i++) {
-		port_id = traffic_client_port_ids[i];
-		//printk("[XX] send message to traffic client number %u\n", i);
-		res = send_netlink_message(msg_size, data, port_id);
-		wake_up_interruptible(&(traffic_nl_sk->sk_wq->wait));
-
-		// if res == -11, try again?
-		if(res<0) {
-			printk(KERN_INFO "Error sending data to client: %d\n", res);
-			if (res == -11) {
-				printk("attempt again? a\n");
-				// this will just fail again; any way to wait for the process to clear out the buffer/
-				// perhaps use ack on all?...
-				//res = send_netlink_message(msg_size, data, client_port_id);
-				//printk("attempt %d result: %d\n", i, res);
-				//if (remove_traffic_client(port_id)) {
-				//	i--;
-				//	if (traffic_client_count == 0) {
-				//		break;
-				//	}
-				//}
-			} else {
-				// assume client is gone
-				if (remove_traffic_client(port_id)) {
-					i--;
-					if (traffic_client_count == 0) {
-						break;
-					}
-				}
-			}
-		}
-	}
+	traffic_clients_send(traffic_clients, msg_size, data);
 }
 
 void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
     int msg_size;
-    int res;
+    //int res;
     unsigned char data[PACKET_SIZE];
-    int i;
-    uint32_t port_id;
+    //int i;
+    //uint32_t port_id;
 
     // Nobody's listening, carry on
-    if (traffic_client_count == 0) {
+    if (traffic_clients_count(traffic_clients) == 0) {
         //printk("Client not connected, not sending\n");
         return;
     }
@@ -353,36 +271,12 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
 
     dns_pktinfo_msg2wire(data, dns_pkt_info);
 
-	for (i = 0; i < traffic_client_count; i++) {
-		port_id = traffic_client_port_ids[i];
+	traffic_clients_send(traffic_clients, msg_size, data);
+	/*
+	for (i = 0; i < get_traffic_client_count(traffic_clients); i++) {
+		port_id = get_traffic_client_port_id(&handler_info->traffic_clients, i);
 		res = send_netlink_message(msg_size, data, port_id);
-		wake_up_interruptible(&(traffic_nl_sk->sk_wq->wait));
-
-		if(res<0) {
-			// what to do with full buffer here?
-			printk(KERN_INFO "Error sending data to client: %d\n", res);
-			if (res == -11) {
-				printk("attempt again?\n");
-				// this will just fail again; any way to wait for the process to clear out the buffer/
-				// perhaps use ack on all?...
-				//res = send_nemantlink_message(msg_size, data, client_port_id);
-				//printk("attempt %d result: %d\n", i, res);
-				//if (remove_traffic_client(port_id)) {
-				//	i--;
-				//	if (traffic_client_count == 0) {
-				//		break;
-				//	}
-				//}
-			} else {
-				if (remove_traffic_client(port_id)) {
-					i--;
-					if (traffic_client_count == 0) {
-						break;
-					}
-				}
-			}
-		}
-	}
+	}*/
 }
 
 static inline uint16_t read_int16(uint8_t* data) {
@@ -640,13 +534,13 @@ NF_CALLBACK(hook_func_new, skb)
     return NF_ACCEPT;
 }
 
-
 static void traffic_client_connect(struct sk_buff *skb) {
     struct nlmsghdr *nlh;
     int pid;
     struct sk_buff *skb_out;
     int msg_size;
     char *msg="Hello from kernel";
+    int client_id;
     //int res;
 
     //printk(KERN_INFO "Entering: %s\n", __FUNCTION__);
@@ -660,11 +554,14 @@ static void traffic_client_connect(struct sk_buff *skb) {
     //printk(KERN_INFO "Netlink received msg payload:%s\n",(char*)nlmsg_data(nlh));
     pid = nlh->nlmsg_pid; /* port id of sending process */
     //printk(KERN_INFO "Client port: %u\n", pid);
-    add_traffic_client(pid);
+
+    // TODO add this again, if client already exists, resets msgs_counter
+    client_id = traffic_clients_add(traffic_clients, pid);
 
     skb_out = nlmsg_new(msg_size,0);
 
-    printk(KERN_INFO "Client (pid %u) connected to traffic port\n", pid);
+    //printk(KERN_INFO "Client (pid %u) connected to traffic port\n", pid);
+    printk(KERN_INFO "Got a ping from client (pid %u)\n", pid);
 
     if(!skb_out) {
         printk(KERN_ERR "Failed to allocate new skb\n");
@@ -1032,12 +929,19 @@ int init_module()
     except_ips = ip_store_create();
 	timer_init();
 
+	//handler_info = data_handler_init(traffic_nl_sk);
+	traffic_clients = traffic_clients_create(traffic_nl_sk);
+
     return 0;
 }
 
 //Called when module unloaded using 'rmmod'
 void cleanup_module()
 {
+	printk("[XX] stopping handler thread\n");
+	traffic_clients_destroy(traffic_clients);
+	printk("[XX] stopped handler thread\n");
+
     timer_cleanup();
     pkt_info_list_destroy(pkt_info_list);
     close_netfilter();
