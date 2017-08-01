@@ -36,6 +36,8 @@ AC_SUBST([regular_CFLAGS])
 dnl Check for the right nfnetlink version
 PKG_CHECK_MODULES([libnfnetlink], [libnfnetlink >= 1.0.1])
 
+AC_CHECK_LIB([mosquitto], [mosquitto_lib_version], [], [AC_MSG_ERROR([libmosquitto not found])])
+
 AC_ARG_WITH(linux-headers,
 	AC_HELP_STRING([--with-linux-headers=PATH      specify path of linux headers]),
 	[ AC_SUBST(KERNELPATH, "$withval") ]

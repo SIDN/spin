@@ -69,13 +69,46 @@ void pktinfo2str(unsigned char* dest, pkt_info_t* pkt_info, size_t max_len) {
              pkt_info->payload_size);
 }
 
+void dns_dname2str(unsigned char* dname, unsigned char* src, size_t max_len) {
+    size_t strpos = 0, pos = 0;
+    size_t lpos;
+    uint8_t labellen, c;
+
+    labellen = src[pos++];
+    if (labellen == 0) {
+        dname[strpos++] = '.';
+    } else {
+        while (labellen > 0) {
+            for (lpos = 0; lpos < labellen; lpos++) {
+                c = src[lpos + pos];
+                if(c == '.' || c == ';' ||
+                   c == '(' || c == ')' ||
+                   c == '\\') {
+                    dname[strpos++] = '\\';
+                    dname[strpos++] = c;
+                } else if (!(isascii(c) && isgraph(c))) {
+                    sprintf(&dname[strpos], "\\%03u", c);
+                    strpos += 4;
+                } else {
+                    dname[strpos++] = c;
+                }
+            }
+            pos += labellen;
+            labellen = src[pos++];
+            dname[strpos++] = '.';
+        }
+    }
+    dname[strpos] = '\0';
+}
+
 void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t max_len) {
     uint32_t ttl;
     unsigned char dname[1024];
     char ip[INET6_ADDRSTRLEN];
+/*
     uint8_t labellen, c;
     size_t pos = 0, strpos = 0, lpos;
-
+*/
     memset(dname, 0, 1024);
 
     ttl = dns_pkt_info->ttl;
@@ -85,31 +118,34 @@ void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t m
         ntop(AF_INET6, ip, dns_pkt_info->ip, INET6_ADDRSTRLEN);
     }
 
+/*
     labellen = dns_pkt_info->dname[pos++];
     if (labellen == 0) {
-		dname[strpos++] = '.';
-	} else {
-		while (labellen > 0) {
-			for (lpos = 0; lpos < labellen; lpos++) {
-				c = dns_pkt_info->dname[lpos + pos];
-				if(c == '.' || c == ';' ||
-				   c == '(' || c == ')' ||
-				   c == '\\') {
-					dname[strpos++] = '\\';
-					dname[strpos++] = c;
-				} else if (!(isascii(c) && isgraph(c))) {
-					sprintf(&dname[strpos], "\\%03u", c);
-					strpos += 4;
-				} else {
-					dname[strpos++] = c;
-				}
-			}
-			pos += labellen;
-			labellen = dns_pkt_info->dname[pos++];
-			dname[strpos++] = '.';
-		}
-	}
+        dname[strpos++] = '.';
+    } else {
+        while (labellen > 0) {
+            for (lpos = 0; lpos < labellen; lpos++) {
+                c = dns_pkt_info->dname[lpos + pos];
+                if(c == '.' || c == ';' ||
+                   c == '(' || c == ')' ||
+                   c == '\\') {
+                    dname[strpos++] = '\\';
+                    dname[strpos++] = c;
+                } else if (!(isascii(c) && isgraph(c))) {
+                    sprintf(&dname[strpos], "\\%03u", c);
+                    strpos += 4;
+                } else {
+                    dname[strpos++] = c;
+                }
+            }
+            pos += labellen;
+            labellen = dns_pkt_info->dname[pos++];
+            dname[strpos++] = '.';
+        }
+    }
     dname[strpos] = '\0';
+*/
+    dns_dname2str(dname, dns_pkt_info->dname, 1024);
     snprintf(dest, max_len,
              "%s %s %u", ip, dname, ttl);
 }
@@ -258,7 +294,7 @@ message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, unsigned char* src
     if (src[0] != SPIN_NETLINK_PROTOCOL_VERSION) {
         return SPIN_ERR_BADVERSION;
     }
-	src++;
+    src++;
 
     msg_type = src[0];
     if (msg_type == SPIN_DNS_ANSWER) {

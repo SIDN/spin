@@ -21,7 +21,7 @@ function Aggregator:same_timestamp(timestamp)
   return timestamp - self.data.timestamp < 3
 end
 
-function Aggregator:add_flow(from_ip, to_ip, count, size)
+function Aggregator:add_flow(from_ip, to_ip, from_port, to_port, count, size)
   local from = arp:get_hw_address(from_ip)
   --print("[XX] GET FROM HW ADDR: '" .. from_ip .."'")
   if not from then
@@ -35,7 +35,7 @@ function Aggregator:add_flow(from_ip, to_ip, count, size)
     --from = to
     --to = from_ip
   end
-  local fdata = self.data.flows[from .. "," .. to]
+  local fdata = self.data.flows[from .. ":" .. from_port .. "," .. to .. ":" .. to_port]
   if not fdata then
     fdata = {}
     fdata.count = count
@@ -44,7 +44,7 @@ function Aggregator:add_flow(from_ip, to_ip, count, size)
     fdata.count = fdata.count + count
     fdata.size = fdata.size + size
   end
-  self.data.flows[from .. "," .. to] = fdata
+  self.data.flows[from .. ":" .. from_port .. "," .. to .. ":" .. to_port] = fdata
 end
 
 function Aggregator:print()
@@ -81,8 +81,11 @@ end
 
 function flow_as_json(c, s)
   local str = '{ '
-  local parts = Split(c, ",", 2)
-  str = str .. '"from": ' .. parts[1] .. ', "to": ' .. parts[2] .. ', '
+  local parts1 = Split(c, ",", 2)
+  local parts2 = Split(parts1[1], ":", 2)
+  local parts3 = Split(parts1[2], ":", 2)
+  str = str .. '"from": ' .. parts2[1] .. ', "to": ' .. parts3[1] .. ', '
+  str = str .. '"from_port": ' .. parts2[2] .. ', "to_port": ' .. parts3[2] .. ', '
   str = str .. '"count": ' .. s.count .. ', '
   str = str .. '"size": ' .. s.size
   str = str .. ' }'
@@ -126,7 +129,7 @@ end
 
 local cur_aggr
 
-function add_flow(timestamp, from, to, count, size, callback)
+function add_flow(timestamp, from, to, from_port, to_port, count, size, callback)
   if not cur_aggr then
     cur_aggr = Aggregator:create(timestamp)
   end
@@ -138,7 +141,7 @@ function add_flow(timestamp, from, to, count, size, callback)
     end
     cur_aggr = Aggregator:create(timestamp)
   else
-    cur_aggr:add_flow(from, to, count, size)
+    cur_aggr:add_flow(from, to, from_port, to_port, count, size)
   end
   --print("ts: " .. timestamp .. " from: " .. from .. " to: " .. to .. " count: " .. count .. " size: " .. size)
 end
@@ -146,36 +149,6 @@ end
 function startswith(str, part)
   return string.len(str) >= string.len(part) and str:sub(0, string.len(part)) == part
 end
-
-function handle_line(line, callback)
-  local timestamp
-  local from
-  local to
-  local count
-  local size
-  for token in string.gmatch(line, "[^%s]+") do
-    if not timestamp and startswith(line, "[") then
-      timestamp = token:match("%d+")
-    end
-    if not from and startswith(token, "src=") then
-      from = token:sub(5)
-      --print("from: '" .. from .. "'")
-    end
-    if not to and startswith(token, "dst=") then
-      to = token:sub(5)
-    end
-    if not count and startswith(token, "packets=") then
-      count = tonumber(token:sub(9))
-    end
-    if not size and startswith(token, "bytes=") then
-      size = tonumber(token:sub(7))
-    end
-  end
-  if from and to and count and size then
-    add_flow(timestamp, from, to, count, size, callback)
-  end
-end
-
 
 local collector = {}
 

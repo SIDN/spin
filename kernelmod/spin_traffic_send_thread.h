@@ -26,6 +26,7 @@ typedef struct send_queue_entry_s {
 typedef struct {
 	send_queue_entry_t* first;
 	send_queue_entry_t* last;
+	size_t sent;
 	spinlock_t lock;
 } send_queue_t;
 

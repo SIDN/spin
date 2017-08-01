@@ -26,6 +26,7 @@ local verbose = true
 --
 local COMMAND_CHANNEL = "SPIN/commands"
 local TRAFFIC_CHANNEL = "SPIN/traffic"
+local DNS_CHANNEL = "SPIN/dns"
 
 local node_cache = nc.NodeCache_create()
 node_cache:set_arp_cache(arp)
@@ -369,13 +370,13 @@ function handle_traffic_message(pkt_info)
   end
 
   -- put internal nodes as the source
-  if to_node.mac then
-    from_node, to_node = to_node, from_node
-  end
+  --if to_node.mac then
+  --  from_node, to_node = to_node, from_node
+  --end
 
   -- timestamp now for not
   local timestamp = os.time()
-  add_flow(timestamp, from_node.id, to_node.id, 1, pkt_info.payload_size, publish_traffic, filter:get_filter_table())
+  add_flow(timestamp, from_node.id, to_node.id, pkt_info.src_port, pkt_info.dest_port, 1, pkt_info.payload_size, publish_traffic)
 end
 
 function handle_dns_message(dns_pkt_info)
@@ -477,31 +478,36 @@ if posix.AF_NETLINK ~= nil then
     hdr_str = netlink.create_netlink_header(msg_str, 0, 0, 0, netlink.get_process_id())
 
     posix.send(fd, hdr_str .. msg_str);
-
+    local l
     while true do
-        if posix.rpoll(fd, 10) > 0 then
-            local spin_msg, err, errno = netlink.read_netlink_message(fd)
-            if spin_msg then
-                --hexdump(spin_msg)
-                --netlink.print_message(spin_msg)
-                counter = counter + 1
-                print("[XX] received message counter: " .. counter)
-                handle_spin_message(spin_msg);
-                ack_counter = ack_counter + 1
-                if ack_counter > 50 then
-                  send_message(fd)
-                  ack_counter = 0
-                end
-            else
-                if (errno == 105) then
-                    -- try again
+--        for l=1,100 do
+                print("[XX] read call start")
+                local spin_msg, err, errno = netlink.read_netlink_message(fd)
+                print("[XX] read call end")
+                if spin_msg then
+		    print("[XX] read msg")
+                    --hexdump(spin_msg)
+                    --netlink.print_message(spin_msg)
+                    counter = counter + 1
+                    --print("[XX] received message counter: " .. counter)
+                    --netlink.print_message(spin_msg)
+                    handle_spin_message(spin_msg);
+                    ack_counter = ack_counter + 1
+                    if ack_counter > 60 then
+		      print("[XX] send ping")
+                      send_message(fd)
+                      ack_counter = 0
+                    end
                 else
-                    posix.close(fd)
-                    fd = netlink.connect_traffic()
+                    if (errno == 105) then
+                        -- try again
+                    else
+                        posix.close(fd)
+                        fd = netlink.connect_traffic()
+                    end
                 end
-            end
-        end
-        client:loop(10)
+--        end
+        client:loop(1)
     end
 else
     print("no posix.AF_NETLINK, can't connect to kernel module, aborting")

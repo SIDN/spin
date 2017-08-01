@@ -38,6 +38,7 @@ send_queue_t* send_queue_create(void) {
 	spin_lock_init(&queue->lock);
 	queue->first = NULL;
 	queue->last = NULL;
+	queue->sent = 0;
 
 	return queue;
 }
@@ -155,6 +156,31 @@ int queue_send_netlink_error(traffic_client_t* traffic_client, int msg_size, voi
     return nlmsg_unicast(traffic_client->traffic_nl_sk, skb_out, client_port_id);
 }
 
+#include "pkt_info.h"
+
+void printk_msg(unsigned char* data, int size) {
+	pkt_info_t pkt;
+	dns_pkt_info_t dns_pkt;
+	char pkt_str[1024];
+	int type;
+	type = wire2pktinfo(&pkt, data);
+	if (type == SPIN_BLOCKED) {
+		pktinfo2str(pkt_str, &pkt, 2048);
+		printk("[BLOCKED] %s\n", pkt_str);
+	} else if (type == SPIN_TRAFFIC_DATA) {
+		pktinfo2str(pkt_str, &pkt, 2048);
+		printk("[TRAFFIC] %s\n", pkt_str);
+	} else if (type == SPIN_DNS_ANSWER) {
+		// note: bad version would have been caught in wire2pktinfo
+		// in this specific case
+		wire2dns_pktinfo(&dns_pkt, data);
+		dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
+		printk("[DNS] %s\n", pkt_str);
+	} else {
+		printk("[unknown packet sent]\n");
+	}
+}
+
 int sender_thread(void *traffic_client_p) {
 	traffic_client_t* traffic_client = (traffic_client_t*) traffic_client_p;
 	send_queue_entry_t* entry;
@@ -168,10 +194,10 @@ int sender_thread(void *traffic_client_p) {
 		//printk("[XX] Thread woke up\n");
 		if (send_queue_size(traffic_client->send_queue) > 0) {
 			while (traffic_client->msgs_sent_since_ping > 100 && !kthread_should_stop()) {
-				printk("[XX] waiting to send until buffer clears. one moment please\n");
+				printk("[XX] waiting to send until buffer clears. one moment please (client %d, buffer size %lu)\n", traffic_client->client_port_id, send_queue_size(traffic_client->send_queue));
 				msleep(1000);
 				wait_counter++;
-				if (wait_counter > 5) {
+				if (wait_counter > 25) {
 					// oh well, try to send anyway
 					traffic_client->msgs_sent_since_ping = 0;
 				}
@@ -201,7 +227,11 @@ int sender_thread(void *traffic_client_p) {
 					}
 				} else {
 					traffic_client->msgs_sent_since_ping++;
-					//printk("[XX] msgs_sent_since_reset: %d\n", traffic_client->msgs_sent_since_ping);
+					traffic_client->send_queue->sent++;
+					
+					//printk("[XX] msgs sent since reset: %d\n", traffic_client->msgs_sent_since_ping);
+					//printk("[XX] msgs sent total: %lu\n", traffic_client->send_queue->sent);
+					//printk_msg(entry->msg_data, entry->msg_size);
 				}
 
 				// we got ownership at the pop(), so delete
