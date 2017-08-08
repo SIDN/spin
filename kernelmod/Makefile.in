@@ -14,7 +14,7 @@ all: default
 default: module
 
 module: spin_kmod.c messaging.c pkt_info.c spin_util.c spin_cfg.c spin_traffic_send_thread.c
-	$(MAKE) V=s -C $(KERNELPATH) M=$(PWD) modules
+	$(MAKE) V=s -C $(KERNELPATH) M=$(PWD) -I../src modules
 
 distclean: clean
 

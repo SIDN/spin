@@ -14,7 +14,7 @@
 
 #define NETLINK_CONFIG_PORT 30
 
-#define MAX_PAYLOAD 1024 /* maximum payload size*/
+#define MAX_NETLINK_PAYLOAD 1024 /* maximum payload size*/
 struct sockaddr_nl src_addr, dest_addr;
 struct nlmsghdr *nlh = NULL;
 struct iovec iov;
@@ -49,7 +49,7 @@ void hexdump(uint8_t* data, unsigned int offset, unsigned int size) {
 int send_command(size_t cmdbuf_size, unsigned char* cmdbuf)
 {
     config_command_t cmd;
-	uint8_t version;
+    uint8_t version;
 
     sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_CONFIG_PORT);
     if(sock_fd<0) {
@@ -68,9 +68,9 @@ int send_command(size_t cmdbuf_size, unsigned char* cmdbuf)
     dest_addr.nl_pid = 0; /* For Linux Kernel */
     dest_addr.nl_groups = 0; /* unicast */
 
-    nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_PAYLOAD));
-    memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
-    nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
+    nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_NETLINK_PAYLOAD));
+    memset(nlh, 0, NLMSG_SPACE(MAX_NETLINK_PAYLOAD));
+    nlh->nlmsg_len = NLMSG_SPACE(MAX_NETLINK_PAYLOAD);
     nlh->nlmsg_pid = getpid();
     nlh->nlmsg_flags = 0;
 
@@ -87,18 +87,18 @@ int send_command(size_t cmdbuf_size, unsigned char* cmdbuf)
     nlh->nlmsg_len = NLMSG_SPACE(cmdbuf_size);
     sendmsg(sock_fd,&msg,0);
     // max len again, we don't know response sizes
-    nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
+    nlh->nlmsg_len = NLMSG_SPACE(MAX_NETLINK_PAYLOAD);
 
     /* Read response message(s) */
     // Last message should always be SPIN_CMD_END with no data
     while (1) {
         recvmsg(sock_fd, &msg, 0);
-		version = ((uint8_t*)NLMSG_DATA(nlh))[0];
-		if (version != 1) {
-			printf("protocol mismatch from kernel module: got %u, expected %u\n", version, SPIN_NETLINK_PROTOCOL_VERSION);
-			break;
-		}
-		
+        version = ((uint8_t*)NLMSG_DATA(nlh))[0];
+        if (version != 1) {
+            printf("protocol mismatch from kernel module: got %u, expected %u\n", version, SPIN_NETLINK_PROTOCOL_VERSION);
+            break;
+        }
+
         cmd = ((uint8_t*)NLMSG_DATA(nlh))[1];
 
         if (cmd == SPIN_CMD_END) {
@@ -106,15 +106,15 @@ int send_command(size_t cmdbuf_size, unsigned char* cmdbuf)
         } else if (cmd == SPIN_CMD_ERR) {
             //printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
             pkt_info_t pkt;
-            char err_str[MAX_PAYLOAD];
-            strncpy(err_str, (char *)NLMSG_DATA(nlh) + 2, MAX_PAYLOAD);
+            char err_str[MAX_NETLINK_PAYLOAD];
+            strncpy(err_str, (char *)NLMSG_DATA(nlh) + 2, MAX_NETLINK_PAYLOAD);
             printf("Error message from kernel: %s\n", err_str);
         } else if (cmd == SPIN_CMD_IP) {
             // TODO: check message size
             // first octet is ip version (AF_INET or AF_INET6)
             uint8_t ipv = ((uint8_t*)NLMSG_DATA(nlh))[2];
             unsigned char ip_str[INET6_ADDRSTRLEN];
-			inet_ntop(ipv, NLMSG_DATA(nlh) + 3, ip_str, INET6_ADDRSTRLEN);
+            inet_ntop(ipv, NLMSG_DATA(nlh) + 3, ip_str, INET6_ADDRSTRLEN);
             printf("%s\n", ip_str);
         } else {
             printf("unknown command response type received from kernel (%u %02x), stopping\n", cmd, cmd);

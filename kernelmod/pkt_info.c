@@ -46,7 +46,7 @@ void ntop(int fam, char* dest, const uint8_t* src, size_t max) {
     }
 }
 
-void pktinfo2str(unsigned char* dest, pkt_info_t* pkt_info, size_t max_len) {
+void pktinfo2str(char* dest, pkt_info_t* pkt_info, size_t max_len) {
     char sa[INET6_ADDRSTRLEN];
     char da[INET6_ADDRSTRLEN];
     if (pkt_info->family == AF_INET) {
@@ -69,10 +69,13 @@ void pktinfo2str(unsigned char* dest, pkt_info_t* pkt_info, size_t max_len) {
              pkt_info->payload_size);
 }
 
-void dns_dname2str(unsigned char* dname, unsigned char* src, size_t max_len) {
+void dns_dname2str(char* dname, char* src, size_t max_len) {
     size_t strpos = 0, pos = 0;
     size_t lpos;
     uint8_t labellen, c;
+#ifndef __KERNEL__
+    //printf("[XX] dns_dname2str called\n");
+#endif
 
     labellen = src[pos++];
     if (labellen == 0) {
@@ -99,17 +102,23 @@ void dns_dname2str(unsigned char* dname, unsigned char* src, size_t max_len) {
         }
     }
     dname[strpos] = '\0';
+#ifndef __KERNEL__
+    //printf("[XX] dns_dname2str done\n");
+#endif
 }
 
-void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t max_len) {
+void dns_pktinfo2str(char* dest, dns_pkt_info_t* dns_pkt_info, size_t max_len) {
     uint32_t ttl;
-    unsigned char dname[1024];
+    char dname[800];
     char ip[INET6_ADDRSTRLEN];
+#ifndef __KERNEL__
+    //printf("[XX] dns_pktinfo2str called\n");
+#endif
 /*
     uint8_t labellen, c;
     size_t pos = 0, strpos = 0, lpos;
 */
-    memset(dname, 0, 1024);
+    memset(dname, 0, 800);
 
     ttl = dns_pkt_info->ttl;
     if (dns_pkt_info->family == AF_INET) {
@@ -145,35 +154,38 @@ void dns_pktinfo2str(unsigned char* dest, dns_pkt_info_t* dns_pkt_info, size_t m
     }
     dname[strpos] = '\0';
 */
-    dns_dname2str(dname, dns_pkt_info->dname, 1024);
+    dns_dname2str(dname, dns_pkt_info->dname, 800);
     snprintf(dest, max_len,
              "%s %s %u", ip, dname, ttl);
+#ifndef __KERNEL__
+    //printf("[XX] dns_pktinfo2str done\n");
+#endif
 }
 
-static inline void write_int16(unsigned char* dest, uint16_t i) {
+static inline void write_int16(char* dest, uint16_t i) {
     const uint16_t wi = htons(i);
     memcpy(dest, &wi, 2);
 }
 
-static inline void write_int32(unsigned char* dest, uint32_t i) {
+static inline void write_int32(char* dest, uint32_t i) {
     const uint32_t wi = htonl(i);
     memcpy(dest, &wi, 4);
 }
 
-static inline uint16_t read_int16(unsigned char* src) {
+static inline uint16_t read_int16(char* src) {
     uint16_t wi;
     memcpy(&wi, src, 2);
     return ntohs(wi);
 }
 
-static inline uint32_t read_int32(unsigned char* src) {
+static inline uint32_t read_int32(char* src) {
     uint32_t wi;
     memcpy(&wi, src, 4);
     return ntohl(wi);
 }
 
 
-void pktinfo2wire(unsigned char* dest, pkt_info_t* pkt_info) {
+void pktinfo2wire(char* dest, pkt_info_t* pkt_info) {
     dest[0] = pkt_info->family;
     dest += 1;
     dest[0] = pkt_info->protocol;
@@ -201,7 +213,7 @@ int pkt_info_equal(pkt_info_t* a, pkt_info_t* b) {
     return (memcmp(a, b, 38) == 0);
 }
 
-void pktinfo_msg2wire(message_type_t type, unsigned char* dest, pkt_info_t* pkt_info) {
+void pktinfo_msg2wire(message_type_t type, char* dest, pkt_info_t* pkt_info) {
     dest[0] = (uint8_t) SPIN_NETLINK_PROTOCOL_VERSION;
     dest += 1;
 
@@ -218,7 +230,7 @@ void pktinfo_msg2wire(message_type_t type, unsigned char* dest, pkt_info_t* pkt_
     pktinfo2wire(dest, pkt_info);
 }
 
-message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src) {
+message_type_t wire2pktinfo(pkt_info_t* pkt_info, char* src) {
     // todo: should we read message type and size earlier?
     message_type_t msg_type;
     uint16_t msg_size;
@@ -230,7 +242,9 @@ message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src) {
     msg_type = src[0];
     if (msg_type == SPIN_TRAFFIC_DATA || msg_type == SPIN_BLOCKED) {
         src++;
+        // TODO: do we need to have the message size?
         msg_size = read_int16(src);
+        (void)msg_size;
         src += 2;
         // right now, we have stored everything in network order anyway
         memcpy(pkt_info, src, sizeof(pkt_info_t));
@@ -256,7 +270,7 @@ message_type_t wire2pktinfo(pkt_info_t* pkt_info, unsigned char* src) {
     return msg_type;
 }
 
-void dns_pktinfo2wire(unsigned char* dest, dns_pkt_info_t* dns_pkt_info) {
+void dns_pktinfo2wire(char* dest, dns_pkt_info_t* dns_pkt_info) {
     uint8_t dname_size = strlen(dns_pkt_info->dname) + 1;
     dest[0] = dns_pkt_info->family;
     dest += 1;
@@ -269,7 +283,7 @@ void dns_pktinfo2wire(unsigned char* dest, dns_pkt_info_t* dns_pkt_info) {
     strncpy(dest, dns_pkt_info->dname, dname_size);
 }
 
-void dns_pktinfo_msg2wire(unsigned char* dest, dns_pkt_info_t* dns_pkt_info) {
+void dns_pktinfo_msg2wire(char* dest, dns_pkt_info_t* dns_pkt_info) {
     uint16_t msg_size;
 
     dest[0] = SPIN_NETLINK_PROTOCOL_VERSION;
@@ -285,7 +299,7 @@ void dns_pktinfo_msg2wire(unsigned char* dest, dns_pkt_info_t* dns_pkt_info) {
     dns_pktinfo2wire(dest, dns_pkt_info);
 }
 
-message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, unsigned char* src) {
+message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, char* src) {
     // todo: should we read message type and size earlier?
     message_type_t msg_type;
     uint16_t msg_size;
@@ -299,7 +313,9 @@ message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, unsigned char* src
     msg_type = src[0];
     if (msg_type == SPIN_DNS_ANSWER) {
         src++;
+        // TODO: do we need to have the msg_size?
         msg_size = read_int16(src);
+        (void)msg_size;
         src += 2;
         dns_pkt_info->family = src[0];
         src += 1;

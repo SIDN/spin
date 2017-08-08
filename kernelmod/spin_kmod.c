@@ -165,7 +165,7 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
         pkt_info->payload_size = (uint32_t)ntohs(udp_header->len) - 8;
         pkt_info->payload_offset = skb_network_header_len(sockbuff) + 8;
     } else if (ip_header->protocol == 6) {
-		tcp_header = (struct tcphdr*)((char*)ip_header + (ip_header->ihl * 4));
+        tcp_header = (struct tcphdr*)((char*)ip_header + (ip_header->ihl * 4));
         pkt_info->src_port = ntohs(tcp_header->source);
         pkt_info->dest_port = ntohs(tcp_header->dest);
         pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff);
@@ -214,12 +214,12 @@ void hexdump_k(uint8_t* data, unsigned int offset, unsigned int size) {
 }
 
 /*int send_netlink_message(int msg_size, void* msg_data, uint32_t client_port_id) {
-	traffic_clients_send(traffic_clients, msg_size, msg_data, client
-	send_queue_add(handler_info->send_queue, msg_size, msg_data, client_port_id);
-	return 1;
+    traffic_clients_send(traffic_clients, msg_size, msg_data, client
+    send_queue_add(handler_info->send_queue, msg_size, msg_data, client_port_id);
+    return 1;
 }*/
 
-#define PACKET_SIZE 1024
+#define PACKET_SIZE 800
 // TODO: refactor two functions below
 void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
     int msg_size;
@@ -247,7 +247,7 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
 
     pktinfo_msg2wire(type, data, pkt_info);
 
-	traffic_clients_send(traffic_clients, msg_size, data);
+    traffic_clients_send(traffic_clients, msg_size, data);
 }
 
 void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
@@ -271,12 +271,12 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
 
     dns_pktinfo_msg2wire(data, dns_pkt_info);
 
-	traffic_clients_send(traffic_clients, msg_size, data);
-	/*
-	for (i = 0; i < get_traffic_client_count(traffic_clients); i++) {
-		port_id = get_traffic_client_port_id(&handler_info->traffic_clients, i);
-		res = send_netlink_message(msg_size, data, port_id);
-	}*/
+    traffic_clients_send(traffic_clients, msg_size, data);
+    /*
+    for (i = 0; i < get_traffic_client_count(traffic_clients); i++) {
+        port_id = get_traffic_client_port_id(&handler_info->traffic_clients, i);
+        res = send_netlink_message(msg_size, data, port_id);
+    }*/
 }
 
 static inline uint16_t read_int16(uint8_t* data) {
@@ -284,21 +284,21 @@ static inline uint16_t read_int16(uint8_t* data) {
 }
 
 unsigned int skip_dname(uint8_t* data, unsigned int cur_pos, size_t payload_size) {
-	uint8_t labellen;
-	if (cur_pos + 1 > payload_size) {
-		printk(KERN_WARNING "unexpected end of payload when trying to read label\n");
-		return -1;
-	}
+    uint8_t labellen;
+    if (cur_pos + 1 > payload_size) {
+        printk(KERN_WARNING "unexpected end of payload when trying to read label\n");
+        return -1;
+    }
     labellen = data[cur_pos++];
     while (labellen > 0) {
         if ((labellen & 0xc0) == 0xc0) {
             // compressed, just skip it
             return ++cur_pos;
         }
-		if (cur_pos + labellen > payload_size) {
-			printk(KERN_WARNING "label len (%u at %u) past payload (%u)\n", (unsigned int)labellen, (unsigned int)cur_pos - 1, (unsigned int)payload_size);
-			return -1;
-		}
+        if (cur_pos + labellen > payload_size) {
+            printk(KERN_WARNING "label len (%u at %u) past payload (%u)\n", (unsigned int)labellen, (unsigned int)cur_pos - 1, (unsigned int)payload_size);
+            return -1;
+        }
         cur_pos += labellen;
         labellen = data[cur_pos++];
     }
@@ -333,14 +333,14 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
         //printk("[XX] error: offset (%u) larger than packet size (%u)\n", offset, skb->len);
         return;
     } else {
-		payload_size = skb->len - offset;
-	}
+        payload_size = skb->len - offset;
+    }
     //hexdump_k(skb->data, pkt_info->payload_offset, pkt_info->payload_size);
     // check data size as well
     if (payload_size < 12) {
-		//printk("[XX] error: packet not large enough to be a DNS packet\n");
-		return;
-	}
+        //printk("[XX] error: packet not large enough to be a DNS packet\n");
+        return;
+    }
     flag_bits = data[2];
     flag_bits2 = data[3];
     // must be qr answer
@@ -365,15 +365,15 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     cur_pos_name = 0;
     labellen = data[cur_pos++];
     while(labellen > 0) {
-		if (cur_pos + labellen > payload_size) {
-			printk(KERN_WARNING "Error: label len larger than packet payload\n");
-			return;
-		}
-		if (cur_pos_name + labellen > 255) {
-			printk(KERN_WARNING "Error: domain name over 255 octets\n");
-			return;
-		}
-		dnsname[cur_pos_name++] = labellen;
+        if (cur_pos + labellen > payload_size) {
+            printk(KERN_WARNING "Error: label len larger than packet payload\n");
+            return;
+        }
+        if (cur_pos_name + labellen > 255) {
+            printk(KERN_WARNING "Error: domain name over 255 octets\n");
+            return;
+        }
+        dnsname[cur_pos_name++] = labellen;
         memcpy(dnsname + cur_pos_name, data + cur_pos, labellen);
         cur_pos += labellen;
         cur_pos_name += labellen;
@@ -384,10 +384,10 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
 
     // then read all answer ips
     // type should be 1 (A) or 28 (AAAA) and class should be IN (1)
-	if (cur_pos + 4 > payload_size) {
-		printk(KERN_WARNING "unexpected end of payload when reading question RR\n");
-		return;
-	}
+    if (cur_pos + 4 > payload_size) {
+        printk(KERN_WARNING "unexpected end of payload when reading question RR\n");
+        return;
+    }
     rr_type = read_int16(data + cur_pos);
     if (rr_type != 1 && rr_type != 28) {
         //printk("[XX] query rr type (%u) not 1 or 28, skip packet\n", rr_type);
@@ -405,11 +405,11 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
         //printk("[XX] skip dname from: %u\n", cur_pos);
         cur_pos = skip_dname(data, cur_pos, payload_size);
         if (cur_pos < 0) {
-			return;
-		}
-		if (cur_pos + 4 > payload_size) {
-			printk(KERN_WARNING "unexpected end of payload while reading answer RR\n");
-		}
+            return;
+        }
+        if (cur_pos + 4 > payload_size) {
+            printk(KERN_WARNING "unexpected end of payload while reading answer RR\n");
+        }
         //printk("[XX] dname skipped pos now: %u\n", cur_pos);
         // read the type
         rr_type = read_int16(data + cur_pos);
@@ -420,9 +420,9 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             //printk("[XX] found A answer\n");
             // data format:
             // <dns type> <ip family> <ip data> <TTL> <domain name wire format>
-			if (cur_pos + 10 > payload_size) {
-				printk(KERN_WARNING "unexpected end of payload while reading answer A RR\n");
-			}
+            if (cur_pos + 10 > payload_size) {
+                printk(KERN_WARNING "unexpected end of payload while reading answer A RR\n");
+            }
             memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
             dpkt_info.family = AF_INET;
             memcpy(&dpkt_info.ttl, data + cur_pos, 4);
@@ -440,9 +440,9 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             //printk("[XX] found AAAA answer\n");
             // data format:
             // <dns type> <ip family> <ip data> <TTL> <domain name wire format>
-			if (cur_pos + 22 > payload_size) {
-				printk(KERN_WARNING "unexpected end of payload while reading answer AAAA RR\n");
-			}
+            if (cur_pos + 22 > payload_size) {
+                printk(KERN_WARNING "unexpected end of payload while reading answer AAAA RR\n");
+            }
             memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
             dpkt_info.family = AF_INET6;
             memcpy(&dpkt_info.ttl, data + cur_pos, 4);
@@ -460,17 +460,17 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             //printk("[XX] not A or AAAA in answer at %u (val: %u)\n", cur_pos - 4, rr_type);
             //printk("[XX] now at %u\n", cur_pos);
             // skip ttl
-			if (cur_pos + 6 > payload_size) {
-				printk(KERN_WARNING "unexpected end of payload while reading answer RR size\n");
-			}
+            if (cur_pos + 6 > payload_size) {
+                printk(KERN_WARNING "unexpected end of payload while reading answer RR size\n");
+            }
             cur_pos += 4;
             //printk("[XX] after ttl at %u (val here: %u)\n", cur_pos, read_int16(data + cur_pos));
             // skip rdata
             cur_pos += read_int16(data + cur_pos) + 2;
             //printk("[XX] skip to: %u\n", cur_pos);
-			if (cur_pos > payload_size) {
-				printk(KERN_WARNING "unexpected end of payload while skipping answer RR\n");
-			}
+            if (cur_pos > payload_size) {
+                printk(KERN_WARNING "unexpected end of payload while skipping answer RR\n");
+            }
 
         }
     }
@@ -491,7 +491,7 @@ void check_pkt_info_timestamp(void) {
 }
 
 void add_pkt_info(pkt_info_t* pkt_info) {
-	check_pkt_info_timestamp();
+    check_pkt_info_timestamp();
     pkt_info_list_add(pkt_info_list, pkt_info);
 }
 
@@ -590,9 +590,10 @@ void send_config_response(int port_id, config_command_t cmd, size_t msg_size, vo
 
     memcpy(nlmsg_data(nlh) + 2, msg_src, msg_size);
 
-    //hexdump_k(nlmsg_data(nlh), 0, msg_size + 2);
-    //hexdump_k(skb_out->data, 0, msg_size + 1 + 16);
+    hexdump_k(nlmsg_data(nlh), 0, msg_size + 2);
+    hexdump_k(skb_out->data, 0, msg_size + 1 + 16);
 
+    printk(KERN_INFO "[XX] sending config response\n");
     res = nlmsg_unicast(config_nl_sk, skb_out, port_id);
 
     if (res < 0) {
@@ -655,22 +656,25 @@ int cmd_remove_ip(uint8_t* databuf, ip_store_t* ip_store) {
 static void config_client_connect(struct sk_buff *skb) {
     struct nlmsghdr *nlh;
     int pid;
-    char error_msg[1024];
+    char error_msg[640];
     config_command_t cmd;
     uint8_t* cmdbuf;
 
     //printk(KERN_INFO "Entering: %s\n", __FUNCTION__);
 
     nlh = (struct nlmsghdr *) skb->data;
-    //printk(KERN_INFO "got command of size %u\n", skb->len);
+    printk(KERN_INFO "[XX] got command of size %u (%u)\n", skb->len, nlh->nlmsg_len);
 
     /* pid of sending process */
     pid = nlh->nlmsg_pid;
-    //printk(KERN_INFO "Client (pid %u) connected to config port\n", pid);
+    printk(KERN_INFO "Client (pid %u) connected to config port\n", pid);
 
     cmdbuf = (uint8_t*) NLMSG_DATA(nlh);
-    if (skb->len < 1) {
-        //printk(KERN_INFO "got command of size 0\n");
+
+    hexdump_k(cmdbuf, 0, nlh->nlmsg_len);
+
+    if (skb->len < 2) {
+        printk(KERN_INFO "got command of size < 2\n");
         snprintf(error_msg, 1024, "empty command");
         send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
     } else {
@@ -679,7 +683,7 @@ static void config_client_connect(struct sk_buff *skb) {
             return;
         }
         cmd = cmdbuf[1];
-        //printk("Got command %u\n", cmd);
+        printk("[XX] Got command %u\n", cmd);
         switch (cmd) {
         case SPIN_CMD_GET_IGNORE:
             ip_store_for_each(ignore_ips, send_config_response_ip_list_callback, &pid);
@@ -850,7 +854,7 @@ void add_default_test_ips(void) {
 }
 
 void init_local(void) {
-	printk(KERN_INFO "SPIN initializing local mode\n");
+    printk(KERN_INFO "SPIN initializing local mode\n");
 
     nfho1.hook = hook_func_new;
     nfho1.hooknum = NF_INET_LOCAL_IN;
@@ -878,7 +882,7 @@ void init_local(void) {
 }
 
 void init_forward(void) {
-	printk(KERN_INFO "SPIN initializing forward mode\n");
+    printk(KERN_INFO "SPIN initializing forward mode\n");
 
     nfho1.hook = hook_func_new;
     nfho1.hooknum = NF_INET_PRE_ROUTING;
@@ -914,23 +918,23 @@ int init_module()
 
     printk(KERN_INFO "SPIN module loaded\n");
 
-	if (strncmp(mode, "local", 6) == 0) {
-		init_local();
-	} else if (strncmp(mode, "forward", 8) == 0) {
-		init_forward();
-	} else {
-		pkt_info_list_destroy(pkt_info_list);
-		close_netfilter();
-		return -ENODEV;
-	}
+    if (strncmp(mode, "local", 6) == 0) {
+        init_local();
+    } else if (strncmp(mode, "forward", 8) == 0) {
+        init_forward();
+    } else {
+        pkt_info_list_destroy(pkt_info_list);
+        close_netfilter();
+        return -ENODEV;
+    }
 
     ignore_ips = ip_store_create();
     block_ips = ip_store_create();
     except_ips = ip_store_create();
-	timer_init();
+    timer_init();
 
-	//handler_info = data_handler_init(traffic_nl_sk);
-	traffic_clients = traffic_clients_create(traffic_nl_sk);
+    //handler_info = data_handler_init(traffic_nl_sk);
+    traffic_clients = traffic_clients_create(traffic_nl_sk);
 
     return 0;
 }
@@ -938,9 +942,9 @@ int init_module()
 //Called when module unloaded using 'rmmod'
 void cleanup_module()
 {
-	printk("[XX] stopping handler thread\n");
-	traffic_clients_destroy(traffic_clients);
-	printk("[XX] stopped handler thread\n");
+    printk("[XX] stopping handler thread\n");
+    traffic_clients_destroy(traffic_clients);
+    printk("[XX] stopped handler thread\n");
 
     timer_cleanup();
     pkt_info_list_destroy(pkt_info_list);

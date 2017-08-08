@@ -39,6 +39,7 @@ void hexdump(uint8_t* data, unsigned int size) {
 
 void send_ack()
 {
+    printf("[XX] send_ack called\n");
     nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_PAYLOAD));
     memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
     nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
@@ -56,26 +57,29 @@ void send_ack()
 
     printf("Sending ACK to kernel\n");
     sendmsg(sock_fd,&msg,0);
+    printf("[XX] send_ack done\n");
 }
 
 #define MESSAGES_BEFORE_WAIT 50
 void check_send_ack() {
-	ack_counter++;
-	if (ack_counter > MESSAGES_BEFORE_WAIT) {
-		send_ack();
-		ack_counter = 0;
-	}
+    printf("[XX] check_send_ack called\n");
+    ack_counter++;
+    if (ack_counter > MESSAGES_BEFORE_WAIT) {
+        send_ack();
+        ack_counter = 0;
+    }
+    printf("[XX] check_send_ack done\n");
 }
 
 int main()
 {
-	ssize_t c = 0;
-	int rs;
+    ssize_t c = 0;
+    int rs;
     message_type_t type;
-	struct timeval tv;
+    struct timeval tv;
     struct pollfd fds[1];
 
-	ack_counter = 0;
+    ack_counter = 0;
 
     sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_TRAFFIC_PORT);
     if(sock_fd<0) {
@@ -83,9 +87,9 @@ int main()
         return -1;
     }
 
-	tv.tv_sec = 0;
-	tv.tv_usec = 500;
-	setsockopt(sock_fd, 270, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
+    tv.tv_sec = 0;
+    tv.tv_usec = 500;
+    setsockopt(sock_fd, 270, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
 
     memset(&src_addr, 0, sizeof(src_addr));
     src_addr.nl_family = AF_NETLINK;
@@ -118,44 +122,53 @@ int main()
     sendmsg(sock_fd,&msg,0);
     printf("Waiting for message from kernel\n");
 */
-	send_ack();
+    send_ack();
 
     fds[0].fd = sock_fd;
     fds[0].events = POLLIN;
 
     /* Read message from kernel */
     while (1) {
-		rs = poll(fds, 1, 500);
-		if (rs == 0) {
-			continue;
-		}
+        rs = poll(fds, 1, 500);
+        if (rs == 0) {
+            continue;
+        }
 
         rs = recvmsg(sock_fd, &msg, 0);
+        printf("[XX] got msg\n");
         if (rs < 0) {
-			continue;
-		}
+            continue;
+        }
         c++;
         //printf("C: %u RS: %u\n", c, rs);
         //printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
         pkt_info_t pkt;
         dns_pkt_info_t dns_pkt;
-        char pkt_str[2048];
+        char pkt_str[1024];
+        printf("[XX] call wire2pktinfo\n");
         type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(nlh));
         if (type == SPIN_BLOCKED) {
-            pktinfo2str(pkt_str, &pkt, 2048);
+            printf("[XX] call pktinfo2str (blocked)\n");
+            pktinfo2str(pkt_str, &pkt, 1024);
+            printf("[XX] pktinfo2str done (size %u)\n", strlen(pkt_str));
             printf("[BLOCKED] %s\n", pkt_str);
-	check_send_ack();
+            check_send_ack();
         } else if (type == SPIN_TRAFFIC_DATA) {
-            pktinfo2str(pkt_str, &pkt, 2048);
+            printf("[XX] call pktinfo2str (traffic)\n");
+            pktinfo2str(pkt_str, &pkt, 1024);
+            printf("[XX] pktinfo2str done (size %u)\n", strlen(pkt_str));
             printf("[TRAFFIC] %s\n", pkt_str);
-	check_send_ack();
+            check_send_ack();
         } else if (type == SPIN_DNS_ANSWER) {
             // note: bad version would have been caught in wire2pktinfo
             // in this specific case
+            printf("[XX] call wire2dns_pktinfo\n");
             wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(nlh));
-            dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
+            printf("[XX] wire2dns_pktinfo done, call  dns_pktinfo2str\n");
+            dns_pktinfo2str(pkt_str, &dns_pkt, 1024);
+            printf("[XX] dns_pktinfo2str done (size %u)\n", strlen(pkt_str));
             printf("[DNS] %s\n", pkt_str);
-	check_send_ack();
+            check_send_ack();
         } else if (type == SPIN_ERR_BADVERSION) {
             printf("Error: version mismatch between client and kernel module\n");
         } else {

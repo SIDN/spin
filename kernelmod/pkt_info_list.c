@@ -1,5 +1,6 @@
 
 #include "pkt_info_list.h"
+#include "spin_util.h"
 
 pkt_info_list_t* pkt_info_list_create(unsigned int size) {
     unsigned int i;

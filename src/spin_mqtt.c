@@ -12,26 +12,45 @@
 
 #include "pkt_info.h"
 #include "dns_cache.h"
+#include "node_cache.h"
 #include "tree.h"
+
+#include "spin_cfg.h"
 
 #include <poll.h>
 
 #include <mosquitto.h>
 
 #include <signal.h>
+#include <time.h>
 
+#include "jsmn.h"
+
+#define NETLINK_CONFIG_PORT 30
 #define NETLINK_TRAFFIC_PORT 31
 
-#define MAX_PAYLOAD 1024 /* maximum payload size*/
+#define MAX_NETLINK_PAYLOAD 1024 /* maximum payload size*/
 struct sockaddr_nl src_addr, dest_addr;
-struct nlmsghdr *nlh = NULL;
-struct iovec iov;
-int sock_fd;
-struct msghdr msg;
+struct nlmsghdr *traffic_nlh = NULL;
+struct iovec traffic_iov;
+int traffic_sock_fd;
+struct msghdr traffic_msg;
+
+struct nlmsghdr *command_nlh = NULL;
+struct iovec command_iov;
+int command_sock_fd;
+struct msghdr command_msg;
 
 int ack_counter;
 
 static dns_cache_t* dns_cache;
+static node_cache_t* node_cache;
+static struct mosquitto* mosq;
+
+static int running;
+
+#define MQTT_CHANNEL_TRAFFIC "SPIN/traffic"
+#define MQTT_CHANNEL_COMMANDS "SPIN/commands"
 
 void hexdump(uint8_t* data, unsigned int size) {
     unsigned int i;
@@ -47,24 +66,31 @@ void hexdump(uint8_t* data, unsigned int size) {
 
 void send_ack()
 {
-    nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_PAYLOAD));
-    memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
-    nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
-    nlh->nlmsg_pid = getpid();
-    nlh->nlmsg_flags = 0;
+    uint32_t now = time(NULL);
 
-    strcpy(NLMSG_DATA(nlh), "Hello!");
+    memset(traffic_nlh, 0, NLMSG_SPACE(MAX_NETLINK_PAYLOAD));
+    traffic_nlh->nlmsg_len = NLMSG_SPACE(MAX_NETLINK_PAYLOAD);
+    traffic_nlh->nlmsg_pid = getpid();
+    traffic_nlh->nlmsg_flags = 0;
 
-    iov.iov_base = (void *)nlh;
-    iov.iov_len = nlh->nlmsg_len;
-    msg.msg_name = (void *)&dest_addr;
-    msg.msg_namelen = sizeof(dest_addr);
-    msg.msg_iov = &iov;
-    msg.msg_iovlen = 1;
+    strcpy(NLMSG_DATA(traffic_nlh), "Hello!");
+
+    traffic_iov.iov_base = (void *)traffic_nlh;
+    traffic_iov.iov_len = traffic_nlh->nlmsg_len;
+    traffic_msg.msg_name = (void *)&dest_addr;
+    traffic_msg.msg_namelen = sizeof(dest_addr);
+    traffic_msg.msg_iov = &traffic_iov;
+    traffic_msg.msg_iovlen = 1;
 
     printf("Sending ACK to kernel\n");
-    sendmsg(sock_fd, &msg, 0);
+    sendmsg(traffic_sock_fd, &traffic_msg, 0);
 
+    printf("[XX] cleaning cache\n");
+    dns_cache_clean(dns_cache, now);
+    printf("[XX] Contents of DNS cache\n");
+    dns_cache_print(dns_cache);
+    printf("[XX] End of DNS cache\n");
+    // hey, how about we clean here?_
 }
 
 #define MESSAGES_BEFORE_PING 50
@@ -76,6 +102,230 @@ void check_send_ack() {
     }
 }
 
+static inline void
+print_pktinfo_wirehex(pkt_info_t* pkt_info) {
+    uint8_t* wire = (char*)malloc(46);
+    memset(wire, 0, 46);
+    pktinfo2wire(wire, pkt_info);
+    // size is 49 (46 bytes of pkt info, 1 byte of type, 2 bytes of size)
+    int i;
+    // print version, msg_type, and size (which is irrelevant right now)
+    printf("{ 0x01, 0x01, 0x00, 0x00, ");
+    for (i = 0; i < 45; i++) {
+        printf("0x%02x, ", wire[i]);
+    }
+    printf("0x%02x }\n", wire[45]);
+
+    free(wire);
+}
+
+static inline void
+print_dnspktinfo_wirehex(dns_pkt_info_t* pkt_info) {
+    uint8_t* wire = (char*)malloc(277);
+    memset(wire, 0, 277);
+    dns_pktinfo2wire(wire, pkt_info);
+    // size is 49 (46 bytes of pkt info, 1 byte of type, 2 bytes of size)
+    int i;
+    // print version, msg_type, and size (which is irrelevant right now)
+    printf("{ 0x01, 0x02, 0x00, 0x00, ");
+    for (i = 0; i < 277; i++) {
+        printf("0x%02x, ", wire[i]);
+    }
+    printf("0x%02x }\n", wire[277]);
+
+    free(wire);
+}
+
+
+typedef struct {
+    uint8_t** ips;
+    size_t ip_count;
+    size_t ip_max;
+    char* error;
+} netlink_command_result_t;
+
+netlink_command_result_t* netlink_command_result_create(void) {
+    netlink_command_result_t* command_result = (netlink_command_result_t*)malloc(sizeof(netlink_command_result_t));
+    command_result->ip_max = 10;
+    command_result->ips = malloc(sizeof(uint8_t*) * command_result->ip_max);
+    command_result->ip_count = 0;
+    command_result->error = NULL;
+
+    return command_result;
+}
+
+void netlink_command_result_destroy(netlink_command_result_t* command_result) {
+    size_t i;
+    for (i = 0; i < command_result->ip_count; i++) {
+        free(command_result->ips[i]);
+    }
+    free(command_result->ips);
+    free(command_result);
+}
+
+void netlink_command_result_add_ip(netlink_command_result_t* command_result, uint8_t ip_fam, uint8_t* ip) {
+    printf("[XX] ADD IP OF SIZE %lu\n", sizeof(ip));
+    // we store it in the 17-bit 'format' of spin here
+    uint8_t* s_ip;
+    if (ip_fam == AF_INET) {
+        command_result->ips[command_result->ip_count] = malloc(17);
+        s_ip = command_result->ips[command_result->ip_count];
+        s_ip[0] = ip_fam;
+        memset(s_ip+1, 12, 0);
+        memcpy(s_ip+13, ip, 4);
+        command_result->ip_count++;
+    } else if (ip_fam == AF_INET6) {
+        command_result->ips[command_result->ip_count] = malloc(17);
+        s_ip = command_result->ips[command_result->ip_count];
+        s_ip[0] = ip_fam;
+        memcpy(s_ip+1, ip, 16);
+        command_result->ip_count++;
+    } else {
+        printf("[XX] error: unknown ip version\n");
+    }
+}
+
+void netlink_command_result_set_error(netlink_command_result_t* command_result, char* error) {
+    command_result->error = error;
+}
+
+unsigned int netlink_command_result2json(netlink_command_result_t* command_result, char* dest, unsigned int max_len) {
+    unsigned int s = 0;
+    int i;
+    if (command_result->error != NULL) {
+        s += snprintf(dest + s, max_len - s, "\"%s\", ", command_result->error);
+    } else {
+        s += snprintf(dest + s, max_len - s, " [ ");
+        for (i = 0; i < command_result->ip_count; i++) {
+            s += snprintf(dest + s, max_len - s, "\"");
+            s += spin_ntop(dest + s, command_result->ips[i], max_len - s);
+            s += snprintf(dest + s, max_len - s, "\" ");
+            if (i < command_result->ip_count - 1) {
+                s += snprintf(dest + s, max_len - s, ", ");
+            }
+        }
+        s += snprintf(dest + s, max_len - s, "] ");
+    }
+    return s;
+}
+
+netlink_command_result_t*
+send_netlink_command_buf(size_t cmdbuf_size, unsigned char* cmdbuf)
+{
+    config_command_t cmd;
+    uint8_t version;
+    netlink_command_result_t* command_result = netlink_command_result_create();
+
+    printf("[XX] send_netlink_command() start\n");
+    command_sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_CONFIG_PORT);
+    if(command_sock_fd < 0) {
+        fprintf(stderr, "Error connecting to socket: %s\n", strerror(errno));
+        netlink_command_result_set_error(command_result, "Error connecting to netlink socket");
+        return command_result;
+    }
+
+    memset(&src_addr, 0, sizeof(src_addr));
+    src_addr.nl_family = AF_NETLINK;
+    src_addr.nl_pid = getpid(); /* self pid */
+
+    bind(command_sock_fd, (struct sockaddr*)&src_addr, sizeof(src_addr));
+
+    memset(&dest_addr, 0, sizeof(dest_addr));
+    dest_addr.nl_family = AF_NETLINK;
+    dest_addr.nl_pid = 0; /* For Linux Kernel */
+    dest_addr.nl_groups = 0; /* unicast */
+
+    command_nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_NETLINK_PAYLOAD));
+    memset(command_nlh, 0, NLMSG_SPACE(MAX_NETLINK_PAYLOAD));
+    command_nlh->nlmsg_len = NLMSG_SPACE(MAX_NETLINK_PAYLOAD);
+    command_nlh->nlmsg_pid = getpid();
+    command_nlh->nlmsg_flags = 0;
+
+    memcpy(NLMSG_DATA(command_nlh), cmdbuf, cmdbuf_size);
+
+    command_iov.iov_base = (void *)command_nlh;
+    command_iov.iov_len = command_nlh->nlmsg_len;
+    command_msg.msg_name = (void *)&dest_addr;
+    command_msg.msg_namelen = sizeof(dest_addr);
+    command_msg.msg_iov = &command_iov;
+    command_msg.msg_iovlen = 1;
+
+    // set it shorter when sending
+    command_nlh->nlmsg_len = NLMSG_SPACE(cmdbuf_size);
+    sendmsg(command_sock_fd,&command_msg,0);
+    // max len again, we don't know response sizes
+    command_nlh->nlmsg_len = NLMSG_SPACE(MAX_NETLINK_PAYLOAD);
+
+    /* Read response message(s) */
+    // Last message should always be SPIN_CMD_END with no data
+    while (1) {
+        printf("[XX] recv response\n");
+        recvmsg(command_sock_fd, &command_msg, 0);
+        printf("[XX] recv response done\n");
+        version = ((uint8_t*)NLMSG_DATA(command_nlh))[0];
+        if (version != 1) {
+            printf("protocol mismatch from kernel module: got %u, expected %u\n", version, SPIN_NETLINK_PROTOCOL_VERSION);
+            break;
+        }
+
+        cmd = ((uint8_t*)NLMSG_DATA(command_nlh))[1];
+
+        if (cmd == SPIN_CMD_END) {
+            printf("[XX] SPIN_CMD_END\n");
+            break;
+        } else if (cmd == SPIN_CMD_ERR) {
+            printf("[XX] SPIN_CMD_ERR\n");
+            //printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
+            pkt_info_t pkt;
+            char err_str[MAX_NETLINK_PAYLOAD];
+            strncpy(err_str, (char *)NLMSG_DATA(command_nlh) + 2, MAX_NETLINK_PAYLOAD);
+            printf("Error message from kernel: %s\n", err_str);
+        } else if (cmd == SPIN_CMD_IP) {
+            printf("[XX] SPIN_CMD_IP\n");
+            // TODO: check message size
+            // first octet is ip version (AF_INET or AF_INET6)
+            uint8_t ipv = ((uint8_t*)NLMSG_DATA(command_nlh))[2];
+            unsigned char ip_str[INET6_ADDRSTRLEN];
+            inet_ntop(ipv, NLMSG_DATA(command_nlh) + 3, ip_str, INET6_ADDRSTRLEN);
+            printf("%s\n", ip_str);
+            netlink_command_result_add_ip(command_result, ipv, NLMSG_DATA(command_nlh) + 3);
+        } else {
+            printf("unknown command response type received from kernel (%u %02x), stopping\n", cmd, cmd);
+            hexdump((uint8_t*)NLMSG_DATA(command_nlh), command_nlh->nlmsg_len);
+            break;
+        }
+    }
+    close(command_sock_fd);
+    printf("[XX] send_netlink_command() done\n");
+    return command_result;
+}
+
+
+unsigned int create_mqtt_command(char* dest, unsigned int max_len, char* command, char* argument, char* result) {
+    unsigned int s = 0;
+    s += snprintf(dest + s, max_len - s, "{ \"command\": \"%s\"", command);
+    if (argument != NULL) {
+        s += snprintf(dest + s, max_len - s, ", \"argument\": %s", argument);
+    }
+    if (result != NULL) {
+        s += snprintf(dest + s, max_len - s, ", \"result\": %s", result);
+    }
+    s += snprintf(dest + s, max_len - s, " }");
+    return s;
+}
+
+void send_command_blocked(pkt_info_t* pkt_info) {
+    char response_str[4096];
+    unsigned int response_size;
+    buffer_t* pkt_json = buffer_create(2048);
+
+    pkt_info2json(node_cache, pkt_info, pkt_json);
+    buffer_finish(pkt_json);
+    response_size = create_mqtt_command(response_str, 4096, "blocked", NULL, buffer_str(pkt_json));
+    mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, response_str, 0, false);
+    buffer_destroy(pkt_json);
+}
+
 int init_netlink()
 {
     ssize_t c = 0;
@@ -83,24 +333,30 @@ int init_netlink()
     message_type_t type;
     struct timeval tv;
     struct pollfd fds[1];
+    uint32_t now;
+
+    buffer_t* json_buf = buffer_create(4096);
+    int mosq_result;
+
+    traffic_nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_NETLINK_PAYLOAD));
 
     ack_counter = 0;
 
-    sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_TRAFFIC_PORT);
-    if(sock_fd<0) {
+    traffic_sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_TRAFFIC_PORT);
+    if(traffic_sock_fd < 0) {
         fprintf(stderr, "Error connecting to socket: %s\n", strerror(errno));
         return -1;
     }
 
     tv.tv_sec = 0;
     tv.tv_usec = 500;
-    setsockopt(sock_fd, 270, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
+    setsockopt(traffic_sock_fd, 270, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
 
     memset(&src_addr, 0, sizeof(src_addr));
     src_addr.nl_family = AF_NETLINK;
     src_addr.nl_pid = getpid(); /* self pid */
 
-    bind(sock_fd, (struct sockaddr*)&src_addr, sizeof(src_addr));
+    bind(traffic_sock_fd, (struct sockaddr*)&src_addr, sizeof(src_addr));
 
     memset(&dest_addr, 0, sizeof(dest_addr));
     memset(&dest_addr, 0, sizeof(dest_addr));
@@ -110,17 +366,21 @@ int init_netlink()
 
     send_ack();
 
-    fds[0].fd = sock_fd;
+    fds[0].fd = traffic_sock_fd;
     fds[0].events = POLLIN;
 
+    flow_list_t* flow_list = flow_list_create(time(NULL));
+
     /* Read message from kernel */
-    while (1) {
-        rs = poll(fds, 1, 500);
+    while (running) {
+        mosquitto_loop(mosq, 0, 10);
+        rs = poll(fds, 1, 50);
         if (rs == 0) {
+            mosquitto_loop(mosq, 0, 10);
             continue;
         }
-        printf("[XX] RECV msg: %p\n", &msg);
-        rs = recvmsg(sock_fd, &msg, 0);
+        //printf("[XX] RECV msg: %p\n", &msg);
+        rs = recvmsg(traffic_sock_fd, &traffic_msg, 0);
 
         if (rs < 0) {
             continue;
@@ -131,38 +391,459 @@ int init_netlink()
         pkt_info_t pkt;
         dns_pkt_info_t dns_pkt;
         char pkt_str[2048];
-        type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(nlh));
+        type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
+        now = time(NULL);
         if (type == SPIN_BLOCKED) {
             //pktinfo2str(pkt_str, &pkt, 2048);
             //printf("[BLOCKED] %s\n", pkt_str);
+            node_cache_add_pkt_info(node_cache, &pkt, now);
+            send_command_blocked(&pkt);
             check_send_ack();
         } else if (type == SPIN_TRAFFIC_DATA) {
-            //pktinfo2str(pkt_str, &pkt, 2048);
-            //printf("[TRAFFIC] %s\n", pkt_str);
+            pktinfo2str(pkt_str, &pkt, 2048);
+            printf("[TRAFFIC] %s\n", pkt_str);
+            //print_pktinfo_wirehex(&pkt);
+            node_cache_add_pkt_info(node_cache, &pkt, now);
+            //json_msg_size = create_traffic_command(node_cache, &pkt, json_msg, json_msg_max_len, now);
+            //mosq_result = mosquitto_publish(mosq, NULL, "SPIN/traffic", json_msg_size, json_msg, 0, false);
+            if (flow_list_should_send(flow_list, now)) {
+                if (!flow_list_empty(flow_list)) {
+                    // create json, send it
+                    create_traffic_command(node_cache, flow_list, json_buf, now);
+                    if (buffer_finish(json_buf)) {
+                        mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
+                    } else {
+                        printf("[XX] trucnated! what now? TODO split up?\n");
+                    }
+                }
+                flow_list_clear(flow_list, now);
+            } else {
+                // add the current one
+                flow_list_add_pktinfo(flow_list, &pkt);
+            }
             check_send_ack();
         } else if (type == SPIN_DNS_ANSWER) {
             // note: bad version would have been caught in wire2pktinfo
             // in this specific case
-            wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(nlh));
+            wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
             dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
+            print_dnspktinfo_wirehex(&dns_pkt);
             printf("[DNS] %s\n", pkt_str);
-            printf("[XX] add to cache\n");
-            dns_cache_add(dns_cache, &dns_pkt);
-            printf("[XX] added to cache\n");
-            dns_cache_print(dns_cache);
-
+            dns_cache_add(dns_cache, &dns_pkt, now);
+            node_cache_add_dns_info(node_cache, &dns_pkt, now);
+            // TODO do we need to send nodeUpdate?
             check_send_ack();
         } else if (type == SPIN_ERR_BADVERSION) {
             printf("Error: version mismatch between client and kernel module\n");
         } else {
             printf("unknown type? %u\n", type);
         }
+
+        mosquitto_loop(mosq, 0, 10);
     }
-    close(sock_fd);
+    close(traffic_sock_fd);
+    flow_list_destroy(flow_list);
+    buffer_destroy(json_buf);
     return 0;
 }
 
-static struct mosquitto* mosq;
+
+static int json_dump(const char *js, jsmntok_t *t, size_t count, int indent) {
+    int i, j, k;
+    if (count == 0) {
+        return 0;
+    }
+    if (t->type == JSMN_PRIMITIVE) {
+        printf("%.*s", t->end - t->start, js+t->start);
+        return 1;
+    } else if (t->type == JSMN_STRING) {
+        printf("'%.*s'", t->end - t->start, js+t->start);
+        return 1;
+    } else if (t->type == JSMN_OBJECT) {
+        printf("\n");
+        j = 0;
+        for (k = 0; k < indent; k++) printf("  ");
+        printf("{\n");
+        for (i = 0; i < t->size; i++) {
+            for (k = 0; k < indent; k++) printf("  ");
+            j += json_dump(js, t+1+j, count-j, indent+1);
+            printf(": ");
+            j += json_dump(js, t+1+j, count-j, indent+1);
+            printf(" \n");
+        }
+        for (k = 0; k < indent; k++) printf("  ");
+        printf("}");
+        return j+1;
+    } else if (t->type == JSMN_ARRAY) {
+        j = 0;
+        printf("\n");
+        for (i = 0; i < t->size; i++) {
+            for (k = 0; k < indent-1; k++) printf("  ");
+            printf("   - ");
+            j += json_dump(js, t+1+j, count-j, indent+1);
+            printf("\n");
+        }
+        return j+1;
+    }
+    return 0;
+}
+
+netlink_command_result_t* send_netlink_command_noarg(config_command_t cmd) {
+    unsigned char cmd_buf[2];
+    cmd_buf[0] = SPIN_NETLINK_PROTOCOL_VERSION;
+    cmd_buf[1] = cmd;
+    return send_netlink_command_buf(2, cmd_buf);
+}
+
+// should we convert earlier?
+netlink_command_result_t* send_netlink_command_iparg(config_command_t cmd, uint8_t* ip) {
+    unsigned char cmd_buf[19];
+    cmd_buf[0] = SPIN_NETLINK_PROTOCOL_VERSION;
+    cmd_buf[1] = (uint8_t) cmd;
+    cmd_buf[2] = ip[0];
+    if (ip[0] == AF_INET) {
+        memcpy(cmd_buf+3, ip+13, 4);
+        return send_netlink_command_buf(7, cmd_buf);
+    } else {
+        memcpy(cmd_buf+3, ip+3, 16);
+        return send_netlink_command_buf(19, cmd_buf);
+    }
+}
+
+void handle_command_get_filters() {
+    netlink_command_result_t* command_result;
+    char response_string[4096];
+    char result_string[4096];
+    unsigned int response_size;
+
+    // ask the
+    command_result = send_netlink_command_noarg(SPIN_CMD_GET_IGNORE);
+    printf("[XX] handle_command_get_filters() done\n");
+    netlink_command_result2json(command_result, result_string, 4096);
+
+    response_size = create_mqtt_command(response_string, 4096, "filters", NULL, result_string);
+    netlink_command_result_destroy(command_result);
+    mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, response_string, 0, false);
+    printf("[XX] FULL MSG: %s\n", response_string);
+}
+
+void handle_command_add_filter(uint8_t* ip) {
+    netlink_command_result_t* command_result = send_netlink_command_iparg(SPIN_CMD_ADD_IGNORE, ip);
+    // todo: store new list as well
+}
+
+void handle_command_remove_filter(uint8_t* ip) {
+    netlink_command_result_t* command_result = send_netlink_command_iparg(SPIN_CMD_REMOVE_IGNORE, ip);
+    // todo: store new list as well
+}
+
+void handle_command_reset_filters() {
+    // reload filters from file (TODO, also: need to do this on startup)
+}
+
+void handle_command_add_name(int node_id, char* name) {
+    // find the node
+    node_t* node = node_cache_find_by_id(node_cache, node_id);
+    tree_entry_t* ip_entry;
+
+    if (node == NULL) {
+        return;
+    }
+
+    // re-read node names, just in case someone has been editing it
+    // TODO: make filename configurable? right now it will silently fail
+    node_names_read_userconfig(node_cache->names, "/etc/spin/names.conf");
+
+    // if it has a mac address, use that, otherwise, add for all its ip
+    // addresses
+    if (node->mac != NULL) {
+        node_names_add_user_name_mac(node_cache->names, node->mac, name);
+    } else {
+        ip_entry = tree_first(node->ips);
+        while (ip_entry != NULL) {
+            node_names_add_user_name_ip(node_cache->names, (uint8_t*)ip_entry->key, name);
+            ip_entry = tree_next(ip_entry);
+        }
+    }
+    // TODO: make filename configurable? right now it will silently fail
+    node_names_write_userconfig(node_cache->names, "/etc/spin/names.conf");
+}
+
+void send_netlink_command_for_node_ips(config_command_t cmd, int node_id) {
+    node_t* node = node_cache_find_by_id(node_cache, node_id);
+    tree_entry_t* ip_entry;
+    netlink_command_result_t* command_result;
+
+    if (node == NULL) {
+        return;
+    }
+    ip_entry = tree_first(node->ips);
+    while (ip_entry != NULL) {
+        command_result = send_netlink_command_iparg(cmd, ip_entry->key);
+        ip_entry = tree_next(ip_entry);
+    }
+    // should we check result?
+    netlink_command_result_destroy(command_result);
+}
+
+void handle_command_block_data(int node_id) {
+    // TODO store this in "/etc/spin/blocked.conf"
+    printf("[XX] BLOCKING NODE %d\n", node_id);
+    send_netlink_command_for_node_ips(SPIN_CMD_ADD_BLOCK, node_id);
+}
+
+void handle_command_stop_block_data(int node_id) {
+    // TODO store this in "/etc/spin/blocked.conf"
+    send_netlink_command_for_node_ips(SPIN_CMD_REMOVE_BLOCK, node_id);
+}
+void handle_command_allow_data(int node_id) {
+    // TODO store this in "/etc/spin/blocked.conf"
+    send_netlink_command_for_node_ips(SPIN_CMD_ADD_EXCEPT, node_id);
+}
+void handle_command_stop_allow_data(int node_id) {
+    // TODO
+    // TODO store this in "/etc/spin/blocked.conf"
+    send_netlink_command_for_node_ips(SPIN_CMD_REMOVE_EXCEPT, node_id);
+}
+
+void send_command_restart() {
+    char response_string[4096];
+    unsigned int response_size = create_mqtt_command(response_string, 4096, "serverRestart", NULL, NULL);
+    mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, response_string, 0, false);
+}
+
+// returns 1 on success, 0 on error
+int json_parse_int_arg(int* dest,
+                       const char* json_str,
+                       jsmntok_t* tokens,
+                       int argument_token_i) {
+    jsmntok_t token = tokens[argument_token_i];
+    if (token.type != JSMN_PRIMITIVE) {
+        printf("[XX] not a primitive\n");
+        return 0;
+    } else {
+        *dest = atoi(json_str + token.start);
+        return 1;
+    }
+}
+
+int json_parse_string_arg(char* dest,
+                          size_t dest_size,
+                          const char* json_str,
+                          jsmntok_t* tokens,
+                          int argument_token_i) {
+    jsmntok_t token = tokens[argument_token_i];
+    size_t size;
+    if (token.type != JSMN_STRING) {
+        printf("[XX] not a string\n");
+        return 0;
+    } else {
+        size = snprintf(dest, dest_size, "%.*s", token.end - token.start, json_str+token.start);
+        return 1;
+    }
+}
+
+int json_parse_ip_arg(uint8_t dest[17],
+                      const char* json_str,
+                      jsmntok_t* tokens,
+                      int argument_token_i) {
+    char ip_str[INET6_ADDRSTRLEN];
+    int result = json_parse_string_arg(ip_str, INET6_ADDRSTRLEN, json_str, tokens, argument_token_i);
+    if (!result) {
+        return result;
+    } else {
+        result = spin_pton(dest, ip_str);
+        if (!result) {
+            return 0;
+        } else {
+            return 1;
+        }
+    }
+}
+
+// more complex argument, of the form
+// { "node_id": <int>, "name": <str> }
+int json_parse_node_id_name_arg(int* node_id,
+                                char* name,
+                                size_t name_size,
+                                const char* json_str,
+                                jsmntok_t* tokens,
+                                int argument_token_i) {
+    jsmntok_t token = tokens[argument_token_i];
+    int i, i_n, i_v, result, id_found = 0, name_found = 0;
+
+    if (token.type != JSMN_OBJECT ||
+        token.size != 2) {
+        printf("[XX] not an object with 2 elements (has %d)\n", token.size);
+        return 0;
+    } else {
+        for (i = 0; i < token.size; i++) {
+            // i*2 is name, i*2 + 1 is value
+            i_n = argument_token_i + i*2 + 1;
+            i_v = argument_token_i + i*2 + 2;
+            if (strncmp("name", json_str + tokens[i_n].start, tokens[i_n].end-tokens[i_n].start) == 0) {
+                result = json_parse_string_arg(name, name_size, json_str, tokens, i_v);
+                if (!result) {
+                    return result;
+                }
+                name_found = 1;
+            } else if (strncmp("node_id", json_str + tokens[i_n].start, tokens[i_n].end-tokens[i_n].start) == 0) {
+                result = json_parse_int_arg(node_id, json_str, tokens, i_v);
+                if (!result) {
+                    return result;
+                }
+                id_found = 1;
+            }
+        }
+    }
+    if (!name_found) {
+        printf("[XX] name not found\n");
+    }
+    if (!id_found) {
+        printf("[XX] id not found\n");
+    }
+    return (name_found && id_found);
+}
+
+void handle_json_command_2(size_t cmd_name_len,
+                           const char* cmd_name,
+                           const char* json_str,
+                           jsmntok_t* tokens,
+                           int argument_token_i) {
+    // figure out which command we got; depending on that we'll
+    // parse the arguments (if any), and handle directly, or contact
+    // the kernel module if necessary
+    config_command_t cmd;
+    int node_id_arg = 0;
+    int result;
+    char str_arg[80];
+    uint8_t ip_arg[17];
+
+    if (strncmp(cmd_name, "get_filters", cmd_name_len) == 0) {
+        handle_command_get_filters();
+    } else if (strncmp(cmd_name, "add_filter", cmd_name_len) == 0) {
+        if (json_parse_ip_arg(ip_arg, json_str, tokens, argument_token_i)) {
+            handle_command_add_filter(ip_arg);
+        }
+    } else if (strncmp(cmd_name, "remove_filter", cmd_name_len) == 0) {
+        if (json_parse_ip_arg(ip_arg, json_str, tokens, argument_token_i)) {
+            handle_command_remove_filter(ip_arg);
+        }
+    } else if (strncmp(cmd_name, "reset_filters", cmd_name_len) == 0) {
+        handle_command_reset_filters();
+    //} else if (strncmp(cmd_name, "get_names", cmd_name_len) == 0) {
+    //    handle_command_get_names();
+    } else if (strncmp(cmd_name, "add_name", cmd_name_len) == 0) {
+        if (json_parse_node_id_name_arg(&node_id_arg, str_arg, 24, json_str, tokens, argument_token_i)) {
+            handle_command_add_name(node_id_arg, str_arg);
+        }
+    } else if (strncmp(cmd_name, "blockdata", cmd_name_len) == 0) {
+        if (json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
+            handle_command_block_data(node_id_arg);
+        }
+    } else if (strncmp(cmd_name, "stopblockdata", cmd_name_len) == 0) {
+        if (json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
+            handle_command_stop_block_data(node_id_arg);
+        }
+    } else if (strncmp(cmd_name, "allowdata", cmd_name_len) == 0) {
+        if (json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
+            handle_command_allow_data(node_id_arg);
+        }
+    } else if (strncmp(cmd_name, "stopallowdata", cmd_name_len) == 0) {
+        if (json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
+            handle_command_stop_allow_data(node_id_arg);
+        }
+    }
+}
+
+void handle_str_command(size_t cmd_name_len, const char* cmd_name, size_t argument_len, const char* argument) {
+    char ip_str[INET6_ADDRSTRLEN];
+    uint8_t ip_arg[17];
+    printf("[XX] HANDLE COMMAND: %.*s\n", cmd_name_len, cmd_name);
+
+    // as it happens, arguments are always a single ip address
+    // nope, not true, some are node id.
+    // hgmm. check, cmd name first, divide handling of argument into response classes?
+    // and then further into responses?
+    if (argument_len > 0) {
+        memcpy(ip_str, argument, argument_len);
+        ip_str[argument_len] = '\0';
+        if (!spin_pton(ip_arg, ip_str)) {
+            printf("[XX] error converting ip address, ignoring command (bad ip: %s)\n", ip_str);
+        }
+    }
+
+
+    if (strncmp(cmd_name, "get_filters", cmd_name_len) == 0) {
+        handle_command_get_filters();
+    } else if (strncmp(cmd_name, "add_filter", cmd_name_len) == 0) {
+        // TODO
+        // also need to add this to userconf. hmz. split that up (make it a LOT easier)
+        // first try to convert. can we perhaps pass the string and do this later?
+        handle_command_add_filter(ip_arg);
+    } else if (strncmp(cmd_name, "remove_filter", cmd_name_len) == 0) {
+    } else {
+        printf("[XX] got unknown command: %.*s\n", cmd_name_len, cmd_name);
+    }
+    printf("[XX] HANDLE COMMAND: %.*s done\n", cmd_name_len, cmd_name);
+}
+
+void handle_json_command(const char* data) {
+    jsmn_parser p;
+    // todo: alloc these upon global init, realloc when necessary?
+    size_t tok_count = 10;
+    jsmntok_t tokens[10];
+    int result;
+
+    jsmn_init(&p);
+    result = jsmn_parse(&p, data, strlen(data), tokens, 10);
+    if (result < 0) {
+        printf("[XX] error parsing json data: %d\n", result);
+    } else {
+        printf("[XX] data parsed (%d tokens). result:\n", result);
+        json_dump(data, &tokens[0], result, 0);
+        printf("\n[XX] end of data\n");
+    }
+    // token should be object, first child should be "command":
+    if (tokens[0].type != JSMN_OBJECT) {
+        printf("[XX] [Error], unknown json data\n");
+        return;
+    }
+    // token 1 should be "command",
+    // token 2 should be the command name (e.g. "get_filters")
+    // token 3 should be "arguments",
+    // token 4 should be an object with the arguments (possibly empty)
+    if (tokens[1].type != JSMN_STRING || strncmp(data+tokens[1].start, "command", 7) != 0) {
+        printf("[XX] [Error] json data not command\n");
+        return;
+    }
+    if (tokens[3].type != JSMN_STRING || strncmp(data+tokens[3].start, "argument", 7) != 0) {
+        printf("[XX] [Error] json data does not contain argument field\n");
+        return;
+    }
+    printf("[XX] GOT AN ACTUAL COMMAND: %.*s\n", tokens[2].end - tokens[2].start, data+tokens[2].start);
+    printf("[XX] ok so far\n");
+    //handle_str_command(tokens[2].end - tokens[2].start, data+tokens[2].start,
+    //                   tokens[4].end - tokens[4].start, data+tokens[4].start);
+    handle_json_command_2(tokens[2].end - tokens[2].start, data+tokens[2].start,
+                          data, tokens, 4);
+}
+
+void handle_command(const struct mosquitto_message* msg, void* user_data) {
+    // commands are in json format of the form:
+    // { "command": <command name> (string)
+    //   "arguments": <arguments> (type depends on command)
+    // we should
+}
+
+void on_message(struct mosquitto* mosq, void* user_data, const struct mosquitto_message* msg) {
+    printf("[XX] mosq message received on %s\n", msg->topic);
+    if (strcmp(msg->topic, MQTT_CHANNEL_COMMANDS) == 0) {
+        printf("[XX] got command: %s\n", msg->payload);
+        handle_command(msg, user_data);
+        handle_json_command(msg->payload);
+    }
+}
 
 void init_mosquitto(void) {
     const char* client_name = "asdf";
@@ -172,168 +853,59 @@ void init_mosquitto(void) {
 
     mosquitto_lib_init();
     mosq = mosquitto_new(client_name, 1, NULL);
+    fprintf(stdout, "Connecting to mqtt server on %s:%d\n", host, port);
     // check error
-    result = mosquitto_connect(mosq, host, port, 1);
+    result = mosquitto_connect(mosq, host, port, 60);
     if (result != 0) {
         fprintf(stderr, "Error connecting to mqtt server on %s:%d, %s\n", host, port, mosquitto_strerror(result));
         exit(1);
     }
-}
-
-#if 0
-void stop_mosquitto(void) {
-    mosquitto_disconnect(mosq);
-    mosquitto_destroy(mosq);
-    mosquitto_lib_cleanup();
-}
-
-int main(int argc, char** argv) {
-    init_mosquitto();
-
-    mosquitto_publish(mosq, NULL, "SPIN/test", 5, "asdf", 0, false);
-    return init_netlink();
-}
-#endif
-
-int my_cmp(size_t key_a_size, void* key_a, size_t key_b_size, void* key_b) {
-    const char* a = (const char*) key_a;
-    const char* b = (const char*) key_b;
-    size_t s = key_a_size;
-    int result;
-
-    if (s > key_b_size) {
-        s = key_b_size;
+    fprintf(stdout, "Connected to mqtt server on %s:%d\n", host, port);
+    result = mosquitto_subscribe(mosq, NULL, MQTT_CHANNEL_COMMANDS, 0);
+    if (result != 0) {
+        fprintf(stderr, "Error subscribing to topic %s: %s\n", MQTT_CHANNEL_COMMANDS, mosquitto_strerror(result));
     }
-    result = strncmp(a, b, s);
-    if (result == 0) {
-        if (key_a_size > key_b_size) {
-            return -1;
-        } else if (key_a_size < key_b_size) {
-            return 1;
-        } else {
-            return 0;
-        }
-    }
-    return result;
-}
 
-void
-print_tree(tree_t* tree) {
-    tree_entry_t* cur;
-    printf("[XX] TREE! depth: %d\n", tree_entry_depth(tree->root));
-    cur = tree_first(tree);
-    while (cur != NULL) {
-        printf("key: %s value: %s\n", (const char*)cur->key, (const char*)cur->data);
-        if (cur->parent != NULL) {
-            printf("[XX]    par: %s\n", cur->parent->key);
-        } else {
-            printf("[XX]    par: <nul>\n");
-        }
-        if (cur->left != NULL) {
-            printf("[XX]    lft: %s\n", cur->left->key);
-        } else {
-            printf("[XX]    lft: <nul>\n");
-        }
-        if (cur->right != NULL) {
-            printf("[XX]    rgt: %s\n", cur->right->key);
-        } else {
-            printf("[XX]    rgt: <nul>\n");
-        }
-        cur = tree_next(cur);
-    }
-    printf("[XX] END OF TREE\n");
-}
+    mosquitto_message_callback_set(mosq, on_message);
 
-int test_tree(int argc, char** argv) {
-    tree_t* tree = tree_create(my_cmp);
-    printf("[XX] 1\n");
-    tree_add(tree, 5, "aaaa", 4, "foo", 1);
-    tree_add(tree, 5, "bbbb", 4, "foo", 1);
-    tree_add(tree, 5, "cccc", 4, "foo", 1);
-    tree_add(tree, 5, "dddd", 4, "foo", 1);
-    tree_add(tree, 5, "eeee", 4, "foo", 1);
-    print_tree(tree);
-    tree->root = tree_entry_balance(tree->root);
-    print_tree(tree);
-    tree_destroy(tree);
-
-    tree = tree_create(my_cmp);
-    printf("\n");
-    printf("[XX] 2\n");
-    tree_add(tree, 5, "iiii", 4, "foo", 1);
-    tree_add(tree, 5, "hhhh", 4, "foo", 1);
-    tree_add(tree, 5, "gggg", 4, "foo", 1);
-    tree_add(tree, 5, "ffff", 4, "foo", 1);
-    tree_add(tree, 5, "eeee", 4, "foo", 1);
-    tree_add(tree, 5, "dddd", 4, "foo", 1);
-    tree_add(tree, 5, "cccc", 4, "foo", 1);
-    tree_add(tree, 5, "bbbb", 4, "foo", 1);
-    tree_add(tree, 5, "aaaa", 4, "foo", 1);
-    print_tree(tree);
-    tree_destroy(tree);
-    tree = tree_create(my_cmp);
-    printf("\n");
-    printf("[XX] 3\n");
-    tree_add(tree, 5, "aaaa", 4, "foo", 1);
-    tree_add(tree, 5, "eeee", 4, "foo", 1);
-    tree_add(tree, 5, "bbbb", 4, "foo", 1);
-    tree_add(tree, 5, "cccc", 4, "foo", 1);
-    tree_add(tree, 5, "dddd", 4, "foo", 1);
-    print_tree(tree);
-    tree_destroy(tree);
-    tree = tree_create(my_cmp);
-    printf("\n");
-    printf("[XX] 4\n");
-    tree_add(tree, 5, "bbbb", 4, "foo", 1);
-    tree_add(tree, 5, "aaaa", 4, "foo", 1);
-    tree_add(tree, 5, "dddd", 4, "foo", 1);
-    tree_add(tree, 5, "cccc", 4, "foo", 1);
-    tree_add(tree, 5, "eeee", 4, "foo", 1);
-    print_tree(tree);
-    tree_destroy(tree);
-    tree = tree_create(my_cmp);
-    printf("\n");
-    printf("[XX] 5\n");
-    tree_add(tree, 5, "aaaa", 4, "foo", 1);
-    tree_add(tree, 5, "bbbb", 4, "foo", 1);
-    tree_add(tree, 5, "cccc", 4, "foo", 1);
-    tree_add(tree, 5, "dddd", 4, "foo", 1);
-    tree_add(tree, 5, "eeee", 4, "foo", 1);
-    print_tree(tree);
-    tree_destroy(tree);
-
-    printf("\n");
-#if 0
-#endif
+    send_command_restart();
+    handle_command_get_filters();
 
 }
 
 void init_cache() {
     dns_cache = dns_cache_create();
+    node_cache = node_cache_create();
 }
 
 void cleanup_cache() {
     dns_cache_destroy(dns_cache);
+    node_cache_destroy(node_cache);
 }
 
 void int_handler(int signal) {
-    cleanup_cache();
-    free(nlh);
-    exit(1);
-}
-
-void
-cache_test() {
+    printf("[XX] got interrupt, quitting\n");
+    //exit(1);
+    running = 0;
 }
 
 int main(int argc, char** argv) {
     int result;
 
     init_cache();
+    init_mosquitto();
     signal(SIGINT, int_handler);
 
+    running = 1;
     result = init_netlink();
 
     cleanup_cache();
+    free(command_nlh);
+    free(traffic_nlh);
+
+    mosquitto_destroy(mosq);
+    mosquitto_lib_cleanup();
+
+    printf("[XX] done\n");
     return 0;
 }

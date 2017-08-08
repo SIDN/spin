@@ -5,7 +5,7 @@
 #include <linux/kernel.h>
 
 #include "pkt_info.h"
-#include "spin_util.h"
+//#include "spin_util.h"
 
 // stores a collection of packet infos
 typedef struct {

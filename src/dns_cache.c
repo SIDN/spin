@@ -5,33 +5,7 @@
 #include <assert.h>
 
 #include "tree.h"
-
-int cmp_ip(size_t size_a, void* key_a, size_t size_b, void* key_b) {
-    assert(size_a == 17);
-    assert(size_b == 17);
-    return memcmp(key_a, key_b, 17);
-}
-
-// note, this does not take label order into account, it is just on pure bytes
-int cmp_domains(size_t size_a, void* a, size_t size_b, void* b) {
-    size_t s = size_a;
-    int result;
-
-    if (s > size_b) {
-        s = size_b;
-    }
-    result = memcmp(a, b, s);
-    if (result == 0) {
-        if (size_a > size_b) {
-            return -1;
-        } else if (size_a < size_b) {
-            return 1;
-        } else {
-            return 0;
-        }
-    }
-    return result;
-}
+#include "util.h"
 
 dns_cache_entry_t*
 dns_cache_entry_create() {
@@ -51,7 +25,7 @@ void
 dns_cache_entry_print(dns_cache_entry_t* entry) {
     tree_entry_t* cur = tree_first(entry->domains);
     while (cur != NULL) {
-        printf("    %s\n", cur->key);
+        printf("    %s\n", (char*)cur->key);
         cur = tree_next(cur);
     }
 }
@@ -59,29 +33,32 @@ dns_cache_entry_print(dns_cache_entry_t* entry) {
 dns_cache_t*
 dns_cache_create() {
     dns_cache_t* dns_cache = (dns_cache_t*) malloc(sizeof(dns_cache_t));
-    dns_cache->entries = tree_create(cmp_ip);
+    dns_cache->entries = tree_create(cmp_ips);
 
     return dns_cache;
 }
 
-void dns_cache_add(dns_cache_t* cache, dns_pkt_info_t* dns_pkt_info) {
+void
+dns_cache_add(dns_cache_t* cache, dns_pkt_info_t* dns_pkt_info, uint32_t timestamp) {
     tree_entry_t* t_entry = tree_find(cache->entries, 17, dns_pkt_info);
     dns_cache_entry_t* entry;
-    unsigned char dname[1024];
-    dns_dname2str(dname, dns_pkt_info->dname, 1024);
+    char dname[512];
+    dns_dname2str(dname, (char*)dns_pkt_info->dname, 512);
+
+    timestamp += dns_pkt_info->ttl;
 
     if (t_entry == NULL) {
         entry = dns_cache_entry_create();
-        printf("[XX] create new IP entry for %s (%p)\n", dname, entry);
-        printf("[XX] created entry at %p\n", entry);
-        tree_add(entry->domains, strlen(dname)+1, dname, sizeof(dns_pkt_info->ttl), &dns_pkt_info->ttl, 1);
+        //printf("[XX] create new IP entry for %s (%p)\n", dname, entry);
+        //printf("[XX] created entry at %p\n", entry);
+        tree_add(entry->domains, strlen(dname)+1, dname, sizeof(timestamp), &timestamp, 1);
         // todo, make noncopy?
         tree_add(cache->entries, 17, dns_pkt_info, sizeof(entry), entry, 1);
         free(entry);
     } else {
         entry = (dns_cache_entry_t*)t_entry->data;
         printf("[XX] add domain %s to existing IP entry (%p)\n", dname, entry);
-        tree_add(entry->domains, strlen(dname)+1, dname, sizeof(dns_pkt_info->ttl), &dns_pkt_info->ttl, 1);
+        tree_add(entry->domains, strlen(dname)+1, dname, sizeof(timestamp), &timestamp, 1);
     }
 }
 
@@ -90,9 +67,8 @@ dns_cache_destroy(dns_cache_t* dns_cache) {
     dns_cache_entry_t* entry;
     tree_entry_t* cur = tree_first(dns_cache->entries);
     while (cur != NULL) {
-        //nxt = tree_next(cur);
-        printf("[XX] DESTROY cache entry at %p\n", cur);
-        printf("[XX] DATA of cache entry at %p\n", cur->data);
+        // the entry's data was allocated separately upon addition
+        // to the cache, so it needs to be destroyed too
         entry = (dns_cache_entry_t*)cur->data;
         dns_cache_entry_destroy(entry);
 
@@ -105,16 +81,49 @@ dns_cache_destroy(dns_cache_t* dns_cache) {
 }
 
 void
+dns_cache_clean(dns_cache_t* dns_cache, uint32_t now) {
+    uint32_t* expiry;
+    dns_cache_entry_t* cur_dns;
+    tree_entry_t* cur = tree_first(dns_cache->entries);
+    tree_entry_t* nxt;
+    tree_entry_t* cur_domain = tree_first(dns_cache->entries);
+    tree_entry_t* nxt_domain;
+
+    while (cur != NULL) {
+        cur_dns = (dns_cache_entry_t*) cur->data;
+        cur_domain = tree_first(cur_dns->domains);
+        while (cur_domain != NULL) {
+            nxt_domain = tree_next(cur_domain);
+            expiry = (uint32_t*) cur_domain->data;
+            if (now > *expiry) {
+                printf("[XX] DOMAIN EXPIRED! DELETE FROM CACHE");
+                tree_remove_entry(cur_dns->domains, cur_domain);
+            }
+            cur_domain = nxt_domain;
+        }
+        nxt = tree_next(cur);
+        if (tree_empty(cur_dns->domains)) {
+            // the entry's data was allocated separately upon addition
+            // to the cache, so it needs to be destroyed too
+            dns_cache_entry_destroy(cur_dns);
+            cur->data = NULL;
+            tree_remove_entry(dns_cache->entries, cur);
+        }
+        cur = nxt;
+    }
+}
+
+void
 dns_cache_print(dns_cache_t* dns_cache) {
     char str[1024];
     unsigned char* keyp;
     int fam;
+    uint32_t* expiry;
     dns_cache_entry_t* entry;
     tree_entry_t* cur, * cur_domain;
 
     cur = tree_first(dns_cache->entries);
     while (cur != NULL) {
-        printf("entry...\n");
         keyp = (unsigned char*)cur->key;
         fam = (int)keyp[0];
         if (fam == AF_INET) {
@@ -122,14 +131,25 @@ dns_cache_print(dns_cache_t* dns_cache) {
         } else {
             ntop((int)keyp[0], str, (unsigned char*)&keyp[1], 1024);
         }
-        printf("[CACHE] '%s'\n", str);
+        printf("[IP] '%s'\n", str);
         entry = (dns_cache_entry_t*)cur->data;
         cur_domain = tree_first(entry->domains);
         while (cur_domain != NULL) {
-            printf("    [domain] '%s' (%p)\n", cur_domain->key, cur_domain->key);
+            expiry = (uint32_t*) cur_domain->data;
+            printf("    [domain] '%s' (%u)\n", (char*)cur_domain->key, *expiry);
             cur_domain = tree_next(cur_domain);
         }
 
         cur = tree_next(cur);
+    }
+}
+
+dns_cache_entry_t*
+dns_cache_find(dns_cache_t* dns_cache, uint8_t ip[17]) {
+    tree_entry_t* entry = tree_find(dns_cache->entries, 17, ip);
+    if (entry) {
+        return (dns_cache_entry_t*)entry->data;
+    } else {
+        return NULL;
     }
 }

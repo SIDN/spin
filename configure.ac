@@ -30,7 +30,7 @@ dnl Checks for library functions.
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS(socket strerror)
 
-regular_CFLAGS="-Wall -Wextra -Wno-unused-parameter"
+regular_CFLAGS="-Wall -Wextra -Wno-unused-parameter -Werror -O0"
 AC_SUBST([regular_CFLAGS])
 
 dnl Check for the right nfnetlink version
@@ -39,11 +39,20 @@ PKG_CHECK_MODULES([libnfnetlink], [libnfnetlink >= 1.0.1])
 AC_CHECK_LIB([mosquitto], [mosquitto_lib_version], [], [AC_MSG_ERROR([libmosquitto not found])])
 
 AC_ARG_WITH(linux-headers,
-	AC_HELP_STRING([--with-linux-headers=PATH      specify path of linux headers]),
-	[ AC_SUBST(KERNELPATH, "$withval") ]
+    AC_HELP_STRING([--with-linux-headers=PATH], [specify path of linux headers]),
+    [ AC_SUBST(KERNELPATH, "$withval") ]
 )
+
+MAKEFILES="Makefile src/Makefile kernelmod/Makefile"
+
+AC_ARG_ENABLE(tests,
+              AC_HELP_STRING([--enable-tests], [enable unit tests and code coverage]),
+              [
+                MAKEFILES="$MAKEFILES src/tests/Makefile";
+                AC_SUBST(TESTDIR, "tests")
+                AC_CONFIG_FILES(src/tests/Makefile)
+                CFLAGS="-g -O0"
+              ], [])
 
 AC_CONFIG_FILES(Makefile src/Makefile kernelmod/Makefile)
 AC_OUTPUT
-
-echo "You can now run 'make' and 'make install'"
