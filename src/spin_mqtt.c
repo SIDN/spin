@@ -128,7 +128,7 @@ print_dnspktinfo_wirehex(dns_pkt_info_t* pkt_info) {
     int i;
     // print version, msg_type, and size (which is irrelevant right now)
     printf("{ 0x01, 0x02, 0x00, 0x00, ");
-    for (i = 0; i < 277; i++) {
+    for (i = 0; i < 276; i++) {
         printf("0x%02x, ", wire[i]);
     }
     printf("0x%02x }\n", wire[277]);
@@ -427,7 +427,7 @@ int init_netlink()
             // in this specific case
             wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
             dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
-            print_dnspktinfo_wirehex(&dns_pkt);
+            //print_dnspktinfo_wirehex(&dns_pkt);
             printf("[DNS] %s\n", pkt_str);
             dns_cache_add(dns_cache, &dns_pkt, now);
             node_cache_add_dns_info(node_cache, &dns_pkt, now);
@@ -601,7 +601,6 @@ void handle_command_allow_data(int node_id) {
     send_netlink_command_for_node_ips(SPIN_CMD_ADD_EXCEPT, node_id);
 }
 void handle_command_stop_allow_data(int node_id) {
-    // TODO
     // TODO store this in "/etc/spin/blocked.conf"
     send_netlink_command_for_node_ips(SPIN_CMD_REMOVE_EXCEPT, node_id);
 }

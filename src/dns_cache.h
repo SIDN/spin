@@ -13,11 +13,16 @@
 #define MAX_SIZE 8000
 
 typedef struct dns_cache_entry_s {
+    // this is the domain(string)->expiry (timestamp + ttl, uint32_t) mapping
     tree_t* domains;
 } dns_cache_entry_t;
 
 // todo: make this a tree or dict
 typedef struct {
+    // this tree maps ip's to trees that map domain names to expiry timestamps
+    // 192.0.2.1
+    //       |- example.com 123451245
+    //       |- example.net 123461234
     tree_t* entries;
 } dns_cache_t;
 

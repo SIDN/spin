@@ -54,7 +54,10 @@ dns_cache_add(dns_cache_t* cache, dns_pkt_info_t* dns_pkt_info, uint32_t timesta
         tree_add(entry->domains, strlen(dname)+1, dname, sizeof(timestamp), &timestamp, 1);
         // todo, make noncopy?
         tree_add(cache->entries, 17, dns_pkt_info, sizeof(entry), entry, 1);
+        // free the outer shell but not the inner data
+        //free(entry->domains);
         free(entry);
+        //dns_cache_entry_destroy(entry);
     } else {
         entry = (dns_cache_entry_t*)t_entry->data;
         printf("[XX] add domain %s to existing IP entry (%p)\n", dname, entry);
@@ -86,7 +89,7 @@ dns_cache_clean(dns_cache_t* dns_cache, uint32_t now) {
     dns_cache_entry_t* cur_dns;
     tree_entry_t* cur = tree_first(dns_cache->entries);
     tree_entry_t* nxt;
-    tree_entry_t* cur_domain = tree_first(dns_cache->entries);
+    tree_entry_t* cur_domain;
     tree_entry_t* nxt_domain;
 
     while (cur != NULL) {
@@ -105,9 +108,21 @@ dns_cache_clean(dns_cache_t* dns_cache, uint32_t now) {
         if (tree_empty(cur_dns->domains)) {
             // the entry's data was allocated separately upon addition
             // to the cache, so it needs to be destroyed too
+            dns_cache_print(dns_cache);
+            char ip_str[INET6_ADDRSTRLEN];
+            spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
             dns_cache_entry_destroy(cur_dns);
             cur->data = NULL;
+            int pre_size = tree_size(dns_cache->entries);
             tree_remove_entry(dns_cache->entries, cur);
+            int post_size = tree_size(dns_cache->entries);
+            if (post_size < pre_size - 1) {
+                printf("[XX] ERROR ERROR ERROR too many entries suddenly gone\n");
+                printf("[XX] while removing last domain of ip %s\n", ip_str);
+                printf("[XX] dns cache after remove:\n");
+                dns_cache_print(dns_cache);
+                exit(1);
+            }
         }
         cur = nxt;
     }

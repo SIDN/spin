@@ -2,6 +2,8 @@
 #include "tree.h"
 #include <stdio.h>
 
+#include <assert.h>
+
 tree_entry_t*
 tree_entry_create(size_t key_size, void* key, size_t data_size, void* data, int copy) {
     tree_entry_t* tree_entry = (tree_entry_t*) malloc(sizeof(tree_entry_t));
@@ -172,20 +174,26 @@ elp(tree_entry_t* e, const char* txt) {
     printf("\n");
 }
 
+void tp(const char* msg, tree_entry_t* e) {
+    int* v;
+    v = e->key;
+    if (e != NULL) {
+        printf("%s %d\n", msg, *v);
+    } else {
+        printf("%s <nil>\n", msg);
+    }
+}
+
 void tree_remove_entry(tree_t* tree, tree_entry_t* el) {
     tree_entry_t* tmp, *btmp;
     if (el == NULL) {
         return;
     }
     if (el == tree->root) {
-        // dunno
-        //printf("[XX] oh ai\n");
         if (el->left != NULL) {
             tmp = tree_entry_last(el->left);
             tmp->right = el->right;
             if (tmp->right != NULL) {
-                //printf("[XX] FOUND AN OCCASION");
-                //exit(123);
                 tmp->right->parent = tmp;
             }
             tree->root = el->left;
@@ -244,22 +252,179 @@ void tree_remove_entry(tree_t* tree, tree_entry_t* el) {
             tree_entry_destroy(el, 0);
         } else {
             // neither are null
+            tmp = tree_entry_first(el->right);
+            if (tmp == el->right) {
+                tmp->left = el->left;
+                tmp->left->parent = tmp;
+                tmp->parent = el->parent;
+            } else {
+                tmp->parent->left = tmp->right;
+                if (tmp->right != NULL) {
+                    tmp->right->parent = tmp->parent;
+                }
+                tmp->left = el->left;
+                tmp->left->parent = tmp;
+                tmp->right = el->right;
+                tmp->right->parent = tmp;
+                tmp->parent = el->parent;
+            }
             if (is_left) {
-                // todo
+                tmp->parent->left = tmp;
+            } else {
+                tmp->parent->right = tmp;
+            }
+
+
+/*
+            if (is_left) {
+                printf("[XX] CASE IN POINT A\n");
+                tp("element to remove: ", el);
                 tmp = tree_entry_first(el->right);
+                tp("smallest of right hand (tmp): ", tmp);
+
+                if (tmp == el->right) {
+                    printf("[XX] CASE AA\n");
+                    tp("set left of tmp to ", el->left);
+                    tmp->left = el->left;
+                    tp("left of tmp now ", tmp->left);
+                    tmp->left->parent = tmp;
+                    tp("its parent now ", tmp->left->parent);
+                    tp("set parent of tmp to ", el->parent);
+                    tmp->parent = el->parent;
+                    tp("parent of tmp now ", tmp->parent);
+                    tmp->parent->left = tmp;
+                    tp("set left of parent to ", tmp);
+                } else {
+                    tmp->parent->left = tmp->right;
+                    if (tmp->right != NULL) {
+                        tmp->right->parent = tmp->parent;
+                    }
+                    tmp->left = el->left;
+                    tmp->left->parent = tmp;
+                    tmp->right = el->right;
+                    tmp->right->parent = tmp;
+                    tmp->parent = el->parent;
+                    tmp->parent->left = tmp;
+                }
+*/
+                /*
+                tmp->parent->left = tmp->right;
+                tmp->parent = el->parent;
+                el->parent->left = tmp;
+                tmp->right = el->right;
+                tmp->left = el->left;
+                if (el->right != NULL) {
+                    el->right->parent = tmp;
+                }
+                if (el->left != NULL) {
+                    el->left->parent = tmp;
+                }
+                // probably not necessary
+                */
+/*
+                el->left = NULL;
+                el->right = NULL;
+                el->parent = NULL;
+*/
+                /*
+                printf("[XX] CASE IN POINT A\n");
+                tmp = tree_entry_first(el->right);
+                tmp->parent->left = NULL;
                 tmp->left = el->left;
                 el->parent->left = tmp;
                 tmp->parent = el->parent;
                 tmp->left->parent = tmp;
-            } else {
+                */
+/*
+             } else {
+                printf("[XX] CASE IN POINT B\n");
+                tp("element to remove: ", el);
+                tmp = tree_entry_first(el->right);
+                tp("smallest of right hand (tmp): ", tmp);
+
+                if (tmp == el->right) {
+                    printf("[XX] CASE AA\n");
+                    tp("set left of tmp to ", el->left);
+                    tmp->left = el->left;
+                    tp("left of tmp now ", tmp->left);
+                    tmp->left->parent = tmp;
+                    tp("its parent now ", tmp->left->parent);
+                    tp("set parent of tmp to ", el->parent);
+                    tmp->parent = el->parent;
+                    tp("parent of tmp now ", tmp->parent);
+                    tmp->parent->right = tmp;
+                    tp("set left of parent to ", tmp);
+                } else {
+                    //tp("set tmp parent
+                    tmp->parent->left = tmp->right;
+                    if (tmp->right != NULL) {
+                        tmp->right->parent = tmp->parent;
+                    }
+                    tmp->left = el->left;
+                    tmp->left->parent = tmp;
+                    tmp->right = el->right;
+                    tmp->right->parent = tmp;
+                    tmp->parent = el->parent;
+                    tmp->parent->right = tmp;
+                }
+*/
+                /*
+                tmp->parent->left = tmp->right;
+                tmp->parent = el->parent;
+                el->parent->left = tmp;
+                tmp->right = el->right;
+                tmp->left = el->left;
+                if (el->right != NULL) {
+                    el->right->parent = tmp;
+                }
+                if (el->left != NULL) {
+                    el->left->parent = tmp;
+                }
+                // probably not necessary
+                */
+/*
+                el->left = NULL;
+                el->right = NULL;
+                el->parent = NULL;
+*/
+/*
+                tp("element to remove: ", el);
+                tmp = tree_entry_last(el->left);
+                tp("largest of left hand (tmp): ", tmp);
+                if (tmp == el->left) {
+                    printf("[XX] CASE BA\n");
+                    tp("set right of tmp to ", el->right);
+                    tmp->right = el->right;
+                    tp("right of tmp now ", tmp->right);
+                    tmp->right->parent = tmp;
+                    tp("its parent now ", tmp->right->parent);
+                    tp("set parent of tmp to ", el->parent);
+                    tmp->parent = el->parent;
+                    tp("parent of tmp now ", tmp->parent);
+                    tmp->parent->right = tmp;
+                    tp("set right of parent to ", tmp);
+                } else {
+                    //tp("set tmp parent
+                    tmp->parent->right = NULL;
+                    tmp->right = el->right;
+                    tmp->right->parent = tmp;
+                    tmp->left = el->left;
+                    tmp->left->parent = tmp;
+                    tmp->parent = el->parent;
+                    tmp->parent->right = tmp;
+                }
+*/
+/*
                 tmp = tree_entry_last(el->left);
                 tmp->right = el->right;
                 el->parent->right = tmp;
                 tmp->parent = el->parent;
                 tmp->right->parent = tmp;
-            }
+*/
+            //}
             tree_entry_destroy(el, 0);
         }
+        (void)btmp;
         while (btmp != NULL) {
             if (is_left && btmp->left != NULL) {
                 btmp->left = tree_entry_balance(btmp->left);
@@ -342,6 +507,12 @@ int tree_entry_depth(tree_entry_t* current) {
         left = tree_entry_depth(current->left);
     }
     if (current->right) {
+        int* val;
+        val = current->key;
+        if (current == current->right) {
+            printf("[XX] error, right of %d is %d\n", *val, *val);
+            assert(0);
+        }
         right = tree_entry_depth(current->right);
     }
     if (left > right) {
@@ -474,7 +645,9 @@ tree_entry_print(tree_entry_t* entry, void(*print_func)(size_t size, void*key)) 
 void
 tree_print(tree_t* tree, void(*print_func)(size_t size, void*key)) {
     printf("[tree] size: %d\n", tree_size(tree));
-    tree_entry_print(tree_entry_last(tree->root), print_func);
+    if (tree->root != NULL) {
+        tree_entry_print(tree_entry_last(tree->root), print_func);
+    }
     printf("[end of tree]\n");
 }
 

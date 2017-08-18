@@ -47,7 +47,7 @@ int cmp_strs(size_t size_a, const void* key_a, size_t size_b, const void* key_b)
 // hmm, we define these in node_cache as well. move to tree itself? (as helper functions?)
 int cmp_ips(size_t size_a, const void* key_a, size_t size_b, const void* key_b) {
     assertf((size_a == 17), "key_a is not of size 17 but %lu", size_a);
-    assertf((size_b == 17), "key_b is not of size 17 but %lu", size_b);;
+    assertf((size_b == 17), "key_b is not of size 17 but %lu", size_b);
     return memcmp(key_a, key_b, 17);
 }
 
