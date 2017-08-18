@@ -26,7 +26,7 @@ node_names_test_SOURCES = node_names_test.c ../node_names.c ../util.c ../tree.c
 node_names_test_CFLAGS = -I../ -fprofile-arcs -ftest-coverage
 node_names_test_LDFLAGS = -L../
 
-util_test_SOURCES = util_test.c ../util.c
+util_test_SOURCES = util_test.c ../util.c ../tree.c
 util_test_CFLAGS = -I../ -fprofile-arcs -ftest-coverage
 util_test_LDFLAGS = -L../
 

@@ -8,13 +8,18 @@
 #include <arpa/inet.h>
 
 #include <errno.h>
+#include <string.h>
 
 #include "pkt_info.h"
 #include "spin_cfg.h"
+#include "tree.h"
+#include "util.h"
 
 #define NETLINK_CONFIG_PORT 30
 
 #define MAX_NETLINK_PAYLOAD 1024 /* maximum payload size*/
+#define LINE_MAX 1024
+
 struct sockaddr_nl src_addr, dest_addr;
 struct nlmsghdr *nlh = NULL;
 struct iovec iov;
@@ -31,7 +36,9 @@ typedef enum {
     SHOW,
     ADD,
     REMOVE,
-    CLEAR
+    CLEAR,
+    LOAD,
+    SAVE
 } cmd_t;
 
 void hexdump(uint8_t* data, unsigned int offset, unsigned int size) {
@@ -46,7 +53,8 @@ void hexdump(uint8_t* data, unsigned int offset, unsigned int size) {
     printf("\n");
 }
 
-int send_command(size_t cmdbuf_size, unsigned char* cmdbuf)
+int
+send_command(size_t cmdbuf_size, unsigned char* cmdbuf, FILE* output)
 {
     config_command_t cmd;
     uint8_t version;
@@ -54,7 +62,7 @@ int send_command(size_t cmdbuf_size, unsigned char* cmdbuf)
     sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_CONFIG_PORT);
     if(sock_fd<0) {
         fprintf(stderr, "Error connecting to socket: %s\n", strerror(errno));
-        return -1;
+        return 0;
     }
 
     memset(&src_addr, 0, sizeof(src_addr));
@@ -115,7 +123,9 @@ int send_command(size_t cmdbuf_size, unsigned char* cmdbuf)
             uint8_t ipv = ((uint8_t*)NLMSG_DATA(nlh))[2];
             unsigned char ip_str[INET6_ADDRSTRLEN];
             inet_ntop(ipv, NLMSG_DATA(nlh) + 3, ip_str, INET6_ADDRSTRLEN);
-            printf("%s\n", ip_str);
+            if (output != NULL) {
+                fprintf(output, "%s\n", ip_str);
+            }
         } else {
             printf("unknown command response type received from kernel (%u %02x), stopping\n", cmd, cmd);
             hexdump((uint8_t*)NLMSG_DATA(nlh), 0, nlh->nlmsg_len);
@@ -123,10 +133,11 @@ int send_command(size_t cmdbuf_size, unsigned char* cmdbuf)
         }
     }
     close(sock_fd);
+    return 1;
 }
 
 void help(int rcode) {
-    printf("Usage: spin_config <type> <command> [address] [options]\n");
+    printf("Usage: spin_config <type> <command> [address/file] [options]\n");
     printf("Types:\n");
     printf("- ignore: show or modify the list of addresses that are ignored\n");
     printf("- block:  show or modify the list of addresses that are blocked\n");
@@ -136,11 +147,14 @@ void help(int rcode) {
     printf("- add:    add address to list\n");
     printf("- remove: remove address from list\n");
     printf("- clear:  remove all addresses from list\n");
+    printf("- load:   clear the list and add all addresses from the given file\n");
+    printf("- save:   store all current addresses from the given file\n");
     printf("If no options are given, show all lists\n");
     exit(rcode);
 }
 
-void execute_no_arg(cmd_types_t type, cmd_t cmd) {
+int
+execute_no_arg(cmd_types_t type, cmd_t cmd, FILE* output) {
     unsigned char cmdbuf[2];
     cmdbuf[0] = SPIN_NETLINK_PROTOCOL_VERSION;
 
@@ -176,10 +190,11 @@ void execute_no_arg(cmd_types_t type, cmd_t cmd) {
         }
         break;
     }
-    send_command(2, cmdbuf);
+    return send_command(2, cmdbuf, output);
 }
 
-void execute_arg(cmd_types_t type, cmd_t cmd, const char* ip_str) {
+int
+execute_arg(cmd_types_t type, cmd_t cmd, const char* ip_str, FILE* output) {
     unsigned char cmdbuf[19];
     size_t cmdsize = 19;
     cmdbuf[0] = SPIN_NETLINK_PROTOCOL_VERSION;
@@ -221,9 +236,11 @@ void execute_arg(cmd_types_t type, cmd_t cmd, const char* ip_str) {
     } else if (inet_pton(AF_INET, ip_str, cmdbuf+3) == 1) {
         cmdbuf[2] = AF_INET;
         cmdsize = 7;
+    } else {
+        return 0;
     }
 
-    send_command(cmdsize, cmdbuf);
+    return send_command(cmdsize, cmdbuf, output);
 }
 
 void show_all_lists() {};
@@ -235,6 +252,9 @@ int main(int argc, char** argv) {
     cmd_types_t type;
     cmd_t cmd;
     int i;
+    int result;
+    FILE* file;
+    char *line, *rline;
     unsigned char buf[sizeof(struct in6_addr)];
 
     if (argc == 1) {
@@ -268,6 +288,10 @@ int main(int argc, char** argv) {
         cmd = REMOVE;
     } else if (strncmp(argv[2], "clear", 6) == 0) {
         cmd = CLEAR;
+    } else if (strncmp(argv[2], "load", 5) == 0) {
+        cmd = LOAD;
+    } else if (strncmp(argv[2], "save", 5) == 0) {
+        cmd = SAVE;
     } else if (strncmp(argv[2], "-h", 3) == 0) {
         help(0);
     } else if (strncmp(argv[2], "-help", 6) == 0) {
@@ -282,7 +306,7 @@ int main(int argc, char** argv) {
             printf("Extraneous argument; show and clear take no address\n");
             exit(1);
         }
-        execute_no_arg(type, cmd);
+        execute_no_arg(type, cmd, stdout);
     }
     if (cmd == ADD || cmd == REMOVE) {
         if (argc < 4) {
@@ -298,8 +322,49 @@ int main(int argc, char** argv) {
             }
         }
         for (i = 3; i < argc; i++) {
-            execute_arg(type, cmd, argv[i]);
+            execute_arg(type, cmd, argv[i], stdout);
         }
+    }
+    if (cmd == LOAD) {
+        if (argc < 4) {
+            printf("Missing argument(s); load and save need a file\n");
+            exit(1);
+        }
+        file = fopen(argv[3], "r");
+        if (file == NULL) {
+            printf("Error reading %s: %s\n", argv[3], strerror(errno));
+            return errno;
+        }
+        if (!execute_no_arg(type, CLEAR, stdout)) {
+            printf("Is the kernel module loaded?\n");
+            exit(2);
+        }
+        line = malloc(LINE_MAX);
+        rline = fgets(line, LINE_MAX, file);
+        result = 0;
+        while (rline != NULL) {
+            if (index(rline, '\n') >= 0) {
+                *index(rline, '\n') = '\0';
+                if (execute_arg(type, ADD, line, stdout)) {
+                    result++;
+                }
+            }
+            rline = fgets(line, LINE_MAX, file);
+        }
+        free(line);
+        printf("Added %d addresses from %s\n", result, argv[3]);
+    }
+    if (cmd == SAVE) {
+        if (argc < 4) {
+            printf("Missing argument(s); load and save need a file\n");
+            exit(1);
+        }
+        file = fopen(argv[3], "w");
+        if (!execute_no_arg(type, SHOW, file)) {
+            printf("Is the kernel module loaded?\n");
+            exit(2);
+        }
+        fclose(file);
     }
 
     // check all given addresses

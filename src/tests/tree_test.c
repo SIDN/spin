@@ -413,6 +413,9 @@ test_remove_4() {
     tree_destroy(tree);
 }
 
+// fill a tree with 200 values, and randomly
+// remove values from it.
+// repeat it 20 times
 void
 test_remove_5() {
     int test_size = 200;
@@ -420,41 +423,27 @@ test_remove_5() {
     tree_entry_t* to_remove;
     int i;
     int rand_i;
-    int* val_i;
     time_t t = time(NULL);
     int count;
+
     for (count = 0; count < 20; count++) {
         tree = tree_create(int_cmp);
         for (i = 0; i < test_size; i++) {
             do_int_add(tree, i);
         }
         assert(tree_size(tree) == test_size);
-            do_int_print(tree);
 
-        printf("[XX] seeding with %d\n", (int)t);
         srand(t);
         // until empty, remove a random xth element
         for (i = test_size; i > 0; i--) {
-            printf("[XX] tree size: %d, should be: %d\n", tree_size(tree), i);
             assert(tree_size(tree) == i);
             rand_i = rand() % i;
             to_remove = tree_first(tree);
-            printf("[XX] remove %d'th element\n", rand_i);
-            //printf("[XX] first: %p\n", to_remove);
             while(rand_i > 1) {
-                //printf("[XX] next: %p\n", tree_next(to_remove));
                 to_remove = tree_next(to_remove);
                 rand_i--;
             }
-            val_i = to_remove->key;
-
-            printf("[XX] removing element with value %d\n", *val_i);
-            fflush(stdout);
-            fflush(stderr);
             tree_remove_entry(tree, to_remove);
-            printf("[XX] removed %d'th element\n", rand_i);
-            printf("[XX] tree size now %d\n", tree_size(tree));
-            do_int_print(tree);
         }
 
         tree_destroy(tree);
@@ -504,7 +493,6 @@ test_first() {
 }
 
 int main(int argc, char** argv) {
-/*
     test_empty();
     test_add_single();
     test_add_nocopy();
@@ -519,7 +507,6 @@ int main(int argc, char** argv) {
     test_remove_2();
     test_remove_3();
     test_remove_4();
-*/
     test_remove_5();
     return 0;
 }

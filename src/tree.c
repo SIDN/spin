@@ -251,177 +251,28 @@ void tree_remove_entry(tree_t* tree, tree_entry_t* el) {
             }
             tree_entry_destroy(el, 0);
         } else {
-            // neither are null
+            // neither are null;
+            // replace element to remove with the smallest of its
+            // right side
             tmp = tree_entry_first(el->right);
-            if (tmp == el->right) {
-                tmp->left = el->left;
-                tmp->left->parent = tmp;
-                tmp->parent = el->parent;
-            } else {
+            tmp->left = el->left;
+            tmp->left->parent = tmp;
+            // a few extra steps if the smallest is not the direct
+            // right child
+            if (tmp != el->right) {
                 tmp->parent->left = tmp->right;
                 if (tmp->right != NULL) {
                     tmp->right->parent = tmp->parent;
                 }
-                tmp->left = el->left;
-                tmp->left->parent = tmp;
                 tmp->right = el->right;
                 tmp->right->parent = tmp;
-                tmp->parent = el->parent;
             }
+            tmp->parent = el->parent;
             if (is_left) {
                 tmp->parent->left = tmp;
             } else {
                 tmp->parent->right = tmp;
             }
-
-
-/*
-            if (is_left) {
-                printf("[XX] CASE IN POINT A\n");
-                tp("element to remove: ", el);
-                tmp = tree_entry_first(el->right);
-                tp("smallest of right hand (tmp): ", tmp);
-
-                if (tmp == el->right) {
-                    printf("[XX] CASE AA\n");
-                    tp("set left of tmp to ", el->left);
-                    tmp->left = el->left;
-                    tp("left of tmp now ", tmp->left);
-                    tmp->left->parent = tmp;
-                    tp("its parent now ", tmp->left->parent);
-                    tp("set parent of tmp to ", el->parent);
-                    tmp->parent = el->parent;
-                    tp("parent of tmp now ", tmp->parent);
-                    tmp->parent->left = tmp;
-                    tp("set left of parent to ", tmp);
-                } else {
-                    tmp->parent->left = tmp->right;
-                    if (tmp->right != NULL) {
-                        tmp->right->parent = tmp->parent;
-                    }
-                    tmp->left = el->left;
-                    tmp->left->parent = tmp;
-                    tmp->right = el->right;
-                    tmp->right->parent = tmp;
-                    tmp->parent = el->parent;
-                    tmp->parent->left = tmp;
-                }
-*/
-                /*
-                tmp->parent->left = tmp->right;
-                tmp->parent = el->parent;
-                el->parent->left = tmp;
-                tmp->right = el->right;
-                tmp->left = el->left;
-                if (el->right != NULL) {
-                    el->right->parent = tmp;
-                }
-                if (el->left != NULL) {
-                    el->left->parent = tmp;
-                }
-                // probably not necessary
-                */
-/*
-                el->left = NULL;
-                el->right = NULL;
-                el->parent = NULL;
-*/
-                /*
-                printf("[XX] CASE IN POINT A\n");
-                tmp = tree_entry_first(el->right);
-                tmp->parent->left = NULL;
-                tmp->left = el->left;
-                el->parent->left = tmp;
-                tmp->parent = el->parent;
-                tmp->left->parent = tmp;
-                */
-/*
-             } else {
-                printf("[XX] CASE IN POINT B\n");
-                tp("element to remove: ", el);
-                tmp = tree_entry_first(el->right);
-                tp("smallest of right hand (tmp): ", tmp);
-
-                if (tmp == el->right) {
-                    printf("[XX] CASE AA\n");
-                    tp("set left of tmp to ", el->left);
-                    tmp->left = el->left;
-                    tp("left of tmp now ", tmp->left);
-                    tmp->left->parent = tmp;
-                    tp("its parent now ", tmp->left->parent);
-                    tp("set parent of tmp to ", el->parent);
-                    tmp->parent = el->parent;
-                    tp("parent of tmp now ", tmp->parent);
-                    tmp->parent->right = tmp;
-                    tp("set left of parent to ", tmp);
-                } else {
-                    //tp("set tmp parent
-                    tmp->parent->left = tmp->right;
-                    if (tmp->right != NULL) {
-                        tmp->right->parent = tmp->parent;
-                    }
-                    tmp->left = el->left;
-                    tmp->left->parent = tmp;
-                    tmp->right = el->right;
-                    tmp->right->parent = tmp;
-                    tmp->parent = el->parent;
-                    tmp->parent->right = tmp;
-                }
-*/
-                /*
-                tmp->parent->left = tmp->right;
-                tmp->parent = el->parent;
-                el->parent->left = tmp;
-                tmp->right = el->right;
-                tmp->left = el->left;
-                if (el->right != NULL) {
-                    el->right->parent = tmp;
-                }
-                if (el->left != NULL) {
-                    el->left->parent = tmp;
-                }
-                // probably not necessary
-                */
-/*
-                el->left = NULL;
-                el->right = NULL;
-                el->parent = NULL;
-*/
-/*
-                tp("element to remove: ", el);
-                tmp = tree_entry_last(el->left);
-                tp("largest of left hand (tmp): ", tmp);
-                if (tmp == el->left) {
-                    printf("[XX] CASE BA\n");
-                    tp("set right of tmp to ", el->right);
-                    tmp->right = el->right;
-                    tp("right of tmp now ", tmp->right);
-                    tmp->right->parent = tmp;
-                    tp("its parent now ", tmp->right->parent);
-                    tp("set parent of tmp to ", el->parent);
-                    tmp->parent = el->parent;
-                    tp("parent of tmp now ", tmp->parent);
-                    tmp->parent->right = tmp;
-                    tp("set right of parent to ", tmp);
-                } else {
-                    //tp("set tmp parent
-                    tmp->parent->right = NULL;
-                    tmp->right = el->right;
-                    tmp->right->parent = tmp;
-                    tmp->left = el->left;
-                    tmp->left->parent = tmp;
-                    tmp->parent = el->parent;
-                    tmp->parent->right = tmp;
-                }
-*/
-/*
-                tmp = tree_entry_last(el->left);
-                tmp->right = el->right;
-                el->parent->right = tmp;
-                tmp->parent = el->parent;
-                tmp->right->parent = tmp;
-*/
-            //}
             tree_entry_destroy(el, 0);
         }
         (void)btmp;

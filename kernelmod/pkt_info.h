@@ -87,7 +87,7 @@ void pktinfo2str(char* dest, pkt_info_t* pkt_info, size_t max_len);
 
 // writes packet info data to target in wire format
 // target must have pktinfo_wire_size() bytes available
-void pktinfo2wire(char* dest, pkt_info_t* pkt_info);
+void pktinfo2wire(uint8_t* dest, pkt_info_t* pkt_info);
 
 // returns true if the packets are considered equal
 // (same family, protocol, addresses and ports)
@@ -95,15 +95,16 @@ int pkt_info_equal(pkt_info_t* a, pkt_info_t* b);
 
 // writes full packet info message (header + pktinfo)
 // target must have pktinfo_msg_size() bytes available
-void pktinfo_msg2wire(message_type_t type, char* dest, pkt_info_t* pkt_info);
+void pktinfo_msg2wire(message_type_t type, uint8_t* dest, pkt_info_t* pkt_info);
 
 // Reads pkt_info data from memory at src
 // Returns the message type. If the type is BLOCKED or TRAFFIC,
 // pkt_info will be filled with info about the blocked or traffic data
 message_type_t wire2pktinfo(pkt_info_t* pkt_info, char* src);
 
-void dns_pktinfo_msg2wire(char* dest, dns_pkt_info_t* pkt_info);
+void dns_pktinfo_msg2wire(uint8_t* dest, dns_pkt_info_t* pkt_info);
 void dns_pktinfo2str(char* dest, dns_pkt_info_t* dns_pkt_info, size_t max_len);
+void dns_pktinfo2wire(uint8_t* dest, dns_pkt_info_t* dns_pkt_info);
 void dns_dname2str(char* dest, char* src, size_t max_len);
 message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, char* src);
 

@@ -17,7 +17,6 @@ dns_cache_entry_create() {
 void
 dns_cache_entry_destroy(dns_cache_entry_t* entry) {
     tree_destroy(entry->domains);
-    printf("[XX] free entry at %p\n", entry);
     free(entry);
 }
 

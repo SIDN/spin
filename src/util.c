@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include <errno.h>
+#include <stdio.h>
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
@@ -167,3 +168,47 @@ int buffer_write(buffer_t* buffer, const char* format, ...) {
     return 0;
 }
 
+int store_ip_tree(tree_t* tree, const char* filename) {
+    tree_entry_t* cur;
+    char ip_str[INET6_ADDRSTRLEN];
+
+    FILE* out = fopen(filename, "w");
+    if (out == NULL) {
+        return 0;
+    }
+    cur = tree_first(tree);
+    while (cur != NULL) {
+        spin_ntop(ip_str, cur->key, cur->key_size);
+        fprintf(out, "%s\n", ip_str);
+        cur = tree_next(cur);
+    }
+    fclose(out);
+    return 1;
+}
+
+#define LINE_MAX 1024
+int read_ip_tree(tree_t* dest, const char* filename) {
+    int count;
+    char* line;
+    char* rline;
+    uint8_t ip[17];
+
+    FILE* in = fopen(filename, "r");
+    if (in == NULL) {
+        return -1;
+    }
+    line = malloc(LINE_MAX);
+    rline = fgets(line, LINE_MAX, in);
+    while (rline != NULL) {
+        if (index(rline, '\n') >= 0) {
+            *index(rline, '\n') = '\0';
+            if (spin_pton(ip, line)) {
+                tree_add(dest, 17, ip, 0, NULL, 1);
+                count++;
+            }
+        }
+        rline = fgets(line, LINE_MAX, in);
+    }
+    free(line);
+    return count;
+}

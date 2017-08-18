@@ -5,7 +5,7 @@ AM_CFLAGS = ${regular_CFLAGS} -g -Wall -Werror
 SUBDIRS = @TESTDIR@
 
 bin_PROGRAMS = spin_config spin_print spin_mqtt
-spin_config_SOURCES = spin_config.c
+spin_config_SOURCES = spin_config.c util.c tree.c
 spin_config_CFLAGS = -I../kernelmod
 spin_config_LDADD = -L../kernelmod
 

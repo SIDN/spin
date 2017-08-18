@@ -409,6 +409,7 @@ int init_netlink()
             if (flow_list_should_send(flow_list, now)) {
                 if (!flow_list_empty(flow_list)) {
                     // create json, send it
+                    buffer_reset(json_buf);
                     create_traffic_command(node_cache, flow_list, json_buf, now);
                     if (buffer_finish(json_buf)) {
                         mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
@@ -416,7 +417,9 @@ int init_netlink()
                         printf("[XX] trucnated! what now? TODO split up?\n");
                     }
                 }
+                printf("[XX] clearing flow list, set timestamp from %u to %u\n", flow_list->timestamp, now);
                 flow_list_clear(flow_list, now);
+                printf("[XX] flow list cleared, timestamp now %u\n", flow_list->timestamp);
             } else {
                 // add the current one
                 flow_list_add_pktinfo(flow_list, &pkt);
@@ -527,18 +530,65 @@ void handle_command_get_filters() {
     printf("[XX] FULL MSG: %s\n", response_string);
 }
 
+void add_ip_to_file(uint8_t* ip, const char* filename) {
+    tree_t *ip_tree = tree_create(cmp_ips);
+    // if this fails, we simply try to write a new one anyway
+    read_ip_tree(ip_tree, filename);
+    tree_add(ip_tree, 17, ip, 0, NULL, 1);
+    store_ip_tree(ip_tree, filename);
+}
+
+void add_ip_tree_to_file(tree_t* tree, const char* filename) {
+    tree_entry_t* cur;
+    tree_t *ip_tree = tree_create(cmp_ips);
+
+    // if this fails, we simply try to write a new one anyway
+    read_ip_tree(ip_tree, filename);
+    cur = tree_first(tree);
+    while(cur != NULL) {
+        tree_add(ip_tree, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        cur = tree_next(cur);
+    }
+    store_ip_tree(ip_tree, filename);
+}
+
+void remove_ip_tree_from_file(tree_t* tree, const char* filename) {
+    tree_entry_t* cur;
+    tree_t *ip_tree = tree_create(cmp_ips);
+
+    // if this fails, we simply try to write a new one anyway
+    read_ip_tree(ip_tree, filename);
+    cur = tree_first(tree);
+    while(cur != NULL) {
+        tree_remove(ip_tree, cur->key_size, cur->key);
+        cur = tree_next(cur);
+    }
+    store_ip_tree(ip_tree, filename);
+}
+
+
+void remove_ip_from_file(uint8_t* ip, const char* filename) {
+    tree_t *ip_tree = tree_create(cmp_ips);
+    // if this fails, we simply try to write a new one anyway
+    read_ip_tree(ip_tree, filename);
+    tree_remove(ip_tree, 17, ip);
+    store_ip_tree(ip_tree, filename);
+}
+
 void handle_command_add_filter(uint8_t* ip) {
     netlink_command_result_t* command_result = send_netlink_command_iparg(SPIN_CMD_ADD_IGNORE, ip);
-    // todo: store new list as well
+    add_ip_to_file(ip, "/etc/spin/ignore.list");
 }
 
 void handle_command_remove_filter(uint8_t* ip) {
     netlink_command_result_t* command_result = send_netlink_command_iparg(SPIN_CMD_REMOVE_IGNORE, ip);
-    // todo: store new list as well
+    remove_ip_from_file(ip, "/etc/spin/ignore.list");
 }
 
 void handle_command_reset_filters() {
-    // reload filters from file (TODO, also: need to do this on startup)
+    // clear the filters; derive them from our own addresses again
+    // hmm, use a script for this?
+    //load_ips_from_file
 }
 
 void handle_command_add_name(int node_id, char* name) {
@@ -569,13 +619,17 @@ void handle_command_add_name(int node_id, char* name) {
     node_names_write_userconfig(node_cache->names, "/etc/spin/names.conf");
 }
 
-void send_netlink_command_for_node_ips(config_command_t cmd, int node_id) {
+// returns the node->ips tree if successful, NULL if node not found
+// (this is useful if we have other actions to perform with the node's
+// ip addresses, such as print or save them)
+// note: caller does *not* get ownership of the tree
+tree_t* send_netlink_command_for_node_ips(config_command_t cmd, int node_id) {
     node_t* node = node_cache_find_by_id(node_cache, node_id);
     tree_entry_t* ip_entry;
     netlink_command_result_t* command_result;
 
     if (node == NULL) {
-        return;
+        return NULL;
     }
     ip_entry = tree_first(node->ips);
     while (ip_entry != NULL) {
@@ -584,25 +638,38 @@ void send_netlink_command_for_node_ips(config_command_t cmd, int node_id) {
     }
     // should we check result?
     netlink_command_result_destroy(command_result);
+    return node->ips;
 }
 
 void handle_command_block_data(int node_id) {
-    // TODO store this in "/etc/spin/blocked.conf"
-    printf("[XX] BLOCKING NODE %d\n", node_id);
-    send_netlink_command_for_node_ips(SPIN_CMD_ADD_BLOCK, node_id);
+    tree_t* ips = send_netlink_command_for_node_ips(SPIN_CMD_ADD_BLOCK, node_id);
+    if (ips != NULL) {
+        add_ip_tree_to_file(ips, "/etc/spin/block.list");
+    }
 }
 
 void handle_command_stop_block_data(int node_id) {
     // TODO store this in "/etc/spin/blocked.conf"
-    send_netlink_command_for_node_ips(SPIN_CMD_REMOVE_BLOCK, node_id);
+    tree_t* ips = send_netlink_command_for_node_ips(SPIN_CMD_REMOVE_BLOCK, node_id);
+    if (ips != NULL) {
+        remove_ip_tree_from_file(ips, "/etc/spin/block.list");
+    }
 }
+
 void handle_command_allow_data(int node_id) {
     // TODO store this in "/etc/spin/blocked.conf"
-    send_netlink_command_for_node_ips(SPIN_CMD_ADD_EXCEPT, node_id);
+    tree_t* ips = send_netlink_command_for_node_ips(SPIN_CMD_ADD_EXCEPT, node_id);
+    if (ips != NULL) {
+        add_ip_tree_to_file(ips, "/etc/spin/allow.list");
+    }
 }
+
 void handle_command_stop_allow_data(int node_id) {
     // TODO store this in "/etc/spin/blocked.conf"
-    send_netlink_command_for_node_ips(SPIN_CMD_REMOVE_EXCEPT, node_id);
+    tree_t* ips = send_netlink_command_for_node_ips(SPIN_CMD_REMOVE_EXCEPT, node_id);
+    if (ips != NULL) {
+        remove_ip_tree_from_file(ips, "/etc/spin/allow.list");
+    }
 }
 
 void send_command_restart() {
