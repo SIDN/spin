@@ -37,20 +37,32 @@ int cmp_strs(size_t size_a, const void* key_a, size_t size_b, const void* key_b)
             return 1;
         } else if (size_a < size_b) {
             return -1;
-        } else {
-            return 0;
         }
     } else {
-        return result;
+        if (result > 0) {
+            return 1;
+        } else if (result < 0) {
+            return -1;
+        }
     }
+    return 0;
 }
 
 // hmm, we define these in node_cache as well. move to tree itself? (as helper functions?)
 int cmp_ips(size_t size_a, const void* key_a, size_t size_b, const void* key_b) {
-    assertf((size_a == 17), "key_a is not of size 17 but %lu", size_a);
-    assertf((size_b == 17), "key_b is not of size 17 but %lu", size_b);
-    return memcmp(key_a, key_b, 17);
+    ip_t* ip_a = (ip_t*) key_a;
+    ip_t* ip_b = (ip_t*) key_b;
+    assertf((size_a == sizeof(ip_t)), "key_a is not of size of ip_t but %lu", size_a);
+    assertf((size_b == sizeof(ip_t)), "key_b is not of size of ip_t but %lu", size_b);
+    if (ip_a->family < ip_b->family) {
+        return -1;
+    } else if (ip_a->family > ip_b->family) {
+        return 1;
+    } else {
+        return memcmp(ip_a->addr, ip_b->addr, 16);
+    }
 }
+
 
 // see above
 // note, this does not take label order into account, it is just on pure bytes
@@ -67,11 +79,14 @@ int cmp_domains(size_t size_a, const void* a, size_t size_b, const void* b) {
             return -1;
         } else if (size_a < size_b) {
             return 1;
-        } else {
-            return 0;
         }
     }
-    return result;
+    if (result > 0) {
+        return 1;
+    } else if (result < 0) {
+        return -1;
+    }
+    return 0;
 }
 
 int cmp_pktinfos(size_t size_a, const void* a, size_t size_b, const void* b) {
@@ -80,17 +95,20 @@ int cmp_pktinfos(size_t size_a, const void* a, size_t size_b, const void* b) {
     return memcmp(a, b, 38);
 }
 
+int
+spin_pton(ip_t* ip, const char* ip_str) {
+    if (ip == NULL) {
+        return 0;
+    }
 
-// dest must have 17 bytes available
-int spin_pton(uint8_t* dest, const char* ip) {
-    int result = inet_pton(AF_INET6, ip, &dest[1]);
+    int result = inet_pton(AF_INET6, ip_str, &ip->addr);
     if (result == 1) {
-        dest[0] = AF_INET6;
+        ip->family = (uint8_t)AF_INET6;
     } else {
-        result = inet_pton(AF_INET, ip, &dest[13]);
+        result = inet_pton(AF_INET, ip_str, &ip->addr[12]);
         if (result == 1) {
-            dest[0] = AF_INET;
-            memset(&dest[1], 0, 12);
+            ip->family = AF_INET;
+            memset(ip->addr, 0, 12);
         } else {
             return 0;
         }
@@ -98,12 +116,13 @@ int spin_pton(uint8_t* dest, const char* ip) {
     return 1;
 }
 
-unsigned int spin_ntop(char* dest, uint8_t* ip, socklen_t size) {
-    if (ip[0] == AF_INET) {
-        inet_ntop(ip[0], &ip[13], dest, size);
+size_t
+spin_ntop(char* dest, ip_t* ip, size_t size) {
+    if (ip->family == AF_INET) {
+        inet_ntop(ip->family, &ip->addr[12], dest, size);
         return strlen(dest);
     } else {
-        inet_ntop(ip[0], &ip[1], dest, size);
+        inet_ntop(ip->family, ip->addr, dest, size);
         return strlen(dest);
     }
 }
@@ -168,6 +187,11 @@ int buffer_write(buffer_t* buffer, const char* format, ...) {
     return 0;
 }
 
+int
+buffer_ok(buffer_t* buffer) {
+    return buffer->ok == 1;
+}
+
 int store_ip_tree(tree_t* tree, const char* filename) {
     tree_entry_t* cur;
     char ip_str[INET6_ADDRSTRLEN];
@@ -188,10 +212,10 @@ int store_ip_tree(tree_t* tree, const char* filename) {
 
 #define LINE_MAX 1024
 int read_ip_tree(tree_t* dest, const char* filename) {
-    int count;
+    int count = 0;
     char* line;
     char* rline;
-    uint8_t ip[17];
+    ip_t ip;
 
     FILE* in = fopen(filename, "r");
     if (in == NULL) {
@@ -202,13 +226,14 @@ int read_ip_tree(tree_t* dest, const char* filename) {
     while (rline != NULL) {
         if (index(rline, '\n') >= 0) {
             *index(rline, '\n') = '\0';
-            if (spin_pton(ip, line)) {
-                tree_add(dest, 17, ip, 0, NULL, 1);
+            if (spin_pton(&ip, line)) {
+                tree_add(dest, sizeof(ip), &ip, 0, NULL, 1);
                 count++;
             }
         }
         rline = fgets(line, LINE_MAX, in);
     }
     free(line);
+    fclose(in);
     return count;
 }

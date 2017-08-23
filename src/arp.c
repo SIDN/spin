@@ -54,24 +54,23 @@ void arp_table_print(arp_table_t* arp_table) {
     printf("[end of arp table]\n");
 }
 
-void arp_table_add(arp_table_t* arp_table, char* ip, char* mac) {
-    // convert ip to a 17-byte array
-    uint8_t ip_bytes[17];
+void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
+    ip_t ip;
 
-    if (!spin_pton(ip_bytes, ip)) {
+    if (!spin_pton(&ip, ip_str)) {
         //printf("[XX] error, bad address, ignoring\n");
         return;
     }
 
-    tree_add(arp_table->entries, 17, ip_bytes, strlen(mac) + 1, mac, 1);
+    tree_add(arp_table->entries, sizeof(ip_t), &ip, strlen(mac) + 1, mac, 1);
 }
 
 int arp_table_size(arp_table_t* arp_table) {
     return tree_size(arp_table->entries);
 }
 
-char* arp_table_find_by_ip(arp_table_t* arp_table, uint8_t* ip) {
-    tree_entry_t* entry = tree_find(arp_table->entries, 17, ip);
+char* arp_table_find_by_ip(arp_table_t* arp_table, ip_t* ip) {
+    tree_entry_t* entry = tree_find(arp_table->entries, sizeof(ip_t), ip);
     if (entry != NULL) {
         return (char*)entry->data;
     } else {
@@ -80,9 +79,9 @@ char* arp_table_find_by_ip(arp_table_t* arp_table, uint8_t* ip) {
 }
 
 char* arp_table_find_by_str(arp_table_t* arp_table, char* ip_str) {
-    uint8_t ip[17];
-    if (spin_pton(ip, ip_str)) {
-        return arp_table_find_by_ip(arp_table, ip);
+    ip_t ip;
+    if (spin_pton(&ip, ip_str)) {
+        return arp_table_find_by_ip(arp_table, &ip);
     } else {
         return NULL;
     }

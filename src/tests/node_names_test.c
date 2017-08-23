@@ -5,12 +5,12 @@
 
 void
 check_ip(node_names_t* node_names, char* ip_str, char* expected) {
-    uint8_t ip[17];
+    ip_t ip;
     char* name;
 
-    assert(spin_pton(ip, ip_str));
+    assert(spin_pton(&ip, ip_str));
 
-    name = node_names_find_ip(node_names, ip);
+    name = node_names_find_ip(node_names, &ip);
     if (expected == NULL) {
         assert(name == 0);
     } else {
@@ -124,21 +124,21 @@ test_aaaa() {
 void
 test_add_by_ip() {
     node_names_t* node_names = node_names_create();
-    uint8_t ip[17];
+    ip_t ip;
 
     assert(tree_size(node_names->user_names_by_ip) == 0);
     assert(tree_size(node_names->user_names_by_mac) == 0);
 
     check_ip(node_names, "192.0.2.1", NULL);
 
-    spin_pton(ip, "192.0.2.1");
-    node_names_add_user_name_ip(node_names, ip, "foo");
+    spin_pton(&ip, "192.0.2.1");
+    node_names_add_user_name_ip(node_names, &ip, "foo");
 
     assert(tree_size(node_names->user_names_by_ip) == 1);
     assert(tree_size(node_names->user_names_by_mac) == 0);
     check_ip(node_names, "192.0.2.1", "foo");
 
-    node_names_add_user_name_ip(node_names, ip, "bar");
+    node_names_add_user_name_ip(node_names, &ip, "bar");
     assert(tree_size(node_names->user_names_by_ip) == 1);
     assert(tree_size(node_names->user_names_by_mac) == 0);
     check_ip(node_names, "192.0.2.1", "bar");
@@ -173,7 +173,7 @@ void
 test_write_userconfig() {
     node_names_t* node_names = node_names_create();
     node_names_t* node_names2 = node_names_create();
-    uint8_t ip[17];
+    ip_t ip;
 
     const char* TEST_OUTPUT_FILE = "/tmp/node_names_test_tmp";
 
@@ -199,10 +199,10 @@ test_write_userconfig() {
     assert(tree_size(node_names2->dhcp_names_by_mac) == 0);
 
     // add some values, then write and read again
-    spin_pton(ip, "192.0.2.1");
-    node_names_add_user_name_ip(node_names, ip, "foo");
-    spin_pton(ip, "192.0.2.2");
-    node_names_add_user_name_ip(node_names, ip, "bar");
+    spin_pton(&ip, "192.0.2.1");
+    node_names_add_user_name_ip(node_names, &ip, "foo");
+    spin_pton(&ip, "192.0.2.2");
+    node_names_add_user_name_ip(node_names, &ip, "bar");
     node_names_add_user_name_mac(node_names, "aa:aa:aa:aa:aa:aa", "foo");
     node_names_add_user_name_mac(node_names, "bb:bb:bb:bb:bb:bb", "bar");
     node_names_write_userconfig(node_names, TEST_OUTPUT_FILE);
@@ -214,17 +214,14 @@ test_write_userconfig() {
 
     node_names_destroy(node_names);
     node_names_destroy(node_names2);
-
 }
 
 
 int main(int argc, char** argv) {
-    /*
     test_read_userconfig();
     test_read_dhcpconfig();
     test_read_both();
     test_aaaa();
-    */
     test_add_by_ip();
     test_add_by_mac();
     test_write_userconfig();

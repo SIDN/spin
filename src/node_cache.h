@@ -10,7 +10,7 @@
 
 typedef struct {
     int id;
-    // note: ip's are in a 17-byte format (family + ip, padded with 12 zeroes in case of ipv4)
+    // note: ip's are in a sizeof(ip_t)-byte format (family + ip, padded with 12 zeroes in case of ipv4)
     // they are stored in the keys, data is empty
     tree_t* ips;
     // domains in string format, stored in the tree keys, with data empty
@@ -27,7 +27,7 @@ node_t* node_create(int id);
 void node_destroy(node_t* node);
 node_t* node_clone(node_t* node);
 
-void node_add_ip(node_t* node, uint8_t* ip);
+void node_add_ip(node_t* node, ip_t* ip);
 void node_add_domain(node_t* node, char* domain);
 void node_set_mac(node_t* node, char* mac);
 void node_set_name(node_t* node, char* name);
@@ -59,7 +59,7 @@ void node_cache_destroy(node_cache_t* node_cache);
 
 void node_cache_print(node_cache_t* node_cache);
 
-void node_cache_add_ip_info(node_cache_t* node_cache, uint8_t* ip, uint32_t timestamp);
+void node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp);
 void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp);
 void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp);
 
@@ -68,7 +68,7 @@ void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, 
  */
 void node_cache_add_node(node_cache_t* node_cache, node_t* node);
 
-node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, uint8_t* ip);
+node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* ip);
 node_t* node_cache_find_by_domain(node_cache_t* node_cache, char* dname);
 node_t* node_cache_find_by_id(node_cache_t* node_cache, int node_id);
 

@@ -56,8 +56,8 @@ node_t* node_clone(node_t* node) {
 }
 
 void
-node_add_ip(node_t* node, uint8_t* ip) {
-    tree_add(node->ips, 17, ip, 0, NULL, 1);
+node_add_ip(node_t* node, ip_t* ip) {
+    tree_add(node->ips, sizeof(ip_t), ip, 0, NULL, 1);
 }
 
 void
@@ -158,7 +158,7 @@ void node_print(node_t* node) {
     printf("      ips:\n");
     cur = tree_first(node->ips);
     while (cur != NULL) {
-        assert(cur->key_size == 17);
+        assert(cur->key_size == sizeof(ip_t));
         keyp = (unsigned char*) cur->key;
         fam = (int)keyp[0];
         if (fam == AF_INET) {
@@ -270,14 +270,14 @@ void node_cache_print(node_cache_t* node_cache) {
 
 }
 
-node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, uint8_t* ip) {
+node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* ip) {
     // TODO: this is very inefficient; we should add a second tree for ip searching
     tree_entry_t* cur = tree_first(node_cache->nodes);
     node_t* node;
     while (cur != NULL) {
         node = (node_t*)cur->data;
         // can we use a node_has_ip?
-        if (tree_find(node->ips, 17, ip) != NULL) {
+        if (tree_find(node->ips, sizeof(ip_t), ip) != NULL) {
             return node;
         }
         cur = tree_next(cur);
@@ -315,7 +315,7 @@ int node_cache_get_new_id(node_cache_t* node_cache) {
 }
 
 void
-add_mac_and_name(node_cache_t* node_cache, node_t* node, uint8_t* ip) {
+add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
     char* mac = arp_table_find_by_ip(node_cache->arp_table, ip);
     char* name;
     if (!mac) {
@@ -338,7 +338,7 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, uint8_t* ip) {
 }
 
 void
-node_cache_add_ip_info(node_cache_t* node_cache, uint8_t* ip, uint32_t timestamp) {
+node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
     // todo: add an search-by-ip tree and don't do anything if we
     // have this one already? (do set mac if now known,
     // and update last_seen)
@@ -350,25 +350,27 @@ node_cache_add_ip_info(node_cache_t* node_cache, uint8_t* ip, uint32_t timestamp
 }
 
 void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp) {
-    uint8_t ip[17];
-    ip[0] = pkt_info->family;
-    memcpy(&ip[1], pkt_info->src_addr, 16);
-    node_cache_add_ip_info(node_cache, ip, timestamp);
-    memcpy(&ip[1], pkt_info->dest_addr, 16);
-    node_cache_add_ip_info(node_cache, ip, timestamp);
+    ip_t ip;
+    ip.family = pkt_info->family;
+    memcpy(ip.addr, pkt_info->src_addr, 16);
+    node_cache_add_ip_info(node_cache, &ip, timestamp);
+    memcpy(ip.addr, pkt_info->dest_addr, 16);
+    node_cache_add_ip_info(node_cache, &ip, timestamp);
 }
 
 void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp) {
     // first see if we have a node with this ip or domain already
     char dname_str[512];
-    uint8_t* ip = (uint8_t*)dns_pkt;
+    ip_t ip;
+    ip.family = dns_pkt->family;
+    memcpy(ip.addr, dns_pkt->ip, 16);
     dns_dname2str(dname_str, dns_pkt->dname, 512);
 
     node_t* node = node_create(0);
     node_set_last_seen(node, timestamp);
-    node_add_ip(node, ip);
+    node_add_ip(node, &ip);
     node_add_domain(node, dname_str);
-    add_mac_and_name(node_cache, node, ip);
+    add_mac_and_name(node_cache, node, &ip);
     node_cache_add_node(node_cache, node);
 }
 
@@ -441,13 +443,13 @@ pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf
     unsigned int s = 0;
     node_t* src_node;
     node_t* dest_node;
-    uint8_t ip[17];
+    ip_t ip;
 
-    ip[0] = pkt_info->family;
-    memcpy(&ip[1], pkt_info->src_addr, 16);
-    src_node = node_cache_find_by_ip(node_cache, 17, ip);
-    memcpy(&ip[1], pkt_info->dest_addr, 16);
-    dest_node = node_cache_find_by_ip(node_cache, 17, ip);
+    ip.family = pkt_info->family;
+    memcpy(ip.addr, pkt_info->src_addr, 16);
+    src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    memcpy(ip.addr, pkt_info->dest_addr, 16);
+    dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
     if (src_node == NULL) {
         char pkt_str[1024];
         printf("[XX] ERROR! src node not found in cache!\n");

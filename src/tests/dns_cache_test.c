@@ -11,11 +11,11 @@
 // if domain is NULL, the ip should not be in the cache
 void
 check_ip_domainname(dns_cache_t* dns_cache, const char* ip_str, const char* domain) {
-    uint8_t ip[17];
-    assert(spin_pton(ip, ip_str));
+    ip_t ip;
+    assert(spin_pton(&ip, ip_str));
     tree_entry_t* domain_entry;
 
-    dns_cache_entry_t* entry = dns_cache_find(dns_cache, ip);
+    dns_cache_entry_t* entry = dns_cache_find(dns_cache, &ip);
     if (domain == NULL) {
         if (entry != NULL) {
             printf("Domain NULL but entry found for %s\n", ip_str);
@@ -40,10 +40,10 @@ check_ip_domainname(dns_cache_t* dns_cache, const char* ip_str, const char* doma
 
 void
 check_ip_domain_ttl(dns_cache_t* dns_cache, const char* ip_str, const char* domain, uint32_t ttl) {
-    uint8_t ip[17];
-    assert(spin_pton(ip, ip_str));
+    ip_t ip;
+    assert(spin_pton(&ip, ip_str));
     tree_entry_t* domain_entry;
-    dns_cache_entry_t* entry = dns_cache_find(dns_cache, ip);
+    dns_cache_entry_t* entry = dns_cache_find(dns_cache, &ip);
     uint32_t* found_ttl;
 
     if (entry == NULL) {
@@ -86,7 +86,8 @@ sample_dns_pkt_info_2(dns_pkt_info_t* dns_pkt_info) {
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0xc0, 0x00, 0x02, 0x02, // 192.0.2.2
-                    0x00, 0x00, 0x0e, 0x10, 0x0d, // TTL (3600)
+                    0x00, 0x00, 0x0e, 0x10, // TTL (3600)
+                    0x0d, // 13 octets
                     0x03, 0x77, 0x77, 0x77, 0x04, 0x74, 0x65,
                     0x73, 0x74, 0x02, 0x6e, 0x6c, 0x00  // www.test.nl
                   };
@@ -102,7 +103,8 @@ sample_dns_pkt_info_3(dns_pkt_info_t* dns_pkt_info) {
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0xc0, 0x00, 0x02, 0x01, // 192.0.2.2
-                    0x00, 0x00, 0x0e, 0x10, 0x0d, // TTL (3600)
+                    0x00, 0x00, 0x0e, 0x10, // TTL (3600)
+                    0x0e, // 14 octets
                     0x03, 0x77, 0x77, 0x77, 0x05, 0x74, 0x65,
                     0x73, 0x74, 0x32, 0x02, 0x6e, 0x6c, 0x00  // www.test2.nl
                   };

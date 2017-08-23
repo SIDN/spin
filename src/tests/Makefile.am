@@ -3,7 +3,7 @@ AM_CFLAGS = ${regular_CFLAGS} -g
 
 CLEANFILES = *.gcda *.gcno *.gcov
 
-bin_PROGRAMS = tree_test node_cache_test arp_test node_names_test util_test dns_cache_test
+bin_PROGRAMS = tree_test node_cache_test arp_test node_names_test util_test dns_cache_test netlink_commands_test
 
 tree_test_SOURCES = tree_test.c ../tree.c ../util.c
 tree_test_CFLAGS = -I../ -fprofile-arcs -ftest-coverage
@@ -26,10 +26,13 @@ node_names_test_SOURCES = node_names_test.c ../node_names.c ../util.c ../tree.c
 node_names_test_CFLAGS = -I../ -fprofile-arcs -ftest-coverage
 node_names_test_LDFLAGS = -L../
 
-util_test_SOURCES = util_test.c ../util.c ../tree.c
-util_test_CFLAGS = -I../ -fprofile-arcs -ftest-coverage
+util_test_SOURCES = util_test.c ../util.c ../tree.c ../../kernelmod/pkt_info.c
+util_test_CFLAGS = -I../ -I../../kernelmod -fprofile-arcs -ftest-coverage
 util_test_LDFLAGS = -L../
 
+netlink_commands_test_SOURCES = netlink_commands_test.c ../netlink_commands.c ../util.c ../tree.c
+netlink_commands_test_CFLAGS = -I../ -fprofile-arcs -ftest-coverage
+netlink_commands_test_LDFLAGS = -L../
 
 all-local:
 	./run_tests.sh

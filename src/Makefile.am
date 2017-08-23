@@ -13,6 +13,6 @@ spin_print_SOURCES = spin_print.c ../kernelmod/pkt_info.c
 spin_print_CFLAGS = -I../kernelmod
 spin_print_LDADD = -L../kernelmod
 
-spin_mqtt_SOURCES = spin_mqtt.c ../kernelmod/pkt_info.c dns_cache.h dns_cache.c tree.h tree.c node_cache.h node_cache.c util.h util.c arp.h arp.c node_names.h node_names.c jsmn.h jsmn.c
+spin_mqtt_SOURCES = spin_mqtt.c ../kernelmod/pkt_info.c dns_cache.h dns_cache.c tree.h tree.c node_cache.h node_cache.c util.h util.c arp.h arp.c node_names.h node_names.c jsmn.h jsmn.c netlink_commands.c
 spin_mqtt_CFLAGS = -I../kernelmod
 spin_mqtt_LDADD = -L../kernelmod

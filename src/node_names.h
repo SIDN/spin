@@ -28,8 +28,8 @@ int node_names_read_dhcpconfig(node_names_t* node_names, const char* filename);
 int node_names_read_userconfig(node_names_t* node_names, const char* filename);
 int node_names_write_userconfig(node_names_t* node_names, const char* filename);
 
-char* node_names_find_ip(node_names_t* node_names, uint8_t* ip);
+char* node_names_find_ip(node_names_t* node_names, ip_t* ip);
 char* node_names_find_mac(node_names_t* node_names, char* mac);
 
-void node_names_add_user_name_ip(node_names_t* node_names, uint8_t* ip, char* name);
+void node_names_add_user_name_ip(node_names_t* node_names, ip_t* ip, char* name);
 void node_names_add_user_name_mac(node_names_t* node_names, char* mac, char* name);

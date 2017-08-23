@@ -73,9 +73,6 @@ void dns_dname2str(char* dname, char* src, size_t max_len) {
     size_t strpos = 0, pos = 0;
     size_t lpos;
     uint8_t labellen, c;
-#ifndef __KERNEL__
-    //printf("[XX] dns_dname2str called\n");
-#endif
 
     labellen = src[pos++];
     if (labellen == 0) {
@@ -102,9 +99,6 @@ void dns_dname2str(char* dname, char* src, size_t max_len) {
         }
     }
     dname[strpos] = '\0';
-#ifndef __KERNEL__
-    //printf("[XX] dns_dname2str done\n");
-#endif
 }
 
 void dns_pktinfo2str(char* dest, dns_pkt_info_t* dns_pkt_info, size_t max_len) {

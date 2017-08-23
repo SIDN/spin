@@ -1,6 +1,7 @@
 
 #include "node_cache.h"
 #include "pkt_info.h"
+#include "test_helper.h"
 
 #include <assert.h>
 
@@ -9,16 +10,12 @@
 node_t*
 sample_node_1() {
     node_t* node = node_create(1);
-    uint8_t ip1[17];
-    memset(ip1, 0, 17);
-    ip1[0] = AF_INET;
-    ip1[13] = 127;
-    ip1[16] = 1;
+    ip_t ip1;
+    spin_pton(&ip1, "127.0.0.1");
 
-    node_add_ip(node, ip1);
-    ip1[0] = AF_INET6;
-    ip1[13] = 0;
-    node_add_ip(node, ip1);
+    node_add_ip(node, &ip1);
+    spin_pton(&ip1, "::1");
+    node_add_ip(node, &ip1);
     node_add_domain(node, "tjeb.nl");
     node_add_domain(node, "example.nl");
     node_set_mac(node, "aa:bb:cc:dd:ee:ff");
@@ -29,17 +26,12 @@ sample_node_1() {
 node_t*
 sample_node_2() {
     node_t* node = node_create(2);
-    uint8_t ip1[17];
-    memset(ip1, 0, 17);
-    ip1[0] = AF_INET;
-    ip1[13] = 192;
-    ip1[14] = 168;
-    ip1[15] = 12;
-    ip1[16] = 13;
+    ip_t ip1;
+    spin_pton(&ip1, "192.168.12.13");
 
-    node_add_ip(node, ip1);
-    ip1[16] = 31;
-    node_add_ip(node, ip1);
+    node_add_ip(node, &ip1);
+    spin_pton(&ip1, "192.168.12.31");
+    node_add_ip(node, &ip1);
     node_add_domain(node, "test.com.");
     node_add_domain(node, "test.nl");
     node_add_domain(node, "test.biz");
@@ -72,17 +64,15 @@ test_node_shares_element() {
     node_t* node1 = sample_node_1();
     node_t* node2 = sample_node_2();
     node_t* node3 = node_create(3);
-    uint8_t ip[17];
-    memset(ip, 0, 17);
-    ip[0] = AF_INET;
-    ip[13] = 127;
-    ip[16] = 1;
+
+    ip_t ip;
+    spin_pton(&ip, "127.0.0.1");
 
     assert(node_shares_element(node1, node2) == 0);
     assert(node_shares_element(node1, node3) == 0);
     assert(node_shares_element(node2, node3) == 0);
 
-    node_add_ip(node3, ip);
+    node_add_ip(node3, &ip);
     assert(node_shares_element(node1, node2) == 0);
     assert(node_shares_element(node1, node3) == 1);
     assert(node_shares_element(node2, node3) == 0);
@@ -192,25 +182,25 @@ test_node_cache_add_3() {
     node_cache_t* node_cache = node_cache_create();
     node_t* node1 = node_create(1);
     node_t* f_node;
-    uint8_t ip[17];
+    ip_t ip;
 
-    spin_pton(ip, "192.0.2.1");
+    spin_pton(&ip, "192.0.2.1");
     node_add_domain(node1, "www.example.com");
-    node_add_ip(node1, ip);
+    node_add_ip(node1, &ip);
     node_set_mac(node1, "aa:aa:aa:aa:aa:aa");
     node_set_name(node1, "foo bar");
     node_set_last_seen(node1, 12345);
 
     node_cache_add_node(node_cache, node_clone(node1));
 
-    f_node = node_cache_find_by_ip(node_cache, 17, ip);
+    f_node = node_cache_find_by_ip(node_cache, 17, &ip);
     assert(f_node != NULL);
     assert(f_node->last_seen == 12345);
 
     node_set_last_seen(node1, 54321);
     node_cache_add_node(node_cache, node_clone(node1));
 
-    f_node = node_cache_find_by_ip(node_cache, 17, ip);
+    f_node = node_cache_find_by_ip(node_cache, 17, &ip);
     assert(f_node != NULL);
     assert(f_node->last_seen == 54321);
 
@@ -221,28 +211,31 @@ test_node_cache_add_3() {
 void
 test_node_to_json() {
     node_t* node1 = node_create(1);
-    uint8_t ip[17];
+    ip_t ip;
     buffer_t* json_buf = buffer_create(1024);
     int str_cmp;
+    const char* expected_json = "{ \"id\": 1,  \"name\": \"foo bar\",  \"mac\": \"aa:aa:aa:aa:aa:aa\",  \"lastseen\": 12345,  \"ips\": [ \"192.0.2.1\", \"192.0.2.2\" ],  \"domains\": [ \"www.example.com\", \"www.example2.com\" ] }";
 
     node_add_domain(node1, "www.example.com");
     node_add_domain(node1, "www.example2.com");
-    spin_pton(ip, "192.0.2.1");
-    node_add_ip(node1, ip);
-    spin_pton(ip, "192.0.2.2");
-    node_add_ip(node1, ip);
+    spin_pton(&ip, "192.0.2.1");
+    node_add_ip(node1, &ip);
+    spin_pton(&ip, "192.0.2.2");
+    node_add_ip(node1, &ip);
     node_set_mac(node1, "aa:aa:aa:aa:aa:aa");
     node_set_name(node1, "foo bar");
     node_set_last_seen(node1, 12345);
 
     node2json(node1, json_buf);
+    buffer_finish(json_buf);
 
-    str_cmp = strcmp(buffer_str(json_buf), "{ \"id\": 1,  \"name\": \"foo bar\",  \"mac\": \"aa:aa:aa:aa:aa:aa\",  \"lastseen\": 12345,  \"ips\": [ 192.0.2.1, 192.0.2.2 ],  \"domains\": [ \"www.example.com\", \"www.example2.com\" ] }");
+    str_cmp = strcmp(buffer_str(json_buf), expected_json);
 
     printf("[XX] JSON:\n%s\n", buffer_str(json_buf));
 
-    assert(str_cmp == 0);
+    assertf(str_cmp == 0, "Wrong JSON data; got:\n%s\nexpected:\n%s\n", buffer_str(json_buf), expected_json);
 
+    buffer_destroy(json_buf);
     node_destroy(node1);
 }
 
@@ -278,19 +271,18 @@ test_pkt_info_to_json() {
     //create_traffic_command(node_cache, &pkt_info, dest, dest_size, timestamp);
     printf("[XX] FULL COMMAND (%lu): %s\n", buffer_size(json_buf), buffer_str(json_buf));
 
+    buffer_destroy(json_buf);
     node_cache_destroy(node_cache);
 }
 
 int
 main(int argc, char** argv) {
-/*
     test_node_print();
     test_node_shares_element();
     test_node_cache_add_1();
     test_node_cache_add_2();
     test_node_cache_add_3();
     test_node_to_json();
-*/
     test_pkt_info_to_json();
     return 0;
 }

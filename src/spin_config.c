@@ -332,8 +332,14 @@ int main(int argc, char** argv) {
         }
         file = fopen(argv[3], "r");
         if (file == NULL) {
-            printf("Error reading %s: %s\n", argv[3], strerror(errno));
-            return errno;
+            if (errno == ENOENT) {
+                printf("No addresses set in %s\n", argv[3]);
+                return 0;
+            } else {
+                printf("Error reading %s: %s (%d)\n", argv[3], strerror(errno), errno);
+                // it's ok if it does not exist
+                return errno;
+            }
         }
         if (!execute_no_arg(type, CLEAR, stdout)) {
             printf("Is the kernel module loaded?\n");

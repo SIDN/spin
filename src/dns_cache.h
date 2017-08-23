@@ -5,6 +5,7 @@
 #include "pkt_info.h"
 
 #include "tree.h"
+#include "util.h"
 
 /**
  * cache of dns requests
@@ -41,6 +42,6 @@ void dns_cache_add(dns_cache_t* cache, dns_pkt_info_t* dns_pkt_info, uint32_t ti
 void dns_cache_clean(dns_cache_t* dns_cache, uint32_t now);
 void dns_cache_print(dns_cache_t* dns_cache);
 
-dns_cache_entry_t* dns_cache_find(dns_cache_t* dns_cache, uint8_t ip[17]);
+dns_cache_entry_t* dns_cache_find(dns_cache_t* dns_cache, ip_t* ip);
 
 #endif // DNS_CACHE_H

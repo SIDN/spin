@@ -122,7 +122,8 @@ int node_names_read_dhcpconfig(node_names_t* node_names, const char* filename) {
     size_t token_len;
     char* token2;
 
-    uint8_t* ip = NULL;
+    ip_t ip;
+    ip.family = 0;
     char* mac = NULL;
     char* name = NULL;
 
@@ -151,18 +152,17 @@ int node_names_read_dhcpconfig(node_names_t* node_names, const char* filename) {
         case 1:
             if (strncmp(line, "config ", 7) == 0) {
                 // handle, switch state
-                if (name != NULL && ip != NULL) {
-                    tree_add(node_names->dhcp_names_by_ip, 17, ip, strlen(name)+1, name, 1);
+                if (name != NULL && ip.family != 0) {
+                    tree_add(node_names->dhcp_names_by_ip, sizeof(ip_t), &ip, strlen(name)+1, name, 1);
                 }
                 if (name != NULL && mac != NULL) {
                     tree_add(node_names->dhcp_names_by_mac, strlen(mac)+1, mac, strlen(name)+1, name, 1);
                 }
                 free(name);
                 free(mac);
-                free(ip);
                 name = NULL;
                 mac = NULL;
-                ip = NULL;
+                ip.family = 0;
 
                 if (strncmp(line, "config host", 11) == 0) {
                     // state stays 1
@@ -186,13 +186,8 @@ int node_names_read_dhcpconfig(node_names_t* node_names, const char* filename) {
                 }
                 name = strdup(token2);
             } else if (strcmp(token, "ip") == 0) {
-                if (ip != NULL) {
-                    free(ip);
-                }
-                ip = (uint8_t*)malloc(17);
-                if (!spin_pton(ip, token2)) {
-                    free(ip);
-                    ip = NULL;
+                if (!spin_pton(&ip, token2)) {
+                    ip.family = 0;
                 }
             } else if (strcmp(token, "mac") == 0) {
                 if (mac != NULL) {
@@ -208,15 +203,14 @@ int node_names_read_dhcpconfig(node_names_t* node_names, const char* filename) {
 
     done:
     // handle if any left
-    if (name != NULL && ip != NULL) {
-        tree_add(node_names->dhcp_names_by_ip, 17, ip, strlen(name)+1, name, 1);
+    if (name != NULL && ip.family != 0) {
+        tree_add(node_names->dhcp_names_by_ip, sizeof(ip_t), &ip, strlen(name)+1, name, 1);
     }
     if (name != NULL && mac != NULL) {
         tree_add(node_names->dhcp_names_by_mac, strlen(mac)+1, mac, strlen(name)+1, name, 1);
     }
     free(name);
     free(mac);
-    free(ip);
 
     fclose(in);
     free(token);
@@ -228,9 +222,7 @@ int node_names_read_dhcpconfig(node_names_t* node_names, const char* filename) {
 int node_names_read_userconfig(node_names_t* node_names, const char* filename) {
     char* line;
     int line_size;
-    //char* mac;
-    uint8_t ip[17];
-//    char* name;
+    ip_t ip;
     char token1[INET6_ADDRSTRLEN];
     size_t token1_len;
     char* token2;
@@ -253,8 +245,8 @@ int node_names_read_userconfig(node_names_t* node_names, const char* filename) {
             if (token1_len == 0 || token2_len == 0) {
                 continue;
             }
-            if (spin_pton(ip, token1)) {
-                tree_add(node_names->user_names_by_ip, 17, ip, token2_len, token2, 1);
+            if (spin_pton(&ip, token1)) {
+                tree_add(node_names->user_names_by_ip, sizeof(ip_t), &ip, token2_len, token2, 1);
             } else if (token1_len == 18) {
                 // should we have more checks or just put it in?
                 // assume mac
@@ -296,10 +288,10 @@ node_names_write_userconfig(node_names_t* node_names, const char* filename) {
     return 0;
 }
 
-char* node_names_find_ip(node_names_t* node_names, uint8_t* ip) {
-    tree_entry_t* entry = tree_find(node_names->user_names_by_ip, 17, ip);
+char* node_names_find_ip(node_names_t* node_names, ip_t* ip) {
+    tree_entry_t* entry = tree_find(node_names->user_names_by_ip, sizeof(ip_t), ip);
     if (entry == NULL) {
-        entry = tree_find(node_names->dhcp_names_by_ip, 17, ip);
+        entry = tree_find(node_names->dhcp_names_by_ip, sizeof(ip_t), ip);
     }
     if (entry == NULL) {
         return NULL;
@@ -320,9 +312,9 @@ char* node_names_find_mac(node_names_t* node_names, char* mac) {
     }
 }
 
-void node_names_add_user_name_ip(node_names_t* node_names, uint8_t* ip, char* name) {
+void node_names_add_user_name_ip(node_names_t* node_names, ip_t* ip, char* name) {
     if (name != NULL && ip != NULL) {
-        tree_add(node_names->user_names_by_ip, 17, ip, strlen(name)+1, name, 1);
+        tree_add(node_names->user_names_by_ip, sizeof(ip_t), ip, strlen(name)+1, name, 1);
     }
 }
 

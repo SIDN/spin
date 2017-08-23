@@ -39,7 +39,7 @@ dns_cache_create() {
 
 void
 dns_cache_add(dns_cache_t* cache, dns_pkt_info_t* dns_pkt_info, uint32_t timestamp) {
-    tree_entry_t* t_entry = tree_find(cache->entries, 17, dns_pkt_info);
+    tree_entry_t* t_entry = tree_find(cache->entries, sizeof(ip_t), dns_pkt_info);
     dns_cache_entry_t* entry;
     char dname[512];
     dns_dname2str(dname, (char*)dns_pkt_info->dname, 512);
@@ -52,7 +52,7 @@ dns_cache_add(dns_cache_t* cache, dns_pkt_info_t* dns_pkt_info, uint32_t timesta
         //printf("[XX] created entry at %p\n", entry);
         tree_add(entry->domains, strlen(dname)+1, dname, sizeof(timestamp), &timestamp, 1);
         // todo, make noncopy?
-        tree_add(cache->entries, 17, dns_pkt_info, sizeof(entry), entry, 1);
+        tree_add(cache->entries, sizeof(ip_t), dns_pkt_info, sizeof(entry), entry, 1);
         // free the outer shell but not the inner data
         //free(entry->domains);
         free(entry);
@@ -159,8 +159,8 @@ dns_cache_print(dns_cache_t* dns_cache) {
 }
 
 dns_cache_entry_t*
-dns_cache_find(dns_cache_t* dns_cache, uint8_t ip[17]) {
-    tree_entry_t* entry = tree_find(dns_cache->entries, 17, ip);
+dns_cache_find(dns_cache_t* dns_cache, ip_t* ip) {
+    tree_entry_t* entry = tree_find(dns_cache->entries, sizeof(ip_t), ip);
     if (entry) {
         return (dns_cache_entry_t*)entry->data;
     } else {
