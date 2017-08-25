@@ -260,9 +260,12 @@ void send_command_blocked(pkt_info_t* pkt_info) {
     unsigned int response_size;
     buffer_t* response_json = buffer_create(2048);
     buffer_t* pkt_json = buffer_create(2048);
+    unsigned int p_size;
 
-    pkt_info2json(node_cache, pkt_info, pkt_json);
+    p_size = pkt_info2json(node_cache, pkt_info, pkt_json);
     buffer_finish(pkt_json);
+    printf("[XX] Sending 'blocked' command for:");
+    printf("[XX] (%d) '%s'\n", p_size, buffer_str(pkt_json));
     response_size = create_mqtt_command(response_json, "blocked", NULL, buffer_str(pkt_json));
     buffer_finish(response_json);
     mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, buffer_str(response_json), 0, false);
@@ -350,6 +353,21 @@ int init_netlink()
             //print_pktinfo_wirehex(&pkt);
             node_cache_add_pkt_info(node_cache, &pkt, now);
 
+
+            // small experiment; check if either endpoint is an internal device, if not,
+            // skip reporting it
+            // (if this is useful, we should do this check in add_pkt_info above, probably)
+            ip_t ip;
+            node_t* src_node;
+            node_t* dest_node;
+            ip.family = pkt.family;
+            memcpy(ip.addr, pkt.src_addr, 16);
+            src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+            memcpy(ip.addr, pkt.dest_addr, 16);
+            dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+            if (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL)) {
+                continue;
+            }
             /*
             buffer_t* tmp = buffer_create(4096);
             pkt_info2json(node_cache, &pkt, tmp);
@@ -381,7 +399,7 @@ int init_netlink()
         } else if (type == SPIN_DNS_ANSWER) {
             // note: bad version would have been caught in wire2pktinfo
             // in this specific case
-            //wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
+            wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
             //dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
             //print_dnspktinfo_wirehex(&dns_pkt);
             //printf("[DNS] %s\n", pkt_str);

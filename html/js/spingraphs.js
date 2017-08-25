@@ -710,12 +710,12 @@ function addFlow(timestamp, from, to, count, size) {
     }
 }
 
-function addBlocked(timestamp, from, to) {
+function addBlocked(from, to) {
     if (contains(filterList, from) || contains(filterList, to)) {
         return;
     }
-    addNode(timestamp, from, false, 1, 1, "to " + to, "source");
-    addNode(timestamp, to, false, 1, 1, "from " + from, "blocked");
+    addNode(from["lastseen"], from, false, 1, 1, "to " + to, "source");
+    addNode(to["lastseen"], to, false, 1, 1, "from " + from, "blocked");
     addEdge(from, to, colour_blocked);
     if (!zoom_locked) {
         network.fit({

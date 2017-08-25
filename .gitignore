@@ -23,3 +23,9 @@ stamp-h1
 *.o
 *.o.cmd
 *.mod.c
+.publish
+src/tests/*_test
+*.gcov
+*.gcda
+*.gcno
+

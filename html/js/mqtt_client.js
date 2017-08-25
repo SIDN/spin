@@ -163,11 +163,9 @@ function handleTrafficMessage(data) {
 }
 
 function handleBlockedMessage(data) {
-    var timestamp = data['timestamp']
-
     var from_node = data['from'];
     var to_node = data['to'];
-    addBlocked(timestamp, from_node, to_node);
+    addBlocked(from_node, to_node);
 }
 
 function serverRestart() {

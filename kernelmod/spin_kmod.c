@@ -93,7 +93,7 @@ log_packet(pkt_info_t* pkt_info) {
 void
 printv(int module_verbosity, const char* format, ...) {
     va_list args;
-    if (module_verbosity >= verbosity) {
+    if (verbosity >= module_verbosity) {
         va_start(args, format);
         vprintk(format, args);
         va_end(args);
@@ -333,7 +333,7 @@ unsigned int skip_dname(uint8_t* data, unsigned int cur_pos, size_t payload_size
 }
 
 static inline void printv_pkt_info(int module_verbosity, const char* msg, pkt_info_t* pkt_info) {
-    if (module_verbosity >= verbosity) {
+    if (verbosity >= module_verbosity) {
         char p[1024];
         pktinfo2str(p, pkt_info, 1024);
         printv(module_verbosity, KERN_DEBUG "%s: %s\n", msg, p);
@@ -539,7 +539,6 @@ NF_CALLBACK(hook_func_new, skb)
     }
 
     pres = parse_packet(skb, &pkt_info);
-    printv(5, "Callback called, res: %d\n", pres);
     if (pres == 0) {
         if (ip_store_contains_ip(block_ips, pkt_info.src_addr) ||
             ip_store_contains_ip(block_ips, pkt_info.dest_addr)) {

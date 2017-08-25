@@ -98,6 +98,12 @@ node_shares_element(node_t* node, node_t* othernode) {
 
     //printf("[XX] ips  at %p\n", node->ips);
     //fflush(stdout);
+    if (node->mac != NULL && othernode->mac != NULL) {
+        if (strcmp(node->mac, othernode->mac) == 0) {
+            return 1;
+        }
+    }
+
     cur_me = tree_first(node->ips);
     while (cur_me != NULL) {
         if (tree_find(othernode->ips, cur_me->key_size, cur_me->key) != NULL) {

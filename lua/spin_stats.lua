@@ -6,7 +6,7 @@ local json = require 'json'
 local TRAFFIC_CHANNEL = "SPIN/traffic"
 
 local HISTORY_SIZE = 300
-local PRINT_INTERVAL = 60
+local PRINT_INTERVAL = 10
 
 local verbose = true
 
@@ -56,6 +56,31 @@ function table_count(t)
     return result
 end
 
+function simple_cmp(a, b)
+    return a > b
+end
+
+function get_keys_sorted_by_value(tbl, sort_function)
+    local keys = {}
+    for key in pairs(tbl) do
+        table.insert(keys, key)
+    end
+
+    table.sort(keys, function(a, b)
+        return sort_function(tbl[a], tbl[b])
+    end)
+
+    return keys
+end
+
+function block_node(node)
+    for _,v in pairs(node["ips"]) do
+        local cmd = "spin_config block add " .. v
+        print(cmd)
+        os.execute(cmd)
+    end
+end
+
 function history_stats()
     local nodes = {}
     local node_info = {}
@@ -88,40 +113,48 @@ function history_stats()
 
     --print("[XX] " .. json.encode(nodes))
     for frm,a in pairs(nodes) do
-      print("[XX] DEVICE: " .. frm .. "(" .. squash_node_info(node_info[frm]) ..")")
-      local size_count = 0
-      local port_count = 0
-      local port_most_used = nil
-      local to_count = 0
-      for to,b in pairs(a) do
+        print("[XX] DEVICE: " .. frm .. "(" .. squash_node_info(node_info[frm]) ..")")
+        local size_count = 0
+        local port_count = 0
+        local port_most_used = nil
+        local to_count = 0
+        for to,b in pairs(a) do
         --print("    " .. squash_node_info(node_info[to]))
-          to_count = to_count + 1
-          for port,size in pairs(b) do
-              if ports[port] == nil then
-                  ports[port] = 1
-              else
-                  ports[port] = ports[port] + 1
-              end
-              port_count = port_count + 1
-              size_count = size_count + size
-              if port_most_used == nil then
-                  port_most_used = port
-              else
-                  if ports[port] > ports[port_most_used] then
-                      port_most_used = port
-                  end
-              end
-          --print("[XX] " .. squash_node_info(node_info[frm]) .. " -> " .. squash_node_info(node_info[to]) .. " " .. port .. " " .. size)
-          end
-      end
-      print("    contacted " .. to_count .. " external nodes")
-      print("    over at total of " .. port_count .. " addr/port combinations")
-      print("    for a total (outgoing) size of " .. size_count)
-      print("    used " .. table_count(ports) .. " different ports")
-      print("    port most used: " .. port_most_used)
-      for p,c in pairs(ports) do
-          print("      " .. p .. "  (" .. c .. " times)")
-      end
+            to_count = to_count + 1
+            for port,size in pairs(b) do
+                if ports[port] == nil then
+                    ports[port] = 1
+                else
+                    ports[port] = ports[port] + 1
+                end
+                port_count = port_count + 1
+                size_count = size_count + size
+                if port_most_used == nil then
+                    port_most_used = port
+                else
+                    if ports[port] > ports[port_most_used] then
+                        port_most_used = port
+                    end
+                end
+                --print("[XX] " .. squash_node_info(node_info[frm]) .. " -> " .. squash_node_info(node_info[to]) .. " " .. port .. " " .. size)
+            end
+        end
+        print("    contacted " .. to_count .. " external nodes")
+        print("    over at total of " .. port_count .. " addr/port combinations")
+        print("    for a total (outgoing) size of " .. size_count)
+        print("    used " .. table_count(ports) .. " different ports")
+        print("    top 10 most used ports: ")
+        local sorted_ports = get_keys_sorted_by_value(ports, simple_cmp)
+        local i = 0
+        for _,k in pairs(sorted_ports) do
+            print("      " .. k .. "  (" .. ports[k] .. " times)")
+            i = i + 1
+            if i >= 10 then break end
+        end
+        if (port_count) > 40 then
+            block_node(node_info[frm])
+        end
+
     end
 
 
@@ -227,7 +260,7 @@ while true do
     local cur = os.time()
     if (cur > last_print + PRINT_INTERVAL) then
         --history_print()
-        history_stats_full()
+        --history_stats_full()
         history_stats()
         print("")
         last_print = cur

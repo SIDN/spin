@@ -66,9 +66,27 @@ int cmp_ips(size_t size_a, const void* key_a, size_t size_b, const void* key_b) 
 
 // see above
 // note, this does not take label order into account, it is just on pure bytes
+// size overrides!
 int cmp_domains(size_t size_a, const void* a, size_t size_b, const void* b) {
+    int result;
+    if (size_a < size_b) {
+        return -1;
+    } else if (size_a > size_b) {
+        return 1;
+    } else {
+        result = memcmp(a, b, size_a);
+        if (result > 0) {
+            return 1;
+        } else if (result < 0) {
+            return -1;
+        } else {
+            return result;
+        }
+    }
+/* original strcmp-like version
     size_t s = size_a;
     int result;
+
 
     if (s > size_b) {
         s = size_b;
@@ -87,6 +105,7 @@ int cmp_domains(size_t size_a, const void* a, size_t size_b, const void* b) {
         return -1;
     }
     return 0;
+*/
 }
 
 int cmp_pktinfos(size_t size_a, const void* a, size_t size_b, const void* b) {
