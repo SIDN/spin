@@ -131,6 +131,7 @@ buffer_t* buffer_create(size_t size) {
     buffer_t* buf = malloc(sizeof(buffer_t));
     buf->data = malloc(size);
     buf->max = size;
+    buf->allow_resize = 0;
     buffer_reset(buf);
     return buf;
 }
@@ -138,6 +139,10 @@ buffer_t* buffer_create(size_t size) {
 void buffer_destroy(buffer_t* buffer) {
     free(buffer->data);
     free(buffer);
+}
+
+void buffer_allow_resize(buffer_t* buffer) {
+    buffer->allow_resize = 1;
 }
 
 int buffer_finish(buffer_t* buffer) {
@@ -162,8 +167,13 @@ char* buffer_str(buffer_t* buffer) {
     return buffer->data;
 }
 
-int buffer_write(buffer_t* buffer, const char* format, ...) {
-    va_list args;
+void buffer_resize(buffer_t* buffer) {
+    buffer->max = buffer->max * 2;
+    buffer->data = realloc(buffer->data, buffer->max);
+}
+
+int
+buffer_writev(buffer_t* buffer, const char* format, va_list args) {
     int written = 0;
     size_t remaining;
 
@@ -175,16 +185,28 @@ int buffer_write(buffer_t* buffer, const char* format, ...) {
         return -1;
     }
     remaining = buffer->max - buffer->pos;
-    va_start(args, format);
     written = vsnprintf(buffer->data + buffer->pos, remaining, format, args);
-    va_end(args);
     if (written == -1 || written+buffer->pos >= buffer->max) {
-        buffer->ok = 0;
-        return -1;
+        if (buffer->allow_resize) {
+            buffer_resize(buffer);
+            return buffer_writev(buffer, format, args);
+        } else {
+            buffer->ok = 0;
+            return -1;
+        }
     } else {
         buffer->pos += written;
     }
     return 0;
+}
+
+int buffer_write(buffer_t* buffer, const char* format, ...) {
+    va_list args;
+    int result;
+    va_start(args, format);
+    result = buffer_writev(buffer, format, args);
+    va_end(args);
+    return result;
 }
 
 int

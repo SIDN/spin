@@ -97,7 +97,7 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     if (ipv6_header->nexthdr == 17) {
         udp_header = (struct udphdr *)skb_transport_header(sockbuff);
         pkt_info->src_port = ntohs(udp_header->source);
-        pkt_info->dest_port =ntohs(udp_header->dest);
+        pkt_info->dest_port = ntohs(udp_header->dest);
         pkt_info->payload_size = (uint32_t)ntohs(udp_header->len) - 8;
         pkt_info->payload_offset = skb_network_header_len(sockbuff) + 8;
     } else if (ipv6_header->nexthdr == 6) {

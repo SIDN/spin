@@ -41,7 +41,6 @@ void cmp_dname_helper(uint8_t* a, uint8_t* b, int expected) {
     char a_str[256], b_str[256];
     dns_dname2str(a_str, (char*)a, 256);
     dns_dname2str(b_str, (char*)b, 256);
-    printf("[XX] COMPARING %s to %s, result: %d\n", a_str, b_str, result);
     assertf(result == expected, "comparison of %s and %s returned %d, expected %d", a_str, b_str, result, expected);
 }
 
@@ -131,12 +130,27 @@ void
 test_buffer_write_2() {
     buffer_t* buf = buffer_create(8);
 
-    printf("[xx] write: %d\n", buffer_write(buf, "12345"));
-    printf("[xx] write: %d\n", buffer_write(buf, "67890"));
+    buffer_write(buf, "12345");
 
+    assert(buffer_ok(buf));
+
+    buffer_write(buf, "67890");
     buffer_finish(buf);
-    printf("[XX] %s\n", buffer_str(buf));
+    assert(!buffer_ok(buf));
 
+    buffer_destroy(buf);
+}
+
+void
+test_buffer_resize() {
+    buffer_t* buf = buffer_create(8);
+    buffer_allow_resize(buf);
+
+    buffer_write(buf, "12345");
+    buffer_write(buf, "67890");
+
+    assert(buf->max == 16);
+    assert(buffer_ok(buf));
     buffer_destroy(buf);
 }
 
@@ -189,6 +203,7 @@ int main(int argc, char** argv) {
     test_ip_pton_ntop();
     test_buffer_write_1();
     test_buffer_write_2();
+    test_buffer_resize();
     test_ip_tree_read_write();
     return 0;
 }

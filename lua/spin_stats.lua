@@ -5,7 +5,8 @@ local json = require 'json'
 
 local TRAFFIC_CHANNEL = "SPIN/traffic"
 
-local HISTORY_SIZE = 30
+local HISTORY_SIZE = 300
+local PRINT_INTERVAL = 60
 
 local verbose = true
 
@@ -103,13 +104,13 @@ function history_stats()
               end
               port_count = port_count + 1
               size_count = size_count + size
-			  if port_most_used == nil then
+              if port_most_used == nil then
                   port_most_used = port
               else
-				  if ports[port] > ports[port_most_used] then
-					  port_most_used = port
-				  end
-			  end
+                  if ports[port] > ports[port_most_used] then
+                      port_most_used = port
+                  end
+              end
           --print("[XX] " .. squash_node_info(node_info[frm]) .. " -> " .. squash_node_info(node_info[to]) .. " " .. port .. " " .. size)
           end
       end
@@ -205,10 +206,7 @@ function handle_traffic_message(payload)
     --print(json.encode(payload))
     local timestamp = payload["timestamp"]
     history[timestamp] = payload["flows"]
-    print("History (" .. history_clean() .. ")")
-    --history_print()
-    history_stats()
-    print("")
+    history_clean()
 end
 
 client.ON_MESSAGE = function(mid, topic, payload)
@@ -224,6 +222,16 @@ broker = arg[1] -- defaults to "localhost" if arg not set
 client:connect(broker)
 vprint("connected")
 
+local last_print = os.time()
 while true do
+    local cur = os.time()
+    if (cur > last_print + PRINT_INTERVAL) then
+        --history_print()
+        history_stats_full()
+        history_stats()
+        print("")
+        last_print = cur
+    end
+
     client:loop()
 end

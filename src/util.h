@@ -31,12 +31,14 @@ typedef struct {
     size_t max;
     int finished;
     int ok;
+    int allow_resize;
 } buffer_t;
 
 buffer_t* buffer_create(size_t size);
 void buffer_destroy(buffer_t* buffer);
 
 
+void buffer_allow_resize(buffer_t* buffer);
 int buffer_finish(buffer_t* buffer);
 void buffer_reset(buffer_t* buffer);
 size_t buffer_size(buffer_t* buffer);

@@ -59,7 +59,7 @@ dns_cache_add(dns_cache_t* cache, dns_pkt_info_t* dns_pkt_info, uint32_t timesta
         //dns_cache_entry_destroy(entry);
     } else {
         entry = (dns_cache_entry_t*)t_entry->data;
-        printf("[XX] add domain %s to existing IP entry (%p)\n", dname, entry);
+        //printf("[XX] add domain %s to existing IP entry (%p)\n", dname, entry);
         tree_add(entry->domains, strlen(dname)+1, dname, sizeof(timestamp), &timestamp, 1);
     }
 }
@@ -98,7 +98,7 @@ dns_cache_clean(dns_cache_t* dns_cache, uint32_t now) {
             nxt_domain = tree_next(cur_domain);
             expiry = (uint32_t*) cur_domain->data;
             if (now > *expiry) {
-                printf("[XX] DOMAIN EXPIRED! DELETE FROM CACHE");
+                //printf("[XX] DOMAIN EXPIRED! DELETE FROM CACHE");
                 tree_remove_entry(cur_dns->domains, cur_domain);
             }
             cur_domain = nxt_domain;

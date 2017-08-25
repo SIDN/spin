@@ -83,14 +83,9 @@ void send_ack()
     traffic_msg.msg_iov = &traffic_iov;
     traffic_msg.msg_iovlen = 1;
 
-    printf("Sending ACK to kernel\n");
     sendmsg(traffic_sock_fd, &traffic_msg, 0);
 
-    printf("[XX] cleaning cache\n");
     dns_cache_clean(dns_cache, now);
-    printf("[XX] Contents of DNS cache\n");
-    dns_cache_print(dns_cache);
-    printf("[XX] End of DNS cache\n");
     // hey, how about we clean here?_
 }
 
@@ -166,7 +161,6 @@ send_netlink_command_buf(size_t cmdbuf_size, unsigned char* cmdbuf)
     uint8_t version;
     netlink_command_result_t* command_result = netlink_command_result_create();
 
-    printf("[XX] send_netlink_command() start\n");
     command_sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_CONFIG_PORT);
     if(command_sock_fd < 0) {
         fprintf(stderr, "Error connecting to socket: %s\n", strerror(errno));
@@ -210,9 +204,7 @@ send_netlink_command_buf(size_t cmdbuf_size, unsigned char* cmdbuf)
     /* Read response message(s) */
     // Last message should always be SPIN_CMD_END with no data
     while (1) {
-        printf("[XX] recv response\n");
         recvmsg(command_sock_fd, &command_msg, 0);
-        printf("[XX] recv response done\n");
         version = ((uint8_t*)NLMSG_DATA(command_nlh))[0];
         if (version != 1) {
             printf("protocol mismatch from kernel module: got %u, expected %u\n", version, SPIN_NETLINK_PROTOCOL_VERSION);
@@ -247,7 +239,6 @@ send_netlink_command_buf(size_t cmdbuf_size, unsigned char* cmdbuf)
         }
     }
     close(command_sock_fd);
-    printf("[XX] send_netlink_command() done\n");
     // TODO: can we alloc this once?
     free(command_nlh);
     return command_result;
@@ -289,6 +280,7 @@ int init_netlink()
     uint32_t now;
 
     buffer_t* json_buf = buffer_create(4096);
+    buffer_allow_resize(json_buf);
     int mosq_result;
 
     traffic_nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_NETLINK_PAYLOAD));
@@ -353,10 +345,19 @@ int init_netlink()
             send_command_blocked(&pkt);
             check_send_ack();
         } else if (type == SPIN_TRAFFIC_DATA) {
-            //pktinfo2str(pkt_str, &pkt, 2048);
-            //printf("[TRAFFIC] %s\n", pkt_str);
+            pktinfo2str(pkt_str, &pkt, 2048);
+            printf("[TRAFFIC] %s\n", pkt_str);
             //print_pktinfo_wirehex(&pkt);
             node_cache_add_pkt_info(node_cache, &pkt, now);
+
+            /*
+            buffer_t* tmp = buffer_create(4096);
+            pkt_info2json(node_cache, &pkt, tmp);
+            buffer_finish(tmp);
+            printf("[XX] AS JSON:\n%s\n", buffer_str(tmp));
+            buffer_destroy(tmp);
+            */
+
             //json_msg_size = create_traffic_command(node_cache, &pkt, json_msg, json_msg_max_len, now);
             //mosq_result = mosquitto_publish(mosq, NULL, "SPIN/traffic", json_msg_size, json_msg, 0, false);
             if (flow_list_should_send(flow_list, now)) {
@@ -368,6 +369,7 @@ int init_netlink()
                         mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
                     } else {
                         printf("[XX] trucnated! what now? TODO split up?\n");
+                        exit(1);
                     }
                 }
                 flow_list_clear(flow_list, now);
@@ -379,10 +381,10 @@ int init_netlink()
         } else if (type == SPIN_DNS_ANSWER) {
             // note: bad version would have been caught in wire2pktinfo
             // in this specific case
-            wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
-            dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
+            //wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
+            //dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
             //print_dnspktinfo_wirehex(&dns_pkt);
-            printf("[DNS] %s\n", pkt_str);
+            //printf("[DNS] %s\n", pkt_str);
             dns_cache_add(dns_cache, &dns_pkt, now);
             node_cache_add_dns_info(node_cache, &dns_pkt, now);
             // TODO do we need to send nodeUpdate?
@@ -921,7 +923,7 @@ int main(int argc, char** argv) {
     result = init_netlink();
 
     cleanup_cache();
-    free(command_nlh);
+    //free(command_nlh);
     free(traffic_nlh);
 
     mosquitto_destroy(mosq);

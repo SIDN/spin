@@ -18,6 +18,7 @@ void arp_table_read(arp_table_t* arp_table) {
     char mac[18];
     char ignore[40];
     int result = 4;
+    char line[1024];
 
     fp = popen("ip neigh", "r");
     if (fp == NULL) {
@@ -25,19 +26,13 @@ void arp_table_read(arp_table_t* arp_table) {
         return;
     }
     /* Read the output a line at a time - output it. */
-
-    /*while (fgets(line, sizeof(line)-1, fp) != NULL) {
-        printf("%s", line);
-    }*/
-
-    while(result == 4) {
-        result = fscanf(fp, "%s dev %s lladdr %s %s\n", ip, ignore, mac, ignore);
+    while (fgets(line, 1024, fp) != NULL) {
+        result = sscanf(line, "%s dev %s lladdr %s %s\n", ip, ignore, mac, ignore);
         if (result == 4) {
             arp_table_add(arp_table, ip, mac);
         }
     }
 
-    /* close */
     pclose(fp);
 }
 

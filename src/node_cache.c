@@ -469,14 +469,14 @@ pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf
     assert(src_node != NULL);
     assert(dest_node != NULL);
 
-    buffer_write(json_buf, "{ \"to\": ");
+    buffer_write(json_buf, "{ \"from\": ");
     s += node2json(src_node, json_buf);
-    buffer_write(json_buf, ", \"from\": ");
+    buffer_write(json_buf, ", \"to\": ");
     s += node2json(dest_node, json_buf);
-    buffer_write(json_buf, ", \"to_port\": %d, ", pkt_info->dest_port);
-    buffer_write(json_buf, "\"from_port\": %d, ", pkt_info->src_port);
-    buffer_write(json_buf, "\"size\": %d, ", pkt_info->payload_size);
-    buffer_write(json_buf, "\"count\": %d }", pkt_info->packet_count);
+    buffer_write(json_buf, ", \"from_port\": %d", pkt_info->src_port);
+    buffer_write(json_buf, ", \"to_port\": %d", pkt_info->dest_port);
+    buffer_write(json_buf, ", \"size\": %d", pkt_info->payload_size);
+    buffer_write(json_buf, ", \"count\": %d }", pkt_info->packet_count);
     return s;
 }
 
@@ -565,4 +565,3 @@ create_traffic_command(node_cache_t* node_cache, flow_list_t* flow_list, buffer_
     buffer_write(json_buf, " \"total_count\": %u } }", flow_list->total_count);
     return s;
 }
-
