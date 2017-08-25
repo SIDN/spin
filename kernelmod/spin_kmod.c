@@ -38,6 +38,11 @@ static char* mode = "forward";
 module_param(mode, charp, 0000);
 MODULE_PARM_DESC(mode, "Run mode (local or forward, defaults to forward)");
 
+// printk has its own verbosity but we need some more granularity
+static int verbosity = 0;
+module_param(verbosity, int, 0000);
+MODULE_PARM_DESC(verbosity, "Logging verbosity (0 = silent, 5 = debug)");
+
 // Hooks for packet capture
 static struct nf_hook_ops nfho1;
 static struct nf_hook_ops nfho2;
@@ -69,6 +74,8 @@ traffic_clients_t* traffic_clients;
 static struct hrtimer htimer;
 static ktime_t kt_periode;
 
+
+
 // storage of pkt_infos so we do not have to send every single packet
 // (this should solve a lot when we have large streams)
 pkt_info_list_t* pkt_info_list = NULL;
@@ -76,23 +83,35 @@ pkt_info_list_t* pkt_info_list = NULL;
 #define NETLINK_CONFIG_PORT 30
 #define NETLINK_TRAFFIC_PORT 31
 
-void log_packet(pkt_info_t* pkt_info) {
+void
+log_packet(pkt_info_t* pkt_info) {
     char pkt_str[INET6_ADDRSTRLEN];
     pktinfo2str(pkt_str, pkt_info, INET6_ADDRSTRLEN);
     printk("%s\n", pkt_str);
 }
 
+void
+printv(int module_verbosity, const char* format, ...) {
+    va_list args;
+    if (module_verbosity >= verbosity) {
+        va_start(args, format);
+        vprintk(format, args);
+        va_end(args);
+    }
+}
+
 int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
-    uint8_t* b;
+    //uint8_t* b;
     struct udphdr *udp_header;
 
     ipv6_header = (struct ipv6hdr *)ipv6_hdr(sockbuff);
 
     // hard-code a number of things to ignore; such as broadcasts (for now)
+    /*
     b = (uint8_t*)(&ipv6_header->daddr);
     if (*b == 255) {
         return -1;
-    }
+    }*/
 
     if (ipv6_header->nexthdr == 17) {
         udp_header = (struct udphdr *)skb_transport_header(sockbuff);
@@ -110,7 +129,10 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
             pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
         } else {
             // if size is zero, ignore tcp packet
-            return 1;
+            printv(5, KERN_DEBUG "Zero length TCP packet, ignoring\n");
+            pkt_info->payload_size = 0;
+            //pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
+            pkt_info->payload_offset = 0;
         }
     } else if (ipv6_header->nexthdr != 58) {
         if (ipv6_header->nexthdr == 0) {
@@ -120,7 +142,7 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
             // what to do with fragments?
             return 1;
         }
-        printk(KERN_DEBUG "unsupported IPv6 next header: %u\n", ipv6_header->nexthdr);
+        printv(3, KERN_DEBUG "unsupported IPv6 next header: %u\n", ipv6_header->nexthdr);
         return -1;
     } else {
         pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff);
@@ -142,7 +164,7 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 // 1: zero-size packet, structure not filled
 // -1: error
 int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
-    uint8_t* b;
+    //uint8_t* b;
     struct udphdr *udp_header;
 
     ip_header = (struct iphdr *)skb_network_header(sockbuff);
@@ -151,12 +173,14 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     }
 
     // hard-code a number of things to ignore; such as broadcasts (for now)
+    // TODO: this should be based on netmask...
+    /*
     b = (uint8_t*)(&ip_header->daddr);
     if (*b == 255 ||
         *b == 224 ||
         *b == 239) {
         return -1;
-    }
+    }*/
 
     if (ip_header->protocol == 17) {
         udp_header = (struct udphdr *)skb_transport_header(sockbuff);
@@ -171,10 +195,13 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
         pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff);
         if (pkt_info->payload_size > 2) {
             pkt_info->payload_size = pkt_info->payload_size - 2;
-            pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
+            //pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
+            pkt_info->payload_offset = 0;
         } else {
             // if size is zero, ignore tcp packet
-            return 1;
+            printv(5, KERN_DEBUG "Payload size: %u\n", pkt_info->payload_size);
+            pkt_info->payload_size = 0;
+            pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
         }
     /* ignore some protocols */
     // TODO: de-capsulate encapsulated ipv6?
@@ -182,7 +209,7 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
                ip_header->protocol != 2 &&
                ip_header->protocol != 41
               ) {
-        printk(KERN_DEBUG "unsupported IPv4 protocol: %u\n", ip_header->protocol);
+        printv(2, KERN_WARNING "unsupported IPv4 protocol: %u\n", ip_header->protocol);
         return -1;
     } else {
         pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff);
@@ -203,14 +230,14 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
 
 void hexdump_k(uint8_t* data, unsigned int offset, unsigned int size) {
     unsigned int i;
-    printk("%02u: ", 0);
+    printv(5, KERN_DEBUG "%02u: ", 0);
     for (i = 0; i < size; i++) {
         if (i > 0 && i % 10 == 0) {
-            printk("\n%02u: ", i);
+            printv(5, KERN_DEBUG "\n%02u: ", i);
         }
-        printk("%02x ", data[i + offset]);
+        printv(5, KERN_DEBUG "%02x ", data[i + offset]);
     }
-    printk("\n");
+    printv(5, KERN_DEBUG "\n");
 }
 
 /*int send_netlink_message(int msg_size, void* msg_data, uint32_t client_port_id) {
@@ -241,7 +268,7 @@ void send_pkt_info(message_type_t type, pkt_info_t* pkt_info) {
     msg_size = pktinfo_msg_size();
 
     if (msg_size > PACKET_SIZE) {
-        printk("message too large, skipping\n");
+        printv(2, KERN_WARNING "message too large, skipping\n");
         return;
     }
 
@@ -265,7 +292,7 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
 
     msg_size = dns_pktinfo_msg_size();
     if (msg_size > PACKET_SIZE) {
-        printk("message too large, skipping\n");
+        printv(2, KERN_WARNING "message too large, skipping\n");
         return;
     }
 
@@ -286,7 +313,7 @@ static inline uint16_t read_int16(uint8_t* data) {
 unsigned int skip_dname(uint8_t* data, unsigned int cur_pos, size_t payload_size) {
     uint8_t labellen;
     if (cur_pos + 1 > payload_size) {
-        printk(KERN_WARNING "unexpected end of payload when trying to read label\n");
+        printv(2, KERN_WARNING "unexpected end of payload when trying to read label\n");
         return -1;
     }
     labellen = data[cur_pos++];
@@ -296,7 +323,7 @@ unsigned int skip_dname(uint8_t* data, unsigned int cur_pos, size_t payload_size
             return ++cur_pos;
         }
         if (cur_pos + labellen > payload_size) {
-            printk(KERN_WARNING "label len (%u at %u) past payload (%u)\n", (unsigned int)labellen, (unsigned int)cur_pos - 1, (unsigned int)payload_size);
+            printv(2, KERN_WARNING "label len (%u at %u) past payload (%u)\n", (unsigned int)labellen, (unsigned int)cur_pos - 1, (unsigned int)payload_size);
             return -1;
         }
         cur_pos += labellen;
@@ -305,10 +332,12 @@ unsigned int skip_dname(uint8_t* data, unsigned int cur_pos, size_t payload_size
     return cur_pos;
 }
 
-static inline void print_pkt_info(pkt_info_t* pkt_info) {
-       char p[1024];
-       pktinfo2str(p, pkt_info, 1024);
-       printk("Packet info: %s\n", p);
+static inline void printv_pkt_info(int module_verbosity, const char* msg, pkt_info_t* pkt_info) {
+    if (module_verbosity >= verbosity) {
+        char p[1024];
+        pktinfo2str(p, pkt_info, 1024);
+        printv(module_verbosity, KERN_DEBUG "%s: %s\n", msg, p);
+    }
 }
 
 
@@ -366,11 +395,11 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     labellen = data[cur_pos++];
     while(labellen > 0) {
         if (cur_pos + labellen > payload_size) {
-            printk(KERN_WARNING "Error: label len larger than packet payload\n");
+            printv(2, KERN_WARNING "Error: label len larger than packet payload\n");
             return;
         }
         if (cur_pos_name + labellen > 255) {
-            printk(KERN_WARNING "Error: domain name over 255 octets\n");
+            printv(2, KERN_WARNING "Error: domain name over 255 octets\n");
             return;
         }
         dnsname[cur_pos_name++] = labellen;
@@ -385,7 +414,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     // then read all answer ips
     // type should be 1 (A) or 28 (AAAA) and class should be IN (1)
     if (cur_pos + 4 > payload_size) {
-        printk(KERN_WARNING "unexpected end of payload when reading question RR\n");
+        printv(2, KERN_WARNING "unexpected end of payload when reading question RR\n");
         return;
     }
     rr_type = read_int16(data + cur_pos);
@@ -408,7 +437,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             return;
         }
         if (cur_pos + 4 > payload_size) {
-            printk(KERN_WARNING "unexpected end of payload while reading answer RR\n");
+            printv(2, KERN_WARNING "unexpected end of payload while reading answer RR\n");
         }
         //printk("[XX] dname skipped pos now: %u\n", cur_pos);
         // read the type
@@ -421,7 +450,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             // data format:
             // <dns type> <ip family> <ip data> <TTL> <domain name wire format>
             if (cur_pos + 10 > payload_size) {
-                printk(KERN_WARNING "unexpected end of payload while reading answer A RR\n");
+                printv(2, KERN_WARNING "unexpected end of payload while reading answer A RR\n");
             }
             memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
             dpkt_info.family = AF_INET;
@@ -441,7 +470,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             // data format:
             // <dns type> <ip family> <ip data> <TTL> <domain name wire format>
             if (cur_pos + 22 > payload_size) {
-                printk(KERN_WARNING "unexpected end of payload while reading answer AAAA RR\n");
+                printv(2, KERN_WARNING "unexpected end of payload while reading answer AAAA RR\n");
             }
             memset(&dpkt_info, 0, sizeof(dns_pkt_info_t));
             dpkt_info.family = AF_INET6;
@@ -461,7 +490,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             //printk("[XX] now at %u\n", cur_pos);
             // skip ttl
             if (cur_pos + 6 > payload_size) {
-                printk(KERN_WARNING "unexpected end of payload while reading answer RR size\n");
+                printv(2, KERN_WARNING "unexpected end of payload while reading answer RR size\n");
             }
             cur_pos += 4;
             //printk("[XX] after ttl at %u (val here: %u)\n", cur_pos, read_int16(data + cur_pos));
@@ -469,7 +498,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             cur_pos += read_int16(data + cur_pos) + 2;
             //printk("[XX] skip to: %u\n", cur_pos);
             if (cur_pos > payload_size) {
-                printk(KERN_WARNING "unexpected end of payload while skipping answer RR\n");
+                printv(2, KERN_WARNING "unexpected end of payload while skipping answer RR\n");
             }
 
         }
@@ -504,9 +533,13 @@ NF_CALLBACK(hook_func_new, skb)
     memset(&pkt_info, 0, sizeof(pkt_info_t));
     sock_buff = skb;
 
-    if(!sock_buff) { return NF_ACCEPT;}
+    if(!sock_buff) {
+        printv(5, KERN_DEBUG "Callback called but no skb, accepting packet\n");
+        return NF_ACCEPT;
+    }
 
     pres = parse_packet(skb, &pkt_info);
+    printv(5, "Callback called, res: %d\n", pres);
     if (pres == 0) {
         if (ip_store_contains_ip(block_ips, pkt_info.src_addr) ||
             ip_store_contains_ip(block_ips, pkt_info.dest_addr)) {
@@ -514,21 +547,26 @@ NF_CALLBACK(hook_func_new, skb)
             if (!ip_store_contains_ip(except_ips, pkt_info.src_addr) &&
                 !ip_store_contains_ip(except_ips, pkt_info.dest_addr)) {
                 send_pkt_info(SPIN_BLOCKED, &pkt_info);
+                printv(5, KERN_DEBUG "Address in block list, dropping packet\n");
                 return NF_DROP;
+            } else {
+                printv(5, KERN_DEBUG "Address in block list, but also in allow list, letting through\n");
             }
         }
         // if message is dns response, send DNS info as well
         if (pkt_info.src_port == 53) {
             handle_dns_answer(&pkt_info, skb);
         }
-        //printk("[XX] add pkt info: ");
-        //print_pkt_info(&pkt_info);
-        add_pkt_info(&pkt_info);
+        if (!ip_store_contains_ip(ignore_ips, pkt_info.src_addr) &&
+            !ip_store_contains_ip(ignore_ips, pkt_info.dest_addr)) {
+            printv_pkt_info(5, "Parsed packet: ", &pkt_info);
+            add_pkt_info(&pkt_info);
+        }
         //printk("added\n");
         //send_pkt_info(SPIN_TRAFFIC_DATA, &pkt_info);
     } else {
         if (pres < -1) {
-            printk(KERN_DEBUG "packet not parsed\n");
+            printv(5, KERN_DEBUG "packet not parsed\n");
         }
     }
     return NF_ACCEPT;
@@ -561,10 +599,10 @@ static void traffic_client_connect(struct sk_buff *skb) {
     skb_out = nlmsg_new(msg_size,0);
 
     //printk(KERN_INFO "Client (pid %u) connected to traffic port\n", pid);
-    printk(KERN_INFO "Got a ping from client (pid %u)\n", pid);
+    printv(2, KERN_INFO "Got a ping from client (pid %u)\n", pid);
 
     if(!skb_out) {
-        printk(KERN_ERR "Failed to allocate new skb\n");
+        printv(1, KERN_ERR "Failed to allocate new skb\n");
         return;
     }
 }
@@ -577,7 +615,7 @@ void send_config_response(int port_id, config_command_t cmd, size_t msg_size, vo
     skb_out = nlmsg_new(msg_size + 2, 0);
 
     if (!skb_out) {
-        printk(KERN_ERR "Failed to allocate new skb\n");
+        printv(1, KERN_ERR "Failed to allocate new skb\n");
         return;
     }
 
@@ -679,11 +717,11 @@ static void config_client_connect(struct sk_buff *skb) {
         send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
     } else {
         if (cmdbuf[0] != SPIN_NETLINK_PROTOCOL_VERSION) {
-            printk(KERN_ERR "Bad protocol version from client: %u\n", cmdbuf[0]);
+            printv(1, KERN_ERR "Bad protocol version from client: %u\n", cmdbuf[0]);
             return;
         }
         cmd = cmdbuf[1];
-        printk("[XX] Got command %u\n", cmd);
+        printv(3, KERN_DEBUG "[XX] Got command %u\n", cmd);
         switch (cmd) {
         case SPIN_CMD_GET_IGNORE:
             ip_store_for_each(ignore_ips, send_config_response_ip_list_callback, &pid);
@@ -750,18 +788,18 @@ static int __init init_netfilter(void) {
     traffic_nl_sk = netlink_kernel_create(&init_net, NETLINK_TRAFFIC_PORT, &netlink_traffic_cfg);
     if(!traffic_nl_sk)
     {
-        printk(KERN_ALERT "Error creating socket.\n");
+        printv(1, KERN_ALERT "Error creating socket.\n");
         return -10;
     }
-    printk("SPIN traffic port created\n");
+    printv(1, KERN_INFO "SPIN traffic port created\n");
 
     config_nl_sk = netlink_kernel_create(&init_net, NETLINK_CONFIG_PORT, &netlink_config_cfg);
     if(!config_nl_sk)
     {
-        printk(KERN_ALERT "Error creating socket.\n");
+        printv(1, KERN_ALERT "Error creating socket.\n");
         return -10;
     }
-    printk("SPIN config port created\n");
+    printv(1, KERN_INFO "SPIN config port created\n");
 
     return 0;
 }
@@ -780,7 +818,7 @@ static inline void log_ip(unsigned char ip[16], int is_ipv6, void* foo) {
     } else {
         ntop(AF_INET, sa, ip, INET6_ADDRSTRLEN);
     }
-    printk(KERN_INFO "IP: %s\n", sa);
+    printv(5, KERN_DEBUG "IP: %s\n", sa);
 }
 
 static void timer_cleanup(void)
@@ -804,57 +842,8 @@ static void timer_init(void)
     hrtimer_start(& htimer, kt_periode, HRTIMER_MODE_REL);
 }
 
-
-
-void test_ip(void) {
-    unsigned char ip1[16];
-    unsigned char ip2[16];
-    unsigned char ip3[16];
-    unsigned char ip4[16];
-    ip_store_t* ip_store = ip_store_create();
-    memset(ip1, 0, 16);
-    memset(ip2, 0, 16);
-    memset(ip3, 0, 16);
-    memset(ip4, 0, 16);
-    ip1[15] = 1;
-    ip2[15] = 2;
-    ip3[15] = 3;
-    ip4[15] = 1;
-    ip_store_add_ip(ip_store, 1, ip1);
-    ip_store_add_ip(ip_store, 1, ip2);
-    ip_store_add_ip(ip_store, 1, ip3);
-    ip_store_remove_ip(ip_store, ip4);
-    ip_store_remove_ip(ip_store, ip4);
-
-    log_ip(ip1, 1, NULL);
-    printk("Full store:\n");
-    ip_store_for_each(ip_store, log_ip, NULL);
-    ip_store_destroy(ip_store);
-}
-
-void add_default_test_ips(void) {
-    unsigned char ip[16];
-    memset(ip, 0, 16);
-    ip[15] = 1;
-    ip_store_add_ip(ignore_ips, 1, ip);
-    ip[15] = 2;
-    ip_store_add_ip(ignore_ips, 1, ip);
-    ip[12] = 127;
-    ip[13] = 0;
-    ip[14] = 0;
-    ip[15] = 1;
-    ip_store_add_ip(ignore_ips, 0, ip);
-
-    ip[12] = 192;
-    ip[13] = 168;
-    ip[14] = 9;
-    ip[15] = 1;
-    ip_store_add_ip(block_ips, 0, ip);
-
-}
-
 void init_local(void) {
-    printk(KERN_INFO "SPIN initializing local mode\n");
+    printv(1, KERN_INFO "SPIN initializing local mode\n");
 
     nfho1.hook = hook_func_new;
     nfho1.hooknum = NF_INET_LOCAL_IN;
@@ -882,7 +871,7 @@ void init_local(void) {
 }
 
 void init_forward(void) {
-    printk(KERN_INFO "SPIN initializing forward mode\n");
+    printv(1, KERN_INFO "SPIN initializing forward mode\n");
 
     nfho1.hook = hook_func_new;
     nfho1.hooknum = NF_INET_PRE_ROUTING;
@@ -909,6 +898,35 @@ void init_forward(void) {
     nf_register_hook(&nfho4);
 }
 
+void init_forward2(void) {
+    printv(1, KERN_INFO "SPIN initializing forward2 mode\n");
+
+    nfho1.hook = hook_func_new;
+    nfho1.hooknum = NF_INET_PRE_ROUTING;
+    nfho1.pf = PF_INET;
+    nfho1.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho1);
+
+    nfho2.hook = hook_func_new;
+    nfho2.hooknum = NF_INET_POST_ROUTING;
+    nfho2.pf = PF_INET;
+    nfho2.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho2);
+
+    nfho3.hook = hook_func_new;
+    nfho3.hooknum = NF_INET_FORWARD;
+    nfho3.pf = PF_INET;
+    nfho3.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho3);
+
+    nfho4.hook = hook_func_new;
+    nfho4.hooknum = NF_INET_LOCAL_OUT;
+    nfho4.pf = PF_INET;
+    nfho4.priority = NF_IP_PRI_FIRST;
+    nf_register_hook(&nfho4);
+}
+
+
 //Called when module loaded using 'insmod'
 int init_module()
 {
@@ -916,12 +934,14 @@ int init_module()
 
     init_netfilter();
 
-    printk(KERN_INFO "SPIN module loaded\n");
+    printv(1, KERN_INFO "SPIN module loaded\n");
 
     if (strncmp(mode, "local", 6) == 0) {
         init_local();
     } else if (strncmp(mode, "forward", 8) == 0) {
         init_forward();
+    } else if (strncmp(mode, "forward2", 8) == 0) {
+        init_forward2();
     } else {
         pkt_info_list_destroy(pkt_info_list);
         close_netfilter();
@@ -942,20 +962,21 @@ int init_module()
 //Called when module unloaded using 'rmmod'
 void cleanup_module()
 {
-    printk("[XX] stopping handler thread\n");
+    printv(1, KERN_INFO "SPIN module shutting down\n");
+    printv(3, KERN_INFO "stopping handler thread\n");
     traffic_clients_destroy(traffic_clients);
-    printk("[XX] stopped handler thread\n");
+    printv(3, KERN_INFO "stopped handler thread\n");
 
     timer_cleanup();
     pkt_info_list_destroy(pkt_info_list);
     close_netfilter();
-    printk(KERN_INFO "SPIN module signing off!\n");
     nf_unregister_hook(&nfho1);                     //cleanup – unregister hook
     nf_unregister_hook(&nfho2);                     //cleanup – unregister hook
     nf_unregister_hook(&nfho3);                     //cleanup – unregister hook
     nf_unregister_hook(&nfho4);                     //cleanup – unregister hook
 
     ip_store_destroy(ignore_ips);
+    printv(1, KERN_INFO "SPIN module finished\n");
 }
 
 MODULE_LICENSE("GPL");

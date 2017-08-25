@@ -345,8 +345,8 @@ int init_netlink()
             send_command_blocked(&pkt);
             check_send_ack();
         } else if (type == SPIN_TRAFFIC_DATA) {
-            pktinfo2str(pkt_str, &pkt, 2048);
-            printf("[TRAFFIC] %s\n", pkt_str);
+            //pktinfo2str(pkt_str, &pkt, 2048);
+            //printf("[TRAFFIC] %s\n", pkt_str);
             //print_pktinfo_wirehex(&pkt);
             node_cache_add_pkt_info(node_cache, &pkt, now);
 
