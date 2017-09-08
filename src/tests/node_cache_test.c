@@ -13,9 +13,9 @@ sample_node_1() {
     ip_t ip1;
     spin_pton(&ip1, "127.0.0.1");
 
-    node_add_ip(node, &ip1);
+    node_add_ip(node, &ip1, 0);
     spin_pton(&ip1, "::1");
-    node_add_ip(node, &ip1);
+    node_add_ip(node, &ip1, 0);
     node_add_domain(node, "tjeb.nl");
     node_add_domain(node, "example.nl");
     node_set_mac(node, "aa:bb:cc:dd:ee:ff");
@@ -29,9 +29,9 @@ sample_node_2() {
     ip_t ip1;
     spin_pton(&ip1, "192.168.12.13");
 
-    node_add_ip(node, &ip1);
+    node_add_ip(node, &ip1, 0);
     spin_pton(&ip1, "192.168.12.31");
-    node_add_ip(node, &ip1);
+    node_add_ip(node, &ip1, 0);
     node_add_domain(node, "test.com.");
     node_add_domain(node, "test.nl");
     node_add_domain(node, "test.biz");
@@ -72,7 +72,7 @@ test_node_shares_element() {
     assert(node_shares_element(node1, node3) == 0);
     assert(node_shares_element(node2, node3) == 0);
 
-    node_add_ip(node3, &ip);
+    node_add_ip(node3, &ip, 0);
     assert(node_shares_element(node1, node2) == 0);
     assert(node_shares_element(node1, node3) == 1);
     assert(node_shares_element(node2, node3) == 0);
@@ -186,7 +186,7 @@ test_node_cache_add_3() {
 
     spin_pton(&ip, "192.0.2.1");
     node_add_domain(node1, "www.example.com");
-    node_add_ip(node1, &ip);
+    node_add_ip(node1, &ip, 0);
     node_set_mac(node1, "aa:aa:aa:aa:aa:aa");
     node_set_name(node1, "foo bar");
     node_set_last_seen(node1, 12345);
@@ -219,9 +219,9 @@ test_node_to_json() {
     node_add_domain(node1, "www.example.com");
     node_add_domain(node1, "www.example2.com");
     spin_pton(&ip, "192.0.2.1");
-    node_add_ip(node1, &ip);
+    node_add_ip(node1, &ip, 0);
     spin_pton(&ip, "192.0.2.2");
-    node_add_ip(node1, &ip);
+    node_add_ip(node1, &ip, 0);
     node_set_mac(node1, "aa:aa:aa:aa:aa:aa");
     node_set_name(node1, "foo bar");
     node_set_last_seen(node1, 12345);

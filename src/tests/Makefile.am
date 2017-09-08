@@ -9,7 +9,7 @@ tree_test_SOURCES = tree_test.c ../tree.c ../util.c
 tree_test_CFLAGS = -I../ -fprofile-arcs -ftest-coverage
 tree_test_LDFLAGS = -L../
 
-node_cache_test_SOURCES = node_cache_test.c ../node_cache.c ../node_names.c ../util.c ../tree.c ../../kernelmod/pkt_info.c ../arp.c
+node_cache_test_SOURCES = node_cache_test.c ../node_cache.c ../node_names.c ../util.c ../tree.c ../../kernelmod/pkt_info.c ../arp.c ../netlink_commands.c
 node_cache_test_CFLAGS = -I../ -I../../kernelmod -fprofile-arcs -ftest-coverage
 node_cache_test_LDFLAGS = -L../ -L../../kernelmod
 
@@ -31,8 +31,8 @@ util_test_CFLAGS = -I../ -I../../kernelmod -fprofile-arcs -ftest-coverage
 util_test_LDFLAGS = -L../
 
 netlink_commands_test_SOURCES = netlink_commands_test.c ../netlink_commands.c ../util.c ../tree.c
-netlink_commands_test_CFLAGS = -I../ -fprofile-arcs -ftest-coverage
-netlink_commands_test_LDFLAGS = -L../
+netlink_commands_test_CFLAGS = -I../ -I../../kernelmod -fprofile-arcs -ftest-coverage
+netlink_commands_test_LDFLAGS = -L../ -L../../kernelmod
 
 all-local:
 	./run_tests.sh

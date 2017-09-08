@@ -4,6 +4,8 @@
 #include <assert.h>
 #include <arpa/inet.h>
 #include "util.h"
+#include "netlink_commands.h"
+#include "spin_cfg.h"
 
 node_t*
 node_create(int id) {
@@ -13,6 +15,8 @@ node_create(int id) {
     node->domains = tree_create(cmp_domains);
     node->name = NULL;
     node->mac = NULL;
+    node->is_blocked = 0;
+    node->is_excepted = 0;
     node->last_seen = 0;
     return node;
 }
@@ -56,8 +60,30 @@ node_t* node_clone(node_t* node) {
 }
 
 void
-node_add_ip(node_t* node, ip_t* ip) {
+node_add_ip(node_t* node, ip_t* ip, int check_status) {
     tree_add(node->ips, sizeof(ip_t), ip, 0, NULL, 1);
+    // check if this ip is blocked or excepted; if any IP in a node
+    // is blocked, set 'is_blocked'; if any IP is excepted, set is_except
+
+    // Todo; should we check more often? re-load regularly?
+    // definitely update locally when setting.
+    // this does not seem to be the most efficient way to do it;
+    // keep a list and somehow keep it updated perhaps?
+    if (check_status) {
+        printf("[XX] CHECK STATUS\n");
+        netlink_command_result_t* cr;
+        cr = send_netlink_command_noarg(SPIN_CMD_GET_BLOCK);
+        if (netlink_command_result_contains_ip(cr, ip)) {
+            node->is_blocked = 1;
+        }
+        netlink_command_result_destroy(cr);
+        cr = send_netlink_command_noarg(SPIN_CMD_GET_EXCEPT);
+        if (netlink_command_result_contains_ip(cr, ip)) {
+            printf("[XX] EXCEPTED!!!!!\n");
+            node->is_excepted = 1;
+        }
+        netlink_command_result_destroy(cr);
+    }
 }
 
 void
@@ -351,7 +377,7 @@ node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
     node_t* node = node_create(0);
     node_set_last_seen(node, timestamp);
     add_mac_and_name(node_cache, node, ip);
-    node_add_ip(node, ip);
+    node_add_ip(node, ip, 1);
     node_cache_add_node(node_cache, node);
 }
 
@@ -374,7 +400,7 @@ void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, 
 
     node_t* node = node_create(0);
     node_set_last_seen(node, timestamp);
-    node_add_ip(node, &ip);
+    node_add_ip(node, &ip, 1);
     node_add_domain(node, dname_str);
     add_mac_and_name(node_cache, node, &ip);
     node_cache_add_node(node_cache, node);

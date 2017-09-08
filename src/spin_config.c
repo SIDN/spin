@@ -41,18 +41,6 @@ typedef enum {
     SAVE
 } cmd_t;
 
-void hexdump(uint8_t* data, unsigned int offset, unsigned int size) {
-    unsigned int i;
-    printf(" 0: ");
-    for (i = 0; i < size; i++) {
-        if (i > 0 && i%10 == 0) {
-            printf("\n%02u: ", i);
-        }
-        printf("%02x ", (uint8_t) data[offset + i]);
-    }
-    printf("\n");
-}
-
 int
 send_command(size_t cmdbuf_size, unsigned char* cmdbuf, FILE* output)
 {
@@ -128,7 +116,7 @@ send_command(size_t cmdbuf_size, unsigned char* cmdbuf, FILE* output)
             }
         } else {
             printf("unknown command response type received from kernel (%u %02x), stopping\n", cmd, cmd);
-            hexdump((uint8_t*)NLMSG_DATA(nlh), 0, nlh->nlmsg_len);
+            hexdump((uint8_t*)NLMSG_DATA(nlh), nlh->nlmsg_len);
             break;
         }
     }

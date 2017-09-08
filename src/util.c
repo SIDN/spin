@@ -278,3 +278,15 @@ int read_ip_tree(tree_t* dest, const char* filename) {
     fclose(in);
     return count;
 }
+
+void hexdump(uint8_t* data, unsigned int size) {
+    unsigned int i;
+    printf("00: ");
+    for (i = 0; i < size; i++) {
+        if (i > 0 && i % 10 == 0) {
+            printf("\n%u: ", i);
+        }
+        printf("%02x ", data[i]);
+    }
+    printf("\n");
+}

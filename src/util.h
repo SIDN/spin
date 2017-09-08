@@ -67,4 +67,8 @@ int store_ip_tree(tree_t* tree, const char* filename);
  */
 int read_ip_tree(tree_t* dest, const char* filename);
 
+void hexdump(uint8_t* data, unsigned int size);
+
+
+
 #endif // SPIN_UTIL_H

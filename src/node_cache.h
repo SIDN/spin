@@ -19,7 +19,11 @@ typedef struct {
     char* name;
     // can be null
     char* mac;
-    // at some point we may want to clean up stuff
+    // some additional info about this node
+    uint8_t is_blocked;
+    uint8_t is_excepted;
+    // at some point we may want to clean up stuff, so keep track of
+    // when we last saw it
     uint32_t last_seen;
 } node_t;
 
@@ -27,7 +31,8 @@ node_t* node_create(int id);
 void node_destroy(node_t* node);
 node_t* node_clone(node_t* node);
 
-void node_add_ip(node_t* node, ip_t* ip);
+// if check_status is true, ask the kernel module for blocked and except status
+void node_add_ip(node_t* node, ip_t* ip, int check_status);
 void node_add_domain(node_t* node, char* domain);
 void node_set_mac(node_t* node, char* mac);
 void node_set_name(node_t* node, char* name);
