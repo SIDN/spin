@@ -16,6 +16,8 @@ var graph2d_1;
 var selectedNodeId;
 // list of filters
 var filterList = [];
+var blockList = [];
+var allowedList = [];
 // feed this data from websocket command
 var zoom_locked = false;
 
@@ -76,6 +78,23 @@ function updateFilterList() {
         $("#filter-list").append(li);
     }
 }
+
+function updateBlockList() {
+    $("#block-list").empty();
+    for (var i = 0; i < blockList.length; i++) {
+        var li = $("<li class='ui-widget-content'></li> ").text(blockList[i]);
+        $("#block-list").append(li);
+    }
+}
+
+function updateAllowedList() {
+    $("#allowed-list").empty();
+    for (var i = 0; i < allowedList.length; i++) {
+        var li = $("<li class='ui-widget-content'></li> ").text(allowedList[i]);
+        $("#allowed-list").append(li);
+    }
+}
+
 
 function initGraphs() {
     $("#new-filter-dialog").hide();
@@ -172,6 +191,7 @@ function initGraphs() {
     });
 
     // create the filterlist dialog
+    // todo: refactor next 3 into 1 call
     $(function() {
         $("#filter-list").selectable({
             selecting: function(event, ui) {
@@ -214,7 +234,92 @@ function initGraphs() {
     });
 
     $(function() {
+        $("#block-list").selectable({
+            selecting: function(event, ui) {
+                if (event.detail == 0) {
+                    _selectRange = true;
+                    return true;
+                }
+                if ($(ui.selecting).hasClass('ui-selected')) {
+                    _deselectQueue.push(ui.selecting);
+                }
+            },
+            unselecting: function(event, ui) {
+                $(ui.unselecting).addClass('ui-selected');
+            },
+            stop: function() {
+                if (!_selectRange) {
+                    $.each(_deselectQueue, function(ix, de) {
+                        $(de)
+                            .removeClass('ui-selecting')
+                            .removeClass('ui-selected');
+                    });
+                }
+                _selectRange = false;
+                _deselectQueue = [];
+
+                // enable or disable the remove blocks button depending
+                // on whether any elements have been selected
+                var selected = [];
+                $(".ui-selected", this).each(function() {
+                    selected.push(index);
+                    var index = $("#block-list li").index(this);
+                });
+                if (selected.length > 0) {
+                    $(".ui-dialog-buttonpane button:contains('Remove Blocks')").button("enable");
+                } else {
+                    $(".ui-dialog-buttonpane button:contains('Remove Blocks')").button("disable");
+                }
+            }
+        });
+    });
+
+    $(function() {
+        $("#allowed-list").selectable({
+            selecting: function(event, ui) {
+                if (event.detail == 0) {
+                    _selectRange = true;
+                    return true;
+                }
+                if ($(ui.selecting).hasClass('ui-selected')) {
+                    _deselectQueue.push(ui.selecting);
+                }
+            },
+            unselecting: function(event, ui) {
+                $(ui.unselecting).addClass('ui-selected');
+            },
+            stop: function() {
+                if (!_selectRange) {
+                    $.each(_deselectQueue, function(ix, de) {
+                        $(de)
+                            .removeClass('ui-selecting')
+                            .removeClass('ui-selected');
+                    });
+                }
+                _selectRange = false;
+                _deselectQueue = [];
+
+                // enable or disable the remove alloweds button depending
+                // on whether any elements have been selected
+                var selected = [];
+                $(".ui-selected", this).each(function() {
+                    selected.push(index);
+                    var index = $("#allowed-list li").index(this);
+                });
+                if (selected.length > 0) {
+                    $(".ui-dialog-buttonpane button:contains('Remove Allowed')").button("enable");
+                } else {
+                    $(".ui-dialog-buttonpane button:contains('Remove Allowed')").button("disable");
+                }
+            }
+        });
+    });
+
+
+    $(function() {
         var dialog;
+        var block_dialog;
+        var allowed_dialog;
         var selected;
 
         dialog = $("#filter-list-dialog").dialog({
@@ -256,22 +361,113 @@ function initGraphs() {
         $("#filter-list-button").button().on("click", function() {
             dialog.dialog("open");
         });
+
+
+        block_dialog = $("#block-list-dialog").dialog({
+            autoOpen: false,
+            autoResize: true,
+            resizable: true,
+            modal: false,
+            minWidth: 360,
+            position: {
+                my: "right top",
+                at: "right top",
+                of: "#mynetwork"
+            },
+            buttons: {
+                "Remove Blocks": function() {
+                    $("#block-list .ui-selected", this).each(function() {
+                        // The inner text contains the name of the block
+                        //alertWithObject("[XX] selected:", this);
+                        var address;
+                        if (this.innerText) {
+                            sendCommand("remove_block_ip", this.innerText);
+                        } else if (this.innerHTML) {
+                            sendCommand("remove_block_ip", this.innerHTML);
+                        }
+                        $(".ui-dialog-buttonpane button:contains('Remove Blocks')").button("disable");
+                    });
+                },
+                Close: function() {
+                    block_dialog.dialog("close");
+                }
+            },
+            close: function() {}
+        });
+
+        $(".ui-dialog-buttonpane button:contains('Remove Blocks')").button("disable");
+        $("#block-list-button").button().on("click", function() {
+            block_dialog.dialog("open");
+        });
+
+
+        allowed_dialog = $("#allowed-list-dialog").dialog({
+            autoOpen: false,
+            autoResize: true,
+            resizable: true,
+            modal: false,
+            minWidth: 360,
+            position: {
+                my: "right top",
+                at: "right top",
+                of: "#mynetwork"
+            },
+            buttons: {
+                "Remove Allowed": function() {
+                    $("#allowed-list .ui-selected", this).each(function() {
+                        // The inner text contains the name of the block
+                        //alertWithObject("[XX] selected:", this);
+                        var address;
+                        if (this.innerText) {
+                            sendCommand("remove_allow_ip", this.innerText);
+                        } else if (this.innerHTML) {
+                            sendCommand("remove_allow_ip", this.innerHTML);
+                        }
+                        $(".ui-dialog-buttonpane button:contains('Remove Allowed')").button("disable");
+                    });
+                },
+                Close: function() {
+                    allowed_dialog.dialog("close");
+                }
+            },
+            close: function() {}
+        });
+
+        $(".ui-dialog-buttonpane button:contains('Remove Allowed')").button("disable");
+        $("#allowed-list-button").button().on("click", function() {
+            allowed_dialog.dialog("open");
+        });
     });
 
-    $("#firewall-node-button").button().on("click", function (evt) {
+    $("#block-node-button").button().on("click", function (evt) {
         var node = nodes.get(selectedNodeId);
         // hmm. misschien we should actually remove the node and
         // let the next occurrence take care of presentation?
-        if (node.blocked) {
-            sendCommand("stopblockdata", selectedNodeId);
-            node.blocked = false;
+        if (node.is_blocked) {
+            sendCommand("remove_block_node", selectedNodeId);
+            node.is_blocked = false;
         } else {
-            sendCommand("blockdata", selectedNodeId);
-            node.blocked = true;
+            sendCommand("add_block_node", selectedNodeId);
+            node.is_blocked = true;
         }
         nodes.update(node);
         updateBlockedButton();
-    })
+    });
+
+    $("#allow-node-button").button().on("click", function (evt) {
+        var node = nodes.get(selectedNodeId);
+        // hmm. misschien we should actually remove the node and
+        // let the next occurrence take care of presentation?
+        if (node.is_excepted) {
+            sendCommand("remove_allow_node", selectedNodeId);
+            node.is_excepted = false;
+        } else {
+            sendCommand("add_allow_node", selectedNodeId);
+            node.is_excepted = true;
+        }
+        nodes.update(node);
+        updateAllowedButton();
+    });
 
     showGraph(traffic_dataset);
     showNetwork();
@@ -423,6 +619,7 @@ function nodeSelected(event) {
         }
 
         updateBlockedButton();
+        updateAllowedButton();
 
         //sendCommand("ip2hostname", node.address);
         //writeToScreen("netowner", "Network owner: &lt;searching&gt;");
@@ -435,11 +632,20 @@ function nodeSelected(event) {
 
 function updateBlockedButton() {
     var node = nodes.get(selectedNodeId);
-    var label = node.blocked ? "Unblock node" : "Block node";
-    $("#firewall-node-button").button("option", {
+    var label = node.is_blocked ? "Unblock node" : "Block node";
+    $("#block-node-button").button("option", {
         "label": label
     });
 }
+
+function updateAllowedButton() {
+    var node = nodes.get(selectedNodeId);
+    var label = node.is_excepted ? "Stop allowing node" : "Allow node";
+    $("#allow-node-button").button("option", {
+        "label": label
+    });
+}
+
 
 /* needed?
     function resetAllNodes() {
@@ -533,6 +739,7 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
     var ips = node.ips ? node.ips : [];
     var domains = node.domains ? node.domains : [];
     var blocked = type == "blocked";
+
     if (node.name) {
         label = node.name;
     } else if (node.mac) {
@@ -553,6 +760,14 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
         }
     }
 
+    var border_colour = "black";
+    if (node.is_blocked) {
+        border_colour = "red";
+    }
+    if (node.is_excepted) {
+        border_colour = "green";
+    }
+
     //alert("add node: " + node)
     var enode = nodes.get(node.id);
     if (enode) {
@@ -560,9 +775,11 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
         enode.label = label;
         enode.ips = ips;
         enode.domains = domains;
-        enode.color = colour;
+        enode.color = { 'background': colour, 'border': border_colour };
         enode.blocked = blocked;
         enode.lastseen = timestamp;
+        enode.is_blocked = node.is_blocked;
+        enode.is_excepted = node.is_excepted;
         nodes.update(enode);
     } else {
         // it's new
@@ -572,12 +789,15 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
             ips: node.ips ? node.ips : [],
             domains: node.domains ? node.domains : [],
             label: label,
-            color: colour,
+            color: { 'background': colour, 'border': border_colour },
             value: size,
             count: count,
             size: size,
             lastseen: timestamp,
+            // blocked means this node was involved in blocked traffic
             blocked: blocked,
+            is_blocked: node.is_blocked,
+            is_excepted: node.is_excepted,
             scaling: {
                 min: 1,
                 label: {

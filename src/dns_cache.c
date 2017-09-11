@@ -107,7 +107,7 @@ dns_cache_clean(dns_cache_t* dns_cache, uint32_t now) {
         if (tree_empty(cur_dns->domains)) {
             // the entry's data was allocated separately upon addition
             // to the cache, so it needs to be destroyed too
-            dns_cache_print(dns_cache);
+            //dns_cache_print(dns_cache);
             char ip_str[INET6_ADDRSTRLEN];
             spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
             dns_cache_entry_destroy(cur_dns);

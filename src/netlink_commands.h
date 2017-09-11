@@ -26,7 +26,8 @@ void netlink_command_result_set_error(netlink_command_result_t* command_result, 
 
 netlink_command_result_t* send_netlink_command_buf(size_t cmdbuf_size, unsigned char* cmdbuf);
 netlink_command_result_t* send_netlink_command_noarg(config_command_t cmd);
-netlink_command_result_t* send_netlink_command_iparg(config_command_t cmd, uint8_t* ip);
+//netlink_command_result_t* send_netlink_command_iparg(config_command_t cmd, uint8_t* ip);
+netlink_command_result_t* send_netlink_command_iparg(config_command_t cmd, ip_t* ip);
 
 
 #endif // SPIN_NETLINK_COMMANDS_H

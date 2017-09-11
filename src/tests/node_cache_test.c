@@ -146,21 +146,21 @@ test_node_cache_add_1() {
     sample_dns_pkt_info_2(&info2);
     sample_dns_pkt_info_3(&info3);
 
-    node_cache_add_dns_info(node_cache, &info1, 12345);
-    node_cache_add_dns_info(node_cache, &info2, 12345);
-    node_cache_add_dns_info(node_cache, &info3, 12345);
+    node_cache_add_dns_info(node_cache, &info1, 12345, 0);
+    node_cache_add_dns_info(node_cache, &info2, 12345, 0);
+    node_cache_add_dns_info(node_cache, &info3, 12345, 0);
     assert(tree_size(node_cache->nodes) == 1);
 
     node_cache_destroy(node_cache);
     node_cache = node_cache_create();
 
-    node_cache_add_dns_info(node_cache, &info1, 12345);
-    node_cache_add_dns_info(node_cache, &info3, 12345);
+    node_cache_add_dns_info(node_cache, &info1, 12345, 0);
+    node_cache_add_dns_info(node_cache, &info3, 12345, 0);
     // 1 and 3 share no data
     assert(tree_size(node_cache->nodes) == 2);
 
     // adding 2 now should merge 3 into it as well
-    node_cache_add_dns_info(node_cache, &info2, 12345);
+    node_cache_add_dns_info(node_cache, &info2, 12345, 0);
     assert(tree_size(node_cache->nodes) == 1);
 
     node_cache_destroy(node_cache);
@@ -171,7 +171,7 @@ test_node_cache_add_2() {
     node_cache_t* node_cache = node_cache_create();
     pkt_info_t pkt_info;
     sample_pkt_info_1(&pkt_info);
-    node_cache_add_pkt_info(node_cache, &pkt_info, 12345);
+    node_cache_add_pkt_info(node_cache, &pkt_info, 12345, 0);
     assert(tree_size(node_cache->nodes) == 2);
 
     node_cache_destroy(node_cache);
@@ -251,7 +251,7 @@ test_pkt_info_to_json() {
 
     sample_pkt_info_1(&pkt_info);
 
-    node_cache_add_pkt_info(node_cache, &pkt_info, 11111);
+    node_cache_add_pkt_info(node_cache, &pkt_info, 11111, 0);
 
     printf("[XX] NODE CACHE: \n");
     node_cache_print(node_cache);
@@ -277,6 +277,7 @@ test_pkt_info_to_json() {
 
 int
 main(int argc, char** argv) {
+
     test_node_print();
     test_node_shares_element();
     test_node_cache_add_1();

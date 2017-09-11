@@ -43,6 +43,7 @@ static node_cache_t* node_cache;
 static struct mosquitto* mosq;
 
 static int running;
+static int local_mode;
 
 #define MQTT_CHANNEL_TRAFFIC "SPIN/traffic"
 #define MQTT_CHANNEL_COMMANDS "SPIN/commands"
@@ -136,7 +137,7 @@ unsigned int netlink_command_result2json(netlink_command_result_t* command_resul
     return s;
 }
 
-unsigned int create_mqtt_command(buffer_t* buf, char* command, char* argument, char* result) {
+unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argument, char* result) {
     buffer_write(buf, "{ \"command\": \"%s\"", command);
     if (argument != NULL) {
         buffer_write(buf, ", \"argument\": %s", argument);
@@ -156,8 +157,8 @@ void send_command_blocked(pkt_info_t* pkt_info) {
 
     p_size = pkt_info2json(node_cache, pkt_info, pkt_json);
     buffer_finish(pkt_json);
-    printf("[XX] Sending 'blocked' command for:");
-    printf("[XX] (%d) '%s'\n", p_size, buffer_str(pkt_json));
+    //printf("[XX] Sending 'blocked' command for:");
+    //printf("[XX] (%d) '%s'\n", p_size, buffer_str(pkt_json));
     response_size = create_mqtt_command(response_json, "blocked", NULL, buffer_str(pkt_json));
     buffer_finish(response_json);
     mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, buffer_str(response_json), 0, false);
@@ -213,6 +214,7 @@ int init_netlink()
 
     /* Read message from kernel */
     while (running) {
+        //printf("[XX] running: %d\n", running);
         mosquitto_loop(mosq, 0, 10);
         rs = poll(fds, 1, 50);
         if (rs == 0) {
@@ -236,15 +238,14 @@ int init_netlink()
         if (type == SPIN_BLOCKED) {
             //pktinfo2str(pkt_str, &pkt, 2048);
             //printf("[BLOCKED] %s\n", pkt_str);
-            node_cache_add_pkt_info(node_cache, &pkt, now);
+            node_cache_add_pkt_info(node_cache, &pkt, now, 1);
             send_command_blocked(&pkt);
             check_send_ack();
         } else if (type == SPIN_TRAFFIC_DATA) {
             //pktinfo2str(pkt_str, &pkt, 2048);
             //printf("[TRAFFIC] %s\n", pkt_str);
             //print_pktinfo_wirehex(&pkt);
-            node_cache_add_pkt_info(node_cache, &pkt, now);
-
+            node_cache_add_pkt_info(node_cache, &pkt, now, 1);
 
             // small experiment; check if either endpoint is an internal device, if not,
             // skip reporting it
@@ -257,7 +258,7 @@ int init_netlink()
             src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
             memcpy(ip.addr, pkt.dest_addr, 16);
             dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
-            if (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL)) {
+            if (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL && !local_mode)) {
                 continue;
             }
             /*
@@ -277,9 +278,6 @@ int init_netlink()
                     create_traffic_command(node_cache, flow_list, json_buf, now);
                     if (buffer_finish(json_buf)) {
                         mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
-                    } else {
-                        printf("[XX] trucnated! what now? TODO split up?\n");
-                        exit(1);
                     }
                 }
                 flow_list_clear(flow_list, now);
@@ -296,7 +294,7 @@ int init_netlink()
             //print_dnspktinfo_wirehex(&dns_pkt);
             //printf("[DNS] %s\n", pkt_str);
             dns_cache_add(dns_cache, &dns_pkt, now);
-            node_cache_add_dns_info(node_cache, &dns_pkt, now);
+            node_cache_add_dns_info(node_cache, &dns_pkt, now, 1);
             // TODO do we need to send nodeUpdate?
             check_send_ack();
         } else if (type == SPIN_ERR_BADVERSION) {
@@ -354,14 +352,14 @@ static int json_dump(const char *js, jsmntok_t *t, size_t count, int indent) {
     return 0;
 }
 
-void handle_command_get_filters() {
+void handle_command_get_list(config_command_t cmd, const char* json_command) {
     netlink_command_result_t* command_result;
     buffer_t* response_json = buffer_create(4096);
     buffer_t* result_json = buffer_create(4096);
     unsigned int response_size;
 
     // ask the kernel module for the list of ignored nodes
-    command_result = send_netlink_command_noarg(SPIN_CMD_GET_IGNORE);
+    command_result = send_netlink_command_noarg(cmd);
     printf("[XX] handle_command_get_filters() done\n");
     printf("[XX] calling result2json\n");
     netlink_command_result2json(command_result, result_json);
@@ -375,7 +373,7 @@ void handle_command_get_filters() {
     buffer_finish(result_json);
     printf("[XX] calling result2json done, bufsize %d ok %d\n", result_json->pos, buffer_ok(result_json));
     printf("[XX] size of command result: %u\n", result_json->pos);
-    response_size = create_mqtt_command(response_json, "filters", NULL, buffer_str(result_json));
+    response_size = create_mqtt_command(response_json, json_command, NULL, buffer_str(result_json));
     if (!buffer_ok(response_json)) {
         printf("[XX] error: response too large\n");
         buffer_destroy(result_json);
@@ -434,7 +432,7 @@ void remove_ip_tree_from_file(tree_t* tree, const char* filename) {
 }
 
 
-void remove_ip_from_file(uint8_t* ip, const char* filename) {
+void remove_ip_from_file(ip_t* ip, const char* filename) {
     tree_t *ip_tree = tree_create(cmp_ips);
     // if this fails, we simply try to write a new one anyway
     read_ip_tree(ip_tree, filename);
@@ -446,6 +444,7 @@ void remove_ip_from_file(uint8_t* ip, const char* filename) {
 // (this is useful if we have other actions to perform with the node's
 // ip addresses, such as print or save them)
 // note: caller does *not* get ownership of the tree
+// TODO: can we skip the lookup? make all callers do it first
 tree_t* send_netlink_command_for_node_ips(config_command_t cmd, int node_id) {
     node_t* node = node_cache_find_by_id(node_cache, node_id);
     tree_entry_t* ip_entry;
@@ -471,11 +470,19 @@ void handle_command_add_filter(int node_id) {
     }
 }
 
-void handle_command_remove_filter(int node_id) {
+void handle_command_remove_ip(config_command_t cmd, ip_t* ip, const char* configfile_to_update) {
+    netlink_command_result_t* cr = send_netlink_command_iparg(cmd, ip);
+    if (configfile_to_update != NULL) {
+        remove_ip_from_file(ip, configfile_to_update);
+    }
+    netlink_command_result_destroy(cr);
+
+    /*
     tree_t* ips = send_netlink_command_for_node_ips(SPIN_CMD_REMOVE_IGNORE, node_id);
     if (ips != NULL) {
         remove_ip_tree_from_file(ips, "/etc/spin/ignore.list");
     }
+    */
 }
 
 void handle_command_reset_filters() {
@@ -515,33 +522,52 @@ void handle_command_add_name(int node_id, char* name) {
 }
 
 void handle_command_block_data(int node_id) {
+    node_t* node = node_cache_find_by_id(node_cache, node_id);
     tree_t* ips = send_netlink_command_for_node_ips(SPIN_CMD_ADD_BLOCK, node_id);
     if (ips != NULL) {
         add_ip_tree_to_file(ips, "/etc/spin/block.list");
     }
+    // the is_blocked status is only read if this node had a new ip address added, so update it now
+    if (node != NULL) {
+        node->is_blocked = 1;
+    }
 }
 
 void handle_command_stop_block_data(int node_id) {
-    // TODO store this in "/etc/spin/blocked.conf"
+    node_t* node = node_cache_find_by_id(node_cache, node_id);
     tree_t* ips = send_netlink_command_for_node_ips(SPIN_CMD_REMOVE_BLOCK, node_id);
     if (ips != NULL) {
         remove_ip_tree_from_file(ips, "/etc/spin/block.list");
+    }
+    // the is_blocked status is only read if this node had a new ip address added, so update it now
+    if (node != NULL) {
+        node->is_blocked = 0;
     }
 }
 
 void handle_command_allow_data(int node_id) {
     // TODO store this in "/etc/spin/blocked.conf"
+    node_t* node = node_cache_find_by_id(node_cache, node_id);
     tree_t* ips = send_netlink_command_for_node_ips(SPIN_CMD_ADD_EXCEPT, node_id);
     if (ips != NULL) {
         add_ip_tree_to_file(ips, "/etc/spin/allow.list");
+    }
+    // the is_excepted status is only read if this node had a new ip address added, so update it now
+    if (node != NULL) {
+        node->is_excepted = 1;
     }
 }
 
 void handle_command_stop_allow_data(int node_id) {
     // TODO store this in "/etc/spin/blocked.conf"
+    node_t* node = node_cache_find_by_id(node_cache, node_id);
     tree_t* ips = send_netlink_command_for_node_ips(SPIN_CMD_REMOVE_EXCEPT, node_id);
     if (ips != NULL) {
         remove_ip_tree_from_file(ips, "/etc/spin/allow.list");
+    }
+    // the is_excepted status is only read if this node had a new ip address added, so update it now
+    if (node != NULL) {
+        node->is_excepted = 0;
     }
 }
 
@@ -662,42 +688,63 @@ void handle_json_command_2(size_t cmd_name_len,
     int node_id_arg = 0;
     int result;
     char str_arg[80];
-    uint8_t ip_arg[sizeof(ip_t)];
+    ip_t ip_arg;
 
     if (strncmp(cmd_name, "get_filters", cmd_name_len) == 0) {
-        handle_command_get_filters();
+        handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
+    } else if (strncmp(cmd_name, "get_blocks", cmd_name_len) == 0) {
+        handle_command_get_list(SPIN_CMD_GET_BLOCK, "blocks");
+    } else if (strncmp(cmd_name, "get_alloweds", cmd_name_len) == 0) {
+        handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
     } else if (strncmp(cmd_name, "add_filter", cmd_name_len) == 0) {
         if (json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
             handle_command_add_filter(node_id_arg);
         }
+        handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
     } else if (strncmp(cmd_name, "remove_filter", cmd_name_len) == 0) {
-        if (json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
-            handle_command_remove_filter(node_id_arg);
+        if (json_parse_ip_arg(&ip_arg, json_str, tokens, argument_token_i)) {
+            handle_command_remove_ip(SPIN_CMD_REMOVE_IGNORE, &ip_arg, "/etc/spin/ignore.list");
         }
+        handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
     } else if (strncmp(cmd_name, "reset_filters", cmd_name_len) == 0) {
         handle_command_reset_filters();
+        handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
     //} else if (strncmp(cmd_name, "get_names", cmd_name_len) == 0) {
     //    handle_command_get_names();
     } else if (strncmp(cmd_name, "add_name", cmd_name_len) == 0) {
         if (json_parse_node_id_name_arg(&node_id_arg, str_arg, 24, json_str, tokens, argument_token_i)) {
             handle_command_add_name(node_id_arg, str_arg);
         }
-    } else if (strncmp(cmd_name, "blockdata", cmd_name_len) == 0) {
+    } else if (strncmp(cmd_name, "add_block_node", cmd_name_len) == 0) {
         if (json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
             handle_command_block_data(node_id_arg);
         }
-    } else if (strncmp(cmd_name, "stopblockdata", cmd_name_len) == 0) {
+        handle_command_get_list(SPIN_CMD_GET_BLOCK, "blocks");
+    } else if (strncmp(cmd_name, "remove_block_node", cmd_name_len) == 0) {
         if (json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
             handle_command_stop_block_data(node_id_arg);
         }
-    } else if (strncmp(cmd_name, "allowdata", cmd_name_len) == 0) {
+        handle_command_get_list(SPIN_CMD_GET_BLOCK, "blocks");
+    } else if (strncmp(cmd_name, "remove_block_ip", cmd_name_len) == 0) {
+        if (json_parse_ip_arg(&ip_arg, json_str, tokens, argument_token_i)) {
+            handle_command_remove_ip(SPIN_CMD_REMOVE_BLOCK, &ip_arg, "/etc/spin/block.list");
+        }
+        handle_command_get_list(SPIN_CMD_GET_BLOCK, "blocks");
+    } else if (strncmp(cmd_name, "add_allow_node", cmd_name_len) == 0) {
         if (json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
             handle_command_allow_data(node_id_arg);
         }
-    } else if (strncmp(cmd_name, "stopallowdata", cmd_name_len) == 0) {
+        handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
+    } else if (strncmp(cmd_name, "remove_allow_node", cmd_name_len) == 0) {
         if (json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
             handle_command_stop_allow_data(node_id_arg);
         }
+        handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
+    } else if (strncmp(cmd_name, "remove_allow_ip", cmd_name_len) == 0) {
+        if (json_parse_ip_arg(&ip_arg, json_str, tokens, argument_token_i)) {
+            handle_command_remove_ip(SPIN_CMD_REMOVE_EXCEPT, &ip_arg, "/etc/spin/allow.list");
+        }
+        handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
     }
 }
 
@@ -781,7 +828,9 @@ void init_mosquitto(void) {
 
     send_command_restart();
     printf("[XX] restart command sent\n");
-    handle_command_get_filters();
+    handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
+    handle_command_get_list(SPIN_CMD_GET_BLOCK, "blocks");
+    handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
 }
 
 void init_cache() {
@@ -802,6 +851,15 @@ void int_handler(int signal) {
 
 int main(int argc, char** argv) {
     int result;
+    int i;
+
+    for (i = 0; i < argc; i++) {
+        if (strncmp(argv[i], "-l", 3) == 0 ||
+            strncmp(argv[i], "--local", 8) == 0) {
+            printf("Running in local mode; traffic without either entry in arp cache will be shown too\n");
+            local_mode = 1;
+        }
+    }
 
     init_cache();
     init_mosquitto();

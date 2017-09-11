@@ -53,7 +53,7 @@ function onTrafficMessage(msg) {
                 }
                 break;
             case 'traffic':
-                console.log("Got traffic command: " + msg);
+                //console.log("Got traffic command: " + msg);
                 //console.log("handling trafficcommand: " + evt.data);
                 // update the Graphs
                 handleTrafficMessage(result);
@@ -63,9 +63,22 @@ function onTrafficMessage(msg) {
                 handleBlockedMessage(result);
                 break;
             case 'filters':
+                console.log("Got filters command: " + msg);
                 filterList = result;
                 filterList.sort();
                 updateFilterList();
+                break;
+            case 'blocks':
+                console.log("Got blocks command: " + msg);
+                blockList = result;
+                blockList.sort();
+                updateBlockList();
+                break;
+            case 'alloweds':
+                console.log("Got alloweds command: " + msg);
+                allowedList = result;
+                allowedList.sort();
+                updateAllowedList();
                 break;
             case 'nodeUpdate':
                 console.log("Got node update command: " + msg);
@@ -90,6 +103,8 @@ function onTrafficOpen(evt) {
     client.subscribe("SPIN/traffic");
 
     sendCommand("get_filters", {})//, "")
+    sendCommand("get_blocks", {})//, "")
+    sendCommand("get_alloweds", {})//, "")
     //show connected status somewhere
     $("#statustext").css("background-color", "#ccffcc").text("Connected");
 }

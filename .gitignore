@@ -23,7 +23,7 @@ stamp-h1
 *.o
 *.o.cmd
 *.mod.c
-.publish
+publish.sh
 src/tests/*_test
 *.gcov
 *.gcda

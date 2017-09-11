@@ -30,6 +30,8 @@
  <span>
    <button id="autozoom-button"></button>
    <button id="filter-list-button">Show filter list</button>
+   <button id="block-list-button">Show blocked list</button>
+   <button id="allowed-list-button">Show allowed list</button>
    <span id="statustext" class="ui-button ui-corner-all">Not connected</span>
  </span>
 </div>
@@ -66,7 +68,8 @@
         <div id="options">
             <button id="add-filter-button" class="">Ignore this node</button>
             <button id="rename-node-button" class="">Rename this node</button>
-            <button id="firewall-node-button" class="">Block this node</button>
+            <button id="block-node-button" class="">Block this node</button>
+            <button id="allow-node-button" class="">Allow this node</button>
         </div>
         <div id="nodeinfo-data" class="ui-widget-content ui-corner-all">
             <div id="nodeid">Node:</div>
@@ -80,8 +83,16 @@
     </div>
 </div>
 
-<div id="filter-list-dialog" title="Filter list" class="initiallyHidden">
+<div id="filter-list-dialog" title="Filter list" class="initiallyHidden ipList">
     <ul id="filter-list">
+    </ul>
+</div>
+<div id="block-list-dialog" title="Block list" class="initiallyHidden ipList">
+    <ul id="block-list">
+    </ul>
+</div>
+<div id="allowed-list-dialog" title="Allowed list" class="initiallyHidden ipList">
+    <ul id="allowed-list">
     </ul>
 </div>
 

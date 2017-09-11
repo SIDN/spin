@@ -2,6 +2,7 @@
 make *_test
 TESTS=`find . -name \*_test`
 for i in ${TESTS}; do
+    echo "run $i"
     $i >& /dev/null
     RESULT=$?
     if [ $RESULT -ne 0 ]; then

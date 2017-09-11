@@ -83,23 +83,6 @@ pkt_info_list_t* pkt_info_list = NULL;
 #define NETLINK_CONFIG_PORT 30
 #define NETLINK_TRAFFIC_PORT 31
 
-void
-log_packet(pkt_info_t* pkt_info) {
-    char pkt_str[INET6_ADDRSTRLEN];
-    pktinfo2str(pkt_str, pkt_info, INET6_ADDRSTRLEN);
-    printk("%s\n", pkt_str);
-}
-
-void
-printv(int module_verbosity, const char* format, ...) {
-    va_list args;
-    if (verbosity >= module_verbosity) {
-        va_start(args, format);
-        vprintk(format, args);
-        va_end(args);
-    }
-}
-
 int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     //uint8_t* b;
     struct udphdr *udp_header;
@@ -148,7 +131,6 @@ int parse_ipv6_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
         pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff);
         pkt_info->payload_offset = skb_network_header_len(sockbuff);
     }
-    //printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
 
     // rest of basic info
     pkt_info->packet_count = 1;
@@ -215,7 +197,6 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
         pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff);
         pkt_info->payload_offset = skb_network_header_len(sockbuff);
     }
-    //printk("data len: %u header len: %u\n", sockbuff->data_len, skb_network_header_len(sockbuff));
 
     // rest of basic info
     pkt_info->packet_count = 1;
@@ -226,18 +207,6 @@ int parse_packet(struct sk_buff* sockbuff, pkt_info_t* pkt_info) {
     memset(pkt_info->dest_addr, 0, 12);
     memcpy(pkt_info->dest_addr + 12, &ip_header->daddr, 4);
     return 0;
-}
-
-void hexdump_k(uint8_t* data, unsigned int offset, unsigned int size) {
-    unsigned int i;
-    printv(5, KERN_DEBUG "%02u: ", 0);
-    for (i = 0; i < size; i++) {
-        if (i > 0 && i % 10 == 0) {
-            printv(5, KERN_DEBUG "\n%02u: ", i);
-        }
-        printv(5, KERN_DEBUG "%02x ", data[i + offset]);
-    }
-    printv(5, KERN_DEBUG "\n");
 }
 
 /*int send_netlink_message(int msg_size, void* msg_data, uint32_t client_port_id) {
@@ -286,7 +255,6 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
 
     // Nobody's listening, carry on
     if (traffic_clients_count(traffic_clients) == 0) {
-        //printk("Client not connected, not sending\n");
         return;
     }
 
@@ -333,7 +301,7 @@ unsigned int skip_dname(uint8_t* data, unsigned int cur_pos, size_t payload_size
 }
 
 static inline void printv_pkt_info(int module_verbosity, const char* msg, pkt_info_t* pkt_info) {
-    if (verbosity >= module_verbosity) {
+    if (log_get_verbosity() >= module_verbosity) {
         char p[1024];
         pktinfo2str(p, pkt_info, 1024);
         printv(module_verbosity, KERN_DEBUG "%s: %s\n", msg, p);
@@ -356,10 +324,7 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     size_t payload_size;
     dns_pkt_info_t dpkt_info;
 
-    //printk("[XX] DNS answer header offset %u packet len %u\n", offset, pkt_info->payload_size);
-    //printk("\n");
     if (offset > skb->len) {
-        //printk("[XX] error: offset (%u) larger than packet size (%u)\n", offset, skb->len);
         return;
     } else {
         payload_size = skb->len - offset;
@@ -367,27 +332,22 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     //hexdump_k(skb->data, pkt_info->payload_offset, pkt_info->payload_size);
     // check data size as well
     if (payload_size < 12) {
-        //printk("[XX] error: packet not large enough to be a DNS packet\n");
         return;
     }
     flag_bits = data[2];
     flag_bits2 = data[3];
     // must be qr answer
     if (!(flag_bits & 0x80)) {
-        //printk("[XX] QR not set\n");
         return;
     }
     if (!(flag_bits2 & 0x0f) == 0) {
-        //printk("[XX] not NOERROR\n");
         return;
     }
     // check if there is a query message
     if (read_int16(data + 4) != 1) {
-        //printk("0 or more than 1 question rr (%u %04x), skip packet\n", read_int16(data + 4), read_int16(data + 4));
         return;
     }
     answer_count = read_int16(data + 6);
-    //printk("[XX] answer count: %u\n", answer_count);
 
     // copy the query name
     cur_pos = 12;
@@ -419,19 +379,16 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
     }
     rr_type = read_int16(data + cur_pos);
     if (rr_type != 1 && rr_type != 28) {
-        //printk("[XX] query rr type (%u) not 1 or 28, skip packet\n", rr_type);
         return;
     }
     cur_pos += 2;
     if (read_int16(data + cur_pos) != 1) {
-        //printk("[XX] class not IN (%u: %u), skip packet\n", cur_pos, read_int16(data + cur_pos));
         return;
     }
     cur_pos += 2;
     // we are now at answer section, so read all of those
     for (i = 0; i < answer_count; i++) {
         // skip the dname
-        //printk("[XX] skip dname from: %u\n", cur_pos);
         cur_pos = skip_dname(data, cur_pos, payload_size);
         if (cur_pos < 0) {
             return;
@@ -439,14 +396,11 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
         if (cur_pos + 4 > payload_size) {
             printv(2, KERN_WARNING "unexpected end of payload while reading answer RR\n");
         }
-        //printk("[XX] dname skipped pos now: %u\n", cur_pos);
         // read the type
         rr_type = read_int16(data + cur_pos);
         // skip the class
         cur_pos += 4;
         if (rr_type == 1) {
-            // okay send
-            //printk("[XX] found A answer\n");
             // data format:
             // <dns type> <ip family> <ip data> <TTL> <domain name wire format>
             if (cur_pos + 10 > payload_size) {
@@ -465,8 +419,6 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             strncpy(dpkt_info.dname, dnsname, 256);
             send_dns_pkt_info(SPIN_DNS_ANSWER, &dpkt_info);
         } else if (rr_type == 28) {
-            // okay send
-            //printk("[XX] found AAAA answer\n");
             // data format:
             // <dns type> <ip family> <ip data> <TTL> <domain name wire format>
             if (cur_pos + 22 > payload_size) {
@@ -485,18 +437,13 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
             send_dns_pkt_info(SPIN_DNS_ANSWER, &dpkt_info);
         } else {
             // skip rr data
-            //
-            //printk("[XX] not A or AAAA in answer at %u (val: %u)\n", cur_pos - 4, rr_type);
-            //printk("[XX] now at %u\n", cur_pos);
             // skip ttl
             if (cur_pos + 6 > payload_size) {
                 printv(2, KERN_WARNING "unexpected end of payload while reading answer RR size\n");
             }
             cur_pos += 4;
-            //printk("[XX] after ttl at %u (val here: %u)\n", cur_pos, read_int16(data + cur_pos));
             // skip rdata
             cur_pos += read_int16(data + cur_pos) + 2;
-            //printk("[XX] skip to: %u\n", cur_pos);
             if (cur_pos > payload_size) {
                 printv(2, KERN_WARNING "unexpected end of payload while skipping answer RR\n");
             }
@@ -561,8 +508,6 @@ NF_CALLBACK(hook_func_new, skb)
             printv_pkt_info(5, "Parsed packet: ", &pkt_info);
             add_pkt_info(&pkt_info);
         }
-        //printk("added\n");
-        //send_pkt_info(SPIN_TRAFFIC_DATA, &pkt_info);
     } else {
         if (pres < -1) {
             printv(5, KERN_DEBUG "packet not parsed\n");
@@ -580,24 +525,15 @@ static void traffic_client_connect(struct sk_buff *skb) {
     int client_id;
     //int res;
 
-    //printk(KERN_INFO "Entering: %s\n", __FUNCTION__);
-
     msg_size=strlen(msg);
 
     nlh=(struct nlmsghdr*)skb->data;
-    //printk(KERN_INFO "socket buff len: %u\n", skb->len);
-    //hexdump_k(skb->data, 0, skb->len);
-    //printk(KERN_INFO "Netlink received message of size %d\n", nlmsg_len(nlh));
-    //printk(KERN_INFO "Netlink received msg payload:%s\n",(char*)nlmsg_data(nlh));
     pid = nlh->nlmsg_pid; /* port id of sending process */
-    //printk(KERN_INFO "Client port: %u\n", pid);
 
-    // TODO add this again, if client already exists, resets msgs_counter
     client_id = traffic_clients_add(traffic_clients, pid);
 
     skb_out = nlmsg_new(msg_size,0);
 
-    //printk(KERN_INFO "Client (pid %u) connected to traffic port\n", pid);
     printv(2, KERN_INFO "Got a ping from client (pid %u)\n", pid);
 
     if(!skb_out) {
@@ -630,11 +566,11 @@ void send_config_response(int port_id, config_command_t cmd, size_t msg_size, vo
     hexdump_k(nlmsg_data(nlh), 0, msg_size + 2);
     hexdump_k(skb_out->data, 0, msg_size + 1 + 16);
 
-    printk(KERN_INFO "[XX] sending config response\n");
+    printv(5, KERN_INFO "sending config response\n");
     res = nlmsg_unicast(config_nl_sk, skb_out, port_id);
 
     if (res < 0) {
-        printk(KERN_INFO "Error while sending config response to user\n");
+        printv(1, KERN_INFO "Error while sending config response to user\n");
     }
 }
 
@@ -697,21 +633,19 @@ static void config_client_connect(struct sk_buff *skb) {
     config_command_t cmd;
     uint8_t* cmdbuf;
 
-    //printk(KERN_INFO "Entering: %s\n", __FUNCTION__);
-
     nlh = (struct nlmsghdr *) skb->data;
-    printk(KERN_INFO "[XX] got command of size %u (%u)\n", skb->len, nlh->nlmsg_len);
+    printv(2, KERN_INFO "Got command of size %u (%u)\n", skb->len, nlh->nlmsg_len);
 
     /* pid of sending process */
     pid = nlh->nlmsg_pid;
-    printk(KERN_INFO "Client (pid %u) connected to config port\n", pid);
+    printv(2, KERN_INFO "Client (pid %u) connected to config port\n", pid);
 
     cmdbuf = (uint8_t*) NLMSG_DATA(nlh);
 
     hexdump_k(cmdbuf, 0, nlh->nlmsg_len);
 
     if (skb->len < 2) {
-        printk(KERN_INFO "got command of size < 2\n");
+        printv(1, KERN_INFO "got command of size < 2\n");
         snprintf(error_msg, 1024, "empty command");
         send_config_response(pid, SPIN_CMD_ERR, strlen(error_msg), error_msg);
     } else {
@@ -779,11 +713,6 @@ struct netlink_kernel_cfg netlink_config_cfg = {
 };
 
 static int __init init_netfilter(void) {
-
-
-    //printk("Entering: %s\n",__FUNCTION__);
-    //printk("init_net at %p, cfg at %p\n", init_net, &cfg);
-
     traffic_nl_sk = netlink_kernel_create(&init_net, NETLINK_TRAFFIC_PORT, &netlink_traffic_cfg);
     if(!traffic_nl_sk)
     {
@@ -929,6 +858,7 @@ void init_forward2(void) {
 //Called when module loaded using 'insmod'
 int init_module()
 {
+    log_set_verbosity(verbosity);
     pkt_info_list = pkt_info_list_create(1024);
 
     init_netfilter();

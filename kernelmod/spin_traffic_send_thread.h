@@ -27,12 +27,12 @@ typedef struct {
 	send_queue_entry_t* first;
 	send_queue_entry_t* last;
 	size_t sent;
-	spinlock_t lock;
+	//spinlock_t lock;
 } send_queue_t;
 
 typedef struct {
 	// TODO: some of these may not be needed anymore
-	
+
 	// the send socket
 	struct sock* traffic_nl_sk;
 	// the queue of messages to send
@@ -46,7 +46,8 @@ typedef struct {
 	struct task_struct* task_struct;
 	// pointer back up to the full structure
 	void* traffic_clients;
-	
+
+    struct rw_semaphore sem;
 } traffic_client_t;
 
 
@@ -58,7 +59,8 @@ typedef struct {
 	traffic_client_t* clients[MAX_TRAFFIC_CLIENTS];
 	// number of current clients
 	int count;
-	spinlock_t lock;
+	//spinlock_t lock;
+    struct rw_semaphore sem;
 } traffic_clients_t;
 
 

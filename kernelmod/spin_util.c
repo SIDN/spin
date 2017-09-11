@@ -4,6 +4,8 @@
 char* ipv4_val = "4";
 char* ipv6_val = "6";
 
+static int verbosity = 0;
+
 ip_store_t* ip_store_create() {
     ip_store_t* ip_store = (ip_store_t*) kmalloc(sizeof(ip_store_t), __GFP_WAIT);
     ip_store->elements = NULL;
@@ -103,4 +105,50 @@ void ip_store_for_each(ip_store_t* ip_store,
         cb(ip, el->val == ipv6_val, data);
         el = el->next;
     }
+}
+
+void
+log_set_verbosity(int new_verbosity) {
+    verbosity = new_verbosity;
+}
+
+int
+log_get_verbosity() {
+    return verbosity;
+}
+
+int*
+log_get_verbosity_ptr() {
+    return &verbosity;
+}
+
+//int log_get_verbosity
+
+void
+log_packet(pkt_info_t* pkt_info) {
+    char pkt_str[INET6_ADDRSTRLEN];
+    pktinfo2str(pkt_str, pkt_info, INET6_ADDRSTRLEN);
+    printk("%s\n", pkt_str);
+}
+
+void
+printv(int module_verbosity, const char* format, ...) {
+    va_list args;
+    if (verbosity >= module_verbosity) {
+        va_start(args, format);
+        vprintk(format, args);
+        va_end(args);
+    }
+}
+
+void hexdump_k(uint8_t* data, unsigned int offset, unsigned int size) {
+    unsigned int i;
+    printv(5, KERN_DEBUG "%02u: ", 0);
+    for (i = 0; i < size; i++) {
+        if (i > 0 && i % 10 == 0) {
+            printv(5, KERN_DEBUG "\n%02u: ", i);
+        }
+        printv(5, KERN_DEBUG "%02x ", data[i + offset]);
+    }
+    printv(5, KERN_DEBUG "\n");
 }

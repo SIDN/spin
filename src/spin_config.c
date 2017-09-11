@@ -20,11 +20,6 @@
 #define MAX_NETLINK_PAYLOAD 1024 /* maximum payload size*/
 #define LINE_MAX 1024
 
-struct sockaddr_nl src_addr, dest_addr;
-struct nlmsghdr *nlh = NULL;
-struct iovec iov;
-int sock_fd;
-struct msghdr msg;
 
 typedef enum {
     IGNORE,
@@ -44,6 +39,11 @@ typedef enum {
 int
 send_command(size_t cmdbuf_size, unsigned char* cmdbuf, FILE* output)
 {
+    struct sockaddr_nl src_addr, dest_addr;
+    struct nlmsghdr *nlh = NULL;
+    struct iovec iov;
+    struct msghdr msg;
+    int sock_fd;
     config_command_t cmd;
     uint8_t version;
 
@@ -74,6 +74,7 @@ send_command(size_t cmdbuf_size, unsigned char* cmdbuf, FILE* output)
 
     iov.iov_base = (void *)nlh;
     iov.iov_len = nlh->nlmsg_len;
+    memset(&msg, 0, sizeof(struct msghdr));
     msg.msg_name = (void *)&dest_addr;
     msg.msg_namelen = sizeof(dest_addr);
     msg.msg_iov = &iov;

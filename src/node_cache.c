@@ -70,7 +70,6 @@ node_add_ip(node_t* node, ip_t* ip, int check_status) {
     // this does not seem to be the most efficient way to do it;
     // keep a list and somehow keep it updated perhaps?
     if (check_status) {
-        printf("[XX] CHECK STATUS\n");
         netlink_command_result_t* cr;
         cr = send_netlink_command_noarg(SPIN_CMD_GET_BLOCK);
         if (netlink_command_result_contains_ip(cr, ip)) {
@@ -79,7 +78,6 @@ node_add_ip(node_t* node, ip_t* ip, int check_status) {
         netlink_command_result_destroy(cr);
         cr = send_netlink_command_noarg(SPIN_CMD_GET_EXCEPT);
         if (netlink_command_result_contains_ip(cr, ip)) {
-            printf("[XX] EXCEPTED!!!!!\n");
             node->is_excepted = 1;
         }
         netlink_command_result_destroy(cr);
@@ -221,6 +219,12 @@ node2json(node_t* node, buffer_t* json_buf) {
     }
     if (node->mac != NULL) {
         buffer_write(json_buf, " \"mac\": \"%s\", ", node->mac);
+    }
+    if (node->is_blocked) {
+        buffer_write(json_buf, " \"is_blocked\": \"true\", ", node->mac);
+    }
+    if (node->is_excepted) {
+        buffer_write(json_buf, " \"is_excepted\": \"true\", ", node->mac);
     }
     buffer_write(json_buf, " \"lastseen\": %u, ", node->last_seen);
 
@@ -370,27 +374,27 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
 }
 
 void
-node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
+node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp, int check_status) {
     // todo: add an search-by-ip tree and don't do anything if we
     // have this one already? (do set mac if now known,
     // and update last_seen)
     node_t* node = node_create(0);
     node_set_last_seen(node, timestamp);
     add_mac_and_name(node_cache, node, ip);
-    node_add_ip(node, ip, 1);
+    node_add_ip(node, ip, check_status);
     node_cache_add_node(node_cache, node);
 }
 
-void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp) {
+void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp, int check_status) {
     ip_t ip;
     ip.family = pkt_info->family;
     memcpy(ip.addr, pkt_info->src_addr, 16);
-    node_cache_add_ip_info(node_cache, &ip, timestamp);
+    node_cache_add_ip_info(node_cache, &ip, timestamp, check_status);
     memcpy(ip.addr, pkt_info->dest_addr, 16);
-    node_cache_add_ip_info(node_cache, &ip, timestamp);
+    node_cache_add_ip_info(node_cache, &ip, timestamp, check_status);
 }
 
-void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp) {
+void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp, int check_status) {
     // first see if we have a node with this ip or domain already
     char dname_str[512];
     ip_t ip;
@@ -400,7 +404,7 @@ void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, 
 
     node_t* node = node_create(0);
     node_set_last_seen(node, timestamp);
-    node_add_ip(node, &ip, 1);
+    node_add_ip(node, &ip, check_status);
     node_add_domain(node, dname_str);
     add_mac_and_name(node_cache, node, &ip);
     node_cache_add_node(node_cache, node);
