@@ -305,14 +305,19 @@ void traffic_clients_destroy(traffic_clients_t* traffic_clients) {
         // stop thread from destructor or here/separately?
         printk("[XX] stopping client nr %d\n", i);
         printk("[XX] stopping client at %p\n", traffic_clients->clients[i]);
+        up_write(&traffic_clients->sem);
         while (!down_write_trylock(&traffic_clients->clients[i]->sem)) {
             printk("[XX] client locked, waiting\n");
             msleep(1000);
         }
         traffic_client_stop(traffic_clients->clients[i]);
         up_write(&traffic_clients->clients[i]->sem);
+        while (!down_write_trylock(&traffic_clients->sem)) {
+            printk("[XX] locked, waiting\n");
+            msleep(1000);
+        }
         printk("[XX] client stopped\n");
-        traffic_client_destroy(traffic_clients->clients[i]);
+        //traffic_client_destroy(traffic_clients->clients[i]);
     }
     up_write(&traffic_clients->sem);
     kfree(traffic_clients);
@@ -359,12 +364,17 @@ int traffic_clients_add(traffic_clients_t* traffic_clients, uint32_t client_port
 
 int traffic_clients_remove(traffic_clients_t* traffic_clients, uint32_t client_port_id) {
     int found = 0;
-    int i;
+    int i = 0;
     int j;
     printk("[XX] remove traffic client %u\n", client_port_id);
     while (!down_write_trylock(&traffic_clients->sem)) {
-        printk("[XX] clients locked, waiting to remove\n");
+        printk("[XX] clients locked, waiting to remove (%d)\n", i);
         msleep(1000);
+        i++;
+        if (i >= 5) {
+            // give up after 5 seconds. Looks like we're deadlocked
+            return 0;
+        }
     }
     for (i = 0; i < traffic_clients->count; i++) {
         if (!found) {
