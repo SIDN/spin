@@ -85,6 +85,8 @@ function updateBlockList() {
         var li = $("<li class='ui-widget-content'></li> ").text(blockList[i]);
         $("#block-list").append(li);
     }
+    updateBlockedNodes();
+    updateBlockedButton();
 }
 
 function updateAllowedList() {
@@ -93,6 +95,8 @@ function updateAllowedList() {
         var li = $("<li class='ui-widget-content'></li> ").text(allowedList[i]);
         $("#allowed-list").append(li);
     }
+    updateAllowedNodes();
+    updateAllowedButton();
 }
 
 
@@ -941,6 +945,56 @@ function addBlocked(from, to) {
         network.fit({
             duration: 0
         });
+    }
+}
+
+function updateBlockedNodes() {
+    var ids = nodes.getIds();
+    for (var i = 0; i < ids.length; i++) {
+        var node = nodes.get(ids[i]);
+        if ("ips" in node) {
+            for (var j = 0; j < node.ips.length; j++) {
+                //filterList.push(node.ips[j]);
+                if (contains(blockList, node.ips[j])) {
+                    //alert("[XX] node " + i + " with ips: " + node.ips + "in block list!");
+                    if  (!node.is_blocked) {
+                        node.is_blocked = true;
+                        nodes.update(node);
+                    }
+                } else {
+                    //alert("[XX] node " + i + " with ips: " + node.ips + "not in block list");
+                    if  (node.is_blocked) {
+                        node.is_blocked = false;
+                        nodes.update(node);
+                    }
+                }
+            }
+        }
+    }
+}
+
+function updateAllowedNodes() {
+    var ids = nodes.getIds();
+    for (var i = 0; i < ids.length; i++) {
+        var node = nodes.get(ids[i]);
+        if ("ips" in node) {
+            for (var j = 0; j < node.ips.length; j++) {
+                //filterList.push(node.ips[j]);
+                if (contains(allowedList, node.ips[j])) {
+                    //alert("[XX] node " + i + " with ips: " + node.ips + "in allowed list!");
+                    if  (!node.is_excepted) {
+                        node.is_excepted = true;
+                        nodes.update(node);
+                    }
+                } else {
+                    //alert("[XX] node " + i + " with ips: " + node.ips + "not in allowed list");
+                    if  (node.is_excepted) {
+                        node.is_excepted = false;
+                        nodes.update(node);
+                    }
+                }
+            }
+        }
     }
 }
 

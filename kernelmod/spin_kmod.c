@@ -492,7 +492,11 @@ NF_CALLBACK(hook_func_new, skb)
             // block it unless it is specifically held
             if (!ip_store_contains_ip(except_ips, pkt_info.src_addr) &&
                 !ip_store_contains_ip(except_ips, pkt_info.dest_addr)) {
-                send_pkt_info(SPIN_BLOCKED, &pkt_info);
+                if (!ip_store_contains_ip(ignore_ips, pkt_info.src_addr) &&
+                    !ip_store_contains_ip(ignore_ips, pkt_info.dest_addr)) {
+                    // but do check if we should ignore it for the messageing
+                    send_pkt_info(SPIN_BLOCKED, &pkt_info);
+                }
                 printv(5, KERN_DEBUG "Address in block list, dropping packet\n");
                 return NF_DROP;
             } else {
