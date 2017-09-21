@@ -157,8 +157,6 @@ void send_command_blocked(pkt_info_t* pkt_info) {
 
     p_size = pkt_info2json(node_cache, pkt_info, pkt_json);
     buffer_finish(pkt_json);
-    //printf("[XX] Sending 'blocked' command for:");
-    //printf("[XX] (%d) '%s'\n", p_size, buffer_str(pkt_json));
     response_size = create_mqtt_command(response_json, "blocked", NULL, buffer_str(pkt_json));
     buffer_finish(response_json);
     mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, buffer_str(response_json), 0, false);
@@ -214,14 +212,12 @@ int init_netlink()
 
     /* Read message from kernel */
     while (running) {
-        //printf("[XX] running: %d\n", running);
         mosquitto_loop(mosq, 0, 10);
         rs = poll(fds, 1, 50);
         if (rs == 0) {
             mosquitto_loop(mosq, 0, 10);
             continue;
         }
-        //printf("[XX] RECV msg: %p\n", &msg);
         rs = recvmsg(traffic_sock_fd, &traffic_msg, 0);
 
         if (rs < 0) {
@@ -261,16 +257,7 @@ int init_netlink()
             if (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL && !local_mode)) {
                 continue;
             }
-            /*
-            buffer_t* tmp = buffer_create(4096);
-            pkt_info2json(node_cache, &pkt, tmp);
-            buffer_finish(tmp);
-            printf("[XX] AS JSON:\n%s\n", buffer_str(tmp));
-            buffer_destroy(tmp);
-            */
 
-            //json_msg_size = create_traffic_command(node_cache, &pkt, json_msg, json_msg_max_len, now);
-            //mosq_result = mosquitto_publish(mosq, NULL, "SPIN/traffic", json_msg_size, json_msg, 0, false);
             if (flow_list_should_send(flow_list, now)) {
                 if (!flow_list_empty(flow_list)) {
                     // create json, send it
@@ -360,39 +347,27 @@ void handle_command_get_list(config_command_t cmd, const char* json_command) {
 
     // ask the kernel module for the list of ignored nodes
     command_result = send_netlink_command_noarg(cmd);
-    printf("[XX] handle_command_get_filters() done\n");
-    printf("[XX] calling result2json\n");
     netlink_command_result2json(command_result, result_json);
     if (!buffer_ok(result_json)) {
-        printf("[XX] error: result too large\n");
         buffer_destroy(result_json);
         buffer_destroy(response_json);
         netlink_command_result_destroy(command_result);
         return;
     }
     buffer_finish(result_json);
-    printf("[XX] calling result2json done, bufsize %d ok %d\n", result_json->pos, buffer_ok(result_json));
-    printf("[XX] size of command result: %u\n", result_json->pos);
     response_size = create_mqtt_command(response_json, json_command, NULL, buffer_str(result_json));
     if (!buffer_ok(response_json)) {
-        printf("[XX] error: response too large\n");
         buffer_destroy(result_json);
         buffer_destroy(response_json);
         netlink_command_result_destroy(command_result);
         return;
     }
     buffer_finish(response_json);
-    printf("[XX] size of command response: %u\n", response_json->pos);
     mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, buffer_str(response_json), 0, false);
-    printf("[XX] response sent to mqtt\n");
-    printf("[XX] FULL MSG: %s\n", buffer_str(response_json));
 
-    printf("[XX] destroy command result\n");
     netlink_command_result_destroy(command_result);
-    printf("[XX] destroy command result done\n");
     buffer_destroy(result_json);
     buffer_destroy(response_json);
-    printf("[XX] all done\n");
 }
 
 void add_ip_to_file(uint8_t* ip, const char* filename) {
@@ -501,6 +476,7 @@ void handle_command_add_name(int node_id, char* name) {
     if (node == NULL) {
         return;
     }
+    node_set_name(node, name);
 
     // re-read node names, just in case someone has been editing it
     // TODO: make filename configurable? right now it will silently fail
@@ -578,7 +554,7 @@ void send_command_restart() {
     if (buffer_ok(response_json)) {
         mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, buffer_str(response_json), 0, false);
     } else {
-        printf("[XX] error: response size too large\n");
+        fprintf(stderr, "error: response size too large\n");
     }
     buffer_destroy(response_json);
 }
@@ -590,7 +566,6 @@ int json_parse_int_arg(int* dest,
                        int argument_token_i) {
     jsmntok_t token = tokens[argument_token_i];
     if (token.type != JSMN_PRIMITIVE) {
-        printf("[XX] not a primitive\n");
         return 0;
     } else {
         *dest = atoi(json_str + token.start);
@@ -606,7 +581,6 @@ int json_parse_string_arg(char* dest,
     jsmntok_t token = tokens[argument_token_i];
     size_t size;
     if (token.type != JSMN_STRING) {
-        printf("[XX] not a string\n");
         return 0;
     } else {
         size = snprintf(dest, dest_size, "%.*s", token.end - token.start, json_str+token.start);
@@ -645,7 +619,6 @@ int json_parse_node_id_name_arg(int* node_id,
 
     if (token.type != JSMN_OBJECT ||
         token.size != 2) {
-        printf("[XX] not an object with 2 elements (has %d)\n", token.size);
         return 0;
     } else {
         for (i = 0; i < token.size; i++) {
@@ -667,12 +640,6 @@ int json_parse_node_id_name_arg(int* node_id,
             }
         }
     }
-    if (!name_found) {
-        printf("[XX] name not found\n");
-    }
-    if (!id_found) {
-        printf("[XX] id not found\n");
-    }
     return (name_found && id_found);
 }
 
@@ -689,6 +656,8 @@ void handle_json_command_2(size_t cmd_name_len,
     int result;
     char str_arg[80];
     ip_t ip_arg;
+    // in a few cases, we need to update the node cache
+    node_t* node;
 
     if (strncmp(cmd_name, "get_filters", cmd_name_len) == 0) {
         handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
@@ -728,6 +697,10 @@ void handle_json_command_2(size_t cmd_name_len,
     } else if (strncmp(cmd_name, "remove_block_ip", cmd_name_len) == 0) {
         if (json_parse_ip_arg(&ip_arg, json_str, tokens, argument_token_i)) {
             handle_command_remove_ip(SPIN_CMD_REMOVE_BLOCK, &ip_arg, "/etc/spin/block.list");
+            node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip_arg);
+            if (node) {
+                node->is_blocked = 0;
+            }
         }
         handle_command_get_list(SPIN_CMD_GET_BLOCK, "blocks");
     } else if (strncmp(cmd_name, "add_allow_node", cmd_name_len) == 0) {
@@ -743,6 +716,10 @@ void handle_json_command_2(size_t cmd_name_len,
     } else if (strncmp(cmd_name, "remove_allow_ip", cmd_name_len) == 0) {
         if (json_parse_ip_arg(&ip_arg, json_str, tokens, argument_token_i)) {
             handle_command_remove_ip(SPIN_CMD_REMOVE_EXCEPT, &ip_arg, "/etc/spin/allow.list");
+            node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip_arg);
+            if (node) {
+                node->is_excepted = 0;
+            }
         }
         handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
     }
@@ -758,15 +735,12 @@ void handle_json_command(const char* data) {
     jsmn_init(&p);
     result = jsmn_parse(&p, data, strlen(data), tokens, 10);
     if (result < 0) {
-        printf("[XX] error parsing json data: %d\n", result);
-    } else {
-        printf("[XX] data parsed (%d tokens). result:\n", result);
-        json_dump(data, &tokens[0], result, 0);
-        printf("\n[XX] end of data\n");
+        fprintf(stderr, "Error: unable to parse json data: %d\n", result);
+        return;
     }
     // token should be object, first child should be "command":
     if (tokens[0].type != JSMN_OBJECT) {
-        printf("[XX] [Error], unknown json data\n");
+        fprintf(stderr, "Error: unknown json data\n");
         return;
     }
     // token 1 should be "command",
@@ -774,31 +748,28 @@ void handle_json_command(const char* data) {
     // token 3 should be "arguments",
     // token 4 should be an object with the arguments (possibly empty)
     if (tokens[1].type != JSMN_STRING || strncmp(data+tokens[1].start, "command", 7) != 0) {
-        printf("[XX] [Error] json data not command\n");
+        fprintf(stderr, "Error: json data not command\n");
         return;
     }
     if (tokens[3].type != JSMN_STRING || strncmp(data+tokens[3].start, "argument", 7) != 0) {
-        printf("[XX] [Error] json data does not contain argument field\n");
+        fprintf(stderr, "Error: json data does not contain argument field\n");
         return;
     }
-    printf("[XX] GOT AN ACTUAL COMMAND: %.*s\n", tokens[2].end - tokens[2].start, data+tokens[2].start);
-    printf("[XX] ok so far\n");
     handle_json_command_2(tokens[2].end - tokens[2].start, data+tokens[2].start,
                           data, tokens, 4);
 }
 
+/*
 void handle_command(const struct mosquitto_message* msg, void* user_data) {
     // commands are in json format of the form:
     // { "command": <command name> (string)
     //   "arguments": <arguments> (type depends on command)
     // we should
 }
+*/
 
 void on_message(struct mosquitto* mosq, void* user_data, const struct mosquitto_message* msg) {
-    printf("[XX] mosq message received on %s\n", msg->topic);
     if (strcmp(msg->topic, MQTT_CHANNEL_COMMANDS) == 0) {
-        printf("[XX] got command: %s\n", msg->payload);
-        handle_command(msg, user_data);
         handle_json_command(msg->payload);
     }
 }
@@ -827,7 +798,6 @@ void init_mosquitto(void) {
     mosquitto_message_callback_set(mosq, on_message);
 
     send_command_restart();
-    printf("[XX] restart command sent\n");
     handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
     handle_command_get_list(SPIN_CMD_GET_BLOCK, "blocks");
     handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
@@ -844,9 +814,13 @@ void cleanup_cache() {
 }
 
 void int_handler(int signal) {
-    printf("[XX] got interrupt, quitting\n");
-    //exit(1);
-    running = 0;
+    if (running) {
+        printf("Got interrupt, quitting\n");
+        running = 0;
+    } else {
+        printf("Got interrupt again, hard exit\n");
+        exit(0);
+    }
 }
 
 int main(int argc, char** argv) {
@@ -869,12 +843,10 @@ int main(int argc, char** argv) {
     result = init_netlink();
 
     cleanup_cache();
-    //free(command_nlh);
     free(traffic_nlh);
 
     mosquitto_destroy(mosq);
     mosquitto_lib_cleanup();
 
-    printf("[XX] done\n");
     return 0;
 }

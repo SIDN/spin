@@ -111,15 +111,12 @@ function history_stats()
     local ports = {}
     local dests = {}
 
-    --print("[XX] " .. json.encode(nodes))
     for frm,a in pairs(nodes) do
-        print("[XX] DEVICE: " .. frm .. "(" .. squash_node_info(node_info[frm]) ..")")
         local size_count = 0
         local port_count = 0
         local port_most_used = nil
         local to_count = 0
         for to,b in pairs(a) do
-        --print("    " .. squash_node_info(node_info[to]))
             to_count = to_count + 1
             for port,size in pairs(b) do
                 if ports[port] == nil then
@@ -136,7 +133,6 @@ function history_stats()
                         port_most_used = port
                     end
                 end
-                --print("[XX] " .. squash_node_info(node_info[frm]) .. " -> " .. squash_node_info(node_info[to]) .. " " .. port .. " " .. size)
             end
         end
         print("    contacted " .. to_count .. " external nodes")
@@ -151,7 +147,7 @@ function history_stats()
             i = i + 1
             if i >= 10 then break end
         end
-        if (port_count) > 40 then
+        if (port_count) > 200 then
             block_node(node_info[frm])
         end
 
@@ -236,7 +232,6 @@ function history_clean()
 end
 
 function handle_traffic_message(payload)
-    --print(json.encode(payload))
     local timestamp = payload["timestamp"]
     history[timestamp] = payload["flows"]
     history_clean()
@@ -262,7 +257,6 @@ while true do
         --history_print()
         --history_stats_full()
         history_stats()
-        print("")
         last_print = cur
     end
 

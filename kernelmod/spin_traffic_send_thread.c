@@ -294,29 +294,21 @@ traffic_clients_t* traffic_clients_create(struct sock* traffic_nl_sk) {
 void traffic_clients_destroy(traffic_clients_t* traffic_clients) {
     // stop anny running client, then free up the data
     int i = 0;
-    printk("[XX] stopping all clients %p\n", traffic_clients);
     while (!down_write_trylock(&traffic_clients->sem)) {
-        printk("[XX] locked, waiting\n");
         msleep(1000);
     }
     for (i = 0; i < traffic_clients->count; i++) {
-        printk("[XX] stopping all clients count %d\n", traffic_clients->count);
         // todo: _destroy for traffic_client_t
         // stop thread from destructor or here/separately?
-        printk("[XX] stopping client nr %d\n", i);
-        printk("[XX] stopping client at %p\n", traffic_clients->clients[i]);
         up_write(&traffic_clients->sem);
         while (!down_write_trylock(&traffic_clients->clients[i]->sem)) {
-            printk("[XX] client locked, waiting\n");
             msleep(1000);
         }
         traffic_client_stop(traffic_clients->clients[i]);
         up_write(&traffic_clients->clients[i]->sem);
         while (!down_write_trylock(&traffic_clients->sem)) {
-            printk("[XX] locked, waiting\n");
             msleep(1000);
         }
-        printk("[XX] client stopped\n");
         //traffic_client_destroy(traffic_clients->clients[i]);
     }
     up_write(&traffic_clients->sem);
@@ -326,7 +318,6 @@ void traffic_clients_destroy(traffic_clients_t* traffic_clients) {
 int traffic_clients_add(traffic_clients_t* traffic_clients, uint32_t client_port_id) {
     int i;
     int count;
-    int j;
     printv(4, KERN_INFO "add traffic client %u\n", client_port_id);
     while (!down_read_trylock(&traffic_clients->sem)) {
         msleep(1000);
@@ -349,11 +340,6 @@ int traffic_clients_add(traffic_clients_t* traffic_clients, uint32_t client_port
         traffic_clients->clients[traffic_clients->count] = traffic_client_create(traffic_clients, traffic_clients->traffic_nl_sk, client_port_id);
         printv(4, KERN_INFO "created data handler for client %d at %p\n", traffic_clients->count, traffic_clients->clients[traffic_clients->count]);
         traffic_clients->count++;
-        printk("[XX] client count now: %d\n", traffic_clients->count);
-        printk("[XX] clients i have after add: %d\n", traffic_clients->count);
-        for (j =0 ; j < traffic_clients->count; j++) {
-            printk("[XX] %d: %d\n", j, traffic_clients->clients[j]->client_port_id);
-        }
         up_write(&traffic_clients->sem);
         return i;
     } else {
@@ -365,10 +351,7 @@ int traffic_clients_add(traffic_clients_t* traffic_clients, uint32_t client_port
 int traffic_clients_remove(traffic_clients_t* traffic_clients, uint32_t client_port_id) {
     int found = 0;
     int i = 0;
-    int j;
-    printk("[XX] remove traffic client %u\n", client_port_id);
     while (!down_write_trylock(&traffic_clients->sem)) {
-        printk("[XX] clients locked, waiting to remove (%d)\n", i);
         msleep(1000);
         i++;
         if (i >= 5) {
@@ -398,17 +381,8 @@ int traffic_clients_remove(traffic_clients_t* traffic_clients, uint32_t client_p
     }
     if (found) {
         printv(4, KERN_INFO "client removed. count now %u\n", traffic_clients->count);
-        printk("[XX] client %d remove, count now: %d\n", client_port_id, traffic_clients->count);
-        printk("[XX] clients i have after removal: %d\n", traffic_clients->count);
-        for (j =0 ; j < traffic_clients->count; j++) {
-            printk("[XX] %d: %d\n", j, traffic_clients->clients[j]->client_port_id);
-        }
     } else {
         printv(4, KERN_INFO "client was not found\n");
-        printk("[XX] clients i have still: %d\n", traffic_clients->count);
-        for (j =0 ; j < traffic_clients->count; j++) {
-            printk("[XX] %d: %d\n", j, traffic_clients->clients[j]->client_port_id);
-        }
     }
     up_write(&traffic_clients->sem);
     return found;
@@ -422,7 +396,6 @@ void traffic_clients_send(traffic_clients_t* traffic_clients, int msg_size, void
     int i;
     // add it to all queues
     if (!down_read_trylock(&traffic_clients->sem)) {
-        printk("[XX] clients list locked, not sending data\n");
         return;
     }
     for (i = 0; i < traffic_clients->count; i++) {
@@ -439,7 +412,6 @@ void traffic_clients_send(traffic_clients_t* traffic_clients, int msg_size, void
         printv(5, KERN_DEBUG "queue size for %u: %lu\n", traffic_clients->clients[i]->client_port_id, send_queue_size(traffic_clients->clients[i]->send_queue));
 
         if (!down_read_trylock(&traffic_clients->sem)) {
-            printk("[XX] clients list locked, not sending data\n");
             return;
         }
     }

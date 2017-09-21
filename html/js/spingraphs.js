@@ -160,6 +160,7 @@ function initGraphs() {
             sendCommand("add_name", argument); // talk to Websocket
 
             node.label = newname;
+            node.name = newname;
             nodes.update(node);
         }
 
@@ -868,7 +869,9 @@ function getConnectedNodes(nodeId) {
     });
     for (var i=0; i < cedges.length; i++) {
         var edge = cedges[i];
-        result.push(edge.to);
+        if (!contains(result, edge.to)) {
+            result.push(edge.to);
+        }
     }
     cedges = edges.get({
         filter: function(item) {
@@ -877,7 +880,9 @@ function getConnectedNodes(nodeId) {
     });
     for (var i=0; i < cedges.length; i++) {
         var edge = cedges[i];
-        result.push(edge.from);
+        if (!contains(result, edge.from)) {
+            result.push(edge.from);
+        }
     }
     return result;
 }
