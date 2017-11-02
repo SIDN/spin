@@ -216,9 +216,21 @@ int init_netlink()
     /* Read message from kernel */
     while (running) {
         rs = poll(fds, 2, 1000);
+        now = time(NULL);
         if (rs < 0) {
             fprintf(stderr, "error in poll(): %s\n", strerror(errno));
         } else if (rs == 0) {
+            if (flow_list_should_send(flow_list, now)) {
+                if (!flow_list_empty(flow_list)) {
+                    // create json, send it
+                    buffer_reset(json_buf);
+                    create_traffic_command(node_cache, flow_list, json_buf, now);
+                    if (buffer_finish(json_buf)) {
+                        mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
+                    }
+                }
+                flow_list_clear(flow_list, now);
+            }
             continue;
         } else {
             if (fds[0].revents & POLLIN) {
@@ -234,7 +246,6 @@ int init_netlink()
                 dns_pkt_info_t dns_pkt;
                 char pkt_str[2048];
                 type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
-                now = time(NULL);
                 if (type == SPIN_BLOCKED) {
                     //pktinfo2str(pkt_str, &pkt, 2048);
                     //printf("[BLOCKED] %s\n", pkt_str);
