@@ -277,13 +277,13 @@ void dns_pktinfo2wire(uint8_t* dest, dns_pkt_info_t* dns_pkt_info) {
     memcpy(dest, dns_pkt_info->dname, dname_size);
 }
 
-void dns_pktinfo_msg2wire(uint8_t* dest, dns_pkt_info_t* dns_pkt_info) {
+void dns_pktinfo_msg2wire(message_type_t type, uint8_t* dest, dns_pkt_info_t* dns_pkt_info) {
     uint16_t msg_size;
 
     dest[0] = SPIN_NETLINK_PROTOCOL_VERSION;
     dest += 1;
 
-    dest[0] = SPIN_DNS_ANSWER;
+    dest[0] = type;
     dest += 1;
     // spread this out into functions too?
     msg_size = sizeof(dns_pkt_info_t);
@@ -305,7 +305,7 @@ message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, char* src) {
     src++;
 
     msg_type = src[0];
-    if (msg_type == SPIN_DNS_ANSWER) {
+    if (msg_type == SPIN_DNS_ANSWER || msg_type == SPIN_DNS_QUERY) {
         src++;
         // TODO: do we need to have the msg_size?
         msg_size = read_int16(src);

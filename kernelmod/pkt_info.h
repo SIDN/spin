@@ -38,6 +38,7 @@ typedef enum {
 	SPIN_TRAFFIC_DATA = 1,
 	SPIN_DNS_ANSWER = 2,
 	SPIN_BLOCKED = 3,
+	SPIN_DNS_QUERY = 4,
 	SPIN_ERR_BADVERSION = 250
 } message_type_t;
 
@@ -102,7 +103,7 @@ void pktinfo_msg2wire(message_type_t type, uint8_t* dest, pkt_info_t* pkt_info);
 // pkt_info will be filled with info about the blocked or traffic data
 message_type_t wire2pktinfo(pkt_info_t* pkt_info, char* src);
 
-void dns_pktinfo_msg2wire(uint8_t* dest, dns_pkt_info_t* pkt_info);
+void dns_pktinfo_msg2wire(message_type_t type, uint8_t* dest, dns_pkt_info_t* pkt_info);
 void dns_pktinfo2str(char* dest, dns_pkt_info_t* dns_pkt_info, size_t max_len);
 void dns_pktinfo2wire(uint8_t* dest, dns_pkt_info_t* dns_pkt_info);
 void dns_dname2str(char* dest, char* src, size_t max_len);

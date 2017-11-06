@@ -63,13 +63,11 @@ void send_ack()
 
 #define MESSAGES_BEFORE_WAIT 50
 void check_send_ack() {
-    printf("[XX] check_send_ack called\n");
     ack_counter++;
     if (ack_counter > MESSAGES_BEFORE_WAIT) {
         send_ack();
         ack_counter = 0;
     }
-    printf("[XX] check_send_ack done\n");
 }
 
 int main()
@@ -138,7 +136,6 @@ int main()
         }
 
         rs = recvmsg(sock_fd, &msg, 0);
-        printf("[XX] got msg\n");
         if (rs < 0) {
             continue;
         }
@@ -148,29 +145,26 @@ int main()
         pkt_info_t pkt;
         dns_pkt_info_t dns_pkt;
         char pkt_str[1024];
-        printf("[XX] call wire2pktinfo\n");
         type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(nlh));
         if (type == SPIN_BLOCKED) {
-            printf("[XX] call pktinfo2str (blocked)\n");
             pktinfo2str(pkt_str, &pkt, 1024);
-            printf("[XX] pktinfo2str done (size %u)\n", strlen(pkt_str));
             printf("[BLOCKED] %s\n", pkt_str);
             check_send_ack();
         } else if (type == SPIN_TRAFFIC_DATA) {
-            printf("[XX] call pktinfo2str (traffic)\n");
             pktinfo2str(pkt_str, &pkt, 1024);
-            printf("[XX] pktinfo2str done (size %u)\n", strlen(pkt_str));
             printf("[TRAFFIC] %s\n", pkt_str);
             check_send_ack();
         } else if (type == SPIN_DNS_ANSWER) {
             // note: bad version would have been caught in wire2pktinfo
             // in this specific case
-            printf("[XX] call wire2dns_pktinfo\n");
             wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(nlh));
-            printf("[XX] wire2dns_pktinfo done, call  dns_pktinfo2str\n");
             dns_pktinfo2str(pkt_str, &dns_pkt, 1024);
-            printf("[XX] dns_pktinfo2str done (size %u)\n", strlen(pkt_str));
-            printf("[DNS] %s\n", pkt_str);
+            printf("[DNS_ANSWER] %s\n", pkt_str);
+            check_send_ack();
+        } else if (type == SPIN_DNS_QUERY) {
+            wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(nlh));
+            dns_pktinfo2str(pkt_str, &dns_pkt, 1024);
+            printf("[DNS_QUERY] %s\n", pkt_str);
             check_send_ack();
         } else if (type == SPIN_ERR_BADVERSION) {
             printf("Error: version mismatch between client and kernel module\n");

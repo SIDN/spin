@@ -266,14 +266,9 @@ void send_dns_pkt_info(message_type_t type, dns_pkt_info_t* dns_pkt_info) {
         return;
     }
 
-    dns_pktinfo_msg2wire(data, dns_pkt_info);
+    dns_pktinfo_msg2wire(type, data, dns_pkt_info);
 
     traffic_clients_send(traffic_clients, msg_size, data);
-    /*
-    for (i = 0; i < get_traffic_client_count(traffic_clients); i++) {
-        port_id = get_traffic_client_port_id(&handler_info->traffic_clients, i);
-        res = send_netlink_message(msg_size, data, port_id);
-    }*/
 }
 
 static inline uint16_t read_int16(uint8_t* data) {
@@ -310,8 +305,74 @@ static inline void printv_pkt_info(int module_verbosity, const char* msg, pkt_in
     }
 }
 
+void handle_dns_query(pkt_info_t* pkt_info, struct sk_buff* skb) {
+    uint16_t offset = pkt_info->payload_offset;
+    uint8_t flag_bits;
+    uint8_t flag_bits2;
+    uint16_t cur_pos;
+    uint16_t cur_pos_name;
+    uint8_t labellen;
+    unsigned char dnsname[256];
+    uint8_t* data = (uint8_t*)skb->data + pkt_info->payload_offset;
+    size_t payload_size;
+    dns_pkt_info_t dpkt_info;
 
-void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
+    if (offset > skb->len) {
+        return;
+    } else {
+        payload_size = skb->len - offset;
+    }
+    //hexdump_k(skb->data, pkt_info->payload_offset, pkt_info->payload_size);
+    // check data size as well
+    if (payload_size < 12) {
+        return;
+    }
+    flag_bits = data[2];
+    flag_bits2 = data[3];
+    // must be qr=0
+    if ((flag_bits & 0x80)) {
+        return;
+    }
+    if (!(flag_bits2 & 0x0f) == 0) {
+        return;
+    }
+    // check if there is a query message
+    if (read_int16(data + 4) != 1) {
+        return;
+    }
+
+    printk("[XX] query get!!\n");
+
+    cur_pos = 12;
+    cur_pos_name = 0;
+    labellen = data[cur_pos++];
+    while(labellen > 0) {
+        if (cur_pos + labellen > payload_size) {
+            printv(2, KERN_WARNING "Error: label len larger than packet payload\n");
+            return;
+        }
+        if (cur_pos_name + labellen > 255) {
+            printv(2, KERN_WARNING "Error: domain name over 255 octets\n");
+            return;
+        }
+        dnsname[cur_pos_name++] = labellen;
+        memcpy(dnsname + cur_pos_name, data + cur_pos, labellen);
+        cur_pos += labellen;
+        cur_pos_name += labellen;
+        labellen = data[cur_pos++];
+    }
+    dnsname[cur_pos_name] = '\0';
+    strncpy(dpkt_info.dname, dnsname, 256);
+
+    dpkt_info.ttl = 0;
+
+    memcpy(dpkt_info.ip, pkt_info->src_addr, 16);
+    dpkt_info.family = pkt_info->family;
+
+    send_dns_pkt_info(SPIN_DNS_QUERY, &dpkt_info);
+}
+
+void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff* skb) {
     uint16_t offset = pkt_info->payload_offset;
     uint8_t flag_bits;
     uint8_t flag_bits2;
@@ -370,7 +431,6 @@ void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff *skb) {
         cur_pos_name += labellen;
         labellen = data[cur_pos++];
     }
-    // if we want trailing dot, remove deduction here
     dnsname[cur_pos_name] = '\0';
 
     // then read all answer ips
@@ -508,6 +568,9 @@ NF_CALLBACK(hook_func_new, skb)
         // if message is dns response, send DNS info as well
         if (pkt_info.src_port == 53) {
             handle_dns_answer(&pkt_info, skb);
+        }
+        if (pkt_info.dest_port == 53) {
+            handle_dns_query(&pkt_info, skb);
         }
         if (!ip_store_contains_ip(ignore_ips, pkt_info.src_addr) &&
             !ip_store_contains_ip(ignore_ips, pkt_info.dest_addr)) {
