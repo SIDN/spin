@@ -233,81 +233,91 @@ int init_netlink()
             }
             continue;
         } else {
-            if (fds[0].revents & POLLIN) {
-                rs = recvmsg(traffic_sock_fd, &traffic_msg, 0);
+            if (fds[0].revents) {
+                if (fds[0].revents & POLLIN) {
+                    rs = recvmsg(traffic_sock_fd, &traffic_msg, 0);
 
-                if (rs < 0) {
-                    continue;
-                }
-                c++;
-                //printf("C: %u RS: %u\n", c, rs);
-                //printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
-                pkt_info_t pkt;
-                dns_pkt_info_t dns_pkt;
-                char pkt_str[2048];
-                type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
-                if (type == SPIN_BLOCKED) {
-                    //pktinfo2str(pkt_str, &pkt, 2048);
-                    //printf("[BLOCKED] %s\n", pkt_str);
-                    node_cache_add_pkt_info(node_cache, &pkt, now, 1);
-                    send_command_blocked(&pkt);
-                    check_send_ack();
-                } else if (type == SPIN_TRAFFIC_DATA) {
-                    //pktinfo2str(pkt_str, &pkt, 2048);
-                    //printf("[TRAFFIC] %s\n", pkt_str);
-                    //print_pktinfo_wirehex(&pkt);
-                    node_cache_add_pkt_info(node_cache, &pkt, now, 1);
-
-                    // small experiment; check if either endpoint is an internal device, if not,
-                    // skip reporting it
-                    // (if this is useful, we should do this check in add_pkt_info above, probably)
-                    ip_t ip;
-                    node_t* src_node;
-                    node_t* dest_node;
-                    ip.family = pkt.family;
-                    memcpy(ip.addr, pkt.src_addr, 16);
-                    src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
-                    memcpy(ip.addr, pkt.dest_addr, 16);
-                    dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
-                    if (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL && !local_mode)) {
+                    if (rs < 0) {
                         continue;
                     }
+                    c++;
+                    //printf("C: %u RS: %u\n", c, rs);
+                    //printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
+                    pkt_info_t pkt;
+                    dns_pkt_info_t dns_pkt;
+                    char pkt_str[2048];
+                    type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
+                    if (type == SPIN_BLOCKED) {
+                        //pktinfo2str(pkt_str, &pkt, 2048);
+                        //printf("[BLOCKED] %s\n", pkt_str);
+                        node_cache_add_pkt_info(node_cache, &pkt, now, 1);
+                        send_command_blocked(&pkt);
+                        check_send_ack();
+                    } else if (type == SPIN_TRAFFIC_DATA) {
+                        //pktinfo2str(pkt_str, &pkt, 2048);
+                        //printf("[TRAFFIC] %s\n", pkt_str);
+                        //print_pktinfo_wirehex(&pkt);
+                        node_cache_add_pkt_info(node_cache, &pkt, now, 1);
 
-                    if (flow_list_should_send(flow_list, now)) {
-                        if (!flow_list_empty(flow_list)) {
-                            // create json, send it
-                            buffer_reset(json_buf);
-                            create_traffic_command(node_cache, flow_list, json_buf, now);
-                            if (buffer_finish(json_buf)) {
-                                mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
-                            }
+                        // small experiment; check if either endpoint is an internal device, if not,
+                        // skip reporting it
+                        // (if this is useful, we should do this check in add_pkt_info above, probably)
+                        ip_t ip;
+                        node_t* src_node;
+                        node_t* dest_node;
+                        ip.family = pkt.family;
+                        memcpy(ip.addr, pkt.src_addr, 16);
+                        src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+                        memcpy(ip.addr, pkt.dest_addr, 16);
+                        dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+                        if (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL && !local_mode)) {
+                            continue;
                         }
-                        flow_list_clear(flow_list, now);
+
+                        if (flow_list_should_send(flow_list, now)) {
+                            if (!flow_list_empty(flow_list)) {
+                                // create json, send it
+                                buffer_reset(json_buf);
+                                create_traffic_command(node_cache, flow_list, json_buf, now);
+                                if (buffer_finish(json_buf)) {
+                                    mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
+                                }
+                            }
+                            flow_list_clear(flow_list, now);
+                        } else {
+                            // add the current one
+                            flow_list_add_pktinfo(flow_list, &pkt);
+                        }
+                        check_send_ack();
+                    } else if (type == SPIN_DNS_ANSWER) {
+                        // note: bad version would have been caught in wire2pktinfo
+                        // in this specific case
+                        wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
+                        //dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
+                        //print_dnspktinfo_wirehex(&dns_pkt);
+                        //printf("[DNS] %s\n", pkt_str);
+                        dns_cache_add(dns_cache, &dns_pkt, now);
+                        node_cache_add_dns_info(node_cache, &dns_pkt, now, 1);
+                        // TODO do we need to send nodeUpdate?
+                        check_send_ack();
+                    } else if (type == SPIN_ERR_BADVERSION) {
+                        printf("Error: version mismatch between client and kernel module\n");
                     } else {
-                        // add the current one
-                        flow_list_add_pktinfo(flow_list, &pkt);
+                        printf("unknown type? %u\n", type);
                     }
-                    check_send_ack();
-                } else if (type == SPIN_DNS_ANSWER) {
-                    // note: bad version would have been caught in wire2pktinfo
-                    // in this specific case
-                    wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
-                    //dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
-                    //print_dnspktinfo_wirehex(&dns_pkt);
-                    //printf("[DNS] %s\n", pkt_str);
-                    dns_cache_add(dns_cache, &dns_pkt, now);
-                    node_cache_add_dns_info(node_cache, &dns_pkt, now, 1);
-                    // TODO do we need to send nodeUpdate?
-                    check_send_ack();
-                } else if (type == SPIN_ERR_BADVERSION) {
-                    printf("Error: version mismatch between client and kernel module\n");
                 } else {
-                    printf("unknown type? %u\n", type);
+                    fprintf(stderr, "Unexpected result from netlink socket (%d)\n", fds[0].revents);
+                    usleep(5000);
                 }
             }
 
-            if (fds[1].revents & POLLIN) {
-                mosquitto_loop(mosq, 0, 10);
+            if (fds[1].revents) {
+                if (fds[1].revents & POLLIN) {
+                    mosquitto_loop(mosq, 0, 10);
+                } else {
+                    fprintf(stderr, "Unexpected result from mosquitto socket (%d)\n", fds[1].revents);
+                    usleep(5000);
+                }
             }
         }
     }
