@@ -873,8 +873,8 @@ void int_handler(int signal) {
 }
 
 void print_version() {
-    printf("SPIN daemon version %s\n", VERSION_GIT_COMMIT);
-    printf("Build date: %s\n", VERSION_BUILD_DATE);
+    printf("SPIN daemon version %s\n", BUILD_VERSION);
+    printf("Build date: %s\n", BUILD_DATE);
 }
 
 int main(int argc, char** argv) {
