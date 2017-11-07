@@ -1,6 +1,6 @@
 #!/bin/sh
 PACKAGE=spin
-VERSION=0.6-beta
+VERSION=`cat VERSION`
 
 BNAME="${PACKAGE}-${VERSION}"
 

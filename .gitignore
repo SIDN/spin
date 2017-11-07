@@ -28,4 +28,4 @@ src/tests/*_test
 *.gcov
 *.gcda
 *.gcno
-
+src/version.c

@@ -26,6 +26,8 @@
 
 #include "jsmn.h"
 
+#include "version.h"
+
 #define NETLINK_CONFIG_PORT 30
 #define NETLINK_TRAFFIC_PORT 31
 
@@ -163,6 +165,9 @@ void send_command_blocked(pkt_info_t* pkt_info) {
     buffer_destroy(response_json);
     buffer_destroy(pkt_json);
 }
+
+// function definition below
+void connect_mosquitto(void);
 
 int init_netlink()
 {
@@ -307,7 +312,7 @@ int init_netlink()
                     }
                 } else {
                     fprintf(stderr, "Unexpected result from netlink socket (%d)\n", fds[0].revents);
-                    usleep(5000);
+                    usleep(500000);
                 }
             }
 
@@ -316,7 +321,11 @@ int init_netlink()
                     mosquitto_loop(mosq, 0, 10);
                 } else {
                     fprintf(stderr, "Unexpected result from mosquitto socket (%d)\n", fds[1].revents);
-                    usleep(5000);
+                    fprintf(stderr, "Socket fd: %d, mosq struct has %d\n", fds[1].fd, mosquitto_socket(mosq));
+                    //usleep(500000);
+                    fprintf(stderr, "Reconnecting to mosquitto server\n");
+                    connect_mosquitto();
+                    fprintf(stderr, "Reconnected, mosq fd now %d\n", mosquitto_socket(mosq));
                 }
             }
         }
@@ -803,13 +812,17 @@ void on_message(struct mosquitto* mosq, void* user_data, const struct mosquitto_
     }
 }
 
-void init_mosquitto(void) {
+void connect_mosquitto(void) {
     const char* client_name = "asdf";
     const char* host = "127.0.0.1";
     const int port = 1883;
     int result;
 
-    mosquitto_lib_init();
+    if (mosq != NULL) {
+        mosquitto_disconnect(mosq);
+        mosquitto_destroy(mosq);
+    }
+
     mosq = mosquitto_new(client_name, 1, NULL);
     fprintf(stdout, "Connecting to mqtt server on %s:%d\n", host, port);
     // check error
@@ -825,6 +838,13 @@ void init_mosquitto(void) {
     }
 
     mosquitto_message_callback_set(mosq, on_message);
+
+}
+
+void init_mosquitto(void) {
+    mosquitto_lib_init();
+
+    connect_mosquitto();
 
     send_command_restart();
     handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
@@ -852,6 +872,11 @@ void int_handler(int signal) {
     }
 }
 
+void print_version() {
+    printf("SPIN daemon version %s\n", VERSION_GIT_COMMIT);
+    printf("Build date: %s\n", VERSION_BUILD_DATE);
+}
+
 int main(int argc, char** argv) {
     int result;
     int i;
@@ -862,7 +887,14 @@ int main(int argc, char** argv) {
             printf("Running in local mode; traffic without either entry in arp cache will be shown too\n");
             local_mode = 1;
         }
+        if (strncmp(argv[i], "-v", 3) == 0 ||
+            strncmp(argv[i], "--version", 10) == 0) {
+            print_version();
+            exit(0);
+        }
     }
+
+    print_version();
 
     init_cache();
     init_mosquitto();
