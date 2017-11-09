@@ -2,6 +2,7 @@ var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
 //var client = new Paho.MQTT.Client("127.0.0.1", 1884, "clientId");
 var last_traffic = 0 // Last received traffic trace
 var time_sync = 0; // Time difference (seconds) between server and client
+var active = false; // Determines whether we are active or not
 
 function init() {
     initGraphs();
@@ -115,6 +116,7 @@ function onTrafficOpen(evt) {
     sendCommand("get_alloweds", {})//, "")
     //show connected status somewhere
     $("#statustext").css("background-color", "#ccffcc").text("Connected");
+    active = true;
 }
 
 function onTrafficClose(evt) {
@@ -122,6 +124,7 @@ function onTrafficClose(evt) {
     $("#statustext").css("background-color", "#ffcccc").text("Not connected");
     console.log('Websocket has disappeared');
     console.log(evt.errorMessage)
+    active = false;
 }
 
 function onTrafficError(evt) {
@@ -139,7 +142,7 @@ function initTrafficDataView() {
 // Sometimes, no data is received for some time
 // Fill that void by adding 0-value datapoints to the graph
 function fillEmptiness() {
-    if (last_traffic != 0 && Date.now() - last_traffic >= 1000) {
+    if (active && last_traffic != 0 && Date.now() - last_traffic >= 1000) {
         var data = { 'timestamp': Math.floor(Date.now() / 1000) - time_sync,
                      'total_size': 0, 'total_count': 0,
                      'flows': []}
