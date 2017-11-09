@@ -197,7 +197,7 @@ function handleTrafficMessage(data) {
         var to_node = f['to'];
 
         if (from_node != null && to_node != null) {
-            addFlow(timestamp, from_node, to_node, f['count'], f['size']);
+            addFlow(timestamp + time_sync, from_node, to_node, f['count'], f['size']);
         } else {
             console.log("partial message: " + JSON.stringify(data))
         }
