@@ -1,6 +1,7 @@
 var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
 //var client = new Paho.MQTT.Client("127.0.0.1", 1884, "clientId");
-var last_traffic = new Date(0) // Last received traffic trace
+var last_traffic = 0 // Last received traffic trace
+var time_sync = 0; // Time difference (seconds) between server and client
 
 function init() {
     initGraphs();
@@ -13,7 +14,7 @@ function init() {
     client.connect({onSuccess:onTrafficOpen});
 
     // Make smooth traffic graph when no data is received
-    setInterval(fillEmptiness, 1000);
+    setInterval(fillEmptiness, 200);
 }
 
 // called when a message arrives
@@ -59,6 +60,9 @@ function onTrafficMessage(msg) {
             case 'traffic':
                 //console.log("Got traffic command: " + msg);
                 //console.log("handling trafficcommand: " + evt.data);
+
+                // First, update time_sync to account for timing differences
+                time_sync = Math.floor(Date.now()/1000 - new Date(result['timestamp']))
                 // update the Graphs
                 handleTrafficMessage(result);
                 break;
@@ -135,15 +139,22 @@ function initTrafficDataView() {
 // Sometimes, no data is received for some time
 // Fill that void by adding 0-value datapoints to the graph
 function fillEmptiness() {
-    if ((new Date()) - last_traffic > 1000) {
-        initTrafficDataView(); // Abuse init function
+    if (last_traffic != 0 && Date.now() - last_traffic >= 1000) {
+        var data = { 'timestamp': Math.floor(Date.now() / 1000) - time_sync,
+                     'total_size': 0, 'total_count': 0,
+                     'flows': []}
+        handleTrafficMessage(data);
     }
 }
 
 // other code goes here
 // Update the Graphs (traffic graph and network view)
 function handleTrafficMessage(data) {
-    last_traffic = Date.now() // update to report new traffic
+    // update to report new traffic
+    // Do not update if we have not received data yet
+    if (!(last_traffic == 0 && data['total_count'] == 0)) {
+        last_traffic = Date.now();
+    }
 
     var timestamp = data['timestamp']
 
