@@ -31,6 +31,8 @@
 #define NETLINK_CONFIG_PORT 30
 #define NETLINK_TRAFFIC_PORT 31
 
+#define MOSQUITTO_KEEPALIVE_TIME 60
+
 #define MAX_NETLINK_PAYLOAD 1024 /* maximum payload size*/
 struct sockaddr_nl src_addr, dest_addr;
 struct nlmsghdr *traffic_nlh = NULL;
@@ -49,6 +51,19 @@ static int local_mode;
 
 #define MQTT_CHANNEL_TRAFFIC "SPIN/traffic"
 #define MQTT_CHANNEL_COMMANDS "SPIN/commands"
+
+void print_time() {
+    time_t timer;
+    char buffer[26];
+    struct tm* tm_info;
+
+    time(&timer);
+    tm_info = localtime(&timer);
+
+    strftime(buffer, 26, "%Y-%m-%d %H:%M:%S", tm_info);
+    printf("%s", buffer);
+    fflush(stdout);
+}
 
 void send_ack()
 {
@@ -176,7 +191,7 @@ int init_netlink()
     message_type_t type;
     struct timeval tv;
     struct pollfd fds[2];
-    uint32_t now;
+    uint32_t now, last_mosq_poll;
 
     buffer_t* json_buf = buffer_create(4096);
     buffer_allow_resize(json_buf);
@@ -216,12 +231,25 @@ int init_netlink()
     fds[1].fd = mosquitto_socket(mosq);
     fds[1].events = POLLIN;
 
+    now = time(NULL);
+    last_mosq_poll = now;
     flow_list_t* flow_list = flow_list_create(time(NULL));
+
 
     /* Read message from kernel */
     while (running) {
         rs = poll(fds, 2, 1000);
         now = time(NULL);
+        /*
+        printf("[XX] ");
+        print_time();
+        printf(" rs: %d ", rs);
+        printf("last: %u now: %u dif: %u", last_mosq_poll, now, now - last_mosq_poll);
+        printf(" D: %02x (%d) ", fds[1].revents, fds[1].revents & POLLIN);
+        printf(" TO: %d", now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME);
+        printf("\n");
+        fflush(stdout);
+        */
         if (rs < 0) {
             fprintf(stderr, "error in poll(): %s\n", strerror(errno));
         } else if (rs == 0) {
@@ -236,7 +264,10 @@ int init_netlink()
                 }
                 flow_list_clear(flow_list, now);
             }
-            continue;
+            if (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME) {
+                mosquitto_loop(mosq, 0, 10);
+                last_mosq_poll = now;
+            }
         } else {
             if (fds[0].revents) {
                 if (fds[0].revents & POLLIN) {
@@ -316,17 +347,19 @@ int init_netlink()
                 }
             }
 
-            if (fds[1].revents) {
-                if (fds[1].revents & POLLIN) {
-                    mosquitto_loop(mosq, 0, 10);
-                } else {
-                    fprintf(stderr, "Unexpected result from mosquitto socket (%d)\n", fds[1].revents);
-                    fprintf(stderr, "Socket fd: %d, mosq struct has %d\n", fds[1].fd, mosquitto_socket(mosq));
-                    //usleep(500000);
-                    fprintf(stderr, "Reconnecting to mosquitto server\n");
-                    connect_mosquitto();
-                    fprintf(stderr, "Reconnected, mosq fd now %d\n", mosquitto_socket(mosq));
-                }
+            if ((fds[1].revents & POLLIN) || (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME)) {
+                mosquitto_loop(mosq, 0, 10);
+                last_mosq_poll = now;
+            } else if (fds[1].revents) {
+                print_time();
+                fprintf(stderr, "Unexpected result from mosquitto socket (%d)\n", fds[1].revents);
+                fprintf(stderr, "Socket fd: %d, mosq struct has %d\n", fds[1].fd, mosquitto_socket(mosq));
+                //usleep(500000);
+                fprintf(stderr, "Reconnecting to mosquitto server\n");
+                connect_mosquitto();
+                print_time();
+                fprintf(stderr, " Reconnected, mosq fd now %d\n", mosquitto_socket(mosq));
+
             }
         }
     }
@@ -825,13 +858,12 @@ void connect_mosquitto(void) {
 
     mosq = mosquitto_new(client_name, 1, NULL);
     fprintf(stdout, "Connecting to mqtt server on %s:%d\n", host, port);
-    // check error
-    result = mosquitto_connect(mosq, host, port, 60);
+    result = mosquitto_connect(mosq, host, port, MOSQUITTO_KEEPALIVE_TIME);
     if (result != 0) {
         fprintf(stderr, "Error connecting to mqtt server on %s:%d, %s\n", host, port, mosquitto_strerror(result));
         exit(1);
     }
-    fprintf(stdout, "Connected to mqtt server on %s:%d\n", host, port);
+    fprintf(stdout, "Connected to mqtt server on %s:%d with keepalive value %d\n", host, port, MOSQUITTO_KEEPALIVE_TIME);
     result = mosquitto_subscribe(mosq, NULL, MQTT_CHANNEL_COMMANDS, 0);
     if (result != 0) {
         fprintf(stderr, "Error subscribing to topic %s: %s\n", MQTT_CHANNEL_COMMANDS, mosquitto_strerror(result));

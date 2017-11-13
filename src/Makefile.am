@@ -4,7 +4,7 @@ AM_CFLAGS = ${regular_CFLAGS} -g -Wall -Werror
 
 SUBDIRS = @TESTDIR@
 
-bin_PROGRAMS = spin_config spin_print spind
+bin_PROGRAMS = spin_config spin_print spind test
 spin_config_SOURCES = spin_config.c util.c tree.c
 spin_config_CFLAGS = -I../kernelmod
 spin_config_LDADD = -L../kernelmod
@@ -17,6 +17,7 @@ spind_SOURCES = spind.c ../kernelmod/pkt_info.c dns_cache.h dns_cache.c tree.h t
 spind_CFLAGS = -I../kernelmod
 spind_LDADD = -L../kernelmod
 
+test_SOURCES = test.c
 
 version.c:
 	./create_version_c.sh
