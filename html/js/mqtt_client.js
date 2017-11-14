@@ -1,4 +1,4 @@
-var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
+var client = new Paho.MQTT.Client("valibox.", 1884, "Web-" + Math.random().toString(16).slice(-5));
 //var client = new Paho.MQTT.Client("127.0.0.1", 1884, "clientId");
 var last_traffic = 0 // Last received traffic trace
 var time_sync = 0; // Time difference (seconds) between server and client
