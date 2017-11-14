@@ -1,5 +1,8 @@
 var client = new Paho.MQTT.Client("192.168.8.1", 1884, "clientId");
 //var client = new Paho.MQTT.Client("127.0.0.1", 1884, "clientId");
+var last_traffic = 0 // Last received traffic trace
+var time_sync = 0; // Time difference (seconds) between server and client
+var active = false; // Determines whether we are active or not
 
 function init() {
     initGraphs();
@@ -10,6 +13,9 @@ function init() {
 
     // connect the client
     client.connect({onSuccess:onTrafficOpen});
+
+    // Make smooth traffic graph when no data is received
+    setInterval(fillEmptiness, 200);
 }
 
 // called when a message arrives
@@ -55,6 +61,9 @@ function onTrafficMessage(msg) {
             case 'traffic':
                 //console.log("Got traffic command: " + msg);
                 //console.log("handling trafficcommand: " + evt.data);
+
+                // First, update time_sync to account for timing differences
+                time_sync = Math.floor(Date.now()/1000 - new Date(result['timestamp']))
                 // update the Graphs
                 handleTrafficMessage(result);
                 break;
@@ -107,6 +116,7 @@ function onTrafficOpen(evt) {
     sendCommand("get_alloweds", {})//, "")
     //show connected status somewhere
     $("#statustext").css("background-color", "#ccffcc").text("Connected");
+    active = true;
 }
 
 function onTrafficClose(evt) {
@@ -114,6 +124,7 @@ function onTrafficClose(evt) {
     $("#statustext").css("background-color", "#ffcccc").text("Not connected");
     console.log('Websocket has disappeared');
     console.log(evt.errorMessage)
+    active = false;
 }
 
 function onTrafficError(evt) {
@@ -128,9 +139,25 @@ function initTrafficDataView() {
     handleTrafficMessage(data);
 }
 
+// Sometimes, no data is received for some time
+// Fill that void by adding 0-value datapoints to the graph
+function fillEmptiness() {
+    if (active && last_traffic != 0 && Date.now() - last_traffic >= 1000) {
+        var data = { 'timestamp': Math.floor(Date.now() / 1000) - time_sync,
+                     'total_size': 0, 'total_count': 0,
+                     'flows': []}
+        handleTrafficMessage(data);
+    }
+}
+
 // other code goes here
 // Update the Graphs (traffic graph and network view)
 function handleTrafficMessage(data) {
+    // update to report new traffic
+    // Do not update if we have not received data yet
+    if (!(last_traffic == 0 && data['total_count'] == 0)) {
+        last_traffic = Date.now();
+    }
 
     var timestamp = data['timestamp']
 
@@ -170,7 +197,7 @@ function handleTrafficMessage(data) {
         var to_node = f['to'];
 
         if (from_node != null && to_node != null) {
-            addFlow(timestamp, from_node, to_node, f['count'], f['size']);
+            addFlow(timestamp + time_sync, from_node, to_node, f['count'], f['size']);
         } else {
             console.log("partial message: " + JSON.stringify(data))
         }
