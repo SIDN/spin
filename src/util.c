@@ -1,5 +1,7 @@
 #include "util.h"
 
+#include "spin_log.h"
+
 #include <assert.h>
 
 #include <errno.h>
@@ -281,12 +283,12 @@ int read_ip_tree(tree_t* dest, const char* filename) {
 
 void hexdump(uint8_t* data, unsigned int size) {
     unsigned int i;
-    printf("00: ");
+    spin_log(LOG_DEBUG, "00: ");
     for (i = 0; i < size; i++) {
         if (i > 0 && i % 10 == 0) {
-            printf("\n%u: ", i);
+            spin_log(LOG_DEBUG, "\n%u: ", i);
         }
-        printf("%02x ", data[i]);
+        spin_log(LOG_DEBUG, "%02x ", data[i]);
     }
-    printf("\n");
+    spin_log(LOG_DEBUG, "\n");
 }

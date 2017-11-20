@@ -11,6 +11,7 @@
 #include <errno.h>
 
 #include "pkt_info.h"
+#include "spin_log.h"
 
 #include <poll.h>
 
@@ -78,6 +79,8 @@ int main()
     message_type_t type;
     struct timeval tv;
     struct pollfd fds[1];
+
+    spin_log_init(0, 6, NULL);
 
     ack_counter = 0;
 

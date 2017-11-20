@@ -35,6 +35,7 @@ void spin_log(int level, const char* format, ...) {
 
 void spin_vlog(int level, const char* format, va_list arg) {
     if (level > log_verbosity) {
+        return;
     }
     vsyslog(level, format, arg);
 }

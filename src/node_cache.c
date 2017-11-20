@@ -1,5 +1,6 @@
 
 #include "node_cache.h"
+#include "spin_log.h"
 
 #include <assert.h>
 #include <arpa/inet.h>
@@ -120,7 +121,7 @@ int
 node_shares_element(node_t* node, node_t* othernode) {
     tree_entry_t* cur_me;
 
-    //printf("[XX] ips  at %p\n", node->ips);
+    //spin_log(LOG_DEBUG, "[XX] ips  at %p\n", node->ips);
     //fflush(stdout);
     if (node->mac != NULL && othernode->mac != NULL) {
         if (strcmp(node->mac, othernode->mac) == 0) {
@@ -178,14 +179,14 @@ void node_print(node_t* node) {
     unsigned char* keyp;
     char str[512];
 
-    printf("[NODE] id: %d\n", node->id);
+    spin_log(LOG_DEBUG, "[NODE] id: %d\n", node->id);
     if (node->name != NULL) {
-        printf("       name: %s\n", node->name);
+        spin_log(LOG_DEBUG, "       name: %s\n", node->name);
     }
     if (node->mac != NULL) {
-        printf("      mac: %s\n", node->mac);
+        spin_log(LOG_DEBUG, "      mac: %s\n", node->mac);
     }
-    printf("      ips:\n");
+    spin_log(LOG_DEBUG, "      ips:\n");
     cur = tree_first(node->ips);
     while (cur != NULL) {
         assert(cur->key_size == sizeof(ip_t));
@@ -196,13 +197,13 @@ void node_print(node_t* node) {
         } else {
             ntop((int)keyp[0], str, (const uint8_t*)&keyp[1], 1024);
         }
-        printf("        %s\n", str);
+        spin_log(LOG_DEBUG, "        %s\n", str);
         cur = tree_next(cur);
     }
-    printf("      domains:\n");
+    spin_log(LOG_DEBUG, "      domains:\n");
     cur = tree_first(node->domains);
     while (cur != NULL) {
-        printf("        %s\n", (unsigned char*)cur->key);
+        spin_log(LOG_DEBUG, "        %s\n", (unsigned char*)cur->key);
         cur = tree_next(cur);
     }
 }
@@ -295,14 +296,14 @@ node_cache_destroy(node_cache_t* node_cache) {
 void node_cache_print(node_cache_t* node_cache) {
     tree_entry_t* cur = tree_first(node_cache->nodes);
     node_t* cur_node;
-    printf("[node cache]\n");
+    spin_log(LOG_DEBUG, "[node cache]\n");
     while (cur != NULL) {
         cur_node = (node_t*) cur->data;
         //node_print(cur_node);
         node_print(cur_node);
         cur = tree_next(cur);
     }
-    printf("[end of node cache]\n");
+    spin_log(LOG_DEBUG, "[end of node cache]\n");
 
 }
 
@@ -418,7 +419,7 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     int node_found = 0;
     tree_entry_t* nxt;
 
-    //printf("[XX] ADDING NODE old cache:\n");
+    //spin_log(LOG_DEBUG, "[XX] ADDING NODE old cache:\n");
     //node_cache_print(node_cache);
 
     while (cur != NULL) {
@@ -460,7 +461,7 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     node->id = new_id;
     tree_add(node_cache->nodes, sizeof(new_id), new_id_mem, sizeof(node_t), node, 0);
 
-    //printf("[XX] DONE ADDING NODE new cache:\n");
+    //spin_log(LOG_DEBUG, "[XX] DONE ADDING NODE new cache:\n");
     //node_cache_print(node_cache);
 }
 
@@ -488,18 +489,18 @@ pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf
     dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
     if (src_node == NULL) {
         char pkt_str[1024];
-        printf("[XX] ERROR! src node not found in cache!\n");
+        spin_log(LOG_ERR, "[XX] ERROR! src node not found in cache!\n");
         pktinfo2str(pkt_str, pkt_info, 1024);
-        printf("[XX] pktinfo: %s\n", pkt_str);
-        printf("[XX] node cache:\n");
+        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
+        spin_log(LOG_DEBUG, "[XX] node cache:\n");
         node_cache_print(node_cache);
     }
     if (src_node == NULL) {
         char pkt_str[1024];
-        printf("[XX] ERROR! dest node not found in cache!\n");
+        spin_log(LOG_ERR, "[XX] ERROR! dest node not found in cache!\n");
         pktinfo2str(pkt_str, pkt_info, 1024);
-        printf("[XX] pktinfo: %s\n", pkt_str);
-        printf("[XX] node cache:\n");
+        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
+        spin_log(LOG_DEBUG, "[XX] node cache:\n");
         node_cache_print(node_cache);
     }
     assert(src_node != NULL);

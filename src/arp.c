@@ -1,5 +1,6 @@
 
 #include "arp.h"
+#include "spin_log.h"
 
 arp_table_t* arp_table_create(void) {
     arp_table_t* arp_table = (arp_table_t*) malloc(sizeof(arp_table_t));
@@ -22,7 +23,7 @@ void arp_table_read(arp_table_t* arp_table) {
 
     fp = popen("ip neigh", "r");
     if (fp == NULL) {
-        printf("error running ip neigh\n");
+        spin_log(LOG_ERR, "error running ip neigh\n");
         return;
     }
     /* Read the output a line at a time - output it. */
@@ -40,20 +41,20 @@ void arp_table_print(arp_table_t* arp_table) {
     char ip_str[INET6_ADDRSTRLEN];
     tree_entry_t* cur = tree_first(arp_table->entries);
 
-    printf("[arp table]\n");
+    spin_log(LOG_DEBUG, "[arp table]\n");
     while (cur != NULL) {
         spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
-        printf("%s %s\n", ip_str, (char*)cur->data);
+        spin_log(LOG_DEBUG, "%s %s\n", ip_str, (char*)cur->data);
         cur = tree_next(cur);
     }
-    printf("[end of arp table]\n");
+    spin_log(LOG_DEBUG, "[end of arp table]\n");
 }
 
 void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
     ip_t ip;
 
     if (!spin_pton(&ip, ip_str)) {
-        //printf("[XX] error, bad address, ignoring\n");
+        //spin_log(LOG_ERR, "[XX] error, bad address, ignoring\n");
         return;
     }
 
@@ -81,4 +82,3 @@ char* arp_table_find_by_str(arp_table_t* arp_table, char* ip_str) {
         return NULL;
     }
 }
-

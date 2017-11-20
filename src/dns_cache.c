@@ -1,5 +1,7 @@
 
 #include "dns_cache.h"
+#include "spin_log.h"
+
 #include <stdlib.h>
 
 #include <assert.h>
@@ -24,7 +26,7 @@ void
 dns_cache_entry_print(dns_cache_entry_t* entry) {
     tree_entry_t* cur = tree_first(entry->domains);
     while (cur != NULL) {
-        printf("    %s\n", (char*)cur->key);
+        spin_log(LOG_DEBUG, "    %s\n", (char*)cur->key);
         cur = tree_next(cur);
     }
 }
@@ -48,8 +50,8 @@ dns_cache_add(dns_cache_t* cache, dns_pkt_info_t* dns_pkt_info, uint32_t timesta
 
     if (t_entry == NULL) {
         entry = dns_cache_entry_create();
-        //printf("[XX] create new IP entry for %s (%p)\n", dname, entry);
-        //printf("[XX] created entry at %p\n", entry);
+        //spin_log(LOG_DEBUG, "[XX] create new IP entry for %s (%p)\n", dname, entry);
+        //spin_log(LOG_DEBUG, "[XX] created entry at %p\n", entry);
         tree_add(entry->domains, strlen(dname)+1, dname, sizeof(timestamp), &timestamp, 1);
         // todo, make noncopy?
         tree_add(cache->entries, sizeof(ip_t), dns_pkt_info, sizeof(entry), entry, 1);
@@ -59,7 +61,7 @@ dns_cache_add(dns_cache_t* cache, dns_pkt_info_t* dns_pkt_info, uint32_t timesta
         //dns_cache_entry_destroy(entry);
     } else {
         entry = (dns_cache_entry_t*)t_entry->data;
-        //printf("[XX] add domain %s to existing IP entry (%p)\n", dname, entry);
+        //spin_log(LOG_DEBUG, "[XX] add domain %s to existing IP entry (%p)\n", dname, entry);
         tree_add(entry->domains, strlen(dname)+1, dname, sizeof(timestamp), &timestamp, 1);
     }
 }
@@ -98,7 +100,7 @@ dns_cache_clean(dns_cache_t* dns_cache, uint32_t now) {
             nxt_domain = tree_next(cur_domain);
             expiry = (uint32_t*) cur_domain->data;
             if (now > *expiry) {
-                //printf("[XX] DOMAIN EXPIRED! DELETE FROM CACHE");
+                //spin_log(LOG_DEBUG, "[XX] DOMAIN EXPIRED! DELETE FROM CACHE");
                 tree_remove_entry(cur_dns->domains, cur_domain);
             }
             cur_domain = nxt_domain;
@@ -116,9 +118,9 @@ dns_cache_clean(dns_cache_t* dns_cache, uint32_t now) {
             tree_remove_entry(dns_cache->entries, cur);
             int post_size = tree_size(dns_cache->entries);
             if (post_size < pre_size - 1) {
-                printf("[XX] ERROR ERROR ERROR too many entries suddenly gone\n");
-                printf("[XX] while removing last domain of ip %s\n", ip_str);
-                printf("[XX] dns cache after remove:\n");
+                spin_log(LOG_ERR, "[XX] ERROR ERROR ERROR too many entries suddenly gone\n");
+                spin_log(LOG_ERR, "[XX] while removing last domain of ip %s\n", ip_str);
+                spin_log(LOG_ERR, "[XX] dns cache after remove:\n");
                 dns_cache_print(dns_cache);
                 exit(1);
             }
@@ -145,12 +147,12 @@ dns_cache_print(dns_cache_t* dns_cache) {
         } else {
             ntop((int)keyp[0], str, (unsigned char*)&keyp[1], 1024);
         }
-        printf("[IP] '%s'\n", str);
+        spin_log(LOG_DEBUG, "[IP] '%s'\n", str);
         entry = (dns_cache_entry_t*)cur->data;
         cur_domain = tree_first(entry->domains);
         while (cur_domain != NULL) {
             expiry = (uint32_t*) cur_domain->data;
-            printf("    [domain] '%s' (%u)\n", (char*)cur_domain->key, *expiry);
+            spin_log(LOG_DEBUG, "    [domain] '%s' (%u)\n", (char*)cur_domain->key, *expiry);
             cur_domain = tree_next(cur_domain);
         }
 

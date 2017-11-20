@@ -13,6 +13,8 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "spin_log.h"
+
 // Do we need a lock around this one?
 //int command_sock_fd;
 
@@ -55,7 +57,7 @@ void netlink_command_result_add_ip(netlink_command_result_t* command_result, uin
         memcpy(command_result->ips[command_result->ip_count].addr, ip, 16);
         command_result->ip_count++;
     } else {
-        printf("[XX] error: unknown ip version\n");
+        spin_log(LOG_WARNING, "[XX] unknown ip version\n");
     }
 }
 
@@ -93,7 +95,7 @@ send_netlink_command_buf(size_t cmdbuf_size, unsigned char* cmdbuf)
 
     sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_CONFIG_PORT);
     if(sock_fd<0) {
-        fprintf(stderr, "Error connecting to socket: %s\n", strerror(errno));
+        spin_log(LOG_ERR, "Error connecting to socket: %s\n", strerror(errno));
         return 0;
     }
 
@@ -136,7 +138,7 @@ send_netlink_command_buf(size_t cmdbuf_size, unsigned char* cmdbuf)
         recvmsg(sock_fd, &msg, 0);
         version = ((uint8_t*)NLMSG_DATA(nlh))[0];
         if (version != 1) {
-            printf("protocol mismatch from kernel module: got %u, expected %u\n", version, SPIN_NETLINK_PROTOCOL_VERSION);
+            spin_log(LOG_ERR, "protocol mismatch from kernel module: got %u, expected %u\n", version, SPIN_NETLINK_PROTOCOL_VERSION);
             break;
         }
 
@@ -145,11 +147,11 @@ send_netlink_command_buf(size_t cmdbuf_size, unsigned char* cmdbuf)
         if (cmd == SPIN_CMD_END) {
             break;
         } else if (cmd == SPIN_CMD_ERR) {
-            //printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
+            //spin_log(LOG_DEBUG, "Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
             //pkt_info_t pkt;
             char err_str[MAX_NETLINK_PAYLOAD];
             strncpy(err_str, (char *)NLMSG_DATA(nlh) + 2, MAX_NETLINK_PAYLOAD);
-            printf("Error message from kernel: %s\n", err_str);
+            spin_log(LOG_ERR, "Error message from kernel: %s\n", err_str);
         } else if (cmd == SPIN_CMD_IP) {
             // TODO: check message size
             // first octet is ip version (AF_INET or AF_INET6)
@@ -157,11 +159,11 @@ send_netlink_command_buf(size_t cmdbuf_size, unsigned char* cmdbuf)
             /*
             unsigned char ip_str[INET6_ADDRSTRLEN];
             inet_ntop(ipv, NLMSG_DATA(nlh) + 3, (char*)ip_str, INET6_ADDRSTRLEN);
-            printf("%s\n", ip_str);
+            spin_log(LOG_DEBUG, "%s\n", ip_str);
             */
             netlink_command_result_add_ip(command_result, ipv, NLMSG_DATA(nlh) + 3);
         } else {
-            printf("unknown command response type received from kernel (%u %02x), stopping\n", cmd, cmd);
+            spin_log(LOG_WARNING, "unknown command response type received from kernel (%u %02x), stopping\n", cmd, cmd);
             hexdump((uint8_t*)NLMSG_DATA(nlh), nlh->nlmsg_len);
             break;
         }
@@ -196,4 +198,3 @@ netlink_command_result_t* send_netlink_command_iparg(config_command_t cmd, ip_t*
         return send_netlink_command_buf(19, cmd_buf);
     }
 }
-
