@@ -13,6 +13,7 @@
 #include "node_cache.h"
 #include "tree.h"
 #include "netlink_commands.h"
+#include "spin_log.h"
 
 // perhaps remove
 #include "spin_cfg.h"
@@ -203,7 +204,7 @@ int init_netlink()
 
     traffic_sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_TRAFFIC_PORT);
     if(traffic_sock_fd < 0) {
-        fprintf(stderr, "Error connecting to netlink socket: %s\n", strerror(errno));
+        spin_log(LOG_ERROR, "Error connecting to netlink socket: %s\n", strerror(errno));
         return -1;
     }
 
@@ -909,24 +910,53 @@ void print_version() {
     printf("Build date: %s\n", BUILD_DATE);
 }
 
+void log_version() {
+    spin_log(LOG_INFO, "SPIN daemon version %s started\n", BUILD_VERSION);
+    spin_log(LOG_INFO, "Build date: %s\n", BUILD_DATE);
+}
+
+void print_help() {
+    printf("Usage: spind [options]\n");
+    printf("Options:\n");
+    printf("-d\t\t\tlog debug messages (set log level to LOG_DEBUG)");
+    printf("-h\t\t\tshow this help\n");
+    printf("-l\t\t\trun in local mode (do not check for ARP cache entries)\n");
+    printf("-o\t\t\tlog to stdout instead of syslog\n");
+    printf("-v\t\t\tprint the version of spind and exit\n");
+}
+
 int main(int argc, char** argv) {
     int result;
-    int i;
+    int c;
+    int log_verbosity = 6;;
 
-    for (i = 0; i < argc; i++) {
-        if (strncmp(argv[i], "-l", 3) == 0 ||
-            strncmp(argv[i], "--local", 8) == 0) {
+    while ((c = getopt (argc, argv, "dhlov")) != -1) {
+        switch (c) {
+        case 'd':
+            log_verbosity = 7;
+            break;
+        case 'h':
+            print_help();
+            exit(0);
+            break;
+        case 'l':
             printf("Running in local mode; traffic without either entry in arp cache will be shown too\n");
             local_mode = 1;
-        }
-        if (strncmp(argv[i], "-v", 3) == 0 ||
-            strncmp(argv[i], "--version", 10) == 0) {
+            break;
+        case 'o':
+            printf("Logging to stdout instead of syslog\n");
+            break;
+        case 'v':
             print_version();
             exit(0);
+            break;
+        default:
+            abort ();
         }
     }
 
-    print_version();
+    spin_log_init(1, log_verbosity, "spind");
+    log_version();
 
     init_cache();
     init_mosquitto();
