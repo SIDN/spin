@@ -53,19 +53,6 @@ static int local_mode;
 #define MQTT_CHANNEL_TRAFFIC "SPIN/traffic"
 #define MQTT_CHANNEL_COMMANDS "SPIN/commands"
 
-void print_time() {
-    time_t timer;
-    char buffer[26];
-    struct tm* tm_info;
-
-    time(&timer);
-    tm_info = localtime(&timer);
-
-    strftime(buffer, 26, "%Y-%m-%d %H:%M:%S", tm_info);
-    printf("%s", buffer);
-    fflush(stdout);
-}
-
 void send_ack()
 {
     uint32_t now = time(NULL);
@@ -204,7 +191,7 @@ int init_netlink()
 
     traffic_sock_fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_TRAFFIC_PORT);
     if(traffic_sock_fd < 0) {
-        spin_log(LOG_ERROR, "Error connecting to netlink socket: %s\n", strerror(errno));
+        spin_log(LOG_ERR, "Error connecting to netlink socket: %s\n", strerror(errno));
         return -1;
     }
 
@@ -243,7 +230,6 @@ int init_netlink()
         now = time(NULL);
         /*
         printf("[XX] ");
-        print_time();
         printf(" rs: %d ", rs);
         printf("last: %u now: %u dif: %u", last_mosq_poll, now, now - last_mosq_poll);
         printf(" D: %02x (%d) ", fds[1].revents, fds[1].revents & POLLIN);
@@ -252,7 +238,7 @@ int init_netlink()
         fflush(stdout);
         */
         if (rs < 0) {
-            fprintf(stderr, "error in poll(): %s\n", strerror(errno));
+            spin_log(LOG_ERR, "error in poll(): %s\n", strerror(errno));
         } else if (rs == 0) {
             if (flow_list_should_send(flow_list, now)) {
                 if (!flow_list_empty(flow_list)) {
@@ -343,7 +329,7 @@ int init_netlink()
                         printf("unknown type? %u\n", type);
                     }
                 } else {
-                    fprintf(stderr, "Unexpected result from netlink socket (%d)\n", fds[0].revents);
+                    spin_log(LOG_ERR, "Unexpected result from netlink socket (%d)\n", fds[0].revents);
                     usleep(500000);
                 }
             }
@@ -352,14 +338,12 @@ int init_netlink()
                 mosquitto_loop(mosq, 0, 10);
                 last_mosq_poll = now;
             } else if (fds[1].revents) {
-                print_time();
-                fprintf(stderr, "Unexpected result from mosquitto socket (%d)\n", fds[1].revents);
-                fprintf(stderr, "Socket fd: %d, mosq struct has %d\n", fds[1].fd, mosquitto_socket(mosq));
+                spin_log(LOG_ERR, "Unexpected result from mosquitto socket (%d)\n", fds[1].revents);
+                spin_log(LOG_ERR, "Socket fd: %d, mosq struct has %d\n", fds[1].fd, mosquitto_socket(mosq));
                 //usleep(500000);
-                fprintf(stderr, "Reconnecting to mosquitto server\n");
+                spin_log(LOG_ERR, "Reconnecting to mosquitto server\n");
                 connect_mosquitto();
-                print_time();
-                fprintf(stderr, " Reconnected, mosq fd now %d\n", mosquitto_socket(mosq));
+                spin_log(LOG_ERR, " Reconnected, mosq fd now %d\n", mosquitto_socket(mosq));
 
             }
         }
@@ -626,7 +610,7 @@ void send_command_restart() {
     if (buffer_ok(response_json)) {
         mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, buffer_str(response_json), 0, false);
     } else {
-        fprintf(stderr, "error: response size too large\n");
+        spin_log(LOG_ERR, "error: response size too large\n");
     }
     buffer_destroy(response_json);
 }
@@ -807,12 +791,12 @@ void handle_json_command(const char* data) {
     jsmn_init(&p);
     result = jsmn_parse(&p, data, strlen(data), tokens, 10);
     if (result < 0) {
-        fprintf(stderr, "Error: unable to parse json data: %d\n", result);
+        spin_log(LOG_ERR, "Error: unable to parse json data: %d\n", result);
         return;
     }
     // token should be object, first child should be "command":
     if (tokens[0].type != JSMN_OBJECT) {
-        fprintf(stderr, "Error: unknown json data\n");
+        spin_log(LOG_ERR, "Error: unknown json data\n");
         return;
     }
     // token 1 should be "command",
@@ -820,11 +804,11 @@ void handle_json_command(const char* data) {
     // token 3 should be "arguments",
     // token 4 should be an object with the arguments (possibly empty)
     if (tokens[1].type != JSMN_STRING || strncmp(data+tokens[1].start, "command", 7) != 0) {
-        fprintf(stderr, "Error: json data not command\n");
+        spin_log(LOG_ERR, "Error: json data not command\n");
         return;
     }
     if (tokens[3].type != JSMN_STRING || strncmp(data+tokens[3].start, "argument", 7) != 0) {
-        fprintf(stderr, "Error: json data does not contain argument field\n");
+        spin_log(LOG_ERR, "Error: json data does not contain argument field\n");
         return;
     }
     handle_json_command_2(tokens[2].end - tokens[2].start, data+tokens[2].start,
@@ -858,16 +842,16 @@ void connect_mosquitto(void) {
     }
 
     mosq = mosquitto_new(client_name, 1, NULL);
-    fprintf(stdout, "Connecting to mqtt server on %s:%d\n", host, port);
+    spin_log(LOG_INFO, "Connecting to mqtt server on %s:%d\n", host, port);
     result = mosquitto_connect(mosq, host, port, MOSQUITTO_KEEPALIVE_TIME);
     if (result != 0) {
-        fprintf(stderr, "Error connecting to mqtt server on %s:%d, %s\n", host, port, mosquitto_strerror(result));
+        spin_log(LOG_ERR, "Error connecting to mqtt server on %s:%d, %s\n", host, port, mosquitto_strerror(result));
         exit(1);
     }
-    fprintf(stdout, "Connected to mqtt server on %s:%d with keepalive value %d\n", host, port, MOSQUITTO_KEEPALIVE_TIME);
+    spin_log(LOG_INFO, "Connected to mqtt server on %s:%d with keepalive value %d\n", host, port, MOSQUITTO_KEEPALIVE_TIME);
     result = mosquitto_subscribe(mosq, NULL, MQTT_CHANNEL_COMMANDS, 0);
     if (result != 0) {
-        fprintf(stderr, "Error subscribing to topic %s: %s\n", MQTT_CHANNEL_COMMANDS, mosquitto_strerror(result));
+        spin_log(LOG_ERR, "Error subscribing to topic %s: %s\n", MQTT_CHANNEL_COMMANDS, mosquitto_strerror(result));
     }
 
     mosquitto_message_callback_set(mosq, on_message);
@@ -897,10 +881,10 @@ void cleanup_cache() {
 
 void int_handler(int signal) {
     if (running) {
-        printf("Got interrupt, quitting\n");
+        spin_log(LOG_INFO, "Got interrupt, quitting\n");
         running = 0;
     } else {
-        printf("Got interrupt again, hard exit\n");
+        spin_log(LOG_INFO, "Got interrupt again, hard exit\n");
         exit(0);
     }
 }
@@ -940,7 +924,7 @@ int main(int argc, char** argv) {
             exit(0);
             break;
         case 'l':
-            printf("Running in local mode; traffic without either entry in arp cache will be shown too\n");
+            spin_log(LOG_INFO, "Running in local mode; traffic without either entry in arp cache will be shown too\n");
             local_mode = 1;
             break;
         case 'o':
