@@ -42,6 +42,7 @@ int traffic_sock_fd;
 struct msghdr traffic_msg;
 
 int ack_counter;
+int stop_on_error;
 
 static dns_cache_t* dns_cache;
 static node_cache_t* node_cache;
@@ -223,20 +224,30 @@ int init_netlink()
     last_mosq_poll = now;
     flow_list_t* flow_list = flow_list_create(time(NULL));
 
+    char str[1024];
+    size_t pos = 0;
+
 
     /* Read message from kernel */
     while (running) {
         rs = poll(fds, 2, 1000);
         now = time(NULL);
-        /*
-        printf("[XX] ");
-        printf(" rs: %d ", rs);
-        printf("last: %u now: %u dif: %u", last_mosq_poll, now, now - last_mosq_poll);
-        printf(" D: %02x (%d) ", fds[1].revents, fds[1].revents & POLLIN);
-        printf(" TO: %d", now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME);
-        printf("\n");
-        fflush(stdout);
-        */
+        memset(str, 0, 1024);
+        pos = 0;
+        pos += sprintf(&str[pos], "[XX] ");
+        pos += sprintf(&str[pos], " rs: %d ", rs);
+        pos += sprintf(&str[pos], "last: %u now: %u dif: %u", last_mosq_poll, now, now - last_mosq_poll);
+        pos += sprintf(&str[pos], " D: %02x (%d) ", fds[1].revents, fds[1].revents & POLLIN);
+        pos += sprintf(&str[pos], " TO: %d", now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME);
+        pos += sprintf(&str[pos], "\n");
+        spin_log(LOG_DEBUG, "%s", str);
+
+        if (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME / 2) {
+            spin_log(LOG_DEBUG, "Calling loop for keepalive check\n");
+            mosquitto_loop_misc(mosq);
+            last_mosq_poll = now;
+        }
+
         if (rs < 0) {
             spin_log(LOG_ERR, "error in poll(): %s\n", strerror(errno));
         } else if (rs == 0) {
@@ -250,10 +261,6 @@ int init_netlink()
                     }
                 }
                 flow_list_clear(flow_list, now);
-            }
-            if (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME) {
-                mosquitto_loop(mosq, 0, 10);
-                last_mosq_poll = now;
             }
         } else {
             if (fds[0].revents) {
@@ -335,11 +342,15 @@ int init_netlink()
             }
 
             if ((fds[1].revents & POLLIN) || (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME)) {
+                spin_log(LOG_DEBUG, "Calling loop for data\n");
                 mosquitto_loop(mosq, 0, 10);
                 last_mosq_poll = now;
             } else if (fds[1].revents) {
                 spin_log(LOG_ERR, "Unexpected result from mosquitto socket (%d)\n", fds[1].revents);
                 spin_log(LOG_ERR, "Socket fd: %d, mosq struct has %d\n", fds[1].fd, mosquitto_socket(mosq));
+                if (stop_on_error) {
+                    exit(1);
+                }
                 //usleep(500000);
                 spin_log(LOG_ERR, "Reconnecting to mosquitto server\n");
                 connect_mosquitto();
@@ -912,12 +923,16 @@ void print_help() {
 int main(int argc, char** argv) {
     int result;
     int c;
-    int log_verbosity = 6;;
+    int log_verbosity = 6;
+    stop_on_error = 0;
 
-    while ((c = getopt (argc, argv, "dhlov")) != -1) {
+    while ((c = getopt (argc, argv, "dehlov")) != -1) {
         switch (c) {
         case 'd':
             log_verbosity = 7;
+            break;
+        case 'e':
+            stop_on_error = 1;
             break;
         case 'h':
             print_help();
