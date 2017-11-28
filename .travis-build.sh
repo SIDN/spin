@@ -8,4 +8,5 @@ export KERNELPATH=$(/usr/bin/find /lib/modules -name build | head -n 1)
 
 autoreconf --install
 ./configure
-make
+make -j
+

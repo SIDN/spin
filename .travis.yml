@@ -2,6 +2,8 @@ language: c
 
 addons:
   apt:
+    sources:
+    - sourceline: 'ppa:mosquitto-dev/mosquitto-ppa'
     packages:
         - linux-generic
         - linux-headers-generic
@@ -9,7 +11,7 @@ addons:
         - autoconf
         - libnfnetlink-dev
         - libnfnetlink0
-        - libmosquitto0-dev
+        - libmosquitto-dev
         - luarocks
         - git
         - luarocks
