@@ -1,0 +1,21 @@
+language: c
+
+addons:
+  apt:
+    packages:
+        - linux-generic
+        - linux-headers-generic
+        - build-essential
+        - autoconf
+        - libnfnetlink-dev
+        - libnfnetlink0
+        - libmosquitto-dev
+        - luarocks
+        - git
+        - luarocks
+        - mosquitto
+        - lua-bitop
+        - lua-posix
+
+script:
+  - ./.travis-build.sh
