@@ -9,7 +9,7 @@ addons:
         - autoconf
         - libnfnetlink-dev
         - libnfnetlink0
-        - libmosquitto-dev
+        - libmosquitto0-dev
         - luarocks
         - git
         - luarocks
