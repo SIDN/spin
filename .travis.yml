@@ -1,0 +1,23 @@
+language: c
+
+addons:
+  apt:
+    sources:
+    - sourceline: 'ppa:mosquitto-dev/mosquitto-ppa'
+    packages:
+        - linux-generic
+        - linux-headers-generic
+        - build-essential
+        - autoconf
+        - libnfnetlink-dev
+        - libnfnetlink0
+        - libmosquitto-dev
+        - luarocks
+        - git
+        - luarocks
+        - mosquitto
+        - lua-bitop
+        - lua-posix
+
+script:
+  - ./.travis-build.sh
