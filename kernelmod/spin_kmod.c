@@ -785,7 +785,7 @@ void register_hook(struct nf_hook_ops* hook) {
 }
 
 void unregister_hook(struct nf_hook_ops* hook) {
-#ifdef nf_register_hook
+#ifdef nf_unregister_hook
     nf_unregister_hook(hook);
 #else
     nf_unregister_net_hook(&init_net, hook);
