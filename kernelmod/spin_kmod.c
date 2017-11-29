@@ -784,6 +784,14 @@ void register_hook(struct nf_hook_ops* hook) {
 #endif
 }
 
+void unregister_hook(struct nf_hook_ops* hook) {
+#ifdef nf_register_hook
+    nf_unregister_hook(hook);
+#else
+    nf_unregister_net_hook(&init_net, hook);
+#endif
+}
+
 void init_local(void) {
     printv(1, KERN_INFO "SPIN initializing local mode\n");
 
@@ -913,10 +921,10 @@ void cleanup_module()
     timer_cleanup();
     pkt_info_list_destroy(pkt_info_list);
     close_netfilter();
-    //nf_unregister_hook(&nfho1);                     //cleanup – unregister hook
-    //nf_unregister_hook(&nfho2);                     //cleanup – unregister hook
-    //nf_unregister_hook(&nfho3);                     //cleanup – unregister hook
-    //nf_unregister_hook(&nfho4);                     //cleanup – unregister hook
+    unregister_hook(&nfho1);
+    unregister_hook(&nfho2);
+    unregister_hook(&nfho3);
+    unregister_hook(&nfho4);
 
     ip_store_destroy(ignore_ips);
     printv(1, KERN_INFO "SPIN module finished\n");
