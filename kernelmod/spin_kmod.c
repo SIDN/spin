@@ -18,6 +18,8 @@
 
 #include <linux/errno.h>
 
+#include <net/net_namespace.h>
+
 #include "messaging.h"
 #include "pkt_info.h"
 #include "pkt_info_list.h"
@@ -774,6 +776,14 @@ static void timer_init(void)
     hrtimer_start(& htimer, kt_periode, HRTIMER_MODE_REL);
 }
 
+void register_hook(struct nf_hook_ops* hook) {
+#ifdef nf_register_hook
+    nf_register_hook(hook);
+#else
+    nf_register_net_hook(&init_net, hook);
+#endif
+}
+
 void init_local(void) {
     printv(1, KERN_INFO "SPIN initializing local mode\n");
 
@@ -781,25 +791,25 @@ void init_local(void) {
     nfho1.hooknum = NF_INET_LOCAL_IN;
     nfho1.pf = PF_INET;
     nfho1.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho1);
+    register_hook(&nfho1);
 
     nfho2.hook = hook_func_new;
     nfho2.hooknum = NF_INET_LOCAL_OUT;
     nfho2.pf = PF_INET;
     nfho2.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho2);
+    register_hook(&nfho2);
 
     nfho3.hook = hook_func_new;
     nfho3.hooknum = NF_INET_LOCAL_IN;
     nfho3.pf = PF_INET6;
     nfho3.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho3);
+    register_hook(&nfho3);
 
     nfho4.hook = hook_func_new;
     nfho4.hooknum = NF_INET_LOCAL_OUT;
     nfho4.pf = PF_INET6;
     nfho4.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho4);
+    register_hook(&nfho4);
 }
 
 void init_forward(void) {
@@ -809,25 +819,25 @@ void init_forward(void) {
     nfho1.hooknum = NF_INET_PRE_ROUTING;
     nfho1.pf = PF_INET;
     nfho1.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho1);
+    register_hook(&nfho1);
 
     nfho2.hook = hook_func_new;
     nfho2.hooknum = NF_INET_POST_ROUTING;
     nfho2.pf = PF_INET;
     nfho2.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho2);
+    register_hook(&nfho2);
 
     nfho3.hook = hook_func_new;
     nfho3.hooknum = NF_INET_PRE_ROUTING;
     nfho3.pf = PF_INET6;
     nfho3.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho3);
+    register_hook(&nfho3);
 
     nfho4.hook = hook_func_new;
     nfho4.hooknum = NF_INET_POST_ROUTING;
     nfho4.pf = PF_INET6;
     nfho4.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho4);
+    register_hook(&nfho4);
 }
 
 void init_forward2(void) {
@@ -837,25 +847,25 @@ void init_forward2(void) {
     nfho1.hooknum = NF_INET_PRE_ROUTING;
     nfho1.pf = PF_INET;
     nfho1.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho1);
+    register_hook(&nfho1);
 
     nfho2.hook = hook_func_new;
     nfho2.hooknum = NF_INET_POST_ROUTING;
     nfho2.pf = PF_INET;
     nfho2.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho2);
+    register_hook(&nfho2);
 
     nfho3.hook = hook_func_new;
     nfho3.hooknum = NF_INET_FORWARD;
     nfho3.pf = PF_INET;
     nfho3.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho3);
+    register_hook(&nfho3);
 
     nfho4.hook = hook_func_new;
     nfho4.hooknum = NF_INET_LOCAL_OUT;
     nfho4.pf = PF_INET;
     nfho4.priority = NF_IP_PRI_FIRST;
-    nf_register_hook(&nfho4);
+    register_hook(&nfho4);
 }
 
 
@@ -903,10 +913,10 @@ void cleanup_module()
     timer_cleanup();
     pkt_info_list_destroy(pkt_info_list);
     close_netfilter();
-    nf_unregister_hook(&nfho1);                     //cleanup – unregister hook
-    nf_unregister_hook(&nfho2);                     //cleanup – unregister hook
-    nf_unregister_hook(&nfho3);                     //cleanup – unregister hook
-    nf_unregister_hook(&nfho4);                     //cleanup – unregister hook
+    //nf_unregister_hook(&nfho1);                     //cleanup – unregister hook
+    //nf_unregister_hook(&nfho2);                     //cleanup – unregister hook
+    //nf_unregister_hook(&nfho3);                     //cleanup – unregister hook
+    //nf_unregister_hook(&nfho4);                     //cleanup – unregister hook
 
     ip_store_destroy(ignore_ips);
     printv(1, KERN_INFO "SPIN module finished\n");
