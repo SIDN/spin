@@ -777,18 +777,18 @@ static void timer_init(void)
 }
 
 void register_hook(struct nf_hook_ops* hook) {
-#ifdef nf_register_hook
-    nf_register_hook(hook);
-#else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
     nf_register_net_hook(&init_net, hook);
+#else
+    nf_register_hook(hook);
 #endif
 }
 
 void unregister_hook(struct nf_hook_ops* hook) {
-#ifdef nf_unregister_hook
-    nf_unregister_hook(hook);
-#else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
     nf_unregister_net_hook(&init_net, hook);
+#else
+    nf_unregister_hook(hook);
 #endif
 }
 
