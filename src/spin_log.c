@@ -19,6 +19,7 @@ void spin_log_close() {
 
 void spin_log(int level, const char* format, ...) {
     va_list arg;
+
     /* Write the error message */
     if (level > log_verbosity) {
         return;

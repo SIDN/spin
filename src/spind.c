@@ -170,6 +170,27 @@ void send_command_blocked(pkt_info_t* pkt_info) {
     buffer_destroy(pkt_json);
 }
 
+void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
+    unsigned int response_size;
+    buffer_t* response_json = buffer_create(2048);
+    buffer_t* pkt_json = buffer_create(2048);
+    unsigned int p_size;
+
+    spin_log(LOG_DEBUG, "[XX] jsonify that pkt info to get dns query command\n");
+    p_size = dns_query_pkt_info2json(node_cache, pkt_info, pkt_json);
+    if (p_size > 0) {
+        spin_log(LOG_DEBUG, "[XX] got an actual dns query command (size >0)\n");
+        buffer_finish(pkt_json);
+        response_size = create_mqtt_command(response_json, "dnsquery", NULL, buffer_str(pkt_json));
+        buffer_finish(response_json);
+        mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, buffer_str(response_json), 0, false);
+    } else {
+        spin_log(LOG_DEBUG, "[XX] did not get an actual dns query command (size 0)\n");
+    }
+    buffer_destroy(response_json);
+    buffer_destroy(pkt_json);
+}
+
 // function definition below
 void connect_mosquitto(void);
 
@@ -224,7 +245,7 @@ int init_netlink()
     last_mosq_poll = now;
     flow_list_t* flow_list = flow_list_create(time(NULL));
 
-    char str[1024];
+    //char str[1024];
     size_t pos = 0;
 
 
@@ -232,6 +253,7 @@ int init_netlink()
     while (running) {
         rs = poll(fds, 2, 1000);
         now = time(NULL);
+        /*
         memset(str, 0, 1024);
         pos = 0;
         pos += sprintf(&str[pos], "[XX] ");
@@ -241,9 +263,10 @@ int init_netlink()
         pos += sprintf(&str[pos], " TO: %d", now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME);
         pos += sprintf(&str[pos], "\n");
         spin_log(LOG_DEBUG, "%s", str);
+        */
 
         if (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME / 2) {
-            spin_log(LOG_DEBUG, "Calling loop for keepalive check\n");
+            //spin_log(LOG_DEBUG, "Calling loop for keepalive check\n");
             mosquitto_loop_misc(mosq);
             last_mosq_poll = now;
         }
@@ -323,11 +346,34 @@ int init_netlink()
                         // note: bad version would have been caught in wire2pktinfo
                         // in this specific case
                         wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
-                        //dns_pktinfo2str(pkt_str, &dns_pkt, 2048);
-                        //print_dnspktinfo_wirehex(&dns_pkt);
-                        //printf("[DNS] %s\n", pkt_str);
+
+                        // DNS answers are not relayed as traffic; we only
+                        // store them internally, so later traffic can be
+                        // matched to the DNS answer by IP address lookup
                         dns_cache_add(dns_cache, &dns_pkt, now);
                         node_cache_add_dns_info(node_cache, &dns_pkt, now, 1);
+                        // TODO do we need to send nodeUpdate?
+                        check_send_ack();
+                    } else if (type == SPIN_DNS_QUERY) {
+                        // We do want to relay dns query information to
+                        // clients; it should be sent as command of
+                        // type 'dnsquery'
+
+
+                        // the info now contains:
+                        // - domain name queried
+                        // - ip address doing the query
+                        // - 0 ttl value
+                        wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
+                        // XXXXX this would add wrong ip
+                        // If the queried domain name isn't known, we add it as a new node
+                        // (with only a domain name)
+                        node_cache_add_dns_query_info(node_cache, &dns_pkt, now, 1);
+                        //node_cache_add_pkt_info(node_cache, &dns_pkt, now, 1);
+                        // We do send a separate notification for the clients that are interested
+                        send_command_dnsquery(&dns_pkt);
+
+
                         // TODO do we need to send nodeUpdate?
                         check_send_ack();
                     } else if (type == SPIN_ERR_BADVERSION) {
@@ -342,7 +388,7 @@ int init_netlink()
             }
 
             if ((fds[1].revents & POLLIN) || (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME)) {
-                spin_log(LOG_DEBUG, "Calling loop for data\n");
+                //spin_log(LOG_DEBUG, "Calling loop for data\n");
                 mosquitto_loop(mosq, 0, 10);
                 last_mosq_poll = now;
             } else if (fds[1].revents) {
@@ -924,6 +970,7 @@ int main(int argc, char** argv) {
     int result;
     int c;
     int log_verbosity = 6;
+    int use_syslog = 1;
     stop_on_error = 0;
 
     while ((c = getopt (argc, argv, "dehlov")) != -1) {
@@ -944,6 +991,7 @@ int main(int argc, char** argv) {
             break;
         case 'o':
             printf("Logging to stdout instead of syslog\n");
+            use_syslog = 0;
             break;
         case 'v':
             print_version();
@@ -954,7 +1002,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    spin_log_init(1, log_verbosity, "spind");
+    spin_log_init(use_syslog, log_verbosity, "spind");
     log_version();
 
     init_cache();

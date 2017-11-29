@@ -341,8 +341,6 @@ void handle_dns_query(pkt_info_t* pkt_info, struct sk_buff* skb) {
         return;
     }
 
-    printk("[XX] query get!!\n");
-
     cur_pos = 12;
     cur_pos_name = 0;
     labellen = data[cur_pos++];

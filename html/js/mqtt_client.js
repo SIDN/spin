@@ -71,6 +71,10 @@ function onTrafficMessage(msg) {
                 //console.log("Got blocked command: " + msg);
                 handleBlockedMessage(result);
                 break;
+            case 'dnsquery':
+                //console.log("Got blocked command: " + msg);
+                handleDNSQueryMessage(result);
+                break;
             case 'filters':
                 console.log("Got filters command: " + msg);
                 filterList = result;
@@ -208,6 +212,12 @@ function handleBlockedMessage(data) {
     var from_node = data['from'];
     var to_node = data['to'];
     addBlocked(from_node, to_node);
+}
+
+function handleDNSQueryMessage(data) {
+    var from_node = data['from'];
+    var dns_node = data['queriednode'];
+    addDNSQuery(from_node, dns_node);
 }
 
 function serverRestart() {

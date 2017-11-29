@@ -299,7 +299,6 @@ void node_cache_print(node_cache_t* node_cache) {
     spin_log(LOG_DEBUG, "[node cache]\n");
     while (cur != NULL) {
         cur_node = (node_t*) cur->data;
-        //node_print(cur_node);
         node_print(cur_node);
         cur = tree_next(cur);
     }
@@ -396,7 +395,7 @@ void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uin
 }
 
 void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp, int check_status) {
-    // first see if we have a node with this ip or domain already
+    // should first see if we have a node with this ip or domain already
     char dname_str[512];
     ip_t ip;
     ip.family = dns_pkt->family;
@@ -411,6 +410,33 @@ void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, 
     node_cache_add_node(node_cache, node);
 }
 
+void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp, int
+check_status) {
+    // first see if we have a node with this ip or domain already
+    char dname_str[512];
+    ip_t ip;
+    ip.family = dns_pkt->family;
+    memcpy(ip.addr, dns_pkt->ip, 16);
+    dns_dname2str(dname_str, dns_pkt->dname, 512);
+
+    // add the node with the domain name; if it is not known
+    // this will result in a 'node' with only the domain name
+    node_t* node = node_create(0);
+    node_set_last_seen(node, timestamp);
+    node_add_domain(node, dname_str);
+    node_cache_add_node(node_cache, node);
+
+    // in this case, the dns_pkt's ip address is a separate node!
+    // add it too if it does not exist
+    node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    if (node == NULL) {
+        node = node_create(0);
+        node_set_last_seen(node, timestamp);
+        node_add_ip(node, &ip, 0);
+        node_cache_add_node(node_cache, node);
+    }
+}
+
 void
 node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     int new_id, *new_id_mem;
@@ -418,9 +444,6 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     node_t* tree_node;
     int node_found = 0;
     tree_entry_t* nxt;
-
-    //spin_log(LOG_DEBUG, "[XX] ADDING NODE old cache:\n");
-    //node_cache_print(node_cache);
 
     while (cur != NULL) {
         tree_node = (node_t*) cur->data;
@@ -459,10 +482,8 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     new_id_mem = (int*) malloc(sizeof(new_id));
     memcpy(new_id_mem, &new_id, sizeof(new_id));
     node->id = new_id;
-    tree_add(node_cache->nodes, sizeof(new_id), new_id_mem, sizeof(node_t), node, 0);
 
-    //spin_log(LOG_DEBUG, "[XX] DONE ADDING NODE new cache:\n");
-    //node_cache_print(node_cache);
+    tree_add(node_cache->nodes, sizeof(new_id), new_id_mem, sizeof(node_t), node, 0);
 }
 
 /*
@@ -494,14 +515,16 @@ pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf
         spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
         spin_log(LOG_DEBUG, "[XX] node cache:\n");
         node_cache_print(node_cache);
+        return 0;
     }
-    if (src_node == NULL) {
+    if (dest_node == NULL) {
         char pkt_str[1024];
         spin_log(LOG_ERR, "[XX] ERROR! dest node not found in cache!\n");
         pktinfo2str(pkt_str, pkt_info, 1024);
         spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
         spin_log(LOG_DEBUG, "[XX] node cache:\n");
         node_cache_print(node_cache);
+        return 0;
     }
     assert(src_node != NULL);
     assert(dest_node != NULL);
@@ -516,6 +539,60 @@ pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf
     buffer_write(json_buf, ", \"count\": %d }", pkt_info->packet_count);
     return s;
 }
+
+unsigned int
+dns_query_pkt_info2json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info, buffer_t* json_buf) {
+    unsigned int s = 0;
+    node_t* src_node;
+    // the 'node' that was queried; this could be a node that we already know
+    node_t* dns_node;
+    char dname_str[512];
+    dns_dname2str(dname_str, dns_pkt_info->dname, 512);
+    ip_t ip;
+
+    ip.family = dns_pkt_info->family;
+    memcpy(ip.addr, dns_pkt_info->ip, 16);
+
+    spin_log(LOG_DEBUG, "[XX] creating dns query command\n");
+
+    dns_node = node_cache_find_by_domain(node_cache, dname_str);
+    if (dns_node == NULL) {
+        // something went wrong, we should have just added t
+        char pkt_str[1024];
+        spin_log(LOG_ERR, "[XX] ERROR! DNS node not found in cache!\n");
+        dns_pktinfo2str(pkt_str, dns_pkt_info, 1024);
+        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
+        spin_log(LOG_DEBUG, "[XX] node cache:\n");
+        node_cache_print(node_cache);
+        return 0;
+    }
+
+    src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    if (src_node == NULL) {
+        printf("[XX] error, src node not found in cache");
+        char pkt_str[1024];
+        spin_log(LOG_ERR, "[XX] ERROR! src node not found in cache!\n");
+        dns_pktinfo2str(pkt_str, dns_pkt_info, 1024);
+        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
+        spin_log(LOG_DEBUG, "[XX] node cache:\n");
+        node_cache_print(node_cache);
+        return 0;
+    }
+
+    buffer_write(json_buf, "{ \"from\": ");
+    s += node2json(src_node, json_buf);
+    s += buffer_write(json_buf, ", \"queriednode\": ");
+    s += node2json(dns_node, json_buf);
+    s += buffer_write(json_buf, ", \"query\": \"%s\"", dname_str);
+    s += buffer_write(json_buf, " }");
+
+    spin_log(LOG_DEBUG, "[XX] dns query command created, size %d\n", s);
+    // temp fix; size is not actually tracked right now
+    return 1;
+    //return s;
+}
+
+
 
 flow_list_t* flow_list_create(uint32_t timestamp) {
     flow_list_t* flow_list = (flow_list_t*)malloc(sizeof(flow_list_t));

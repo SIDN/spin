@@ -26,6 +26,7 @@ var colour_dst = "lightblue";
 var colour_recent = "#bbffbb";
 var colour_edge = "#9999ff";
 var colour_blocked = "#ff0000";
+var colour_dns = "#ffab44";
 
 // these are used in the filterlist dialog
 var _selectRange = false,
@@ -744,6 +745,7 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
     var ips = node.ips ? node.ips : [];
     var domains = node.domains ? node.domains : [];
     var blocked = type == "blocked";
+    var dnsquery = type == "dnsquery";
 
     if (node.name) {
         label = node.name;
@@ -760,6 +762,8 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
     } else {
         if (blocked) {
             colour = colour_blocked;
+        } else if (dnsquery) {
+            colour = colour_dns;
         } else {
             colour = colour_recent;
         }
@@ -946,6 +950,20 @@ function addBlocked(from, to) {
     addNode(from["lastseen"], from, false, 1, 1, "to " + to, "source");
     addNode(to["lastseen"], to, false, 1, 1, "from " + from, "blocked");
     addEdge(from, to, colour_blocked);
+    if (!zoom_locked) {
+        network.fit({
+            duration: 0
+        });
+    }
+}
+
+function addDNSQuery(from, dns) {
+    if (contains(filterList, from) || contains(filterList, dns)) {
+        return;
+    }
+    addNode(from["lastseen"], from, false, 0, 0, "to " + dns, "source");
+    addNode(dns["lastseen"], dns, false, 0, 0, "dns " + from, "dnsquery");
+    addEdge(from, dns, colour_dns);
     if (!zoom_locked) {
         network.fit({
             duration: 0

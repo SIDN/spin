@@ -67,13 +67,18 @@ void node_cache_print(node_cache_t* node_cache);
 void node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp, int check_status);
 void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp, int check_status);
 void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp, int check_status);
+void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp, int check_status);
 
 /**
- * this takes ownership of the given node pointer, do not use or free after
+ * this takes ownership of the given node pointer, do not use or free after!
  */
 void node_cache_add_node(node_cache_t* node_cache, node_t* node);
 
 node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* ip);
+/**
+ * Note: currently the cache stores domain names by their string representation, so convert
+ * if you are looking for a node by its wireformat domain
+ */
 node_t* node_cache_find_by_domain(node_cache_t* node_cache, char* dname);
 node_t* node_cache_find_by_id(node_cache_t* node_cache, int node_id);
 
@@ -82,6 +87,7 @@ node_t* node_cache_find_by_id(node_cache_t* node_cache, int node_id);
 
 
 unsigned int pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf);
+unsigned int dns_query_pkt_info2json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info, buffer_t* json_buf);
 
 typedef struct {
     int packet_count;
