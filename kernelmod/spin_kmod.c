@@ -367,7 +367,11 @@ void handle_dns_query(pkt_info_t* pkt_info, struct sk_buff* skb) {
     memcpy(dpkt_info.ip, pkt_info->src_addr, 16);
     dpkt_info.family = pkt_info->family;
 
-    send_dns_pkt_info(SPIN_DNS_QUERY, &dpkt_info);
+    // Don't send the info if the sender of the query is on the
+    // ignore list
+    if (!ip_store_contains_ip(ignore_ips, dpkt_info.ip)) {
+        send_dns_pkt_info(SPIN_DNS_QUERY, &dpkt_info);
+    }
 }
 
 void handle_dns_answer(pkt_info_t* pkt_info, struct sk_buff* skb) {
