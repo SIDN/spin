@@ -4,6 +4,17 @@
 
 cjson = require 'cjson'
 
+--
+-- helper functions. todo: put in util?
+--
+function has_value(tab, el)
+    for _,v in pairs(tab) do
+        if el == v then return true end
+    end
+    return false
+end
+
+
 -- main module
 local luamud = {}
 
@@ -155,10 +166,9 @@ function luamud.acl_create(data)
     local new_acl = {}
     setmetatable(new_acl, acl)
     acl.data = data
-    acl.entries = {}
+    acl.rules = {}
     acl, err = acl:validate()
     if acl == nil then return nil, err end
-    -- if we need to fill in extra values (last-update?)
     return acl
 end
 
@@ -182,7 +192,9 @@ function acl:validate()
     end
     for _, ace_e in pairs(ace) do
         -- todo: should this be its own object as well?
-        table.insert(self.entries, ace_e)
+        local rule, err = luamud.rule_create(ace_e)
+        if rule == nil then return nil, err end
+        table.insert(self.rules, rule)
     end
     --if self.data
     return self
@@ -191,5 +203,74 @@ end
 -- end of ACL encapsulation
 --
 
+--
+-- Rule encapsulation
+--
+-- todo: make this into separate module?
+--
+local rule = {}
+rule.__index = rule
+
+luamud.match_types = {
+    "any-acl",
+    "mud-acl",
+    "icmp-acl",
+    "ipv6-acl",
+    "tcp-acl",
+    "any-acl",
+    "udp-acl",
+    "ipv4-acl",
+    "ipv6-acl"
+}
+
+luamud.action_types = {
+    "ietf-mud:direction-initiated",
+    "forwarding"
+}
+
+-- Create an acl structure using raw objects (ie the json data that
+-- has already been decoded)
+-- The data object is the list element under "ace"
+function luamud.rule_create(data, rule_type)
+    local new_rule = {}
+    setmetatable(new_rule, rule)
+    rule.data = data
+    rule.type = rule_type
+    rule.matches = {}
+    rule.actions = {}
+    rule, err = rule:validate()
+    if rule == nil then return nil, err end
+    return rule
+end
+
+function rule:validate()
+    if self.data["rule-name"] == nil then
+        return nil, "No element 'rule-name' in rule"
+    end
+    if self.data["matches"] == nil then
+        return nil, "No element 'matches' in rule " .. self.data["rule-name"]
+    end
+    -- acl should be one of: any-acl, mud-acl, icmp-acl, ipv6-acl,
+    -- tcp-acl, any-acl, udp-acl, ipv4-acl, and ipv6-acl
+    for match_type, match_match in pairs(self.data["matches"]) do
+        if not has_value(luamud.match_types, match_type) then
+            return nil, "Unknown match type: " .. match_type
+        end
+    end
+    -- TODO: further match rules; dnsname, port-range, etc.
+
+    if self.data["actions"] == nil then
+        return nil, "No element 'actions' in rule " .. self.data["rule-name"]
+    end
+    for action_type, action in pairs(self.data["actions"]) do
+        if not has_value(luamud.action_types, action_type) then
+            return nil, "Unknown action type: " .. action_type
+        end
+        --if action_type == "ietf-mud:direction-initiated" and
+        --   not has_value(luamud.action_direction_initiated, action_
+
+    end
+    return self
+end
 
 return luamud
