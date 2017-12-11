@@ -33,7 +33,6 @@ end
 
 -- Validates and returns self if valid
 -- Returns nil, err if not
--- Optional values that are not set and have a default value are filled in
 function mud:validate()
     print("[XX] validating MUD description")
     -- the main element should be "ietf-mud:mud"
@@ -49,9 +48,7 @@ function mud:validate()
     if mud_data["last-update"] == nil then
         return nil, "No element 'last-update'"
     end
-    if mud_data["cache-validity"] == nil then
-        mud_data["cache-validity"] = 48
-    end
+    -- cache-validity is optional, default returned by getter
     if mud_data["is-supported"] == nil then
         return nil, "No element 'is-supported'"
     end
@@ -60,6 +57,29 @@ function mud:validate()
 
     --return "validation not implemented"
     return self
+end
+
+-- essentially, all direct functions are helper functions, since
+-- we keep the internal data as a straight conversion from json
+function mud:get_mud_url()
+    return self.data["ietf-mud:mud"]["mud-url"]
+end
+
+-- warning: returns a string
+function mud:get_last_update()
+    return self.data["ietf-mud:mud"]["last-update"]
+end
+
+function mud:get_cache_validity()
+    if self.data["ietf-mud:mud"]["cache-validity"] ~= nil then
+        return self.data["ietf-mud:mud"]["cache-validity"]
+    else
+        return 48
+    end
+end
+
+function mud:get_is_supported()
+    return self.data["ietf-mud:mud"]["is-supported"]
 end
 
 function mud:to_json()
