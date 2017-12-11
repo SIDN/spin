@@ -1,0 +1,91 @@
+{
+     "ietf-mud:mud": {
+       "mud-url":
+     "https://bms.example.com/.well-known/mud/v1/lightbulb2000",
+       "last-update": "2017-10-07T12:16:24+02:00",
+       "cache-validity": 48,
+       "is-supported": true,
+       "systeminfo":
+     "https://bms.example.com/descriptions/lightbulb2000",
+       "from-device-policy": {
+         "access-lists": {
+           "access-list": [
+             {
+               "acl-name": "mud-14377-v6fr",
+               "acl-type": "ietf-access-control-list:ipv6-acl"
+             }
+           ]
+         }
+       },
+       "to-device-policy": {
+         "access-lists": {
+           "access-list": [
+             {
+               "acl-name": "mud-14377-v6to",
+               "acl-type": "ietf-access-control-list:ipv6-acl"
+             }
+           ]
+         }
+       }
+     },
+     "ietf-access-control-list:access-lists": {
+       "acl": [
+         {
+           "acl-name": "mud-14377-v6to",
+           "acl-type": "ipv6-acl",
+           "access-list-entries": {
+             "ace": [
+               {
+                 "rule-name": "cl0-todev",
+                 "matches": {
+                   "ipv6-acl": {
+                     "ietf-acldns:src-dnsname":
+     "service.bms.example.com",
+                     "protocol": 6,
+                     "source-port-range": {
+                       "lower-port": 443,
+                       "upper-port": 443
+                     }
+                   },
+                   "tcp-acl": {
+                     "ietf-mud:direction-initiated": "from-device"
+                   }
+                 },
+                 "actions": {
+                   "forwarding": "accept"
+                 }
+               }
+             ]
+           }
+         },
+         {
+           "acl-name": "mud-14377-v6fr",
+           "acl-type": "ipv6-acl",
+           "access-list-entries": {
+             "ace": [
+               {
+                 "rule-name": "cl0-frdev",
+                 "matches": {
+                   "ipv6-acl": {
+                     "ietf-acldns:dst-dnsname":
+                        "service.bms.example.com",
+                     "protocol": 6,
+                     "destination-port-range": {
+                       "lower-port": 443,
+                       "upper-port": 443
+                     }
+                   },
+                   "tcp-acl": {
+                     "ietf-mud:direction-initiated": "from-device"
+                   }
+                 },
+                 "actions": {
+                   "forwarding": "accept"
+                 }
+               }
+             ]
+           }
+         }
+       ]
+     }
+}
