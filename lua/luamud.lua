@@ -265,7 +265,6 @@ function acl:get_rules()
     return self.rules
 end
 
-
 --
 -- end of ACL encapsulation
 --
@@ -278,7 +277,7 @@ end
 local rule = {}
 rule.__index = rule
 
-luamud.match_types = {
+luamud.acl_types = {
     "any-acl",
     "mud-acl",
     "icmp-acl",
@@ -291,13 +290,23 @@ luamud.match_types = {
 }
 
 luamud.action_types = {
-    "ietf-mud:direction-initiated",
     "forwarding"
 }
 
 luamud.actions = {
     "accept",
-    "reject"
+    "reject",
+    "drop"
+}
+
+-- 'supported' for now; we will implement them one by one
+luamud.supported_match_types = {
+    "ietf-mud:direction-initiated",
+    "ietf-acldns:src-dnsname",
+    "ietf-acldns:dst-dnsname",
+    "protocol",
+    "source-port-range",
+    "destination-port-range",
 }
 
 -- Create an acl structure using raw objects (ie the json data that
@@ -324,12 +333,59 @@ function rule:validate()
     end
     -- acl should be one of: any-acl, mud-acl, icmp-acl, ipv6-acl,
     -- tcp-acl, any-acl, udp-acl, ipv4-acl, and ipv6-acl
-    for match_type, match_match in pairs(self.data["matches"]) do
-        if not has_value(luamud.match_types, match_type) then
+    for acl_type, acl_matches in pairs(self.data["matches"]) do
+        if not has_value(luamud.acl_types, acl_type) then
             return nil, "Unknown match type: " .. match_type
         end
+        for match_type, match_value in pairs(acl_matches) do
+            print("[XX] " .. match_type)
+            if not has_value(luamud.supported_match_types, match_type) then
+                return nil, "Unsupported match type: " .. match_type
+            end
+            if match_type == "ietf-mud:direction-initiated" then
+                if not has_value({"from-device", "to-device"}, match_value) then
+                    return nil, "Bad value for ietf-mud:direction_initiated: " .. match_value
+                end
+            elseif match_type == "ietf-acldns:src-dnsname" then
+                -- what to check here?
+            elseif match_type == "ietf-acldns:dst-dnsname" then
+                -- what to check here?
+            elseif match_type == "protocol" then
+                if not type(match_value) == "number" then
+                    return nil, "Bad value for protocol match rule: " .. match_value
+                end
+            elseif match_type == "source-port-range" then
+                print("[XX]" .. type(match_value['lower-port']))
+                -- should be a table with 'lower-port' (int, mandatory),
+                -- 'upper-port' (int, optional), and 'operation' (optional)
+                if match_value['lower-port'] == nil then
+                    return nil, "Missing 'lower-port' value in source-port-range match rule"
+                elseif type(match_value['lower-port']) ~= "number" then
+                    return nil, "Bad value for source-port-range lower-port: " .. match_value['lower-port']
+                end
+                if match_value['upper-port'] ~= nil and
+                   type(match_value['upper-port']) ~= "number" then
+                    return nil, "Bad value for source-port-range upper-port: " .. match_value['upper-port']
+                end
+            elseif match_type == "destination-port-range" then
+                print("[XX]" .. type(match_value['lower-port']))
+                -- should be a table with 'lower-port' (int, mandatory),
+                -- 'upper-port' (int, optional), and 'operation' (optional)
+                if match_value['lower-port'] == nil then
+                    return nil, "Missing 'lower-port' value in source-port-range match rule"
+                elseif type(match_value['lower-port']) ~= "number" then
+                    return nil, "Bad value for source-port-range match rule: " .. match_value['lower-port']
+                end
+                if match_value['upper-port'] ~= nil and
+                   type(match_value['upper-port']) ~= "number" then
+                    return nil, "Bad value for source-port-range upper-port: " .. match_value['upper-port']
+                end
+            --elseif match_type == "" then
+            end
+        end
     end
-    -- TODO: further match rules; dnsname, port-range, etc.
+    -- TODO: further match rules; dnsname, port-range, dscp, etc.
+    -- also check for specifics in list...
 
     if self.data["actions"] == nil then
         return nil, "No element 'actions' in rule " .. self.data["rule-name"]
@@ -343,6 +399,18 @@ function rule:validate()
 
     end
     return self
+end
+
+function rule:get_name()
+    return self.data["rule-name"]
+end
+
+function rule:get_matches()
+    return self.matches
+end
+
+function rule:get_actions()
+    return self.actions
 end
 
 return luamud

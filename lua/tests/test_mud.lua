@@ -24,6 +24,9 @@ else
     print("Globally defined acls:")
     for _,acl in pairs(mud:get_acls()) do
         print("    " .. acl:get_name())
+        for _,r in pairs(acl:get_rules()) do
+            print("        " .. r:get_name())
+        end
     end
 
     print("From-device policy:")
