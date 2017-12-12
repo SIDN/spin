@@ -20,4 +20,19 @@ else
     else
         print("Systeminfo not set")
     end
+
+    print("Globally defined acls:")
+    for _,acl in pairs(mud:get_acls()) do
+        print("    " .. acl:get_name())
+    end
+
+    print("From-device policy:")
+    for acl_n, acl_type in pairs(mud:get_from_device_acls()) do
+        print("    " .. acl_n .. " (" .. acl_type .. ")")
+    end
+
+    print("To-device policy:")
+    for acl_n, acl_type in pairs(mud:get_to_device_acls()) do
+        print("    " .. acl_n .. " (" .. acl_type .. ")")
+    end
 end

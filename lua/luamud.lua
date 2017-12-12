@@ -24,6 +24,8 @@ local luamud = {}
 -- on the top-level of the MUD description. Note that these
 -- can in theory contain more than defined in the actual policies
 -- that are set
+-- The actual policies are the acls in from_device_acls and
+-- to_device_acls
 --
 -- This implementation follows
 -- https://tools.ietf.org/html/draft-ietf-opsawg-mud-13
@@ -46,13 +48,16 @@ function luamud.mud_create(mud_json)
     mud.data, err = cjson.decode(mud_json)
     if mud.data == nil then return nil, err end
 
+    -- validate top-level info
+    new_mud, err = new_mud:validate()
+    if new_mud == nil then return nil, err end
+
     -- read the acls from ietf-access-control-list:access-lists
+    -- and the from- and to-device policies
     acl_count, err = new_mud:read_acls()
     if acl_count == nil then return nil, err end
 
-    mud, err = mud:validate()
-    if mud == nil then return nil, err end
-    return mud
+    return new_mud
 end
 
 -- returns the number of acls read, or nil,error
@@ -71,13 +76,42 @@ function mud:read_acls()
         if acl_entry == nil then return nil, err end
         table.insert(self.acls, acl_entry)
     end
+    print(self.data["ietf-mud:mud"]["from-device-policy"])
+
+    self.from_device_acls = {}
+    if self.data["ietf-mud:mud"]["from-device-policy"] and
+       self.data["ietf-mud:mud"]["from-device-policy"]["access-lists"] and
+       self.data["ietf-mud:mud"]["from-device-policy"]["access-lists"]["access-list"] then
+        for _,policy_acl_desc in pairs(self.data["ietf-mud:mud"]["from-device-policy"]["access-lists"]["access-list"]) do
+            local pname = policy_acl_desc["acl-name"]
+            local ptype = policy_acl_desc["acl-type"]
+            if self:get_acl(pname) == nil then
+                return nil, "from-device ACL named '" .. pname .. "' not defined"
+            end
+            self.from_device_acls[pname] = ptype
+        end
+    end
+
+    self.to_device_acls = {}
+    if self.data["ietf-mud:mud"]["to-device-policy"] and
+       self.data["ietf-mud:mud"]["to-device-policy"]["access-lists"] and
+       self.data["ietf-mud:mud"]["to-device-policy"]["access-lists"]["access-list"] then
+        for _,policy_acl_desc in pairs(self.data["ietf-mud:mud"]["to-device-policy"]["access-lists"]["access-list"]) do
+            local pname = policy_acl_desc["acl-name"]
+            local ptype = policy_acl_desc["acl-type"]
+            if self:get_acl(pname) == nil then
+                --return nil, "to-device ACL named '" .. pname .. "' not defined"
+            end
+            self.to_device_acls[pname] = ptype
+        end
+    end
+
     return table.getn(self.acls)
 end
 
 -- Validates and returns self if valid
 -- Returns nil, err if not
 function mud:validate()
-    print("[XX] validating MUD description")
     -- the main element should be "ietf-mud:mud"
     mud_data = self.data["ietf-mud:mud"]
     if mud_data == nil then
@@ -136,7 +170,27 @@ function mud:get_systeminfo()
     end
 end
 
+function mud:get_acls()
+    return self.acls
+end
+
 function mud:get_acl(name)
+    for _,acl in pairs(self.acls) do
+        if acl:get_name() == name then return acl end
+    end
+    return nil
+end
+
+-- this just returns the table acl_name->acl_type
+-- NOT the actual acls (to get those, use mud:get_acl(name)
+function mud:get_from_device_acls()
+    return self.from_device_acls
+end
+
+-- this just returns the table acl_name->acl_type
+-- NOT the actual acls (to get those, use mud:get_acl(name)
+function mud:get_to_device_acls()
+    return self.to_device_acls
 end
 
 function mud:to_json()
@@ -165,16 +219,15 @@ acl.__index = acl
 function luamud.acl_create(data)
     local new_acl = {}
     setmetatable(new_acl, acl)
-    acl.data = data
-    acl.rules = {}
-    acl, err = acl:validate()
-    if acl == nil then return nil, err end
-    return acl
+    new_acl.data = data
+    new_acl.rules = {}
+    new_acl, err = new_acl:validate()
+    if new_acl == nil then return nil, err end
+    return new_acl
 end
 
 function acl:validate()
     -- the top-level element should be "acl"
-    print("[XX] validating ACL")
     if self.data["acl-name"] == nil then
         return nil, "No element 'acl-name' in access control list"
     end
@@ -199,6 +252,20 @@ function acl:validate()
     --if self.data
     return self
 end
+
+function acl:get_name()
+    return self.data["acl-name"]
+end
+
+function acl:get_type()
+    return self.data["acl-type"]
+end
+
+function acl:get_rules()
+    return self.rules
+end
+
+
 --
 -- end of ACL encapsulation
 --
@@ -226,6 +293,11 @@ luamud.match_types = {
 luamud.action_types = {
     "ietf-mud:direction-initiated",
     "forwarding"
+}
+
+luamud.actions = {
+    "accept",
+    "reject"
 }
 
 -- Create an acl structure using raw objects (ie the json data that
