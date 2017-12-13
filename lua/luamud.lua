@@ -193,6 +193,67 @@ function mud:get_to_device_acls()
     return self.to_device_acls
 end
 
+function mud:get_policy_actions(from_device, ips, domains, from_port, to_port)
+    local acls
+    if from_device then
+        acls = self:get_from_device_acls()
+    else
+        acls = self:get_to_device_acls()
+    end
+    for acl_name,_ in pairs(acls) do
+        print("[XX] try acl " .. acl_name)
+        acl = self:get_acl(acl_name)
+        for _,rule in pairs(acl:get_rules()) do
+            print("[XX] try rule " .. rule:get_name())
+            print("[XX] rule has " .. table.getn(rule:get_matches()) .. " matches")
+            for acl_type,acl_matches in pairs(rule:get_matches()) do
+                print("[XX] try r-acl " .. acl_type)
+                for match_type,match_value in pairs(acl_matches) do
+                    print("[XX] try match " .. match_type)
+                    if match_type == "destination-port-range" then
+                        print("[XX] to_port: " .. to_port)
+                        if match_value["upper_port"] == nil then
+                            -- should be True probably, after refactor
+                            if to_port == match_value["lower_port"] then
+                                print("[XX] MATCH!")
+                                return acl:get_actions()
+                            end
+                        else
+                            if to_port >= match_value["lower_port"] and
+                               to_port <= match_value["upper_port"] then
+                                print("[XX] MATCH!")
+                                return acl:get_actions()
+                            end
+                        end
+                    elseif match_type == "source-port-range" then
+                        print("[XX] from_port: " .. from_port)
+                        if match_value["upper_port"] == nil then
+                            -- should be True probably, after refactor
+                            if from_port == match_value["lower_port"] then
+                                print("[XX] MATCH!")
+                                return acl:get_actions()
+                            end
+                        else
+                            if from_port >= match_value["lower_port"] and
+                               from_port <= match_value["upper_port"] then
+                                print("[XX] MATCH!")
+                                return acl:get_actions()
+                            end
+                        end
+                    elseif match_type == "ietf-mud:direction-initiated" then
+                        -- can't really tell with the info we have
+                    elseif match_type == "ietf-acldns:dst-dnsname" then
+                        -- todo
+                    else
+                        print("[XX] unimplemented match type: " .. match_type)
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
 function mud:to_json()
     return cjson.encode(self.data)
 end
@@ -406,11 +467,11 @@ function rule:get_name()
 end
 
 function rule:get_matches()
-    return self.matches
+    return self.data["matches"]
 end
 
 function rule:get_actions()
-    return self.actions
+    return self.data["actions"]
 end
 
 return luamud
