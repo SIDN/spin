@@ -14,7 +14,7 @@ if [ $CHECK -eq 0 ]; then
 
     mkdir -p /tmp/${BNAME} &&\
     cp -r * /tmp/${BNAME}/ &&\
-    (cd /tmp/${BNAME}; autoreconf --install && (make distclean||/bin/true)) &&\
+    (cd /tmp/${BNAME}; autoreconf --install && (make distclean||/bin/true) && rm -rf lua/tests && rm -rf src/tests) &&\
     (cd /tmp; tar -czvf ${BNAME}.tar.gz ${BNAME}) &&\
     echo "Created /tmp/${BNAME}.tar.gz" &&\
     rm -rf /tmp/${BNAME}
