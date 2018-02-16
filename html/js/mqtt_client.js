@@ -1,10 +1,11 @@
-var client = new Paho.MQTT.Client("valibox.", 1884, "Web-" + Math.random().toString(16).slice(-5));
+var client = 0;// = new Paho.MQTT.Client("valibox.", 1884, "Web-" + Math.random().toString(16).slice(-5));
 //var client = new Paho.MQTT.Client("127.0.0.1", 1884, "clientId");
 var last_traffic = 0 // Last received traffic trace
 var time_sync = 0; // Time difference (seconds) between server and client
 var active = false; // Determines whether we are active or not
 
 function init() {
+    connectToMQTT();
     initGraphs();
 
     // set callback handlers
@@ -16,6 +17,21 @@ function init() {
 
     // Make smooth traffic graph when no data is received
     setInterval(fillEmptiness, 200);
+}
+
+function connectToMQTT() {
+    var url = new URL(window.location);
+    var mqtt_host = url.searchParams.get("mqtt_host");
+    if (!mqtt_host) {
+        mqtt_host = "valibox.";
+    }
+    var mqtt_port = url.searchParams.get("mqtt_port");
+    if (mqtt_port) {
+        mqtt_port = parseInt(mqtt_port);
+    } else {
+        mqtt_port = 1884;
+    }
+    client = new Paho.MQTT.Client(mqtt_host, mqtt_port, "Web-" + Math.random().toString(16).slice(-5));
 }
 
 // called when a message arrives
