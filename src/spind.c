@@ -51,6 +51,9 @@ static struct mosquitto* mosq;
 static int running;
 static int local_mode;
 
+const char* mosq_host;
+int mosq_port;
+
 #define MQTT_CHANNEL_TRAFFIC "SPIN/traffic"
 #define MQTT_CHANNEL_COMMANDS "SPIN/commands"
 
@@ -192,7 +195,7 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
 }
 
 // function definition below
-void connect_mosquitto(void);
+void connect_mosquitto(const char* host, int port);
 
 int init_netlink()
 {
@@ -399,7 +402,7 @@ int init_netlink()
                 }
                 //usleep(500000);
                 spin_log(LOG_ERR, "Reconnecting to mosquitto server\n");
-                connect_mosquitto();
+                connect_mosquitto(mosq_host, mosq_port);
                 spin_log(LOG_ERR, " Reconnected, mosq fd now %d\n", mosquitto_socket(mosq));
 
             }
@@ -460,6 +463,10 @@ void handle_command_get_list(config_command_t cmd, const char* json_command) {
 
     // ask the kernel module for the list of ignored nodes
     command_result = send_netlink_command_noarg(cmd);
+    if (command_result == NULL) {
+        fprintf(stderr, "Error connecting to kernel, is the module running?\n");
+        return;
+    }
     netlink_command_result2json(command_result, result_json);
     if (!buffer_ok(result_json)) {
         buffer_destroy(result_json);
@@ -887,10 +894,8 @@ void on_message(struct mosquitto* mosq, void* user_data, const struct mosquitto_
     }
 }
 
-void connect_mosquitto(void) {
+void connect_mosquitto(const char* host, int port) {
     const char* client_name = "asdf";
-    const char* host = "127.0.0.1";
-    const int port = 1883;
     int result;
 
     if (mosq != NULL) {
@@ -915,10 +920,10 @@ void connect_mosquitto(void) {
 
 }
 
-void init_mosquitto(void) {
+void init_mosquitto(const char* host, int port) {
     mosquitto_lib_init();
 
-    connect_mosquitto();
+    connect_mosquitto(host, port);
 
     send_command_restart();
     handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
@@ -963,6 +968,8 @@ void print_help() {
     printf("-h\t\t\tshow this help\n");
     printf("-l\t\t\trun in local mode (do not check for ARP cache entries)\n");
     printf("-o\t\t\tlog to stdout instead of syslog\n");
+    printf("-m <address>\t\t\tHostname or IP address of the MQTT server\n");
+    printf("-p <port number>\t\t\tPort number of the MQTT server\n");
     printf("-v\t\t\tprint the version of spind and exit\n");
 }
 
@@ -971,9 +978,11 @@ int main(int argc, char** argv) {
     int c;
     int log_verbosity = 6;
     int use_syslog = 1;
+    mosq_host = "127.0.0.1";
+    mosq_port = 1883;
     stop_on_error = 0;
 
-    while ((c = getopt (argc, argv, "dehlov")) != -1) {
+    while ((c = getopt (argc, argv, "dehlm:op:v")) != -1) {
         switch (c) {
         case 'd':
             log_verbosity = 7;
@@ -989,9 +998,19 @@ int main(int argc, char** argv) {
             spin_log(LOG_INFO, "Running in local mode; traffic without either entry in arp cache will be shown too\n");
             local_mode = 1;
             break;
+        case 'm':
+            mosq_host = optarg;
+            break;
         case 'o':
             printf("Logging to stdout instead of syslog\n");
             use_syslog = 0;
+            break;
+        case 'p':
+            mosq_port = strtol(optarg, NULL, 10);
+            if (mosq_port <= 0 || mosq_port > 65535) {
+                fprintf(stderr, "Error, not a valid port number: %s\n", optarg);
+                exit(1);
+            }
             break;
         case 'v':
             print_version();
@@ -1006,7 +1025,7 @@ int main(int argc, char** argv) {
     log_version();
 
     init_cache();
-    init_mosquitto();
+    init_mosquitto(mosq_host, mosq_port);
     signal(SIGINT, int_handler);
 
     running = 1;
