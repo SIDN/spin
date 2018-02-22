@@ -167,8 +167,11 @@ void send_command_blocked(pkt_info_t* pkt_info) {
     p_size = pkt_info2json(node_cache, pkt_info, pkt_json);
     buffer_finish(pkt_json);
     response_size = create_mqtt_command(response_json, "blocked", NULL, buffer_str(pkt_json));
-    buffer_finish(response_json);
-    mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, buffer_str(response_json), 0, false);
+    if (buffer_finish(response_json)) {
+        mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, buffer_str(response_json), 0, false);
+    } else {
+        spin_log(LOG_WARNING, "Error converting blocked pkt_info to JSON; partial packet: %s\n", buffer_str(response_json));
+    }
     buffer_destroy(response_json);
     buffer_destroy(pkt_json);
 }
@@ -185,8 +188,11 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
         spin_log(LOG_DEBUG, "[XX] got an actual dns query command (size >0)\n");
         buffer_finish(pkt_json);
         response_size = create_mqtt_command(response_json, "dnsquery", NULL, buffer_str(pkt_json));
-        buffer_finish(response_json);
-        mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, buffer_str(response_json), 0, false);
+        if (buffer_finish(response_json)) {
+            mosquitto_publish(mosq, NULL, "SPIN/traffic", response_size, buffer_str(response_json), 0, false);
+        } else {
+            spin_log(LOG_WARNING, "Error converting dnsquery pkt_info to JSON; partial packet: %s\n", buffer_str(response_json));
+        }
     } else {
         spin_log(LOG_DEBUG, "[XX] did not get an actual dns query command (size 0)\n");
     }
