@@ -275,6 +275,22 @@ test_pkt_info_to_json() {
     node_cache_destroy(node_cache);
 }
 
+void
+test_node_cache_domains_case() {
+    node_t* node = node_create(1);
+    assert(tree_size(node->domains) == 0);
+    node_add_domain(node, "aaaaa.nl");
+    assert(tree_size(node->domains) == 1);
+    node_add_domain(node, "bbbbb.nl");
+    assert(tree_size(node->domains) == 2);
+    node_add_domain(node, "bbbbb.NL");
+    assert(tree_size(node->domains) == 2);
+    node_add_domain(node, "BBBBB.nl");
+    assert(tree_size(node->domains) == 2);
+    node_add_domain(node, "bBbBb.nl");
+    assert(tree_size(node->domains) == 2);
+}
+
 int
 main(int argc, char** argv) {
 
@@ -285,5 +301,6 @@ main(int argc, char** argv) {
     test_node_cache_add_3();
     test_node_to_json();
     test_pkt_info_to_json();
+    test_node_cache_domains_case();
     return 0;
 }

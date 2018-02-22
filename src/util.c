@@ -76,7 +76,7 @@ int cmp_domains(size_t size_a, const void* a, size_t size_b, const void* b) {
     } else if (size_a > size_b) {
         return 1;
     } else {
-        result = memcmp(a, b, size_a);
+        result = strncasecmp((const char*)a, (const char*)b, size_a);
         if (result > 0) {
             return 1;
         } else if (result < 0) {
@@ -85,29 +85,6 @@ int cmp_domains(size_t size_a, const void* a, size_t size_b, const void* b) {
             return result;
         }
     }
-/* original strcmp-like version
-    size_t s = size_a;
-    int result;
-
-
-    if (s > size_b) {
-        s = size_b;
-    }
-    result = memcmp(a, b, s);
-    if (result == 0) {
-        if (size_a > size_b) {
-            return -1;
-        } else if (size_a < size_b) {
-            return 1;
-        }
-    }
-    if (result > 0) {
-        return 1;
-    } else if (result < 0) {
-        return -1;
-    }
-    return 0;
-*/
 }
 
 int cmp_pktinfos(size_t size_a, const void* a, size_t size_b, const void* b) {
