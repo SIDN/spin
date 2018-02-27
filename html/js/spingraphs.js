@@ -947,8 +947,12 @@ function addBlocked(from, to) {
     if (contains(filterList, from) || contains(filterList, to)) {
         return;
     }
-    addNode(from["lastseen"], from, false, 1, 1, "to " + to, "source");
-    addNode(to["lastseen"], to, false, 1, 1, "from " + from, "blocked");
+
+    // from["lastseen"] is the existing lastseen value, so we update
+    // the from node with the lastseen value of packet too
+    var timestamp = to["lastseen"];
+    addNode(timestamp, from, false, 1, 1, "to " + to, "source");
+    addNode(timestamp, to, false, 1, 1, "from " + from, "blocked");
     addEdge(from, to, colour_blocked);
     if (!zoom_locked) {
         network.fit({
@@ -961,8 +965,12 @@ function addDNSQuery(from, dns) {
     if (contains(filterList, from) || contains(filterList, dns)) {
         return;
     }
-    addNode(from["lastseen"], from, false, 0, 0, "to " + dns, "source");
-    addNode(dns["lastseen"], dns, false, 0, 0, "dns " + from, "dnsquery");
+
+    // from["lastseen"] is the existing lastseen value, so we update
+    // the from node with the lastseen value of the dns request too
+    var timestamp = dns["lastseen"];
+    addNode(timestamp, from, false, 0, 0, "to " + dns, "source");
+    addNode(timestamp, dns, false, 0, 0, "dns " + from, "dnsquery");
     addEdge(from, dns, colour_dns);
     if (!zoom_locked) {
         network.fit({
