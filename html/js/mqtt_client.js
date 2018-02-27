@@ -54,13 +54,12 @@ function sendCommand(command, argument) {
 }
 
 function writeToScreen(element, message) {
-    console.log("find element " + element)
     var el = document.getElementById(element);
     el.innerHTML = message;
 }
 
 function onTrafficMessage(msg) {
-    //try {
+    try {
         var message = JSON.parse(msg)
         var command = message['command'];
         var argument = message['argument'];
@@ -121,14 +120,19 @@ function onTrafficMessage(msg) {
                 console.log("unknown command from server: " + msg);
                 break;
         }
-    //} catch (error) {
-    //    console.log(error + ": " + error);
-    //}
+    } catch (error) {
+        console.error("Error handling message: " + msg);
+        if (error.stack) {
+            console.error("Stacktrace: " + error.stack);
+        } else {
+            console.error("Error: " + error);
+        }
+    }
 }
 
 function onTrafficOpen(evt) {
     // Once a connection has been made, make a subscription and send a message..
-    console.log("onConnect");
+    console.log("Connected");
     client.subscribe("SPIN/traffic");
 
     sendCommand("get_filters", {})//, "")
@@ -142,14 +146,14 @@ function onTrafficOpen(evt) {
 function onTrafficClose(evt) {
     //show disconnected status somewhere
     $("#statustext").css("background-color", "#ffcccc").text("Not connected");
-    console.log('Websocket has disappeared');
-    console.log(evt.errorMessage)
+    console.error('Websocket has disappeared');
+    console.error(evt.errorMessage)
     active = false;
 }
 
 function onTrafficError(evt) {
     //show traffick errors on the console
-    console.log('WebSocket traffic error: ' + evt.data);
+    console.error('WebSocket traffic error: ' + evt.data);
 }
 
 function initTrafficDataView() {
@@ -219,7 +223,7 @@ function handleTrafficMessage(data) {
         if (from_node != null && to_node != null) {
             addFlow(timestamp + time_sync, from_node, to_node, f['count'], f['size']);
         } else {
-            console.log("partial message: " + JSON.stringify(data))
+            console.error("partial message: " + JSON.stringify(data))
         }
     }
 }
