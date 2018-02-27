@@ -744,7 +744,7 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
     var colour = colour_recent;
     var ips = node.ips ? node.ips : [];
     var domains = node.domains ? node.domains : [];
-    var blocked = type == "blocked";
+    var blocked = type == "blocked" || isBlocked(node);
     var dnsquery = type == "dnsquery";
 
     if (node.name) {
@@ -969,6 +969,19 @@ function addDNSQuery(from, dns) {
             duration: 0
         });
     }
+}
+
+/*
+ Function to check whether a specific node is blocked.
+ Requires the list 'ips' to be present
+ */
+function isBlocked(node) {
+    if ("ips" in node) {
+        for (var j = 0; j < node.ips.length; j++) {
+            return contains(blockList, node.ips[j]);
+        }
+    }
+    return false
 }
 
 function updateBlockedNodes() {
