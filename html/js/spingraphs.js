@@ -762,10 +762,13 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
         colour = colour_src;
     } else {
         if (blocked) {
+            // Node observes blocked traffic
             colour = colour_blocked;
-        } else if (dnsquery) {
+        } else if (dnsquery && !nodes.get(node.id)) {
+            // Node does not exist, dnsquery
             colour = colour_dns;
         } else {
+            // In all other cases
             colour = colour_recent;
         }
     }
@@ -833,6 +836,10 @@ function addEdge(from, to, colour) {
             color: colour
         });
         curEdgeId += 1;
+    } else if (existing[0].color != colour) {
+        // If color changed, update it!
+        existing[0].color = colour;
+        edges.update(existing[0]);
     }
 }
 
