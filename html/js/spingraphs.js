@@ -835,6 +835,10 @@ function addEdge(from, to, colour) {
             color: colour
         });
         curEdgeId += 1;
+    } else if (existing[0].color != colour) {
+        // If color changed, update it!
+        existing[0].color = colour;
+        edges.update(existing[0]);
     }
 }
 
