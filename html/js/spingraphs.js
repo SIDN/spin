@@ -761,10 +761,13 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
         colour = colour_src;
     } else {
         if (blocked) {
+            // Node observes blocked traffic
             colour = colour_blocked;
-        } else if (dnsquery) {
+        } else if (dnsquery && !nodes.get(node.id)) {
+            // Node does not exist, dnsquery
             colour = colour_dns;
         } else {
+            // In all other cases
             colour = colour_recent;
         }
     }
