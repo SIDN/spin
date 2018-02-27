@@ -744,7 +744,8 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
     var colour = colour_recent;
     var ips = node.ips ? node.ips : [];
     var domains = node.domains ? node.domains : [];
-    var blocked = type == "blocked" || isBlocked(node);
+    node.is_blocked = node.is_blocked || isBlocked(node);
+    var blocked = type == "blocked" || node.is_blocked;
     var dnsquery = type == "dnsquery";
 
     if (node.name) {
