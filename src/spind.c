@@ -312,14 +312,14 @@ int init_netlink()
                     if (type == SPIN_BLOCKED) {
                         //pktinfo2str(pkt_str, &pkt, 2048);
                         //printf("[BLOCKED] %s\n", pkt_str);
-                        node_cache_add_pkt_info(node_cache, &pkt, now, 1);
+                        node_cache_add_pkt_info(node_cache, &pkt, now);
                         send_command_blocked(&pkt);
                         check_send_ack();
                     } else if (type == SPIN_TRAFFIC_DATA) {
                         //pktinfo2str(pkt_str, &pkt, 2048);
                         //printf("[TRAFFIC] %s\n", pkt_str);
                         //print_pktinfo_wirehex(&pkt);
-                        node_cache_add_pkt_info(node_cache, &pkt, now, 1);
+                        node_cache_add_pkt_info(node_cache, &pkt, now);
 
                         // small experiment; check if either endpoint is an internal device, if not,
                         // skip reporting it
@@ -360,7 +360,7 @@ int init_netlink()
                         // store them internally, so later traffic can be
                         // matched to the DNS answer by IP address lookup
                         dns_cache_add(dns_cache, &dns_pkt, now);
-                        node_cache_add_dns_info(node_cache, &dns_pkt, now, 1);
+                        node_cache_add_dns_info(node_cache, &dns_pkt, now);
                         // TODO do we need to send nodeUpdate?
                         check_send_ack();
                     } else if (type == SPIN_DNS_QUERY) {
@@ -377,7 +377,7 @@ int init_netlink()
                         // XXXXX this would add wrong ip
                         // If the queried domain name isn't known, we add it as a new node
                         // (with only a domain name)
-                        node_cache_add_dns_query_info(node_cache, &dns_pkt, now, 1);
+                        node_cache_add_dns_query_info(node_cache, &dns_pkt, now);
                         //node_cache_add_pkt_info(node_cache, &dns_pkt, now, 1);
                         // We do send a separate notification for the clients that are interested
                         send_command_dnsquery(&dns_pkt);

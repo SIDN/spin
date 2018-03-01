@@ -61,28 +61,8 @@ node_t* node_clone(node_t* node) {
 }
 
 void
-node_add_ip(node_t* node, ip_t* ip, int check_status) {
+node_add_ip(node_t* node, ip_t* ip) {
     tree_add(node->ips, sizeof(ip_t), ip, 0, NULL, 1);
-    // check if this ip is blocked or excepted; if any IP in a node
-    // is blocked, set 'is_blocked'; if any IP is excepted, set is_except
-
-    // Todo; should we check more often? re-load regularly?
-    // definitely update locally when setting.
-    // this does not seem to be the most efficient way to do it;
-    // keep a list and somehow keep it updated perhaps?
-    if (check_status) {
-        netlink_command_result_t* cr;
-        cr = send_netlink_command_noarg(SPIN_CMD_GET_BLOCK);
-        if (netlink_command_result_contains_ip(cr, ip)) {
-            node->is_blocked = 1;
-        }
-        netlink_command_result_destroy(cr);
-        cr = send_netlink_command_noarg(SPIN_CMD_GET_EXCEPT);
-        if (netlink_command_result_contains_ip(cr, ip)) {
-            node->is_excepted = 1;
-        }
-        netlink_command_result_destroy(cr);
-    }
 }
 
 void
@@ -374,27 +354,27 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
 }
 
 void
-node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp, int check_status) {
+node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
     // todo: add an search-by-ip tree and don't do anything if we
     // have this one already? (do set mac if now known,
     // and update last_seen)
     node_t* node = node_create(0);
     node_set_last_seen(node, timestamp);
     add_mac_and_name(node_cache, node, ip);
-    node_add_ip(node, ip, check_status);
+    node_add_ip(node, ip);
     node_cache_add_node(node_cache, node);
 }
 
-void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp, int check_status) {
+void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp) {
     ip_t ip;
     ip.family = pkt_info->family;
     memcpy(ip.addr, pkt_info->src_addr, 16);
-    node_cache_add_ip_info(node_cache, &ip, timestamp, check_status);
+    node_cache_add_ip_info(node_cache, &ip, timestamp);
     memcpy(ip.addr, pkt_info->dest_addr, 16);
-    node_cache_add_ip_info(node_cache, &ip, timestamp, check_status);
+    node_cache_add_ip_info(node_cache, &ip, timestamp);
 }
 
-void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp, int check_status) {
+void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp) {
     // should first see if we have a node with this ip or domain already
     char dname_str[512];
     ip_t ip;
@@ -404,14 +384,13 @@ void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, 
 
     node_t* node = node_create(0);
     node_set_last_seen(node, timestamp);
-    node_add_ip(node, &ip, check_status);
+    node_add_ip(node, &ip);
     node_add_domain(node, dname_str);
     add_mac_and_name(node_cache, node, &ip);
     node_cache_add_node(node_cache, node);
 }
 
-void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp, int
-check_status) {
+void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp) {
     // first see if we have a node with this ip or domain already
     char dname_str[512];
     ip_t ip;
@@ -432,7 +411,7 @@ check_status) {
     if (node == NULL) {
         node = node_create(0);
         node_set_last_seen(node, timestamp);
-        node_add_ip(node, &ip, 0);
+        node_add_ip(node, &ip);
         node_cache_add_node(node_cache, node);
     }
 }

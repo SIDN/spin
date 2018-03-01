@@ -31,8 +31,7 @@ node_t* node_create(int id);
 void node_destroy(node_t* node);
 node_t* node_clone(node_t* node);
 
-// if check_status is true, ask the kernel module for blocked and except status
-void node_add_ip(node_t* node, ip_t* ip, int check_status);
+void node_add_ip(node_t* node, ip_t* ip);
 void node_add_domain(node_t* node, char* domain);
 void node_set_mac(node_t* node, char* mac);
 void node_set_name(node_t* node, char* name);
@@ -64,10 +63,10 @@ void node_cache_destroy(node_cache_t* node_cache);
 
 void node_cache_print(node_cache_t* node_cache);
 
-void node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp, int check_status);
-void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp, int check_status);
-void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp, int check_status);
-void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp, int check_status);
+void node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp);
+void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp);
+void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp);
+void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp);
 
 /**
  * this takes ownership of the given node pointer, do not use or free after!
