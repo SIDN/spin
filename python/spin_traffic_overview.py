@@ -176,7 +176,30 @@ def store_traffic(data):
 def on_message(client, userdata, msg):
     payload = msg.payload.decode("utf-8")
     #print(payload)
-    store_traffic(json.loads(payload))
+    try:
+        store_traffic(json.loads(payload))
+    except Exception as exc:
+        print("Error processing data: " + str(exc))
+        print("The message was:")
+        print(payload)
+        sys.exit(1)
+
+def print_flows(args, prev_time):
+	global stored_flows
+	stored_flows.sort(key=lambda e: e.size_in + e.size_out, reverse=True)
+	dt = datetime.datetime.now()
+	cur_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+	if not args.quiet:
+		if args.clear_screen:
+			sys.stdout.write("\033[2J\033[H")
+		print("Traffic summary %s - %s:" % (prev_time, cur_time))
+	for f in stored_flows:
+		if not args.quiet:
+			if args.show_csv:
+				print(f.to_csv())
+			else:
+				print(f.to_simplified())
+	
 
 def main(args):
     global stored_flows
@@ -190,9 +213,15 @@ def main(args):
 
     while True:
         counter = 0
+        show_counter = 0
         while counter < args.interval * 10:
             time.sleep(0.1)
             counter += 1
+            show_counter += 1
+            if (args.update_interval < args.interval):
+                if show_counter >= args.update_interval * 10:
+                    print_flows(args, prev_time)
+                    show_counter = 0
 
         if len(stored_flows) > 0:
             stored_flows.sort(key=lambda e: e.size_in + e.size_out, reverse=True)
@@ -227,6 +256,7 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--mqtt-host', help='Connect to MQTT at the given host', default="127.0.0.1")
     parser.add_argument('-p', '--mqtt-port', help='Connect to MQTT at the given port (defaults to 1883)', type=int, default=1883)
     parser.add_argument('-i', '--interval', help='Collect and show/store summaries per interval seconds (defaults to 60)', type=int, default=60)
+    parser.add_argument('-u', '--update-interval', help='Show intermediate summaries every X seconds (defaults to 60)', type=int, default=60)
     parser.add_argument('-q', '--quiet', help='Do not print output to stdout', action="store_true")
     parser.add_argument('-r', '--clear-screen', help='Clear the terminal screen between intervals', action="store_true")
     parser.add_argument('-c', '--show-csv', help='Show full CSV output instead of the simplified overview', action="store_true")
