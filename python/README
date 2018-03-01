@@ -1,0 +1,7 @@
+These are some 'external' tools; to show amongs other things that SPIN functionality does not have to run on the router.
+
+Requirements:
+- paho mqtt libraries (pip3 install paho-mqtt)
+
+spin_traffic_overview.py:
+    Shows, and stores, traffic totals in either csv or simplified format.
