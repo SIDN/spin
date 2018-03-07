@@ -46,6 +46,8 @@ node_t* node_clone(node_t* node) {
     if (node->name) {
         node_set_name(new, node->name);
     }
+    new->is_blocked = node->is_blocked;
+    new->is_excepted = node->is_excepted;
     new->last_seen = node->last_seen;
     cur = tree_first(node->ips);
     while (cur != NULL) {
