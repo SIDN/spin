@@ -210,6 +210,20 @@ test_node_cache_add_3() {
     assert(f_node->is_blocked == 1);
     assert(f_node->is_excepted == 1);
 
+
+    // check blocked and excepted statuses stay when merging a node that
+    // has them at zero
+    node_set_last_seen(node1, 54322);
+    node_set_blocked(node1, 0);
+    node_set_excepted(node1, 0);
+    node_cache_add_node(node_cache, node_clone(node1));
+
+    f_node = node_cache_find_by_ip(node_cache, 17, &ip);
+    assert(f_node != NULL);
+    assert(f_node->last_seen == 54322);
+    assert(f_node->is_blocked == 1);
+    assert(f_node->is_excepted == 1);
+
     node_destroy(node1);
     node_cache_destroy(node_cache);
 }
@@ -236,8 +250,6 @@ test_node_to_json() {
     buffer_finish(json_buf);
 
     str_cmp = strcmp(buffer_str(json_buf), expected_json);
-
-    printf("[XX] JSON:\n%s\n", buffer_str(json_buf));
 
     assertf(str_cmp == 0, "Wrong JSON data; got:\n%s\nexpected:\n%s\n", buffer_str(json_buf), expected_json);
 

@@ -153,8 +153,10 @@ node_merge(node_t* dest, node_t* src) {
     if (dest->last_seen < src->last_seen) {
         dest->last_seen = src->last_seen;
     }
-    node_set_blocked(dest, src->is_blocked);
-    node_set_excepted(dest, src->is_excepted);
+    // When merging nodes, set blocked and excepted to 1 if either
+    // of them were not 0
+    node_set_blocked(dest, src->is_blocked | dest->is_blocked);
+    node_set_excepted(dest, src->is_excepted | dest->is_excepted);
     cur = tree_first(src->ips);
     while (cur != NULL) {
         tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);

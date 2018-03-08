@@ -40,6 +40,15 @@ void node_set_excepted(node_t* node, uint8_t excepted);
 void node_set_last_seen(node_t* node, uint32_t lastg_seen);
 
 int node_shares_element(node_t* node, node_t* othernode);
+/*
+ * Merge two nodes;
+ * Add all IP addresses and domain names that are in src to dest
+ * Set the last_seen value to the highest of the two
+ * If either of them have non-zero is_blocked or is_excepted, copy that
+ * value
+ * If name of dest is not set, set it to name of src
+ * If mac of dest is not set, set it to mac of src
+ */
 void node_merge(node_t* dest, node_t* src);
 
 void node_print(node_t* node);
