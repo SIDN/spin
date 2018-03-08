@@ -196,13 +196,19 @@ test_node_cache_add_3() {
     f_node = node_cache_find_by_ip(node_cache, 17, &ip);
     assert(f_node != NULL);
     assert(f_node->last_seen == 12345);
+    assert(f_node->is_blocked == 0);
+    assert(f_node->is_excepted == 0);
 
     node_set_last_seen(node1, 54321);
+    node_set_blocked(node1, 1);
+    node_set_excepted(node1, 1);
     node_cache_add_node(node_cache, node_clone(node1));
 
     f_node = node_cache_find_by_ip(node_cache, 17, &ip);
     assert(f_node != NULL);
     assert(f_node->last_seen == 54321);
+    assert(f_node->is_blocked == 1);
+    assert(f_node->is_excepted == 1);
 
     node_destroy(node1);
     node_cache_destroy(node_cache);

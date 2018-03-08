@@ -95,6 +95,16 @@ node_set_name(node_t* node, char* name) {
 }
 
 void
+node_set_blocked(node_t* node, uint8_t blocked) {
+    node->is_blocked = blocked;
+}
+
+void
+node_set_excepted(node_t* node, uint8_t excepted) {
+    node->is_excepted = excepted;
+}
+
+void
 node_set_last_seen(node_t* node, uint32_t last_seen) {
     node->last_seen = last_seen;
 }
@@ -143,6 +153,8 @@ node_merge(node_t* dest, node_t* src) {
     if (dest->last_seen < src->last_seen) {
         dest->last_seen = src->last_seen;
     }
+    node_set_blocked(dest, src->is_blocked);
+    node_set_excepted(dest, src->is_excepted);
     cur = tree_first(src->ips);
     while (cur != NULL) {
         tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);

@@ -35,6 +35,8 @@ void node_add_ip(node_t* node, ip_t* ip);
 void node_add_domain(node_t* node, char* domain);
 void node_set_mac(node_t* node, char* mac);
 void node_set_name(node_t* node, char* name);
+void node_set_blocked(node_t* node, uint8_t blocked);
+void node_set_excepted(node_t* node, uint8_t excepted);
 void node_set_last_seen(node_t* node, uint32_t lastg_seen);
 
 int node_shares_element(node_t* node, node_t* othernode);
