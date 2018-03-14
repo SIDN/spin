@@ -1,0 +1,46 @@
+{
+     "ietf-mud:mud": {
+       "mud-url":
+     "https://dns.example/.well-known/mud/v1/dns_device",
+       "last-update": "2017-10-07T12:16:24+02:00",
+       "cache-validity": 48,
+       "is-supported": true,
+       "systeminfo":
+     "https://dns.example/documentation/dnsdevice",
+       "from-device-policy": {
+         "access-lists": {
+           "access-list": [
+             {
+               "acl-name": "dns_only",
+               "acl-type": "ietf-access-control-list:ipv6-acl"
+             }
+           ]
+         }
+       }
+     },
+     "ietf-access-control-list:access-lists": {
+       "acl": [
+         {
+           "acl-name": "dns_only",
+           "acl-type": "ipv6-acl",
+           "access-list-entries": {
+             "ace": [
+               {
+                 "rule-name": "dns_queries",
+                 "matches": {
+                   "ipv6-acl": {
+                     "destination-port-range": {
+                       "lower-port": 53
+                     }
+                   }
+                 },
+                 "actions": {
+                   "forwarding": "accept"
+                 }
+               }
+             ]
+           }
+         }
+       ]
+     }
+}
