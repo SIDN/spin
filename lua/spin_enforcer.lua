@@ -4,8 +4,9 @@ local mqtt = require 'mosquitto'
 local json = require 'json'
 
 local TRAFFIC_CHANNEL = "SPIN/traffic"
+local INCIDENT_CHANNEL = "SPIN/incidents"
 
-local HISTORY_SIZE = 300
+local HISTORY_SIZE = 600
 local PRINT_INTERVAL = 10
 
 local verbose = true
@@ -21,6 +22,7 @@ local client = mqtt.new()
 client.ON_CONNECT = function()
     vprint("Connected to MQTT broker")
     client:subscribe(TRAFFIC_CHANNEL)
+    client:subscribe(INCIDENT_CHANNEL)
     vprint("Subscribed to " .. TRAFFIC_CHANNEL)
 end
 
@@ -153,7 +155,6 @@ function history_stats()
 
     end
 
-
     return nodes
 end
 
@@ -237,10 +238,65 @@ function handle_traffic_message(payload)
     history_clean()
 end
 
+function handle_incident_report(incident)
+    print("[XX] GOT INCIDENT REPORT OHNOES")
+    print("[XX] incident reported:")
+    print(json.encode(incident))
+    local timestamp = incident["timestamp"]
+    local dst_addr = incident["dst_addr"]
+    local dst_port = incident["dst_port"]
+    local hist_entry = history[timestamp]
+    if hist_entry == nil then
+        print("Incident not found in history")
+    else
+        -- we are looking for dst_addr:dst_port
+        -- it can both be the from_port
+        for _,flow in pairs(hist_entry) do
+            for _,ip in pairs(flow["to"]["ips"]) do
+                --print("[XX] to: " .. ip .. ":" .. flow["to_port"])
+                if ip == dst_addr and flow["to_port"] == dst_port then
+                    print("[XX] Incident found in history! It was:")
+                    print(json.encode(flow["from"]))
+                    if flow["from"]["mac"] ~= nil then
+                        print("[XX] Blocking all traffic from and to addresses: ")
+                        for _,v in pairs(flow["from"]["ips"]) do
+                            print("[XX] " ..v)
+                        end
+                    else
+                        print("Reported incident does not appear to concern a local device")
+                    end
+                    return
+                end
+            end
+            for _,ip in pairs(flow["from"]["ips"]) do
+                --print("[XX] from ip: " .. ip .. ":" .. flow["from_port"])
+                if ip == dst_addr and flow["from_port"] == dst_port then
+                    print("[XX] Incident found in history! It was:")
+                    print(json.encode(flow["to"]))
+                    if flow["to"]["mac"] ~= nil then
+                        print("[XX] Blocking all traffic from and to addresses: ")
+                        for _,v in pairs(flow["to"]["ips"]) do
+                            print("[XX] " ..v)
+                        end
+                    else
+                        print("Reported incident does not appear to concern a local device")
+                    end
+                    return
+                end
+            end
+        end
+        print("[XX] incident not found.")
+    end
+end
+
 client.ON_MESSAGE = function(mid, topic, payload)
     local pd = json.decode(payload)
-    if pd["command"] and pd["command"] == "traffic" then
-        handle_traffic_message(pd["result"])
+    if topic == TRAFFIC_CHANNEL then
+        if pd["command"] and pd["command"] == "traffic" then
+            handle_traffic_message(pd["result"])
+        end
+    elseif topic == INCIDENT_CHANNEL then
+        handle_incident_report(pd["incident"])
     end
 end
 
@@ -256,7 +312,7 @@ while true do
     if (cur > last_print + PRINT_INTERVAL) then
         --history_print()
         --history_stats_full()
-        history_stats()
+        --history_stats()
         last_print = cur
     end
 

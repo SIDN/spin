@@ -595,7 +595,7 @@ function updateNodeInfo(nodeId) {
     writeToScreen("trafficcount", "Connections seen: " + node.count);
     writeToScreen("trafficsize", "Traffic size: " + node.size);
     writeToScreen("ipaddress", "");
-    writeToScreen("lastseen", "Last seen: " + new Date(node.lastseen * 1000));
+    writeToScreen("lastseen", "Last seen: " + node.lastseen + " (" + new Date(node.lastseen * 1000) + ")");
     // TODO: mark that this is hw not ip
 
     return node;
