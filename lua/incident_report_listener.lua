@@ -2,11 +2,11 @@
 
 local mqtt = require 'mosquitto'
 local json = require 'json'
+local http = require'socket.http'
 
-local TRAFFIC_CHANNEL = "SPIN/traffic"
 local INCIDENT_CHANNEL = "SPIN/incidents"
 
-local SERVER_HOST = "http://localhost:8000/incidents/api/"
+local DEFAULT_SERVER_URI = "http://spin.tjeb.nl/incidents/api/"
 
 -- hey this could fetch it too!
 -- do we have http request built in?
@@ -24,11 +24,16 @@ function help(error)
     end
     print("Usage: incident_report_tool.lua [options] timestamp dst_addr dst_port [src_addr] [src_port]")
     print("")
-    print("Network-local tool to report malicious traffic incidents, so that SPIN can act upon it")
+    print("Listens to incident report notifications, fetches the incident data upon notification, and sends it to SPIN")
     print("")
     print("Options:")
+    print("-s <URI> server URI to fetch reports from (will query")
+    print("         '<URI><timestamp from notification>'). Defaults to")
+    print("         " .. DEFAULT_SERVER_URI)
+    print("-l <ip address> address to listen on (defaults to *)")
+    print("-p <port> port to listen on (defaults to 40421)")
     print("-m <host> mqtt host (defaults to 127.0.0.1)")
-    print("-p <port> mqtt port (defaults to 1883)")
+    print("-n <port> mqtt port (defaults to 1883)")
     os.exit()
 end
 
@@ -39,76 +44,43 @@ function parse_args(args)
     local mqtt_host = "127.0.0.1"
     local mqtt_port = 1883
     local argcount = 0
-    local src_addr = "1.2.3.4"
-    local src_port = "12345"
+    local listen_host = "*"
+    local listen_port = 40421
+    local server_uri = DEFAULT_SERVER_URI
     skip = false
     for i = 1,table.getn(args) do
         if skip then
             skip = false
         elseif arg[i] == "-h" then
             help()
+        elseif arg[i] == "-s" then
+            server_uri = arg[i+1]
+            if server_uri == nil then help("missing argument for -m") end
+            skip = true
         elseif arg[i] == "-m" then
             mqtt_host = arg[i+1]
             if mqtt_host == nil then help("missing argument for -m") end
             skip = true
-        elseif arg[i] == "-p" then
-            mqtt_port = arg[i+1]
-            if mqtt_host == nil then help("missing argument for -p") end
+        elseif arg[i] == "-n" then
+            mqtt_port = tonumber(arg[i+1])
+            if mqtt_host == nil then help("missing argument for -n") end
             skip = true
-        elseif argcount == 0 then
-            timestamp = tonumber(arg[i])
-            if timestamp == nil then help("Timestamp must be an integer: " .. arg[i]) end
-            argcount = argcount + 1
-        elseif argcount == 1 then
-            dst_addr = arg[i]
-            argcount = argcount + 1
-        elseif argcount == 2 then
-            dst_port = tonumber(arg[i])
-            if dst_port == nil then help("dst_port must be an integer") end
-            argcount = argcount + 1
-        elseif argcount == 3 then
-            src_addr = arg[i]
-            argcount = argcount + 1
-        elseif argcount == 4 then
-            src_port = tonumber(arg[i])
-            if src_port == nil then help("src_port must be an integer") end
-            argcount = argcount + 1
+        elseif arg[i] == "-l" then
+            listen_host = arg[i+1]
+            if listen_host == nil then help("missing argument for -l") end
+            skip = true
+        elseif arg[i] == "-p" then
+            listen_port = tonumber(arg[i+1])
+            if listen_port == nil then help("missing argument for -p") end
+            skip = true
         else
             help("Too many arguments at " .. table.getn(args))
         end
     end
-    if argcount < 3 then
-        help("Missing arguments")
-    end
-    return mqtt_host, mqtt_port, timestamp, src_addr, src_port, dst_addr, dst_port
+    return server_uri, listen_host, listen_port, mqtt_host, mqtt_port
 end
 
-function old()
-    local mqtt_host, mqtt_port, timestamp, src_addr, src_port, dst_addr, dst_port = parse_args(arg)
-
-    local incident_msg_table = {}
-    incident_msg_table["timestamp"] = timestamp
-    incident_msg_table["src_addr"] = src_addr
-    incident_msg_table["src_port"] = src_port
-    incident_msg_table["dst_addr"] = src_addr
-    incident_msg_table["dst_port"] = src_port
-    -- this messes up the order, is that a problem? do we want to hand-build?
-    local incident_msg_json =
-    '{ "incident": { ' ..
-        '"timestamp": ' .. timestamp .. ',' ..
-        '"src_addr": "' .. src_addr .. '",' ..
-        '"src_port": ' .. src_port .. ',' ..
-        '"dst_addr": "' .. dst_addr .. '",' ..
-        '"dst_port": ' .. dst_port .. ',' ..
-        '"severity": ' .. 5 .. ',' ..
-        '"type": ' .. '"ddos"' .. ',' ..
-        '"name": ' .. '"malware.evil.prototype"' ..
-    '} }'
-end
-
-function report_incident(incident_msg_json)
-
-
+function report_incident(incident_msg_json, mqtt_host, mqtt_port)
     local client = mqtt.new()
 
     client.ON_CONNECT = function()
@@ -119,19 +91,22 @@ function report_incident(incident_msg_json)
         client:disconnect()
     end
 
-    --client:connect(mqtt_host, mqtt_port)
-    client:connect("192.168.1.1", 1883)
+    client:connect(mqtt_host, mqtt_port)
 
     client:loop_forever()
 end
 
+-- cli options:
+-- mqtt_host, mqtt_port, listen_host, listen_port
+local server_uri, listen_host, listen_port, mqtt_host, mqtt_port = parse_args(arg)
+
 local socket = require("socket")
-local server = assert(socket.bind("*", 40421))
+local server = assert(socket.bind(listen_host, listen_port))
 local tcp = assert(socket.tcp())
 
 print(socket._VERSION)
 print(tcp)
-print("listening")
+print("Listening on " .. listen_host .. ":" .. listen_port)
 while 1 do
 
     local client = server:accept()
@@ -139,12 +114,11 @@ while 1 do
     line = client:receive()
     local incident_timestamp = tonumber(line)
     print("Got incident report ping for timestamp " .. incident_timestamp)
-    local http=require'socket.http'
     body,c,l,h = http.request(SERVER_HOST .. incident_timestamp)
     print('status line',l)
     print('body',body)
     incident_msg_json = body
-    report_incident(incident_msg_json)
+    report_incident(incident_msg_json, mqtt_host, mqtt_port)
     client:close()
 
 end
