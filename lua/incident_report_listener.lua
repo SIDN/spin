@@ -3,10 +3,11 @@
 local mqtt = require 'mosquitto'
 local json = require 'json'
 local http = require'socket.http'
+local https = require'ssl.https'
 
 local INCIDENT_CHANNEL = "SPIN/incidents"
 
-local DEFAULT_SERVER_URI = "http://spin.tjeb.nl/incidents/api/"
+local DEFAULT_SERVER_URI = "https://spin.tjeb.nl/incidents/api/"
 
 -- hey this could fetch it too!
 -- do we have http request built in?
@@ -96,6 +97,25 @@ function report_incident(incident_msg_json, mqtt_host, mqtt_port)
     client:loop_forever()
 end
 
+function fetch_incident_data(uri)
+    if uri:sub(0,8) == "https://" then
+        body,c,l,h = https.request(uri)
+    else
+        body,c,l,h = http.request(uri)
+    end
+    print("Fetching incident information from " .. uri)
+    print("Status response: " .. h)
+    --for h,v in pairs(l) do
+    --    print(h .. ": " .. v)
+    --end
+    -- very basic status code parsing
+    if (c >= 200 and c < 300) then
+        return body
+    elseif (c >= 301 and c < 400) then
+        return fetch_incident_data(l['location'])
+    end
+end
+
 -- cli options:
 -- mqtt_host, mqtt_port, listen_host, listen_port
 local server_uri, listen_host, listen_port, mqtt_host, mqtt_port = parse_args(arg)
@@ -114,11 +134,12 @@ while 1 do
     line = client:receive()
     local incident_timestamp = tonumber(line)
     print("Got incident report ping for timestamp " .. incident_timestamp)
-    body,c,l,h = http.request(SERVER_HOST .. incident_timestamp)
-    print('status line',l)
-    print('body',body)
-    incident_msg_json = body
-    report_incident(incident_msg_json, mqtt_host, mqtt_port)
+    local incident_msg_json = fetch_incident_data(server_uri .. incident_timestamp)
+    if incident_msg_json == nil then
+        print("Error fetching incident data, notification not accepted")
+    else
+        report_incident(incident_msg_json, mqtt_host, mqtt_port)
+    end
     client:close()
 
 end

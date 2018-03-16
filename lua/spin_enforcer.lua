@@ -296,7 +296,11 @@ client.ON_MESSAGE = function(mid, topic, payload)
             handle_traffic_message(pd["result"])
         end
     elseif topic == INCIDENT_CHANNEL then
-        handle_incident_report(pd["incident"])
+        if pd["incident"] == nil then
+            print("[XX] Error: no incident data found in " .. payload)
+        else
+            handle_incident_report(pd["incident"])
+        end
     end
 end
 
