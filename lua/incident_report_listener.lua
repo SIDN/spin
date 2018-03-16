@@ -133,12 +133,16 @@ while 1 do
 
     line = client:receive()
     local incident_timestamp = tonumber(line)
-    print("Got incident report ping for timestamp " .. incident_timestamp)
-    local incident_msg_json = fetch_incident_data(server_uri .. incident_timestamp)
-    if incident_msg_json == nil then
-        print("Error fetching incident data, notification not accepted")
+    if incident_timestamp ~= nil then
+        print("Got incident report ping for timestamp " .. incident_timestamp)
+        local incident_msg_json = fetch_incident_data(server_uri .. incident_timestamp)
+        if incident_msg_json == nil then
+            print("Error fetching incident data, notification not accepted")
+        else
+            report_incident(incident_msg_json, mqtt_host, mqtt_port)
+        end
     else
-        report_incident(incident_msg_json, mqtt_host, mqtt_port)
+        print("Bad message from client, ignoring notification")
     end
     client:close()
 
