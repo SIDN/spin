@@ -316,7 +316,7 @@ while true do
     if (cur > last_print + PRINT_INTERVAL) then
         --history_print()
         --history_stats_full()
-        --history_stats()
+        history_stats()
         last_print = cur
     end
 
