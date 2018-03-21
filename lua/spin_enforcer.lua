@@ -242,12 +242,15 @@ function handle_incident_report(incident)
     print("[XX] GOT INCIDENT REPORT OHNOES")
     print("[XX] incident reported:")
     print(json.encode(incident))
-    local timestamp = incident["timestamp"]
+    local timestamp = incident["incident_timestamp"]
     local dst_addr = incident["dst_addr"]
     local dst_port = incident["dst_port"]
     local hist_entry = history[timestamp]
     if hist_entry == nil then
-        print("Incident not found in history")
+        print("Incident not found in history; have timestamps for: ")
+        for t,_ in pairs(history) do
+            print(t)
+        end
     else
         -- we are looking for dst_addr:dst_port
         -- it can both be the from_port
