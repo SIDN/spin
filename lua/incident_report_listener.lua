@@ -118,12 +118,16 @@ function report_incident(incident_msg_json, mqtt_host, mqtt_port)
 end
 
 function report_incidents(incident_msg_json, mqtt_host, mqtt_port, last_report_timestamp)
-    local incidents = json.decode(incident_msg_json)
+    local incidents_all = json.decode(incident_msg_json)
+    local incidents = incidents_all["incidents"]
+    if incidents == nil then return end
     local last_timestamp = last_report_timestamp
 
     for _,i in pairs(incidents) do
-		print(json.encode(i))
-        if report_incident(json.encode(i), mqtt_host, mqtt_port) then
+		local single_incident = {}
+		single_incident["incident"] = i
+		print(json.encode(single_incident))
+        if report_incident(json.encode(single_incident), mqtt_host, mqtt_port) then
 			local timestamp = i["report_timestamp"]
 			if timestamp > last_timestamp then
 				last_timestamp = timestamp
