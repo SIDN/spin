@@ -2,8 +2,9 @@
 
 local mqtt = require 'mosquitto'
 local json = require 'json'
-local http = require'socket.http'
-local https = require'ssl.https'
+local http = require 'socket.http'
+local https = require 'ssl.https'
+local posix = require 'posix'
 
 local INCIDENT_CHANNEL = "SPIN/incidents"
 
@@ -35,6 +36,7 @@ function help(error)
     print("-p <port> port to listen on (defaults to 40421)")
     print("-m <host> mqtt host (defaults to 127.0.0.1)")
     print("-n <port> mqtt port (defaults to 1883)")
+    print("-i <interval> Instead of listening for notifications, fetch them every <interval> seconds")
     os.exit()
 end
 
@@ -42,12 +44,14 @@ end
 -- mqtt_host, mqtt_port, timestamp, src_addr, src_port, dest_addr, dest_port
 -- or none on error
 function parse_args(args)
+    local listen = true
     local mqtt_host = "127.0.0.1"
     local mqtt_port = 1883
     local argcount = 0
     local listen_host = "*"
     local listen_port = 40421
     local server_uri = DEFAULT_SERVER_URI
+    local poll_interval = 0
     skip = false
     for i = 1,table.getn(args) do
         if skip then
@@ -74,11 +78,17 @@ function parse_args(args)
             listen_port = tonumber(arg[i+1])
             if listen_port == nil then help("missing argument for -p") end
             skip = true
+        elseif args[i] == "-i" then
+            poll_interval = tonumber(arg[i+1])
+            if poll_interval == nil then help("missing argument for -i") end
+            if poll_interval <= 0 then help("poll interval must be > 0") end
+            if (listen_host ~= "*" or listen_port ~= 40421) then help("Cannot run in listen and poll mode simultaneously") end
+            skip = true
         else
             help("Too many arguments at " .. table.getn(args))
         end
     end
-    return server_uri, listen_host, listen_port, mqtt_host, mqtt_port
+    return server_uri, listen_host, listen_port, mqtt_host, mqtt_port, poll_interval
 end
 
 function report_incident(incident_msg_json, mqtt_host, mqtt_port)
@@ -95,6 +105,13 @@ function report_incident(incident_msg_json, mqtt_host, mqtt_port)
     client:connect(mqtt_host, mqtt_port)
 
     client:loop_forever()
+end
+
+function report_incidents(incident_msg_json, mqtt_host, mqtt_port)
+    incidents = json.decode(incident_msg_json)
+    for _,i in pairs(incidents) do
+        report_incident(json.encode(i, mqtt_host, mqtt_port))
+    end
 end
 
 function fetch_incident_data(uri)
@@ -116,34 +133,62 @@ function fetch_incident_data(uri)
     end
 end
 
--- cli options:
--- mqtt_host, mqtt_port, listen_host, listen_port
-local server_uri, listen_host, listen_port, mqtt_host, mqtt_port = parse_args(arg)
-
-local socket = require("socket")
-local server = assert(socket.bind(listen_host, listen_port))
-local tcp = assert(socket.tcp())
-
-print(socket._VERSION)
-print(tcp)
-print("Listening on " .. listen_host .. ":" .. listen_port)
-while 1 do
-
-    local client = server:accept()
-
-    line = client:receive()
-    local incident_timestamp = tonumber(line)
-    if incident_timestamp ~= nil then
-        print("Got incident report ping for timestamp " .. incident_timestamp)
-        local incident_msg_json = fetch_incident_data(server_uri .. incident_timestamp)
-        if incident_msg_json == nil then
+function poller(server_uri, interval, mqtt_host, mqtt_port)
+    local prev_time = os.time()
+    while true do
+        posix.sleep(3)
+        local cur_time = os.time()
+        local url = server_uri .. "between/" .. prev_time .. "/" .. cur_time
+        print(url)
+        local incidents_json = fetch_incident_data(url)
+        if incidents_json == nil then
             print("Error fetching incident data, notification not accepted")
         else
-            report_incident(incident_msg_json, mqtt_host, mqtt_port)
+            print("should report incidents now, json:")
+            print(incidents_json)
+            report_incidents(incidents_json, mqtt_host, mqtt_port)
         end
-    else
-        print("Bad message from client, ignoring notification")
+        prev_time = cur_time
     end
-    client:close()
+end
 
+function listener(server_uri, listen_host, listen_port, mqtt_host, mqtt_port)
+    local socket = require("socket")
+    local server = assert(socket.bind(listen_host, listen_port))
+    local tcp = assert(socket.tcp())
+
+    print(socket._VERSION)
+    print(tcp)
+    print("Listening on " .. listen_host .. ":" .. listen_port)
+    while 1 do
+
+        local client = server:accept()
+
+        line = client:receive()
+        local incident_timestamp = tonumber(line)
+        if incident_timestamp ~= nil then
+            print("Got incident report ping for timestamp " .. incident_timestamp)
+            local incidents_json = fetch_incident_data(server_uri .. "incident/" .. incident_timestamp)
+            if incident_msg_json == nil then
+                print("Error fetching incident data, notification not accepted")
+            else
+                report_incidents(incidents_json, mqtt_host, mqtt_port)
+            end
+        else
+            print("Bad message from client, ignoring notification")
+        end
+        client:close()
+
+    end
+end
+
+-- cli options:
+-- mqtt_host, mqtt_port, listen_host, listen_port
+local server_uri, listen_host, listen_port, mqtt_host, mqtt_port, poll_interval = parse_args(arg)
+
+if (poll_interval > 0) then
+    print("[XX] polling mode")
+    poller(server_uri, interval, mqtt_host, mqtt_port)
+else
+    listener(server_uri, listen_host, listen_port, mqtt_host, mqtt_port)
 end
