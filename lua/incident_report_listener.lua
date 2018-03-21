@@ -98,30 +98,52 @@ function report_incident(incident_msg_json, mqtt_host, mqtt_port)
         client:publish(INCIDENT_CHANNEL, incident_msg_json)
     end
 
+    client.ON_DISCONNECT = function()
+    end
+
     client.ON_PUBLISH = function()
         client:disconnect()
     end
 
-    client:connect(mqtt_host, mqtt_port)
+    if mqtt_port == nil then mqtt_port = 1883 end
 
-    client:loop_forever()
+    client:connect(mqtt_host, mqtt_port)
+    if (client:socket()) then
+		client:loop_forever()
+		return true
+	else
+		print("Error: unable to connect to mqtt server")
+		return false
+	end
 end
 
-function report_incidents(incident_msg_json, mqtt_host, mqtt_port)
-    incidents = json.decode(incident_msg_json)
+function report_incidents(incident_msg_json, mqtt_host, mqtt_port, last_report_timestamp)
+    local incidents = json.decode(incident_msg_json)
+    local last_timestamp = last_report_timestamp
+
     for _,i in pairs(incidents) do
-        report_incident(json.encode(i, mqtt_host, mqtt_port))
+		print(json.encode(i))
+        if report_incident(json.encode(i), mqtt_host, mqtt_port) then
+			local timestamp = i["report_timestamp"]
+			if timestamp > last_timestamp then
+				last_timestamp = timestamp
+			end
+		end
     end
+    return last_timestamp
 end
 
 function fetch_incident_data(uri)
+    print(http.request(uri))
     if uri:sub(0,8) == "https://" then
         body,c,l,h = https.request(uri)
     else
         body,c,l,h = http.request(uri)
     end
     print("Fetching incident information from " .. uri)
-    print("Status response: " .. h)
+    if h ~= nil then
+		print("Status response: " .. h)
+	end
     --for h,v in pairs(l) do
     --    print(h .. ": " .. v)
     --end
@@ -133,22 +155,24 @@ function fetch_incident_data(uri)
     end
 end
 
-function poller(server_uri, interval, mqtt_host, mqtt_port)
-    local prev_time = os.time()
+function poller(server_uri, poll_interval, mqtt_host, mqtt_port)
+    local prev_time = 0
     while true do
-        posix.sleep(3)
+        posix.sleep(poll_interval)
+        -- heeey i don't think we even need cur_time; make api '/reported_since/<timestamp>'
         local cur_time = os.time()
         local url = server_uri .. "between/" .. prev_time .. "/" .. cur_time
-        print(url)
+        --print(url)
         local incidents_json = fetch_incident_data(url)
         if incidents_json == nil then
             print("Error fetching incident data, notification not accepted")
         else
             print("should report incidents now, json:")
             print(incidents_json)
-            report_incidents(incidents_json, mqtt_host, mqtt_port)
+            -- report the incident(s) and set 'prev_time' to
+            -- latest incident that was successfully reported
+            prev_time = report_incidents(incidents_json, mqtt_host, mqtt_port, prev_time)
         end
-        prev_time = cur_time
     end
 end
 
@@ -187,8 +211,7 @@ end
 local server_uri, listen_host, listen_port, mqtt_host, mqtt_port, poll_interval = parse_args(arg)
 
 if (poll_interval > 0) then
-    print("[XX] polling mode")
-    poller(server_uri, interval, mqtt_host, mqtt_port)
+    poller(server_uri, poll_interval, mqtt_host, mqtt_port)
 else
     listener(server_uri, listen_host, listen_port, mqtt_host, mqtt_port)
 end
