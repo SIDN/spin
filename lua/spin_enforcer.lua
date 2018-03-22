@@ -75,6 +75,12 @@ function get_keys_sorted_by_value(tbl, sort_function)
     return keys
 end
 
+function block_ip(ip)
+	local cmd = "spin_config block add " .. ip
+	print(cmd)
+	os.execute(cmd)
+end
+
 function block_node(node)
     for _,v in pairs(node["ips"]) do
         local cmd = "spin_config block add " .. v
@@ -238,19 +244,20 @@ function handle_traffic_message(payload)
     history_clean()
 end
 
-function handle_incident_report(incident)
-    print("[XX] GOT INCIDENT REPORT OHNOES")
+function handle_incident_report(incident, timestamp)
+    print("[XX] Incident report receiver, timestamp: " .. timestamp)
     print("[XX] incident reported:")
     print(json.encode(incident))
-    local timestamp = incident["incident_timestamp"]
+    --local timestamp = incident["incident_timestamp"]
     local dst_addr = incident["dst_addr"]
     local dst_port = incident["dst_port"]
     local hist_entry = history[timestamp]
     if hist_entry == nil then
-        print("Incident not found in history; have timestamps for: ")
-        for t,_ in pairs(history) do
-            print(t)
-        end
+        print("[XX] Incident not found in history")
+        --print("Incident not found in history; have timestamps for: ")
+        --for t,_ in pairs(history) do
+        --    print(t)
+        --end
     else
         -- we are looking for dst_addr:dst_port
         -- it can both be the from_port
@@ -264,11 +271,13 @@ function handle_incident_report(incident)
                         print("[XX] Blocking all traffic from and to addresses: ")
                         for _,v in pairs(flow["from"]["ips"]) do
                             print("[XX] " ..v)
+                            block_ip(v)
                         end
+                        return true
                     else
                         print("Reported incident does not appear to concern a local device")
                     end
-                    return
+                    return false
                 end
             end
             for _,ip in pairs(flow["from"]["ips"]) do
@@ -279,17 +288,20 @@ function handle_incident_report(incident)
                     if flow["to"]["mac"] ~= nil then
                         print("[XX] Blocking all traffic from and to addresses: ")
                         for _,v in pairs(flow["to"]["ips"]) do
-                            print("[XX] " ..v)
+                            print("[XX] " .. v)
+                            block_ip(v)
                         end
+                        return true
                     else
                         print("Reported incident does not appear to concern a local device")
                     end
-                    return
+                    return false
                 end
             end
         end
         print("[XX] incident not found.")
     end
+    return false
 end
 
 client.ON_MESSAGE = function(mid, topic, payload)
@@ -302,7 +314,11 @@ client.ON_MESSAGE = function(mid, topic, payload)
         if pd["incident"] == nil then
             print("[XX] Error: no incident data found in " .. payload)
         else
-            handle_incident_report(pd["incident"])
+			local incident = pd["incident"]
+			local ts = incident["incident_timestamp"]
+			for i=ts-5,ts+5 do
+				if handle_incident_report(incident, i) then break end
+			end
         end
     end
 end
@@ -319,7 +335,7 @@ while true do
     if (cur > last_print + PRINT_INTERVAL) then
         --history_print()
         --history_stats_full()
-        history_stats()
+        --history_stats()
         last_print = cur
     end
 
