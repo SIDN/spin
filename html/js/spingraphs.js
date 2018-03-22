@@ -1060,9 +1060,16 @@ function cleanNetwork() {
         var node = nodes.get(ids[i]);
         if (node.lastseen < delete_before) {
             deleteNode(node, true);
-        } else if (node.lastseen < unhighlight_before && node["color"] == colour_recent) {
-            node["color"] = colour_dst;
-            nodes.update(node);
+        } else if (node.lastseen < unhighlight_before) {
+            if (node["color"] == colour_recent) {
+                node["color"] = colour_dst;
+                nodes.update(node);
+            } else if (node["color"]["background"] == colour_recent) {
+                node["color"]["background"] = colour_dst;
+                nodes.update(node);
+            }
         }
+
+
     }
 }
