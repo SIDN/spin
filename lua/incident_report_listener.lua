@@ -68,7 +68,7 @@ function parse_args(args)
             skip = true
         elseif arg[i] == "-n" then
             mqtt_port = tonumber(arg[i+1])
-            if mqtt_host == nil then help("missing argument for -n") end
+            if mqtt_port == nil then help("missing argument for -n") end
             skip = true
         elseif arg[i] == "-l" then
             listen_host = arg[i+1]

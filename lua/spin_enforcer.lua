@@ -7,7 +7,6 @@ local TRAFFIC_CHANNEL = "SPIN/traffic"
 local INCIDENT_CHANNEL = "SPIN/incidents"
 
 local HISTORY_SIZE = 600
-local PRINT_INTERVAL = 10
 
 local verbose = true
 
@@ -16,16 +15,6 @@ function vprint(msg)
         print("[SPIN/mqtt] " .. msg)
     end
 end
-
-local client = mqtt.new()
-
-client.ON_CONNECT = function()
-    vprint("Connected to MQTT broker")
-    client:subscribe(TRAFFIC_CHANNEL)
-    client:subscribe(INCIDENT_CHANNEL)
-    vprint("Subscribed to " .. TRAFFIC_CHANNEL)
-end
-
 
 local history = {}
 
@@ -89,7 +78,7 @@ function block_node(node)
     end
 end
 
-function history_stats()
+function history_stats(limit)
     local nodes = {}
     local node_info = {}
     for _,v in pairs(history) do
@@ -155,7 +144,7 @@ function history_stats()
             i = i + 1
             if i >= 10 then break end
         end
-        if (port_count) > 200 then
+        if limit > 0 and port_count > limit then
             block_node(node_info[frm])
         end
 
@@ -304,38 +293,117 @@ function handle_incident_report(incident, timestamp)
     return false
 end
 
+function help(error)
+    if error ~= nil then
+        print("Error: " .. error)
+        print("")
+    end
+    print("Usage: spin_enforcer.lua [options]")
+    print("")
+    print("Tracks traffic patterns and applies prototype policy enforcement by blocking devices")
+    print("")
+    print("Options:")
+    print("-h               show this help")
+    print("-m <host>        mqtt host (defaults to 127.0.0.1)")
+    print("-n <port>        mqtt port (defaults to 1883)")
+    print("-l <limit>       Block a devices if contacts more than <limit> address/port combinations (defaults to disabled)")
+    print("-i               Listens to provider API incident reports (on the MQTT topic SPIN/incidents, defaults to disabled)")
+    print("-s <interval>    Show traffic statistics every <interval> seconds (defaults to disabled)")
+    print("-k <seconds>     Keep history for <seconds> seconds (defaults to 600 seconds)")
+    os.exit()
+end
+
+function parse_args(args)
+    local mqtt_host = "127.0.0.1"
+    local mqtt_port = 1883
+    local limit = 0
+    local handle_incidents = false
+    local print_interval = 0
+    local keep_history_time = 600
+
+    skip = false
+    for i = 1,table.getn(args) do
+        if skip then
+            skip = false
+        elseif arg[i] == "-h" then
+            help()
+        elseif arg[i] == "-m" then
+            mqtt_host = arg[i+1]
+            if mqtt_host == nil then help("missing argument for -m") end
+            skip = true
+        elseif arg[i] == "-n" then
+            mqtt_port = tonumber(arg[i+1])
+            if mqtt_port == nil then help("missing or bad argument for -n") end
+            skip = true
+        elseif arg[i] == "-l" then
+            listen_host = arg[i+1]
+            if listen_host == nil then help("missing argument for -l") end
+            skip = true
+        elseif arg[i] == "-i" then
+            handle_incidents = true
+        elseif args[i] == "-s" then
+            print_interval = tonumber(arg[i+1])
+            if print_interval == nil then help("missing argument for -i") end
+            if print_interval <= 0 then help("print interval must be > 0") end
+            skip = true
+        elseif args[i] == "-k" then
+            keep_history_time = tonumber(arg[i+1])
+            if keep_history_time == nil then help("missing or bad argument for -k") end
+            skip = true
+        else
+            help("Too many arguments at " .. table.getn(args))
+        end
+    end
+    return mqtt_host, mqtt_port, limit, handle_incidents, print_interval, keep_history_time
+end
+
+
+mqtt_host, mqtt_port, limit, handle_incidents, print_interval, keep_history_time = parse_args(arg)
+
+HISTORY_SIZE = keep_history_time
+
+local client = mqtt.new()
+
+client.ON_CONNECT = function()
+    vprint("Connected to MQTT broker")
+    client:subscribe(TRAFFIC_CHANNEL)
+    vprint("Subscribed to " .. TRAFFIC_CHANNEL)
+    if handle_incidents then
+        client:subscribe(INCIDENT_CHANNEL)
+        vprint("Subscribed to " .. INCIDENT_CHANNEL)
+    end
+end
+
 client.ON_MESSAGE = function(mid, topic, payload)
     local pd = json.decode(payload)
     if topic == TRAFFIC_CHANNEL then
         if pd["command"] and pd["command"] == "traffic" then
             handle_traffic_message(pd["result"])
         end
-    elseif topic == INCIDENT_CHANNEL then
+    elseif handle_incidents and topic == INCIDENT_CHANNEL then
         if pd["incident"] == nil then
-            print("[XX] Error: no incident data found in " .. payload)
+            print("Error: no incident data found in " .. payload)
+            print("Incident report ignored")
         else
-			local incident = pd["incident"]
-			local ts = incident["incident_timestamp"]
-			for i=ts-5,ts+5 do
-				if handle_incident_report(incident, i) then break end
-			end
+            local incident = pd["incident"]
+            local ts = incident["incident_timestamp"]
+            for i=ts-5,ts+5 do
+                if handle_incident_report(incident, i) then break end
+            end
         end
     end
 end
 
-
-vprint("SPIN stats tool")
-broker = arg[1] -- defaults to "localhost" if arg not set
-client:connect(broker)
+vprint("SPIN policy enforcer, connecting to " .. mqtt_host .. ":" .. mqtt_port)
+client:connect(mqtt_host, mqtt_port)
 vprint("connected")
+
 
 local last_print = os.time()
 while true do
     local cur = os.time()
-    if (cur > last_print + PRINT_INTERVAL) then
-        --history_print()
-        --history_stats_full()
-        --history_stats()
+    if (print_interval > 0 and cur > last_print + print_interval) then
+        history_stats(limit)
         last_print = cur
     end
 
