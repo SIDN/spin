@@ -755,7 +755,17 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
     } else if (domains.length > 0) {
         label = node.domains[0];
     } else if (ips.length > 0) {
-        label = node.ips[0];
+        if (node.ips[0].match(/^224.0.0/)) {
+            // Multicast ipv4
+            label = "Multicast IPv4";
+        }
+        else if (node.ips[0].match(/^ff/)) {
+            // Multicast ipv6
+            label = "Multicast IPv6";
+        } else {
+            // Generic ip
+            label = node.ips[0];
+        }
     }
 
     if (node.mac) {
