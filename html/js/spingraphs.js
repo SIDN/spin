@@ -1061,10 +1061,7 @@ function cleanNetwork() {
         if (node.lastseen < delete_before) {
             deleteNode(node, true);
         } else if (node.lastseen < unhighlight_before) {
-            if (node["color"] == colour_recent) {
-                node["color"] = colour_dst;
-                nodes.update(node);
-            } else if (node["color"]["background"] == colour_recent) {
+            if (node["color"]["background"] == colour_recent) {
                 node["color"]["background"] = colour_dst;
                 nodes.update(node);
             }
