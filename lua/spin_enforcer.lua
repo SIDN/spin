@@ -81,6 +81,7 @@ end
 function history_stats(limit)
     local nodes = {}
     local node_info = {}
+
     for _,v in pairs(history) do
         for _,f in pairs(v) do
             if f["from"]["mac"] ~= nil then
@@ -132,6 +133,18 @@ function history_stats(limit)
                 end
             end
         end
+        local ni = node_info[frm]
+        local devicename = "<unknown>"
+        if ni["name"] ~= nil then
+            devicename = ni["name"]
+        elseif ni["mac"] ~= nil then
+            devicename = ni["mac"]
+        elseif table.getn(ni["domains"]) > 0 then
+            devicename = ni["domains"][0]
+        elseif table.getn(ni["ips"]) > 0 then
+            devicename = ni["ips"][0]
+        end
+        print("Device: " .. devicename)
         print("    contacted " .. to_count .. " external nodes")
         print("    over at total of " .. port_count .. " addr/port combinations")
         print("    for a total (outgoing) size of " .. size_count)
