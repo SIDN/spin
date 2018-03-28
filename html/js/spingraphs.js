@@ -638,6 +638,7 @@ function nodeSelected(event) {
 
 function updateBlockedButton() {
     var node = nodes.get(selectedNodeId);
+    if (node == null) return;
     var label = node.is_blocked ? "Unblock node" : "Block node";
     $("#block-node-button").button("option", {
         "label": label
@@ -646,6 +647,7 @@ function updateBlockedButton() {
 
 function updateAllowedButton() {
     var node = nodes.get(selectedNodeId);
+    if (node == null) return;
     var label = node.is_excepted ? "Stop allowing node" : "Allow node";
     $("#allow-node-button").button("option", {
         "label": label
