@@ -176,7 +176,7 @@ function redrawTrafficGraph() {
                      'total_size': 0, 'total_count': 0,
                      'flows': []}
         handleTrafficMessage(data);
-    } else {
+    } else if (active) {
         var d = datacache;
         datacache = [];
         handleTrafficMessage(d);
