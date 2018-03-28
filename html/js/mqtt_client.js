@@ -203,6 +203,14 @@ function handleTrafficMessage(data) {
         end: d,
         height: '140px',
         drawPoints: false,
+        dataAxis: {
+            left: {
+                range: {min: 0}
+            },
+            right: {
+                range: {min: 0}
+            }
+        }
     };
     graph2d_1.setOptions(options);
     var ids = traffic_dataset.getIds();
