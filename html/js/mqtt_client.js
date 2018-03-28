@@ -18,7 +18,7 @@ function init() {
     client.connect({onSuccess:onTrafficOpen});
 
     // Make smooth traffic graph when no data is received
-    setInterval(redrawTrafficGraph, 2500);
+    setInterval(redrawTrafficGraph, 1000);
 }
 
 function connectToMQTT() {
@@ -250,7 +250,7 @@ function moveTimeline(maxtime) {
     
     var options = {
         start: Date.now() - 700000 > start ? new Date(Date.now() - 600000) : graph2d_1.options.start,
-        end: new Date(maxtime*1000),
+        end: start > Date.now() - 600000 ? graph2d_1.options.end : new Date(maxtime*1000),
         height: '140px',
         drawPoints: false,
         dataAxis: {

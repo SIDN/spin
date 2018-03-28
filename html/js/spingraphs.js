@@ -517,13 +517,13 @@ function showGraph(dataset) {
 
     // Graph options
     var options = {
-        start: new Date(Date.now() - 30000),
-        //end: '2017-01-28',
+        start: new Date(Date.now()),
+        end: new Date(Date.now() + 600000),
         height: '140px',
         drawPoints: false,
         zoomable: false,
         moveable: false,
-        showCurrentTime: false,
+        showCurrentTime: true,
         //clickToUse: true
     };
 
@@ -577,6 +577,7 @@ function showNetwork() {
             stabilization: {
                 enabled: true,
                 iterations: 5,
+                updateInterval: 10,
             }
         },
         nodes: {
@@ -584,7 +585,8 @@ function showNetwork() {
         },
         edges: {
             shadow:shadowState,
-            arrows:'to',smooth:true
+            arrows:'to',
+            smooth:true
         }
     };
     network = new vis.Network(container, data, options);
