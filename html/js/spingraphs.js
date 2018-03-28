@@ -517,10 +517,13 @@ function showGraph(dataset) {
 
     // Graph options
     var options = {
-        //start: '2017-01-26',
+        start: new Date(Date.now() - 30000),
         //end: '2017-01-28',
         height: '140px',
         drawPoints: false,
+        zoomable: false,
+        moveable: false,
+        showCurrentTime: false,
         //clickToUse: true
     };
 
