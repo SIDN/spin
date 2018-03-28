@@ -4,6 +4,8 @@ var last_traffic = 0 // Last received traffic trace
 var time_sync = 0; // Time difference (seconds) between server and client
 var active = false; // Determines whether we are active or not
 
+var datacache = []; // array of all data items to be added on the next iteration.
+
 function init() {
     connectToMQTT();
     initGraphs();
@@ -16,7 +18,7 @@ function init() {
     client.connect({onSuccess:onTrafficOpen});
 
     // Make smooth traffic graph when no data is received
-    setInterval(fillEmptiness, 200);
+    setInterval(redrawTrafficGraph, 1000);
 }
 
 function connectToMQTT() {
@@ -80,7 +82,8 @@ function onTrafficMessage(msg) {
                 // First, update time_sync to account for timing differences
                 time_sync = Math.floor(Date.now()/1000 - new Date(result['timestamp']))
                 // update the Graphs
-                handleTrafficMessage(result);
+                //handleTrafficMessage(result);
+                datacache.push(result); // push to cache
                 break;
             case 'blocked':
                 //console.log("Got blocked command: " + msg);
@@ -163,14 +166,20 @@ function initTrafficDataView() {
     handleTrafficMessage(data);
 }
 
+// Takes data from cache and redraws the graph
 // Sometimes, no data is received for some time
 // Fill that void by adding 0-value datapoints to the graph
-function fillEmptiness() {
-    if (active && last_traffic != 0 && Date.now() - last_traffic >= 1000) {
+function redrawTrafficGraph() {
+    // FIXME
+    if (active && datacache.length == 0) {
         var data = { 'timestamp': Math.floor(Date.now() / 1000) - time_sync,
                      'total_size': 0, 'total_count': 0,
                      'flows': []}
         handleTrafficMessage(data);
+    } else if (active) {
+        var d = datacache;
+        datacache = [];
+        handleTrafficMessage(d);
     }
 }
 
@@ -181,51 +190,79 @@ function handleTrafficMessage(data) {
     // Do not update if we have not received data yet
     if (!(last_traffic == 0 && data['total_count'] == 0)) {
         last_traffic = Date.now();
+    } else {
+        moveTimeline();
     }
+    var aData = Array.isArray(data) ? data : [data];
+    var elements = [];
+    var elements_cnt = [];
+    var timestamp_max = Date.now()/1000 - 60*5; // 5 minutes in the past
+    while (dataitem = aData.shift()) {
+        var timestamp = dataitem['timestamp']
+        if (timestamp > timestamp_max) {
+            timestamp_max = timestamp;
+        }
+        var d = new Date(timestamp * 1000);
+        elements.push({
+            x: d,
+            y: dataitem['total_size'],
+            group: 0
+        });
+        elements_cnt.push({
+            x: d,
+            y: dataitem['total_count'],
+            group: 1
+        });
 
-    var timestamp = data['timestamp']
+        // Add the new flows
+        var arr = dataitem['flows'];
+        for (var i = 0, len = arr.length; i < len; i++) {
+            var f = arr[i];
+            // defined in spingraph.js
+            //alert("FIND NODE: " + f['from'])
+            var from_node = f['from'];
+            var to_node = f['to'];
 
-    // update traffic graph
-    var d = new Date(timestamp * 1000);
-    traffic_dataset.add({
-        x: d,
-        y: data['total_size'],
-        group: 0
-    });
-    traffic_dataset.add({
-        x: d,
-        y: data['total_count'],
-        group: 1
-    });
-
-    var options = {
-        start: new Date((timestamp * 1000) - 600000),
-        end: d,
-        height: '140px',
-        drawPoints: false,
-    };
-    graph2d_1.setOptions(options);
-    var ids = traffic_dataset.getIds();
-
-    //
-    // update network view
-    //
-
-    // Add the new flows
-    var arr = data['flows'];
-    for (var i = 0, len = arr.length; i < len; i++) {
-        var f = arr[i];
-        // defined in spingraph.js
-        //alert("FIND NODE: " + f['from'])
-        var from_node = f['from'];
-        var to_node = f['to'];
-
-        if (from_node != null && to_node != null) {
-            addFlow(timestamp + time_sync, from_node, to_node, f['count'], f['size']);
-        } else {
-            console.error("partial message: " + JSON.stringify(data))
+            if (from_node != null && to_node != null) {
+                addFlow(timestamp + time_sync, from_node, to_node, f['count'], f['size']);
+            } else {
+                console.error("partial message: " + JSON.stringify(data))
+            }
         }
     }
+    traffic_dataset.add(elements.concat(elements_cnt));
+    // console.log("Graph updated")
+    // var ids = traffic_dataset.getIds();
+
+    var graph_end = Date.parse(graph2d_1.options.end);
+    if (Date.now() + 10000 >= graph_end) {
+        moveTimeline(timestamp_max);
+    }
+}
+
+// Function to redraw the graph
+function moveTimeline(maxtime) {
+    // Only rescale graph every minute. Rescale if current date gets within 10 seconds of maximum
+    if (typeof maxtime == 'undefined') {
+        maxtime = Date.now()/1000;
+    }
+    var start = Date.parse(graph2d_1.options.start);
+    
+    var options = {
+        start: Date.now() - 700000 > start ? new Date(Date.now() - 600000) : graph2d_1.options.start,
+        end: start > Date.now() - 600000 ? graph2d_1.options.end : new Date(maxtime*1000),
+        height: '140px',
+        drawPoints: false,
+        dataAxis: {
+            left: {
+                range: {min: 0}
+            },
+            right: {
+                range: {min: 0}
+            }
+        }
+    };
+    graph2d_1.setOptions(options);
 }
 
 function handleBlockedMessage(data) {

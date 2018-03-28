@@ -517,10 +517,13 @@ function showGraph(dataset) {
 
     // Graph options
     var options = {
-        //start: '2017-01-26',
-        //end: '2017-01-28',
+        start: new Date(Date.now()),
+        end: new Date(Date.now() + 600000),
         height: '140px',
         drawPoints: false,
+        zoomable: false,
+        moveable: false,
+        showCurrentTime: true,
         //clickToUse: true
     };
 
@@ -574,6 +577,7 @@ function showNetwork() {
             stabilization: {
                 enabled: true,
                 iterations: 5,
+                updateInterval: 10,
             }
         },
         nodes: {
@@ -581,7 +585,8 @@ function showNetwork() {
         },
         edges: {
             shadow:shadowState,
-            arrows:'to',smooth:true
+            arrows:'to',
+            smooth:true
         }
     };
     network = new vis.Network(container, data, options);
@@ -638,6 +643,7 @@ function nodeSelected(event) {
 
 function updateBlockedButton() {
     var node = nodes.get(selectedNodeId);
+    if (node == null) return;
     var label = node.is_blocked ? "Unblock node" : "Block node";
     $("#block-node-button").button("option", {
         "label": label
@@ -646,6 +652,7 @@ function updateBlockedButton() {
 
 function updateAllowedButton() {
     var node = nodes.get(selectedNodeId);
+    if (node == null) return;
     var label = node.is_excepted ? "Stop allowing node" : "Allow node";
     $("#allow-node-button").button("option", {
         "label": label
