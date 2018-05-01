@@ -2,6 +2,7 @@ local mt_engine = require 'minittp_engine'
 local mt_io = require 'minittp_io'
 local mt_util = require 'minittp_util'
 
+local copas = require 'copas'
 local liluat = require 'liluat'
 
 posix = require 'posix'
@@ -158,7 +159,7 @@ function arg_parse(args)
     return config_file, mqtt_host, mqtt_port
 end
 
-function handler:init(args)
+function handler:read_config(args)
     -- TODO: check correctness of config file, if any
     local config_file, mqtt_host, mqtt_port = arg_parse(args)
     local config = {}
@@ -176,21 +177,195 @@ function handler:init(args)
         config['mqtt']['port'] = mqtt_port
     end
     self.config = config
+end
 
+function handler:init(args)
+   
+    -- we keep track of active downloads by having a dict of
+    -- "<client_ip>-<device mac>" -> <bytes_sent>
+    self.active_dumps = {}
+
+    self:read_config(args)
     self:load_templates()
+
     return true
+end
+
+function handler:handle_index(request, response)
+    html, err = self:render_raw("index.html", {mqtt_host = self.config['mqtt']['host']})
+    if html == nil then
+        response:set_status(500, "Internal Server Error")
+        response.content = "Template error: " .. err
+        return response
+    end
+    response.content = html
+    return response
+end
+
+function get_tcpdump_pname(request, mac)
+    return request.client_address .. "-" .. mac
+end
+
+--
+-- Class for managing tcpdump processes
+--
+local tcpdumper = {}
+tcpdumper.__index = tcpdumper
+
+function tcpdumper.create(device, response)
+    local td = {}
+    setmetatable(td, tcpdumper)
+    -- check device for format here or at caller?
+    -- should be aa:bb:cc:dd:ee:ff
+    td.running = true
+    td.bytes_sent = 0
+    td.response = response
+
+    local subp, err = mt_io.subprocess("/home/jelte/repos/minittp/examples/data_outputter.sh", {device}, 0, true, false, false)
+    if subp == nil then
+        print("[XX] error starting process: " .. err)
+        return nil
+    end
+    td.subp = subp
+
+    return td
+end
+
+function tcpdumper:run()
+    while self.running do
+        copas.sleep(0.1)
+        line, err = self.subp:read_line(false)
+        if line == nil then
+            print("[XX] error reading from subprocess: " .. err)
+            if err ~= "read timed out" then
+                sent, err = response:send_chunk("")
+                print("not timeout error")
+                subp:kill()
+                subp:close()
+                return
+            end
+        else
+            sent, err = self.response:send_chunk(line)
+            if sent == nil then
+                sent, err = response:send_chunk("")
+                print("Error sending data: " .. err)
+                subp:kill()
+                subp:close()
+                return nil
+            else
+                -- do not count the \r\n that signals end of chunk
+                self.bytes_sent = self.bytes_sent + sent - 2
+            end
+        end
+    end
+    self.subp:kill()
+    self.subp:close()
+    sent, err = self.response:send_chunk("")
+    if sent == nil then
+        print("Error sending data: " .. err)
+    end
+    -- just to make sure
+    self.running = false
+    return nil
+end
+
+function tcpdumper:stop()
+    self.running = false
+end
+
+function handler:handle_tcpdump_start(request, response)
+    local device = request.params["device"]
+    local dname = get_tcpdump_pname(request, device)
+
+    if self.active_dumps[dname] ~= nil then return nil, "already running" end
+    local dumper, err = tcpdumper.create(device, response)
+    -- todo: 500 internal server error?
+    if dumper == nil then return nil, err end
+    self.active_dumps[dname] = dumper
+    
+    response:set_header("Transfer-Encoding", "chunked")
+    response:set_header("Content-Disposition",  "attachment; filename=\"tcpdump_"..device..".txt\"")
+    response:send_status()
+    response:send_headers()
+    
+    dumper:run()
+    -- remove it again
+    self.active_dumps[dname] = nil
+    return nil
+end
+
+function handler:handle_tcpdump_status(request, response)
+    local device = request.params["device"]
+    local dname = get_tcpdump_pname(request, device)
+    local running = false
+    local bytes_sent = 0
+    if self.active_dumps[dname] ~= nil then
+        print("[XX] RUNNING: " .. dname)
+        running = true
+        bytes_sent = self.active_dumps[dname].bytes_sent
+    else
+        print("[XX] NOT RUNNING: " .. dname)
+    end
+
+    html, err = self:render_raw("tcpdump_status.html", { device=device, running=running, bytes_sent=bytes_sent })
+
+    if html == nil then
+        response:set_status(500, "Internal Server Error")
+        response.content = "Template error: " .. err
+        return response
+    end
+    response.content = html
+    return response
+end
+
+function handler:handle_tcpdump_stop(request, response)
+    local device = request.params["device"]
+    local dname = get_tcpdump_pname(request, device)
+
+    if self.active_dumps[dname] ~= nil then
+        self.active_dumps[dname]:stop()
+    end
+    response:set_header("Location", "/tcpdump?device=" .. device)
+    response:set_status(302, "Found")
+    return response
+end
+
+function handler:handle_tcpdump_manage(request, response)
+    local device = request.params["device"]
+    local dname = get_tcpdump_pname(request, device)
+    local running = false
+    local bytes_sent = 0
+    if self.active_dumps[dname] ~= nil then
+        print("[XX] RUNNING: " .. dname)
+        running = true
+        bytes_sent = self.active_dumps[dname].bytes_sent
+    else
+        print("[XX] NOT RUNNING: " .. dname)
+    end
+
+    html, err = self:render_raw("tcpdump.html", { device=device, running=running, bytes_sent=bytes_sent })
+
+    if html == nil then
+        response:set_status(500, "Internal Server Error")
+        response.content = "Template error: " .. err
+        return response
+    end
+    response.content = html
+    return response
 end
 
 function handler:handle_request(request, response)
     local result = nil
     if request.path == "/" then
-        html, err = self:render_raw("index.html", {mqtt_host = self.config['mqtt']['host']})
-        if html == nil then
-            response:set_status(500, "Internal Server Error")
-            response.content = "Template error: " .. err
-            return response
-        end
-        response.content = html
+        return self:handle_index(request, response)
+    elseif request.path == "/tcpdump" then
+        return self:handle_tcpdump_manage(request, response)
+    elseif request.path == "/tcpdump_status" then
+        return self:handle_tcpdump_status(request, response)
+    elseif request.path == "/tcpdump_start" then
+        return self:handle_tcpdump_start(request, response)
+    elseif request.path == "/tcpdump_stop" then
+        return self:handle_tcpdump_stop(request, response)
     else
         -- try one of the static files
         response = mt_engine.handle_static_file(request, response, "../html")
