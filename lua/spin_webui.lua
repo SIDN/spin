@@ -108,6 +108,22 @@ function handler:load_templates()
   p:close()
 end
 
+-- we have a two-layer template system; rather than adding headers
+-- and footers to each template, we have a base template, which gets
+-- the output from the 'inner' template as an argument ('main_html')
+-- The outer template is called BASE
+function handler:render(template_name, args)
+  if not args then args = {} end
+  if not self.templates[template_name] then
+    return "[Error: could not find template " .. template_name .. "]"
+  end
+  --args['langkeys'] = language_keys
+  args['main_html'] = liluat.render(self.templates[template_name], args)
+  return liluat.render(self.templates['base.html'], args)
+end
+
+-- If you want to have a different base, or just render a section of
+-- a page, use render_raw
 function handler:render_raw(template_name, args)
   if not args then args = {} end
   if not self.templates[template_name] then
@@ -192,7 +208,7 @@ function handler:init(args)
 end
 
 function handler:handle_index(request, response)
-    html, err = self:render_raw("index.html", {mqtt_host = self.config['mqtt']['host']})
+    html, err = self:render("index.html", {mqtt_host = self.config['mqtt']['host']})
     if html == nil then
         response:set_status(500, "Internal Server Error")
         response.content = "Template error: " .. err
