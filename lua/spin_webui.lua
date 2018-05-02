@@ -237,7 +237,8 @@ function tcpdumper.create(device, response)
     td.bytes_sent = 0
     td.response = response
 
-    local subp, err = mt_io.subprocess("/home/jelte/repos/minittp/examples/data_outputter.sh", {device}, 0, true, false, false)
+    local subp, err = mt_io.subprocess("tcpdump", {"-s", "0", "-w", "-", "ether", "host", "E4:95:6E:40:66:ED"}, 0, true, false, false)
+    --local subp, err = mt_io.subprocess("/home/jelte/repos/minittp/examples/data_outputter.sh", {device}, 0, true, false, false)
     if subp == nil then
         print("[XX] error starting process: " .. err)
         return nil
@@ -263,7 +264,7 @@ function tcpdumper:run()
         else
             sent, err = self.response:send_chunk(line)
             if sent == nil then
-                sent, err = response:send_chunk("")
+                sent, err = self.response:send_chunk("")
                 print("Error sending data: " .. err)
                 subp:kill()
                 subp:close()
@@ -300,7 +301,7 @@ function handler:handle_tcpdump_start(request, response)
     self.active_dumps[dname] = dumper
     
     response:set_header("Transfer-Encoding", "chunked")
-    response:set_header("Content-Disposition",  "attachment; filename=\"tcpdump_"..device..".txt\"")
+    response:set_header("Content-Disposition",  "attachment; filename=\"tcpdump_"..device..".pcap\"")
     response:send_status()
     response:send_headers()
     
@@ -384,7 +385,7 @@ function handler:handle_request(request, response)
         return self:handle_tcpdump_stop(request, response)
     else
         -- try one of the static files
-        response = mt_engine.handle_static_file(request, response, "../html")
+        response = mt_engine.handle_static_file(request, response, "/www/spin")
     end
     return response
 end

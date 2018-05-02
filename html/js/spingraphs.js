@@ -475,6 +475,13 @@ function initGraphs() {
         updateAllowedButton();
     });
 
+    $("#tcpdump-node-button").button().on("click", function (evt) {
+        var node = nodes.get(selectedNodeId);
+        // Much TODO here; port, etc. currently spin_webui.lua must
+        // be started and lua-minittp installed
+        var w = window.open("http://192.168.8.1:8080/tcpdump?device="+node.mac, "popupWindow", "width=600,  height=400, scrollbars=yes");
+    });
+
     showGraph(traffic_dataset);
     showNetwork();
     initTrafficDataView();
