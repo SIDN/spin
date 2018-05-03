@@ -475,7 +475,7 @@ function initGraphs() {
         updateAllowedButton();
     });
 
-    $("#tcpdump-node-button").button().on("click", function (evt) {
+    $("#pcap-node-button").button().on("click", function (evt) {
         var node = nodes.get(selectedNodeId);
         // Much TODO here; port, etc. currently spin_webui.lua must
         // be started and lua-minittp installed
