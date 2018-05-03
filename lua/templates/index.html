@@ -1,0 +1,41 @@
+{{ --$def with (mqtt_host, mqtt_port) }}
+    
+  <script type="javascript">
+      function modal(href) {
+          window.open(href,'_blank',
+                           'toolbar=no,
+                            location=no,
+                            status=no,
+                            menubar=no,
+                            scrollbars=yes,
+                            resizable=yes,
+                            width=400,
+                            height=400');
+      }
+  </script>
+  
+<div>
+  <p>
+   <a href="graph.html?mqtt_host={{=mqtt_host}}">graph test (MQTT at {{= mqtt_host }} )</a>
+   <br />
+   <a href="debug.html">debug mode</a>
+   <br />
+   <a id="OpenDialog" href="/tcpdump?device=aa:bb:cc">Dump test device</a>
+<!--
+   <a id="OpenDialog" href="/tcpdump?device=aa:bb:cc" onclick="return false;" target="_blank">Dump test device 1</a>
+   <br />
+   <a href="/tcpdump?device=dd:ee:ff" onclick="return false;">Dump test device 2</a>
+   <br />
+   <a href="/tcpdump?device=gg:hh:ii" onclick="return false;">Dump test device 3</a>
+-->
+  </p>
+</div>
+
+  <script>
+    $(document).ready(function () {
+        $("#OpenDialog").click(function () {
+            var w = window.open(this, "popupWindow", "width=600, height=400, scrollbars=yes");
+            return false;
+        });
+    });
+  </script>

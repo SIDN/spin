@@ -1,0 +1,10 @@
+{{ --$def with (device, running, bytes_sent) }}
+
+
+{{ if running then }}
+    <p>Closing or reloading this window will stop the TCPDUMP</p>
+    <p>Bytes sent: {{= bytes_sent }} </p>
+    <p><a href="#" onclick="stop();">Stop download</a></p>
+{{ else }}
+    <p><a href="/tcpdump_start?device={{= device }}" onclick="start()" target="_blank">Start download</a></p>
+{{ end }}
