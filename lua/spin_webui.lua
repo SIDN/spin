@@ -25,11 +25,11 @@ function file_tokenize(filename)
     local result = {}
     local fr, err = mt_io.file_reader(filename)
     if fr == nil then return nil, err end
-    
+
     for line in fr:read_line_iterator(true) do
         for token in line:gmatch("%S+") do table.insert(result, token) end
     end
-    
+
     print("[XX] done tokenizing " .. filename)
     return result
 end
@@ -72,7 +72,7 @@ function config_parse(filename)
     local config = {}
     local tokens, err = file_tokenize_iterator(filename)
     if tokens == nil then return nil, err end
-    
+
     local cur_section = "main"
 
     while not tokens.done do
@@ -171,7 +171,7 @@ function arg_parse(args)
             help(1, "Too many arguments at '" .. args[i] .. "'")
         end
     end
-    
+
     return config_file, mqtt_host, mqtt_port
 end
 
@@ -196,7 +196,7 @@ function handler:read_config(args)
 end
 
 function handler:init(args)
-   
+
     -- we keep track of active downloads by having a dict of
     -- "<client_ip>-<device mac>" -> <bytes_sent>
     self.active_dumps = {}
@@ -237,7 +237,7 @@ function tcpdumper.create(device, response)
     td.bytes_sent = 0
     td.response = response
 
-    local subp, err = mt_io.subprocess("tcpdump", {"-s", "0", "-w", "-", "ether", "host", "E4:95:6E:40:66:ED"}, 0, true, false, false)
+    local subp, err = mt_io.subprocess("tcpdump", {"-s", "0", "-w", "-", "ether", "host", device}, 0, true, false, false)
     --local subp, err = mt_io.subprocess("/home/jelte/repos/minittp/examples/data_outputter.sh", {device}, 0, true, false, false)
     if subp == nil then
         print("[XX] error starting process: " .. err)
@@ -299,12 +299,12 @@ function handler:handle_tcpdump_start(request, response)
     -- todo: 500 internal server error?
     if dumper == nil then return nil, err end
     self.active_dumps[dname] = dumper
-    
+
     response:set_header("Transfer-Encoding", "chunked")
     response:set_header("Content-Disposition",  "attachment; filename=\"tcpdump_"..device..".pcap\"")
     response:send_status()
     response:send_headers()
-    
+
     dumper:run()
     -- remove it again
     self.active_dumps[dname] = nil
