@@ -251,7 +251,7 @@ end
 function tcpdumper:run()
     while self.running do
         copas.sleep(0.1)
-        line, err = self.subp:read_line(false)
+        line, err = self.subp:read_bytes(1024)
         if line == nil then
             print("[XX] error reading from subprocess: " .. err)
             if err ~= "read timed out" then
