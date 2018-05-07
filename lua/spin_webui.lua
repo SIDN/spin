@@ -385,7 +385,7 @@ function handler:handle_request(request, response)
         return self:handle_tcpdump_stop(request, response)
     else
         -- try one of the static files
-        response = mt_engine.handle_static_file(request, response, "/www/spin")
+        response = mt_engine.handle_static_file(request, response, "/www")
     end
     return response
 end
