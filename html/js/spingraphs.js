@@ -477,11 +477,17 @@ function initGraphs() {
 
     $("#pcap-node-button").button().on("click", function (evt) {
         var node = nodes.get(selectedNodeId);
+        var name = node.mac;
+
+        if (!name) {
+            alert("Sorry, for now we can only dump pcap for devices, not remote nodes");
+            return;
+        }
         // Much TODO here; port, etc. currently spin_webui.lua must
         // be started and lua-minittp installed
         var url = window.location.protocol + "//" + window.location.hostname +
-        ":8080" + "/tcpdump?device="+node.mac;
-        var w = window.open(url, "popupWindow", "width=600,  height=400, scrollbars=yes");
+        "/spin/tcpdump?device="+name;
+        var w = window.open(url, name, "width=600,  height=400, scrollbars=yes");
     });
 
     showGraph(traffic_dataset);
