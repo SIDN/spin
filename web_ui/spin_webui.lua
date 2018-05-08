@@ -384,8 +384,8 @@ function handler:handle_request(request, response)
     elseif request.path == "/tcpdump_stop" then
         return self:handle_tcpdump_stop(request, response)
     else
-        -- try one of the static files
-        response = mt_engine.handle_static_file(request, response, "/www")
+        -- try one of the static files; note: relative path
+        response = mt_engine.handle_static_file(request, response, "static")
     end
     return response
 end
