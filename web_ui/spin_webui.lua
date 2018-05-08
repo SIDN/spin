@@ -21,7 +21,6 @@ posix = require 'posix'
 -- in the given filename
 -- or nil, err on error
 function file_tokenize(filename)
-    print("[XX] tokenizing " .. filename)
     local result = {}
     local fr, err = mt_io.file_reader(filename)
     if fr == nil then return nil, err end
@@ -30,7 +29,6 @@ function file_tokenize(filename)
         for token in line:gmatch("%S+") do table.insert(result, token) end
     end
 
-    print("[XX] done tokenizing " .. filename)
     return result
 end
 
@@ -237,10 +235,8 @@ function tcpdumper.create(device, response)
     td.bytes_sent = 0
     td.response = response
 
-    local subp, err = mt_io.subprocess("tcpdump", {"-s", "0", "-w", "-", "ether", "host", device}, 0, true, false, false)
-    --local subp, err = mt_io.subprocess("/home/jelte/repos/minittp/examples/data_outputter.sh", {device}, 0, true, false, false)
+    local subp, err = mt_io.subprocess("tcpdump", {"-s", "1600", "-w", "-", "ether", "host", device}, 0, true, false, false)
     if subp == nil then
-        print("[XX] error starting process: " .. err)
         return nil
     end
     td.subp = subp
@@ -256,7 +252,6 @@ function tcpdumper:run()
             print("[XX] error reading from subprocess: " .. err)
             if err ~= "read timed out" then
                 sent, err = response:send_chunk("")
-                print("not timeout error")
                 subp:kill()
                 subp:close()
                 return
@@ -317,11 +312,8 @@ function handler:handle_tcpdump_status(request, response)
     local running = false
     local bytes_sent = 0
     if self.active_dumps[dname] ~= nil then
-        print("[XX] RUNNING: " .. dname)
         running = true
         bytes_sent = self.active_dumps[dname].bytes_sent
-    else
-        print("[XX] NOT RUNNING: " .. dname)
     end
 
     html, err = self:render_raw("tcpdump_status.html", { device=device, running=running, bytes_sent=bytes_sent })
@@ -353,11 +345,8 @@ function handler:handle_tcpdump_manage(request, response)
     local running = false
     local bytes_sent = 0
     if self.active_dumps[dname] ~= nil then
-        print("[XX] RUNNING: " .. dname)
         running = true
         bytes_sent = self.active_dumps[dname].bytes_sent
-    else
-        print("[XX] NOT RUNNING: " .. dname)
     end
 
     html, err = self:render_raw("tcpdump.html", { device=device, running=running, bytes_sent=bytes_sent })
@@ -373,15 +362,15 @@ end
 
 function handler:handle_request(request, response)
     local result = nil
-    if request.path == "/" then
+    if request.path == "/" or request.path == "/spin" or request.path == "/spin/" then
         return self:handle_index(request, response)
-    elseif request.path == "/tcpdump" then
+    elseif request.path == "/spin/tcpdump" then
         return self:handle_tcpdump_manage(request, response)
-    elseif request.path == "/tcpdump_status" then
+    elseif request.path == "/spin/tcpdump_status" then
         return self:handle_tcpdump_status(request, response)
-    elseif request.path == "/tcpdump_start" then
+    elseif request.path == "/spin/tcpdump_start" then
         return self:handle_tcpdump_start(request, response)
-    elseif request.path == "/tcpdump_stop" then
+    elseif request.path == "/spin/tcpdump_stop" then
         return self:handle_tcpdump_stop(request, response)
     else
         -- try one of the static files; note: relative path
