@@ -235,7 +235,7 @@ function tcpdumper.create(device, response)
     td.bytes_sent = 0
     td.response = response
 
-    local subp, err = mt_io.subprocess("tcpdump", {"-s", "1600", "-w", "-", "ether", "host", device}, 0, true, false, false)
+    local subp, err = mt_io.subprocess("tcpdump", {"-i", "br-lan", "-s", "1600", "-w", "-", "ether", "host", device}, 0, true, false, false)
     if subp == nil then
         return nil
     end
