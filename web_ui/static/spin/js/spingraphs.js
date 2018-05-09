@@ -487,7 +487,7 @@ function initGraphs() {
         // be started and lua-minittp installed
         var url = window.location.protocol + "//" + window.location.hostname +
         "/spin/tcpdump?device="+name;
-        var w = window.open(url, name, "width=600,  height=400, scrollbars=yes");
+        var w = window.open(url, name, "width=400,  height=300, scrollbars=yes");
     });
 
     showGraph(traffic_dataset);

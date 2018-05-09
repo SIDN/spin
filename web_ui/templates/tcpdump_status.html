@@ -2,9 +2,10 @@
 
 
 {{ if running then }}
-    <p>Closing or reloading this window will stop the TCPDUMP</p>
+    <p>Closing or reloading this window will stop the capture!</p>
     <p>Bytes sent: {{= bytes_sent }} </p>
     <p><a href="#" onclick="stop();">Stop download</a></p>
 {{ else }}
-    <p><a href="/spin/tcpdump_start?device={{= device }}" onclick="start()" target="_blank">Start download</a></p>
+    <p>Click start to start the capture.</p>
+    <p><a href="/spin/tcpdump_start?device={{= device }}" onclick="start()" target="_blank">Start capture</a></p>
 {{ end }}

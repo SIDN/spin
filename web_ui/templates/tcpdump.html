@@ -11,7 +11,12 @@
     </head>
 
     <body onunload="stop()">
-            <div id="bytes_sent_status"></div>
+        <div>
+            <h3>SPIN traffic capture</h3>
+            <p>Device MAC address: {{= device }}</p>
+        </div>
+        </div>
+        <div id="bytes_sent_status"></div>
     <script type="text/javascript" >
         var reloader;
 
@@ -20,18 +25,20 @@
             //$("bytes_sent_status").load("/spin/tcpdump_status?device={{=device}}", function (data) { $(this).html(data); console.log("status set to " + data); });
             $("#bytes_sent_status").load("/spin/tcpdump_status?device={{=device}}");
         }
-        
+
         function stop() {
             clearInterval(reloader);
             $.get("/spin/tcpdump_stop?device={{=device}}").done(function(){window.close();});
         }
 
-        function start() {
-            reloader = setInterval(function() {
-                load_status();
-            }, 1000);
+        function reload_once() {
+            setTimeout(load_status, 1000);
         }
-        
+
+        function start() {
+            reloader = setInterval(load_status, 2000);
+        }
+
         $(window).on('beforeunload', function(){
             // Call for stop if the user hasn't, we do not
             // want runaway tcpdump processes
@@ -42,7 +49,7 @@
             });
             return void(0);
         });
-        
+
         load_status();
     </script>
 
