@@ -48,7 +48,7 @@ Lua dependencies (for client tooling and message broker):
 - luaposix
 
     `apt-get install libmosquitto-dev`
-    `luarocks install mosquitto lua-bitop luaposix`
+    `luarocks install lua-mosquitto luabitop luaposix`
 
 
 Runtime dependencies:

@@ -485,6 +485,7 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
 {
     "to": {"id":1,"lastseen":1502702327,"ips":["::1"],"domains":[]},
     "from": {"id":1,"lastseen":1502702327,"ips":["::1"],"domains":[]},
+    "protocol":6,
     "to_port":1883,
     "size":744,
     "count":2,
@@ -528,6 +529,7 @@ pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf
     s += node2json(src_node, json_buf);
     buffer_write(json_buf, ", \"to\": ");
     s += node2json(dest_node, json_buf);
+    buffer_write(json_buf, ", \"protocol\": %d", pkt_info->protocol);
     buffer_write(json_buf, ", \"from_port\": %d", pkt_info->src_port);
     buffer_write(json_buf, ", \"to_port\": %d", pkt_info->dest_port);
     buffer_write(json_buf, ", \"size\": %d", pkt_info->payload_size);

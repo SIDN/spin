@@ -970,7 +970,7 @@ void log_version() {
 void print_help() {
     printf("Usage: spind [options]\n");
     printf("Options:\n");
-    printf("-d\t\t\tlog debug messages (set log level to LOG_DEBUG)");
+    printf("-d\t\t\tlog debug messages (set log level to LOG_DEBUG)\n");
     printf("-h\t\t\tshow this help\n");
     printf("-l\t\t\trun in local mode (do not check for ARP cache entries)\n");
     printf("-o\t\t\tlog to stdout instead of syslog\n");

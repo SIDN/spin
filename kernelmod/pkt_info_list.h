@@ -30,7 +30,7 @@ int pkt_info_list_check_timestamp(pkt_info_list_t* pkt_info_list, uint32_t times
 // Clear the pkt info list
 void pkt_info_list_clear(pkt_info_list_t* pkt_info_list, uint32_t timestamp);
 // Resize the pkt_info_list (automatically called when adding beyond the current max_size)
-// This function does nothing if the new size is smaller than the current max_size
+// This function does nothing if the new size is not larger than the current max_size
 void pkt_info_list_resize(pkt_info_list_t* pkt_info_list, unsigned int new_size);
 // Add pkt_info to the list
 void pkt_info_list_add(pkt_info_list_t* pkt_info_list, pkt_info_t* pkt_info);
