@@ -356,7 +356,7 @@ function parse_args(args)
             handle_incidents = true
         elseif args[i] == "-s" then
             print_interval = tonumber(arg[i+1])
-            if print_interval == nil then help("missing argument for -i") end
+            if print_interval == nil then help("missing argument for -s") end
             if print_interval <= 0 then help("print interval must be > 0") end
             skip = true
         elseif args[i] == "-k" then

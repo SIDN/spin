@@ -56,7 +56,7 @@ void pkt_info_list_clear(pkt_info_list_t* pkt_info_list, uint32_t timestamp) {
 
 void pkt_info_list_resize(pkt_info_list_t* pkt_info_list, unsigned int new_size) {
 	unsigned int i;
-	if (new_size < pkt_info_list->max_size) {
+	if (new_size <= pkt_info_list->max_size) {
 		return;
 	}
 	pkt_info_list->pkt_infos = (pkt_info_t**)krealloc(pkt_info_list->pkt_infos, sizeof(pkt_info_t*) * new_size, __GFP_WAIT);

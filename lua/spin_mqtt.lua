@@ -45,12 +45,6 @@ function vwrite(msg)
     end
 end
 
-function vwrite(msg)
-    if verbose then
-        io.write(msg)
-    end
-end
-
 local client = mqtt.new()
 client.ON_CONNECT = function()
     vprint("Connected to MQTT broker")
