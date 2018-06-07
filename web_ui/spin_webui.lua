@@ -5,6 +5,12 @@ local mt_util = require 'minittp_util'
 local copas = require 'copas'
 local liluat = require 'liluat'
 
+local mqtt = require 'mosquitto'
+local json = require 'json'
+
+local TRAFFIC_CHANNEL = "SPIN/traffic"
+local HISTORY_SIZE = 600
+
 posix = require 'posix'
 
 --
@@ -147,6 +153,8 @@ function arg_parse(args)
     mqtt_host = nil
     mqtt_port = nil
 
+    if args == nil then return config_file, mqtt_host, mqtt_port end
+    
     skip = false
     for i = 1,table.getn(args) do
         if skip then
@@ -174,7 +182,6 @@ function arg_parse(args)
 end
 
 function handler:read_config(args)
-    -- TODO: check correctness of config file, if any
     local config_file, mqtt_host, mqtt_port = arg_parse(args)
     local config = {}
     config['mqtt'] = {}
@@ -193,8 +200,53 @@ function handler:read_config(args)
     self.config = config
 end
 
-function handler:init(args)
+function handler:add_device_seen(mac, name, timestamp)
+    local device_data = {}
+    device_data['lastseen'] = timestamp
+    device_data['name'] = name
+    device_data['new'] = true
+    device_data['profile'] = ""
+    device_data['enforcement'] = ""
+    device_data['logging'] = ""
+    
+    self.devices_seen[mac] = device_data
+end
 
+function handler:handle_traffic_message(data, orig_data)
+    if data.flows == nil then return end
+    for i, d in ipairs(data.flows) do
+        local mac = nil
+        local ips = nil
+        if d.from ~= nil and d.from.mac ~= nil then
+            mac = d.from.mac
+            ips = d.from.ips
+        elseif d.to ~= nil and d.to.mac ~= nil then
+            mac = d.to.mac
+            ips = d.to.ips
+        end
+        
+        if mac ~= nil then
+            local name = nil
+            -- If we have a known name, use that
+            if d.name ~= nil then
+                name = d.name
+            -- Otherwise, use the first ip address we saw
+            elseif ips ~= nil and table.getn(ips) > 0 then
+                name = ips[1]
+            -- to be sure we have *something* , fall back to mac
+            else
+                d.name = mac
+            end
+            -- gather additional info, if available
+            self:add_device_seen(mac, name, os.time())
+        end
+    end
+    --for a,b in pairs(self.devices_seen) do
+    --    print("[XX] " .. a .. ": " .. b)
+    --end
+end
+
+function handler:init(args)
     -- we keep track of active downloads by having a dict of
     -- "<client_ip>-<device mac>" -> <bytes_sent>
     self.active_dumps = {}
@@ -202,7 +254,74 @@ function handler:init(args)
     self:read_config(args)
     self:load_templates()
 
+    -- We will use this list for the fixed url mappings
+    self.fixed_handlers = {
+        ["/"] = handler.handle_index,
+        ["/spin"] = self.handle_index,
+        ["/spin/"] = self.handle_index,
+        ["/spin/tcpdump"] = self.handle_tcpdump_manage,
+        ["/spin/tcpdump_status"] = self.handle_tcpdump_status,
+        ["/spin/tcpdump_start"] = self.handle_tcpdump_start,
+        ["/spin/tcpdump_stop"] = self.handle_tcpdump_stop,
+        ["/spin/api/devices"] = self.handle_device_list
+    }
+
+    local client = mqtt.new()
+    self.devices_seen = {}
+
+    client.ON_CONNECT = function()
+        vprint("Connected to MQTT broker")
+        client:subscribe(TRAFFIC_CHANNEL)
+        vprint("Subscribed to " .. TRAFFIC_CHANNEL)
+        if handle_incidents then
+            client:subscribe(INCIDENT_CHANNEL)
+            vprint("Subscribed to " .. INCIDENT_CHANNEL)
+        end
+    end
+    
+    local h = self
+
+    client.ON_MESSAGE = function(mid, topic, payload)
+        --print("[XX] message for you, sir!")
+        local pd = json.decode(payload)
+        if topic == TRAFFIC_CHANNEL then
+            if pd["command"] and pd["command"] == "traffic" then
+                h:handle_traffic_message(pd["result"], payload)
+            end
+        elseif handle_incidents and topic == INCIDENT_CHANNEL then
+            if pd["incident"] == nil then
+                print("Error: no incident data found in " .. payload)
+                print("Incident report ignored")
+            else
+                local incident = pd["incident"]
+                local ts = incident["incident_timestamp"]
+                for i=ts-5,ts+5 do
+                    if handle_incident_report(incident, i) then break end
+                end
+            end
+        end
+    end
+
+    print("[XX] connecting to " .. self.config.mqtt.host .. ":" .. self.config.mqtt.port)
+    a,b,c,d = client:connect(self.config.mqtt.host, self.config.mqtt.port)
+    --print(client:socket)
+    --client.socket = copas.wrap(client.socket)
+    --if a ~= nil then print("a: " .. a) end
+    if b ~= nil then print("b: " .. b) end
+    if c ~= nil then print("c: " .. c) end
+    if d ~= nil then print("d: " .. d) end
+
+    self.client = client
+    copas.addthread(self.mqtt_looper, self)
+
     return true
+end
+
+function handler:mqtt_looper()
+    while true do
+        self.client:loop()
+        copas.sleep(0.1)
+    end
 end
 
 function handler:handle_index(request, response)
@@ -348,6 +467,12 @@ function handler:handle_tcpdump_stop(request, response)
     return response
 end
 
+function handler:handle_device_list(request, response)
+    response:set_header("Content-Type", "application/json")
+    response.content = json.encode(self.devices_seen)
+    return response
+end
+
 function handler:handle_tcpdump_manage(request, response)
     local device = request.params["device"]
     local dname = get_tcpdump_pname(request, device)
@@ -371,19 +496,13 @@ end
 
 function handler:handle_request(request, response)
     local result = nil
-    if request.path == "/" or request.path == "/spin" or request.path == "/spin/" then
-        return self:handle_index(request, response)
-    elseif request.path == "/spin/tcpdump" then
-        return self:handle_tcpdump_manage(request, response)
-    elseif request.path == "/spin/tcpdump_status" then
-        return self:handle_tcpdump_status(request, response)
-    elseif request.path == "/spin/tcpdump_start" then
-        return self:handle_tcpdump_start(request, response)
-    elseif request.path == "/spin/tcpdump_stop" then
-        return self:handle_tcpdump_stop(request, response)
+    
+    local handler = self.fixed_handlers[request.path]
+    if handler ~= nil then
+        return handler(self, request, response)
     else
         -- try one of the static files; note: relative path
-        response = mt_engine.handle_static_file(request, response, "static")
+        return mt_engine.handle_static_file(request, response, "static")
     end
     return response
 end
