@@ -267,7 +267,8 @@ node_cache_create() {
     node_cache->arp_table = arp_table_create();
     node_cache->names = node_names_create();
     node_names_read_dhcpconfig(node_cache->names, "/etc/config/dhcp");
-    //node_names_read_userconfig(node_cache->names, "/etc/spin/spin_userdata.cfg");
+    // can/should we regularly call this again?
+    node_names_read_dhcpleases(node_cache->names, "/var/dhcp.leases");
     node_names_read_userconfig(node_cache->names, "/etc/spin/names.conf");
     return node_cache;
 }
@@ -375,10 +376,22 @@ node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
     // have this one already? (do set mac if now known,
     // and update last_seen)
     node_t* node = node_create(0);
+    char* name;
+
     node_set_last_seen(node, timestamp);
     add_mac_and_name(node_cache, node, ip);
     node_add_ip(node, ip);
-    node_cache_add_node(node_cache, node);
+    if (node_cache_add_node(node_cache, node) == 1) {
+        // It was new; reread the DHCP leases table, and set the name if it wasn't set yet
+        node_names_read_dhcpleases(node_cache->names, "/var/dhcp.leases");
+        if (node->mac && !node->name) {
+            name = node_names_find_mac(node_cache->names, node->mac);
+            if (name != NULL) {
+                node_set_name(node, name);
+            }
+
+        }
+    }
 }
 
 void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp) {
@@ -432,7 +445,9 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     }
 }
 
-void
+// return 0 if it existed/was merged
+// return 1 if it was new
+int
 node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     int new_id, *new_id_mem;
     tree_entry_t* cur = tree_first(node_cache->nodes);
@@ -446,7 +461,7 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
             if (!node_found) {
                 node_merge(tree_node, node);
                 node_found = 1;
-                // TODO: walk the rest of the cache two, we may need to merge more nodes now
+                // TODO: walk the rest of the cache too, we may need to merge more nodes now
                 node_destroy(node);
                 node = tree_node;
                 cur = tree_next(cur);
@@ -470,7 +485,7 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
         }
     }
     if (node_found) {
-        return;
+        return 0;
     }
     // ok no elements at all, add as a new one
     new_id = node_cache_get_new_id(node_cache);
@@ -479,6 +494,7 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     node->id = new_id;
 
     tree_add(node_cache->nodes, sizeof(new_id), new_id_mem, sizeof(node_t), node, 0);
+    return 1;
 }
 
 /*

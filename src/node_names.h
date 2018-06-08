@@ -25,6 +25,7 @@ node_names_t* node_names_create(void);
 void node_names_destroy(node_names_t*);
 
 int node_names_read_dhcpconfig(node_names_t* node_names, const char* filename);
+int node_names_read_dhcpleases(node_names_t* node_names, const char* filename);
 int node_names_read_userconfig(node_names_t* node_names, const char* filename);
 int node_names_write_userconfig(node_names_t* node_names, const char* filename);
 

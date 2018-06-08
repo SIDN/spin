@@ -47,6 +47,7 @@ static inline int readline(char* dest, FILE* in, size_t max) {
 }
 
 #define LINE_MAX 256
+#define TOKEN_MAX 64
 
 static inline char* find_name(const char* str) {
     // find the separator
@@ -72,6 +73,19 @@ static inline char* find_mac(const char* str) {
 
 static inline int instr(char c, const char* str) {
     return index(str, c) != NULL;
+}
+
+static inline size_t skip_token(char* in, const char* delimit, size_t max) {
+    size_t in_i = 0, out_i = 0;
+    // skip spaces
+    while (instr(in[in_i], " \t")) { in_i++; };
+    while (!instr(in[in_i], delimit)) {
+        in_i++;
+        if (in_i >= max) {
+            return 0;
+        }
+    }
+    return in_i;
 }
 
 static inline size_t get_token(char* dest, char* in, const char* delimit, size_t max) {
@@ -217,6 +231,68 @@ int node_names_read_dhcpconfig(node_names_t* node_names, const char* filename) {
     free(token2);
     free(line);
     return 0;
+}
+
+int node_names_read_dhcpleases(node_names_t* node_names, const char* filename) {
+    // states:
+    // 0: looking for 'config' section
+    // 1: in 'config host' section
+    int done = 0;
+    char* line;
+    char* line_cur;
+    int line_size;
+    size_t token_len;
+
+    char mac[TOKEN_MAX];
+    char name[TOKEN_MAX];
+
+    FILE* in = fopen(filename, "r");
+
+    if (in == NULL) {
+        return -1;
+    }
+    line = (char*)malloc(LINE_MAX);
+
+    while (!done) {
+        line_size = readline(line, in, LINE_MAX);
+        if (line_size == 0) {
+            done = 1;
+            break;
+        }
+        line_cur = line;
+
+        // Assuming the simplified lease format for now:
+        // timestamp mac ip name [other]
+        token_len = skip_token(line_cur, " \t", LINE_MAX);
+        if (token_len <= 0) {
+            done = 1;
+            break;
+        }
+        line_cur += token_len;
+        token_len = get_token(mac, line_cur, " \t", TOKEN_MAX);
+        if (token_len <= 0) {
+            done = 1;
+            break;
+        }
+        line_cur += token_len;
+        token_len = skip_token(line_cur, " \t", LINE_MAX);
+        if (token_len <= 0) {
+            done = 1;
+            break;
+        }
+        line_cur += token_len;
+        token_len = get_token(name, line_cur, " \t", TOKEN_MAX);
+        if (token_len <= 0) {
+            done = 1;
+            break;
+        }
+
+        if (strlen(mac) != 0 && strlen(name) != 0 && strncmp(name, "*", 2) != 0) {
+            tree_add(node_names->dhcp_names_by_mac, strlen(mac)+1, mac, strlen(name)+1, name, 1);
+        }
+        name[0] = '\0';
+        mac[0] = '\0';
+    }
 }
 
 int node_names_read_userconfig(node_names_t* node_names, const char* filename) {
