@@ -154,7 +154,7 @@ function arg_parse(args)
     mqtt_port = nil
 
     if args == nil then return config_file, mqtt_host, mqtt_port end
-    
+
     skip = false
     for i = 1,table.getn(args) do
         if skip then
@@ -208,7 +208,7 @@ function handler:add_device_seen(mac, name, timestamp)
     device_data['profile'] = ""
     device_data['enforcement'] = ""
     device_data['logging'] = ""
-    
+
     self.devices_seen[mac] = device_data
 end
 
@@ -224,7 +224,7 @@ function handler:handle_traffic_message(data, orig_data)
             mac = d.to.mac
             ips = d.to.ips
         end
-        
+
         if mac ~= nil then
             local name = nil
             -- If we have a known name, use that
@@ -278,7 +278,7 @@ function handler:init(args)
             vprint("Subscribed to " .. INCIDENT_CHANNEL)
         end
     end
-    
+
     local h = self
 
     client.ON_MESSAGE = function(mid, topic, payload)
@@ -469,6 +469,7 @@ end
 
 function handler:handle_device_list(request, response)
     response:set_header("Content-Type", "application/json")
+    response:set_header("Access-Control-Allow-Origin", "*")
     response.content = json.encode(self.devices_seen)
     return response
 end
@@ -496,7 +497,7 @@ end
 
 function handler:handle_request(request, response)
     local result = nil
-    
+
     local handler = self.fixed_handlers[request.path]
     if handler ~= nil then
         return handler(self, request, response)
