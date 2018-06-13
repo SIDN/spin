@@ -3,10 +3,10 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
     <head>
         <title>Download device traffic {{= device }}</title>
-        <script type="text/javascript" src="/spin/js/jquery-3.1.1.min.js" ></script>
-        <script type="text/javascript" src="/spin/js/jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
-        <link type="text/css" href="/spin/js/jquery-ui-1.12.1.custom/jquery-ui.theme.css" rel="stylesheet">
-        <link type="text/css" href="/spin/js/jquery-ui-1.12.1.custom/jquery-ui.css" rel="stylesheet">
+        <script type="text/javascript" src="/spin_api/js/jquery-3.1.1.min.js" ></script>
+        <script type="text/javascript" src="/spin_api/js/jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
+        <link type="text/css" href="/spin_api/js/jquery-ui-1.12.1.custom/jquery-ui.theme.css" rel="stylesheet">
+        <link type="text/css" href="/spin_api/js/jquery-ui-1.12.1.custom/jquery-ui.css" rel="stylesheet">
         </script>
     </head>
 
@@ -22,13 +22,13 @@
 
         function load_status() {
             //alert("load!");
-            //$("bytes_sent_status").load("/spin/tcpdump_status?device={{=device}}", function (data) { $(this).html(data); console.log("status set to " + data); });
-            $("#bytes_sent_status").load("/spin/tcpdump_status?device={{=device}}");
+            //$("bytes_sent_status").load("/spin_api/tcpdump_status?device={{=device}}", function (data) { $(this).html(data); console.log("status set to " + data); });
+            $("#bytes_sent_status").load("/spin_api/tcpdump_status?device={{=device}}");
         }
 
         function stop() {
             clearInterval(reloader);
-            $.get("/spin/tcpdump_stop?device={{=device}}").done(function(){window.close();});
+            $.get("/spin_api/tcpdump_stop?device={{=device}}").done(function(){window.close();});
         }
 
         function reload_once() {
@@ -45,7 +45,7 @@
             $.ajax({
             async: false,
             cache: false,
-            url: "/spin/tcpdump_stop?device={{=device}}"
+            url: "/spin_api/tcpdump_stop?device={{=device}}"
             });
             return void(0);
         });

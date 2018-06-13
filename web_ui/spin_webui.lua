@@ -11,6 +11,8 @@ local json = require 'json'
 local TRAFFIC_CHANNEL = "SPIN/traffic"
 local HISTORY_SIZE = 600
 
+local profile_manager_m = require 'profile_manager'
+
 posix = require 'posix'
 
 --
@@ -202,10 +204,11 @@ end
 
 function handler:add_device_seen(mac, name, timestamp)
     local device_data = {}
-    device_data['lastseen'] = timestamp
+    device_data['lastSeen'] = timestamp
     device_data['name'] = name
     device_data['new'] = true
-    device_data['profile'] = ""
+    device_data['mac'] = mac
+    device_data['appliedProfiles'] = self.profile_manager:get_device_profiles(mac) 
     device_data['enforcement'] = ""
     device_data['logging'] = ""
 
@@ -241,80 +244,6 @@ function handler:handle_traffic_message(data, orig_data)
             self:add_device_seen(mac, name, os.time())
         end
     end
-    --for a,b in pairs(self.devices_seen) do
-    --    print("[XX] " .. a .. ": " .. b)
-    --end
-end
-
-function handler:init(args)
-    -- we keep track of active downloads by having a dict of
-    -- "<client_ip>-<device mac>" -> <bytes_sent>
-    self.active_dumps = {}
-
-    self:read_config(args)
-    self:load_templates()
-
-    -- We will use this list for the fixed url mappings
-    self.fixed_handlers = {
-        ["/"] = handler.handle_index,
-        ["/spin"] = self.handle_index,
-        ["/spin/"] = self.handle_index,
-        ["/spin/tcpdump"] = self.handle_tcpdump_manage,
-        ["/spin/tcpdump_status"] = self.handle_tcpdump_status,
-        ["/spin/tcpdump_start"] = self.handle_tcpdump_start,
-        ["/spin/tcpdump_stop"] = self.handle_tcpdump_stop,
-        ["/spin/api/devices"] = self.handle_device_list
-    }
-
-    local client = mqtt.new()
-    self.devices_seen = {}
-
-    client.ON_CONNECT = function()
-        vprint("Connected to MQTT broker")
-        client:subscribe(TRAFFIC_CHANNEL)
-        vprint("Subscribed to " .. TRAFFIC_CHANNEL)
-        if handle_incidents then
-            client:subscribe(INCIDENT_CHANNEL)
-            vprint("Subscribed to " .. INCIDENT_CHANNEL)
-        end
-    end
-
-    local h = self
-
-    client.ON_MESSAGE = function(mid, topic, payload)
-        --print("[XX] message for you, sir!")
-        local pd = json.decode(payload)
-        if topic == TRAFFIC_CHANNEL then
-            if pd["command"] and pd["command"] == "traffic" then
-                h:handle_traffic_message(pd["result"], payload)
-            end
-        elseif handle_incidents and topic == INCIDENT_CHANNEL then
-            if pd["incident"] == nil then
-                print("Error: no incident data found in " .. payload)
-                print("Incident report ignored")
-            else
-                local incident = pd["incident"]
-                local ts = incident["incident_timestamp"]
-                for i=ts-5,ts+5 do
-                    if handle_incident_report(incident, i) then break end
-                end
-            end
-        end
-    end
-
-    print("[XX] connecting to " .. self.config.mqtt.host .. ":" .. self.config.mqtt.port)
-    a,b,c,d = client:connect(self.config.mqtt.host, self.config.mqtt.port)
-    --print(client:socket)
-    --client.socket = copas.wrap(client.socket)
-    --if a ~= nil then print("a: " .. a) end
-    if b ~= nil then print("b: " .. b) end
-    if c ~= nil then print("c: " .. c) end
-    if d ~= nil then print("d: " .. d) end
-
-    self.client = client
-    copas.addthread(self.mqtt_looper, self)
-
-    return true
 end
 
 function handler:mqtt_looper()
@@ -467,13 +396,6 @@ function handler:handle_tcpdump_stop(request, response)
     return response
 end
 
-function handler:handle_device_list(request, response)
-    response:set_header("Content-Type", "application/json")
-    response:set_header("Access-Control-Allow-Origin", "*")
-    response.content = json.encode(self.devices_seen)
-    return response
-end
-
 function handler:handle_tcpdump_manage(request, response)
     local device = request.params["device"]
     local dname = get_tcpdump_pname(request, device)
@@ -495,6 +417,148 @@ function handler:handle_tcpdump_manage(request, response)
     return response
 end
 
+function handler:set_api_headers(response)
+    response:set_header("Content-Type", "application/json")
+    response:set_header("Access-Control-Allow-Origin", "*")
+    response:set_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+    response:set_header("Access-Control-Allow-Methods", "GET,POST,HEAD,OPTIONS")
+end
+
+function handler:handle_device_list(request, response)
+    self:set_api_headers(response)
+    response.content = json.encode(self.devices_seen)
+    return response
+end
+
+function handler:handle_profile_list(request, response)
+    self:set_api_headers(response)
+    local profile_list = {}
+    for i,v in pairs(self.profile_manager.profiles) do
+        table.insert(profile_list, v)
+    end
+    response.content = json.encode(profile_list)
+    return response
+end
+
+function handler:handle_device_profiles(request, response, device_mac)
+    self:set_api_headers(response)
+    if request.method == "GET" then
+        response.content = json.encode(self.profile_manager:get_device_profiles(device_mac))
+    else
+        if request.post_data ~= nil and request.post_data.profile_id ~= nil then
+            if self.devices_seen[device_mac] ~= nil then
+                local status, err = self.profile_manager:set_device_profile(device_mac, request.post_data.profile_id)
+            else
+                status = nil
+                err = "Error: unknown device: " .. device_mac
+            end
+            -- persist the new state
+            if status ~= nil then
+                -- all ok, basic 200 response good
+                self.profile_manager:save_device_profiles()
+                return response
+            else
+                -- todo: how to convey error?
+                response:set_status(400, "Bad request")
+                response.content = json.encode({status = 400, error = err})
+            end
+        else
+            response:set_status(400, "Bad request")
+            response.content = json.encode({status = 400, error = "Parameter missing in POST data: profile_id"})
+        end
+    end
+    return response
+end
+
+function handler:init(args)
+    -- we keep track of active downloads by having a dict of
+    -- "<client_ip>-<device mac>" -> <bytes_sent>
+    self.active_dumps = {}
+
+    self:read_config(args)
+    self:load_templates()
+    
+    self.profile_manager = profile_manager_m.create_profile_manager()
+    self.profile_manager:load_all_profiles()
+    self.profile_manager:load_device_profiles()
+
+    -- We will use this list for the fixed url mappings
+    -- Fixed handlers are interpreted as they are; they are
+    -- ONLY valid for the EXACT path identified in this list
+    self.fixed_handlers = {
+        ["/"] = handler.handle_index,
+        ["/spin_api"] = self.handle_index,
+        ["/spin_api/"] = self.handle_index,
+        ["/spin_api/tcpdump"] = self.handle_tcpdump_manage,
+        ["/spin_api/tcpdump_status"] = self.handle_tcpdump_status,
+        ["/spin_api/tcpdump_start"] = self.handle_tcpdump_start,
+        ["/spin_api/tcpdump_stop"] = self.handle_tcpdump_stop,
+        ["/spin_api/devices"] = self.handle_device_list,
+        ["/spin_api/profiles"] = self.handle_profile_list
+    }
+
+    -- Pattern handlers are more flexible than fixed handlers;
+    -- they use lua patterns to find a handler
+    -- Take care; it is first-come-first-serve in this list
+    -- Capture values are passed to the handler as extra arguments
+    -- The maximum number of capture fields is 4
+    self.pattern_handlers = {
+        { pattern = "/spin_api/devices/(%x%x:%x%x:%x%x:%x%x:%x%x:%x%x)/appliedProfiles",
+          handler = self.handle_device_profiles
+        },
+    }
+
+    local client = mqtt.new()
+    self.devices_seen = {}
+
+    client.ON_CONNECT = function()
+        vprint("Connected to MQTT broker")
+        client:subscribe(TRAFFIC_CHANNEL)
+        vprint("Subscribed to " .. TRAFFIC_CHANNEL)
+        if handle_incidents then
+            client:subscribe(INCIDENT_CHANNEL)
+            vprint("Subscribed to " .. INCIDENT_CHANNEL)
+        end
+    end
+
+    local h = self
+
+    client.ON_MESSAGE = function(mid, topic, payload)
+        --print("[XX] message for you, sir!")
+        local pd = json.decode(payload)
+        if topic == TRAFFIC_CHANNEL then
+            if pd["command"] and pd["command"] == "traffic" then
+                h:handle_traffic_message(pd["result"], payload)
+            end
+        elseif handle_incidents and topic == INCIDENT_CHANNEL then
+            if pd["incident"] == nil then
+                print("Error: no incident data found in " .. payload)
+                print("Incident report ignored")
+            else
+                local incident = pd["incident"]
+                local ts = incident["incident_timestamp"]
+                for i=ts-5,ts+5 do
+                    if handle_incident_report(incident, i) then break end
+                end
+            end
+        end
+    end
+
+    print("[XX] connecting to " .. self.config.mqtt.host .. ":" .. self.config.mqtt.port)
+    a,b,c,d = client:connect(self.config.mqtt.host, self.config.mqtt.port)
+    --print(client:socket)
+    --client.socket = copas.wrap(client.socket)
+    --if a ~= nil then print("a: " .. a) end
+    if b ~= nil then print("b: " .. b) end
+    if c ~= nil then print("c: " .. c) end
+    if d ~= nil then print("d: " .. d) end
+
+    self.client = client
+    copas.addthread(self.mqtt_looper, self)
+
+    return true
+end
+
 function handler:handle_request(request, response)
     local result = nil
 
@@ -502,6 +566,13 @@ function handler:handle_request(request, response)
     if handler ~= nil then
         return handler(self, request, response)
     else
+        -- see if it matches one of the pattern handlers
+        for i, ph in pairs(self.pattern_handlers) do
+            local s,e,arg1,arg2,arg3,arg4 = string.find(request.path, ph.pattern)
+            if s ~= nil and e ~= nil then
+                return ph.handler(self, request, response, arg1, arg2, arg3, arg4)
+            end
+        end
         -- try one of the static files; note: relative path
         return mt_engine.handle_static_file(request, response, "static")
     end

@@ -486,7 +486,7 @@ function initGraphs() {
         // Much TODO here; port, etc. currently spin_webui.lua must
         // be started and lua-minittp installed
         var url = window.location.protocol + "//" + window.location.hostname +
-        "/spin/tcpdump?device="+name;
+        "/spin_api/tcpdump?device="+name;
         var w = window.open(url, name, "width=400,  height=300, scrollbars=yes");
     });
 
