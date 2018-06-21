@@ -218,6 +218,10 @@ function handler:add_device_seen(mac, name, timestamp)
         device_data['logging'] = ""
 
         self.devices_seen[mac] = device_data
+
+        -- this device is new, so send a notification
+        local notification_txt = "New device on network ("..name..")! Please set a profile"
+        self:create_notification(notification_txt)
     end
 end
 
@@ -495,6 +499,62 @@ function handler:handle_toggle_new(request, response, device_mac)
     return response
 end
 
+-- TODO: move to own module?
+-- (down to TODO_MOVE_ENDS_HERE)
+function handler:create_notification(text)
+    local new_notification = {}
+    new_notification['id'] = self.notification_counter
+    self.notification_counter = self.notification_counter + 1
+    new_notification['timestamp'] = os.time()
+    new_notification['message'] = text
+    table.insert(self.notifications, new_notification)
+end
+
+function handler:delete_notification(id)
+    local to_remove = nil
+    for i,v in pairs(self.notifications) do
+        if v.id == id then
+            to_remove = i
+        end
+    end
+    if to_remove ~= nil then table.remove(self.notifications, to_remove) end
+end
+
+function handler:handle_notification_list(request, response)
+    self:set_api_headers(response)
+    response.content = json.encode(self.notifications)
+    return response
+end
+
+function handler:handle_notification_delete(request, response, notification_id)
+    self:set_api_headers(response)
+    if request.method == "POST" then
+        self:delete_notification(tonumber(notification_id))
+    else
+        response.set_status(400, "Bad request")
+        response.content = "This URL requires a POST"
+    end
+    return response
+end
+
+function handler:handle_notification_add(request, response)
+    if request.method == "POST" then
+        if request.post_data ~= nil and request.post_data.message ~= nil then
+            self:create_notification(request.post_data.message)
+            return response
+        else
+            response:set_status(400, "Bad request")
+            response.content = "No element 'message' found in post data"
+        end
+    else
+        response.set_status(400, "Bad request")
+        response.content = "This URL requires a POST"
+    end
+    return response
+end
+
+-- TODO_MOVE_ENDS_HERE
+
 function handler:init(args)
     -- we keep track of active downloads by having a dict of
     -- "<client_ip>-<device mac>" -> <bytes_sent>
@@ -506,6 +566,8 @@ function handler:init(args)
     self.profile_manager = profile_manager_m.create_profile_manager()
     self.profile_manager:load_all_profiles()
     self.profile_manager:load_device_profiles()
+    self.notifications = {}
+    self.notification_counter = 1
 
     -- We will use this list for the fixed url mappings
     -- Fixed handlers are interpreted as they are; they are
@@ -519,7 +581,9 @@ function handler:init(args)
         ["/spin_api/tcpdump_start"] = self.handle_tcpdump_start,
         ["/spin_api/tcpdump_stop"] = self.handle_tcpdump_stop,
         ["/spin_api/devices"] = self.handle_device_list,
-        ["/spin_api/profiles"] = self.handle_profile_list
+        ["/spin_api/profiles"] = self.handle_profile_list,
+        ["/spin_api/notifications"] = self.handle_notification_list,
+        ["/spin_api/notifications/create"] = self.handle_notification_add
     }
 
     -- Pattern handlers are more flexible than fixed handlers;
@@ -533,6 +597,9 @@ function handler:init(args)
         },
         { pattern = "/spin_api/devices/(%x%x:%x%x:%x%x:%x%x:%x%x:%x%x)/toggleNew/?$",
           handler = self.handle_toggle_new
+        },
+        { pattern = "/spin_api/notifications/(%d+)/delete/?$",
+          handler = self.handle_notification_delete
         }
     }
 

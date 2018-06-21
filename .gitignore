@@ -29,3 +29,6 @@ src/tests/*_test
 *.gcda
 *.gcno
 src/version.c
+src/spind
+kernelmod/.deps
+kernelmod/.dirstamp
