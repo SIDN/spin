@@ -417,11 +417,15 @@ function handler:handle_tcpdump_manage(request, response)
     return response
 end
 
-function handler:set_api_headers(response)
-    response:set_header("Content-Type", "application/json")
+function handler:set_cors_headers(response)
     response:set_header("Access-Control-Allow-Origin", "*")
     response:set_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
     response:set_header("Access-Control-Allow-Methods", "GET,POST,HEAD,OPTIONS")
+end
+
+function handler:set_api_headers(response)
+    self:set_cors_headers(response)
+    response:set_header("Content-Type", "application/json")
 end
 
 function handler:handle_device_list(request, response)
@@ -561,6 +565,11 @@ end
 
 function handler:handle_request(request, response)
     local result = nil
+    -- handle OPTIONS separately for now
+    if request.method == "OPTIONS" then
+        self:set_cors_headers(response)
+        return response
+    end
 
     local handler = self.fixed_handlers[request.path]
     if handler ~= nil then
