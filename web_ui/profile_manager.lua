@@ -58,8 +58,9 @@ function profile_manager:get_device_profiles(device_mac)
     if self.device_profiles[device_mac] ~= nil then
         return self.device_profiles[device_mac]
     else
-        print(json.encode(self.device_profiles))
-        return {}
+        result = {}
+        table.insert(result, "allow_all")
+        return result
     end
 end
 

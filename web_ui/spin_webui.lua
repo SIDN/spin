@@ -203,16 +203,22 @@ function handler:read_config(args)
 end
 
 function handler:add_device_seen(mac, name, timestamp)
-    local device_data = {}
-    device_data['lastSeen'] = timestamp
-    device_data['name'] = name
-    device_data['new'] = true
-    device_data['mac'] = mac
-    device_data['appliedProfiles'] = self.profile_manager:get_device_profiles(mac) 
-    device_data['enforcement'] = ""
-    device_data['logging'] = ""
+    if self.devices_seen[mac] ~= nil then
+        self.devices_seen[mac]['lastSeen'] = timestamp
+        self.devices_seen[mac]['name'] = name
+        self.devices_seen[mac]['appliedProfiles'] = self.profile_manager:get_device_profiles(mac) 
+    else
+        local device_data = {}
+        device_data['lastSeen'] = timestamp
+        device_data['name'] = name
+        device_data['new'] = true
+        device_data['mac'] = mac
+        device_data['appliedProfiles'] = self.profile_manager:get_device_profiles(mac) 
+        device_data['enforcement'] = ""
+        device_data['logging'] = ""
 
-    self.devices_seen[mac] = device_data
+        self.devices_seen[mac] = device_data
+    end
 end
 
 function handler:handle_traffic_message(data, orig_data)
@@ -220,25 +226,26 @@ function handler:handle_traffic_message(data, orig_data)
     for i, d in ipairs(data.flows) do
         local mac = nil
         local ips = nil
+        local name = nil
         if d.from ~= nil and d.from.mac ~= nil then
+            name = d.from.name
             mac = d.from.mac
             ips = d.from.ips
         elseif d.to ~= nil and d.to.mac ~= nil then
+            name = d.to.name
             mac = d.to.mac
             ips = d.to.ips
         end
 
         if mac ~= nil then
-            local name = nil
-            -- If we have a known name, use that
-            if d.name ~= nil then
-                name = d.name
-            -- Otherwise, use the first ip address we saw
-            elseif ips ~= nil and table.getn(ips) > 0 then
-                name = ips[1]
-            -- to be sure we have *something* , fall back to mac
-            else
-                d.name = mac
+            -- If we don't have a name yet, use an IP address
+            if name == nil then
+              if ips ~= nil and table.getn(ips) > 0 then
+                  name = ips[1]
+              -- to be sure we have *something* , fall back to mac
+              else
+                  d.name = mac
+              end
             end
             -- gather additional info, if available
             self:add_device_seen(mac, name, os.time())
@@ -450,8 +457,9 @@ function handler:handle_device_profiles(request, response, device_mac)
         response.content = json.encode(self.profile_manager:get_device_profiles(device_mac))
     else
         if request.post_data ~= nil and request.post_data.profile_id ~= nil then
+            local status = nil
             if self.devices_seen[device_mac] ~= nil then
-                local status, err = self.profile_manager:set_device_profile(device_mac, request.post_data.profile_id)
+                status, err = self.profile_manager:set_device_profile(device_mac, request.post_data.profile_id)
             else
                 status = nil
                 err = "Error: unknown device: " .. device_mac
@@ -469,6 +477,19 @@ function handler:handle_device_profiles(request, response, device_mac)
         else
             response:set_status(400, "Bad request")
             response.content = json.encode({status = 400, error = "Parameter missing in POST data: profile_id"})
+        end
+    end
+    return response
+end
+
+function handler:handle_toggle_new(request, response, device_mac)
+    self:set_api_headers(response)
+    if request.method == "POST" then
+        if self.devices_seen[device_mac] ~= nil then
+            self.devices_seen[device_mac].new = not self.devices_seen[device_mac].new
+        else
+            response:set_status(400, "Bad request")
+            response.content = json.encode({status = 400, error = "Unknown device: " .. device_mac})
         end
     end
     return response
@@ -507,9 +528,12 @@ function handler:init(args)
     -- Capture values are passed to the handler as extra arguments
     -- The maximum number of capture fields is 4
     self.pattern_handlers = {
-        { pattern = "/spin_api/devices/(%x%x:%x%x:%x%x:%x%x:%x%x:%x%x)/appliedProfiles",
+        { pattern = "/spin_api/devices/(%x%x:%x%x:%x%x:%x%x:%x%x:%x%x)/appliedProfiles/?$",
           handler = self.handle_device_profiles
         },
+        { pattern = "/spin_api/devices/(%x%x:%x%x:%x%x:%x%x:%x%x:%x%x)/toggleNew/?$",
+          handler = self.handle_toggle_new
+        }
     }
 
     local client = mqtt.new()
