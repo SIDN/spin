@@ -145,7 +145,7 @@ For the communication protocol between a user-space program and the kernel modul
 
 For the channels and mqtt message formats, see [doc/mqtt_protocol.md](doc/mqtt_protocol.md)
 
-## REST API
+## Web API
 
-For the REST API description, see [doc/rest_api.md](doc/rest_api.md)
+For the Web API description, see [doc/web_api.md](doc/web_api.md)
 
