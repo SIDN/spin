@@ -1,0 +1,57 @@
+
+Incident reports by provider
+
+This is a prototype of the incident report system so that providers
+can help stop malicious traffic without resorting to a full quarantine
+of the home network.
+
+The underlying idea is that the SPIN system has a history of local
+traffic, whereas the provider (or any reporter of incidents) only knows
+the public IP address(es), and not the originator of the malicious
+traffic.
+
+The incident report contains a timestamp and traffic information, and
+SPIN can search its history for the offending device. Depending on the
+type of report, and user settings, SPIN can block that device until the
+issue is resolved.
+
+This is just a prototype, and it only does full blocking without
+configuration right now.
+
+From a high overview, the system works as follows
+
+- The provider (or trusted reporter) contacts the router stating that
+  it has an incident report
+- The router fetches the incident report, which contains (at least) the
+  following data:
+  * timestamp
+  * source address (likely the public address of the router in case of IPv4)
+  * source port
+  * target address
+  * target port
+  * severity (not implemented yet)
+  * type (not implemented yet)
+- The router pushes this information to the MQTT broker, on the channel
+  "SPIN/incidents"
+- The incident report handler (part of SPIN), reads that message and
+  searches its history for the offending device
+- If found, it sends a message to the MQTT broker to block that device.
+  Note: right now this only works on the router itself, as it uses
+  the spin_config tool. We need an mqtt channel operation for this as
+  well.
+
+
+JSON format:
+{
+  "incident": {
+    "timestamp": int,
+    "src_addr": string,
+    "src_port": int,
+    "dst_addr": string,
+    "dst_port": int,
+    "severity": string? (hmm, maybe int with a definition list),
+    "type": string
+  }
+}
+
+
