@@ -127,9 +127,12 @@ Toggles the 'new' status of the device.
 
 Returns a list of notifications from SPIN to the user, in the form of a list of dictionaries. The dictionaries contain the following fields:
 
-* id (integer): the unique identifier of the profile
+* id (integer): the unique identifier of the message
 * message (string): the message to show to the user
 * timestamp (integer): A UNIX timestamp (seconds since epoch), set to the time the message was created.
+* deviceMac (string, optional): The MAC address of the device this notification refers to
+* deviceName (string, optional): The name of the device this notification refers to, see /spin_api/devices for information on what value is used for the name
+
 
 #### Example response
 

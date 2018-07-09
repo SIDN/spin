@@ -220,8 +220,8 @@ function handler:add_device_seen(mac, name, timestamp)
         self.devices_seen[mac] = device_data
 
         -- this device is new, so send a notification
-        local notification_txt = "New device on network ("..name..")! Please set a profile"
-        self:create_notification(notification_txt)
+        local notification_txt = "New device on network! Please set a profile"
+        self:create_notification(notification_txt, mac, name)
     end
 end
 
@@ -461,9 +461,19 @@ function handler:handle_device_profiles(request, response, device_mac)
         response.content = json.encode(self.profile_manager:get_device_profiles(device_mac))
     else
         if request.post_data ~= nil and request.post_data.profile_id ~= nil then
+            local profile_id = request.post_data.profile_id
             local status = nil
             if self.devices_seen[device_mac] ~= nil then
                 status, err = self.profile_manager:set_device_profile(device_mac, request.post_data.profile_id)
+                local device_name = self.devices_seen[device_mac].name
+                local profile_name = self.profile_manager.profiles[profile_id]
+                if status then
+                  local notification_txt = "Profile set to " .. profile_name)
+                  self:create_notification(notification_txt, device_mac, device_name)
+                else
+                  local notification_txt = "Error setting device profile: " .. err
+                  self:create_notification(notification_txt, device_mac, device_name)
+                end
             else
                 status = nil
                 err = "Error: unknown device: " .. device_mac
@@ -501,12 +511,18 @@ end
 
 -- TODO: move to own module?
 -- (down to TODO_MOVE_ENDS_HERE)
-function handler:create_notification(text)
+function handler:create_notification(text, device_mac, device_name)
     local new_notification = {}
     new_notification['id'] = self.notification_counter
     self.notification_counter = self.notification_counter + 1
     new_notification['timestamp'] = os.time()
     new_notification['message'] = text
+    if device_mac ~= nil then
+        new_notification['deviceMac'] = device_mac
+    end
+    if device_name ~= nil then
+        new_notification['deviceName'] = device_name
+    end
     table.insert(self.notifications, new_notification)
 end
 
@@ -620,20 +636,22 @@ function handler:init(args)
 
     client.ON_MESSAGE = function(mid, topic, payload)
         --print("[XX] message for you, sir!")
-        local pd = json.decode(payload)
-        if topic == TRAFFIC_CHANNEL then
-            if pd["command"] and pd["command"] == "traffic" then
-                h:handle_traffic_message(pd["result"], payload)
-            end
-        elseif handle_incidents and topic == INCIDENT_CHANNEL then
-            if pd["incident"] == nil then
-                print("Error: no incident data found in " .. payload)
-                print("Incident report ignored")
-            else
-                local incident = pd["incident"]
-                local ts = incident["incident_timestamp"]
-                for i=ts-5,ts+5 do
-                    if handle_incident_report(incident, i) then break end
+        local success, pd = pcall(json.decode, payload)
+        if success and pd then
+            if topic == TRAFFIC_CHANNEL then
+                if pd["command"] and pd["command"] == "traffic" then
+                    h:handle_traffic_message(pd["result"], payload)
+                end
+            elseif handle_incidents and topic == INCIDENT_CHANNEL then
+                if pd["incident"] == nil then
+                    print("Error: no incident data found in " .. payload)
+                    print("Incident report ignored")
+                else
+                    local incident = pd["incident"]
+                    local ts = incident["incident_timestamp"]
+                    for i=ts-5,ts+5 do
+                        if handle_incident_report(incident, i) then break end
+                    end
                 end
             end
         end
