@@ -439,6 +439,38 @@ function handler:set_api_headers(response)
     response:set_header("Content-Type", "application/json")
 end
 
+function handler:handle_configuration(request, response)
+    self:set_api_headers(response)
+    if request.method == "GET" then
+        -- read the config, we don't use it ourselves just yet
+        local fr, err = mt_io.file_reader("/etc/spin/spin_webui.conf")
+        if fr ~= nil then
+          response.content = fr:read_lines_single_str()
+        else
+          if err ~= nil then print("[XX] error: " .. err) end
+          -- we should put the error in here if it is not filenotfound
+          response.content = "{}"
+        end
+    elseif request.method == "POST" then
+        if request.post_data and request.post_data.config then
+            local fw, err = mt_io.file_writer("/etc/spin/spin_webui.conf")
+            if fw ~= nil then
+                fw:write_line(request.post_data.config)
+                fw:close()
+            else
+                response:set_status(400, "Bad request")
+                response.content = json.encode({status = 400, error = err})
+            end
+        else
+            response:set_status(400, "Bad request")
+            response.content = json.encode({status = 400, error = "Missing value: 'config' in POST data"})
+        end
+    else
+        response:set_status(405, "Method not allowed")
+    end
+    return response
+end
+
 function handler:handle_device_list(request, response)
     self:set_api_headers(response)
     response.content = json.encode(self.devices_seen)
@@ -463,12 +495,13 @@ function handler:handle_device_profiles(request, response, device_mac)
         if request.post_data ~= nil and request.post_data.profile_id ~= nil then
             local profile_id = request.post_data.profile_id
             local status = nil
+            local err = ""
             if self.devices_seen[device_mac] ~= nil then
                 status, err = self.profile_manager:set_device_profile(device_mac, request.post_data.profile_id)
                 local device_name = self.devices_seen[device_mac].name
-                local profile_name = self.profile_manager.profiles[profile_id]
+                local profile_name = self.profile_manager.profiles[profile_id].name
                 if status then
-                  local notification_txt = "Profile set to " .. profile_name)
+                  local notification_txt = "Profile set to " .. profile_name
                   self:create_notification(notification_txt, device_mac, device_name)
                 else
                   local notification_txt = "Error setting device profile: " .. err
@@ -599,7 +632,8 @@ function handler:init(args)
         ["/spin_api/devices"] = self.handle_device_list,
         ["/spin_api/profiles"] = self.handle_profile_list,
         ["/spin_api/notifications"] = self.handle_notification_list,
-        ["/spin_api/notifications/create"] = self.handle_notification_add
+        ["/spin_api/notifications/create"] = self.handle_notification_add,
+        ["/spin_api/configuration"] = self.handle_configuration
     }
 
     -- Pattern handlers are more flexible than fixed handlers;

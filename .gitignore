@@ -32,3 +32,4 @@ src/version.c
 src/spind
 kernelmod/.deps
 kernelmod/.dirstamp
+.idea/
