@@ -243,7 +243,7 @@ function handler:add_device_seen(mac, name, timestamp)
 
         -- this device is new, so send a notification
         local notification_txt = "New device on network! Please set a profile"
-        self:create_notification(notification_txt, mac, name)
+        self:create_notification("new_device", notification_txt, mac, name)
     end
     self.devices_seen_updated = get_time_string()
 end
@@ -535,10 +535,10 @@ function handler:handle_device_profiles(request, response, device_mac)
                 local profile_name = self.profile_manager.profiles[profile_id].name
                 if status then
                   local notification_txt = "Profile set to " .. profile_name
-                  self:create_notification(notification_txt, device_mac, device_name)
+                  self:create_notification("profile_set_to", notification_txt, device_mac, device_name)
                 else
                   local notification_txt = "Error setting device profile: " .. err
-                  self:create_notification(notification_txt, device_mac, device_name)
+                  self:create_notification("profile_set_error", notification_txt, device_mac, device_name)
                 end
             else
                 status = nil
@@ -578,11 +578,12 @@ end
 
 -- TODO: move to own module?
 -- (down to TODO_MOVE_ENDS_HERE)
-function handler:create_notification(text, device_mac, device_name)
+function handler:create_notification(msg_key, text, device_mac, device_name)
     local new_notification = {}
     new_notification['id'] = self.notification_counter
     self.notification_counter = self.notification_counter + 1
     new_notification['timestamp'] = os.time()
+    new_notification['messageKey'] = msg_key
     new_notification['message'] = text
     if device_mac ~= nil then
         new_notification['deviceMac'] = device_mac
@@ -627,12 +628,23 @@ end
 
 function handler:handle_notification_add(request, response)
     if request.method == "POST" then
-        if request.post_data ~= nil and request.post_data.message ~= nil then
-            self:create_notification(request.post_data.message)
+        local errors = {}
+        if request.post_data == nil then
+          table.insert(errors, "no message POST data")
+        else
+          if request.post_data.messageKey == nil then
+            table.insert(errors, "No element 'messageKey' found in post data")
+          end
+          if request.post_data.message == nil then
+            table.insert(errors, "No element 'message' found in post data")
+          end
+        end
+        if #errors == 0 then
+            self:create_notification(request.post_data.messageKey, request.post_data.message, request.post_data.deviceMac, request.post_data.deviceName)
             return response
         else
             response:set_status(400, "Bad request")
-            response.content = "No element 'message' found in post data"
+            response.content = json.encode({status = 400, error = errors})
         end
     else
         response.set_status(400, "Bad request")
