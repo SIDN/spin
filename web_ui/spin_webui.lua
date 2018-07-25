@@ -509,8 +509,21 @@ end
 function handler:handle_profile_list(request, response)
     self:set_api_headers(response)
     local profile_list = {}
+    -- we'll make a selective deep copy of the data, since for now we
+    -- want to leave out some of the fields
+    -- we may need to find a construct similar to the
+    -- serializer from DRF
     for i,v in pairs(self.profile_manager.profiles) do
-        table.insert(profile_list, v)
+        local profile = {}
+        profile.id = v.id
+        profile.name = v.name
+        profile.type = v.type
+        profile.description = v.description
+        table.insert(profile_list, profile)
+    end
+    for i,v in pairs(profile_list) do
+      v.rules_v4 = nil
+      v.rules_v6 = nil
     end
     response.content = json.encode(profile_list)
     response:set_header("Last-Modified", self.profile_manager.profiles_updated)
