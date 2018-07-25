@@ -131,19 +131,51 @@ Returns a list of notifications from SPIN to the user, in the form of a list of 
 * id (integer): the unique identifier of the message
 * message (string): the message to show to the user
 * messageKey (string): a unique message key that can be used for i18n
+* messageArgs (list of strings): variable data arguments that may be used in the message (such as names)
 * timestamp (integer): A UNIX timestamp (seconds since epoch), set to the time the message was created.
 * deviceMac (string, optional): The MAC address of the device this notification refers to
 * deviceName (string, optional): The name of the device this notification refers to, see /spin_api/devices for information on what value is used for the name
 
+Current messageKeys, their default text values, and their arguments are:
+
+| messageKey     | Arguments      | Default text                                |
+|----------------|----------------|---------------------------------------------|
+| new_device     |         -      | New device on network! Please set a profile |
+| profile_set_to |  profile-name  | Profile set to <arg 0>                      |
+| profile_error  |  error-message | Error setting profile: <arg 0>              |
 
 #### Example response
 
     [
-      {
-        "id": 1,
-        "message": "New device on network (android-14234156)! Please set a profile",
-        "timestamp": 1530711319
-      }
+       {
+          "deviceName" : "raptor",
+          "deviceMac" : "1a:5f:41:3f:fc:e6",
+          "messageArgs" : [],
+          "timestamp" : 1532526169,
+          "messageKey" : "new_device",
+          "id" : 1,
+          "message" : "New device on network! Please set a profile"
+       },
+       {
+          "deviceName" : "android-33535267",
+          "id" : 2,
+          "messageKey" : "new_device",
+          "message" : "New device on network! Please set a profile",
+          "messageArgs" : [],
+          "timestamp" : 1532526173,
+          "deviceMac" : "84:cf:bf:44:44:44"
+       },
+       {
+          "messageArgs" : [
+             "IPv4 only"
+          ],
+          "deviceMac" : "84:cf:bf:44:44:44",
+          "timestamp" : 1532526223,
+          "messageKey" : "profile_set_to",
+          "id" : 3,
+          "message" : "Profile set to IPv4 only",
+          "deviceName" : "android-33535267"
+       }
     ]
 
 
