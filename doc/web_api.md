@@ -16,6 +16,7 @@ The spin_webui daemon offers some web pages, and a REST API that can read and co
   - [/spin_api/notifications/\[integer\]/delete](#spin_apinotificationsintegerdelete)
   - [/spin_api/profiles](#spin_apiprofiles)
     - [Example response](#example-response)
+  - [/spin_api/configuration](#spin_apiconfiguration)
 - [Other URLs](#other-urls)
   - [/spin_api/tcpdump](#spin_apitcpdump)
   - [/spin_api/tcpdump_status](#spin_apitcpdump_status)
@@ -129,6 +130,7 @@ Returns a list of notifications from SPIN to the user, in the form of a list of 
 
 * id (integer): the unique identifier of the message
 * message (string): the message to show to the user
+* messageKey (string): a unique message key that can be used for i18n
 * timestamp (integer): A UNIX timestamp (seconds since epoch), set to the time the message was created.
 * deviceMac (string, optional): The MAC address of the device this notification refers to
 * deviceName (string, optional): The name of the device this notification refers to, see /spin_api/devices for information on what value is used for the name
@@ -184,26 +186,53 @@ Returns the available profiles for devices, in the form of a list of dictionarie
 * id (string): A unique identifier for the profile
 * name (string): A human-readable name for the profile
 * description (string): A description of the profile
+* type (string): One of CREATED_BU_USER, or CREATED_BY_SYSTEM
 
 #### Example response
 
     [
-      {
-        "description": "Deny all access to the Internet",
-        "id": "deny_all",
-        "name": "Deny all"
-      },
-      {
-        "description": "Deny all access to the Internet, but allow access to SIDN",
-        "id": "deny_all_except_sidn",
-        "name": "Deny all except SIDN"
-      },
-      {
-        "description": "Full access to the Internet",
-        "id": "allow_all",
-        "name": "Allow all"
-      }
+       {
+          "name" : "Blocked by Anomaly Detector",
+          "type" : "CREATED_BY_SYSTEM",
+          "description" : "Internet access blocked by anomaly detector",
+          "id" : "blocked_by_ad"
+       },
+       {
+          "type" : "CREATED_BY_USER",
+          "name" : "Deny all",
+          "id" : "deny_all",
+          "description" : "Deny all access to the Internet"
+       },
+       {
+          "id" : "deny_all_except_sidn",
+          "description" : "Deny all access to the Internet, but allow access to SIDN",
+          "name" : "Deny all except SIDN",
+          "type" : "CREATED_BY_USER"
+       },
+       {
+          "description" : "Allow all IPv6 traffic, Deny all IPv4 traffic",
+          "id" : "ipv6_only",
+          "name" : "IPv6 only",
+          "type" : "CREATED_BY_USER"
+       }
     ]
+
+### /spin_api/configuration
+
+(note: this endpoint is temporary, or will at the very least change in the future)
+
+**Method(s)**: GET, POST
+
+**URL Parameters**: None
+
+**Content Parameters \[POST only\]**:
+  * config (JSON data structure): The data to store
+
+This is an endpoint where applications can store arbitrary data for persistency.
+
+For GET, returns the JSON data that was stored in the most recent POST call to this endpoint.
+
+For POST, stores the data in the content parameter 'config'. This can be any arbitrary JSON data structure, and it will be returned on the next GET request to this endpoint.
 
 
 ## Other URLs
@@ -238,3 +267,4 @@ Starts the tcpdump managed by the /spin_api/tcpdump page
 **URL Parameter**: device (mac address)
 
 Stops the tcpdump managed by the /spin_api/tcpdump page
+
