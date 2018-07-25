@@ -47,6 +47,9 @@ function _M.create_profile_manager()
     pm.device_profile_file = DEVICE_PROFILE_FILE
     pm.profiles = {}
     pm.device_profiles = {}
+    pm.profile_list_updated = get_time_string()
+    pm.device_profiles_updated = get_time_string()
+
     return pm
 end
 
@@ -72,6 +75,7 @@ function profile_manager:load_all_profiles()
             end
         end
     end
+    self.profile_list_updated = get_time_string()
 end
 
 function profile_manager:save_device_profiles()
@@ -88,11 +92,11 @@ end
 
 function profile_manager:get_device_profiles(device_mac)
     if self.device_profiles[device_mac] ~= nil then
-        return self.device_profiles[device_mac]
+        return self.device_profiles[device_mac], self.device_profiles_updated
     else
         result = {}
         table.insert(result, "allow_all")
-        return result
+        return result, self.device_profiles_updated
     end
 end
 
@@ -113,6 +117,7 @@ function profile_manager:set_device_profile(device_mac, profile_id)
         else
           print("[XX] no IPv4 rules defined in profile")
         end
+        self.device_profiles_updated = get_time_string()
     else
         return nil, "Error: unknown profile: " .. profile_id
     end
@@ -151,6 +156,7 @@ function profile_manager:load_device_profiles()
         end
     end
 
+    self.device_profiles_updated = get_time_string()
     return result
 end
 

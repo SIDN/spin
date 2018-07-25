@@ -4,6 +4,7 @@ local mt_util = require 'minittp_util'
 
 local copas = require 'copas'
 local liluat = require 'liluat'
+local sys_stat = require "posix.sys.stat"
 
 local mqtt = require 'mosquitto'
 local json = require 'json'
@@ -12,6 +13,8 @@ local TRAFFIC_CHANNEL = "SPIN/traffic"
 local HISTORY_SIZE = 600
 
 local profile_manager_m = require 'profile_manager'
+
+local TEMPLATE_PATH = "templates/"
 
 posix = require 'posix'
 
@@ -96,6 +99,25 @@ function config_parse(filename)
     return config
 end
 
+-- return the current time, or given timestamp in the format of RFC7232 section 2.2
+function get_time_string(timestamp)
+    if timestamp ~= nil then
+      return os.date("%a, %d %b %Y %X %z", timestamp)
+    else
+      return os.date("%a, %d %b %Y %X %z")
+    end
+end
+
+-- return the file timestamp in the format of RFC7232 section 2.2
+function get_file_timestamp(file_path)
+    local fstat, err = sys_stat.stat(file_path)
+    if fstat == nil then
+        return nil, err
+    end
+
+    return os.date("%a, %d %b %Y %X %z", fstat.st_mtime)
+end
+
 --
 -- minittp handler functionality
 --
@@ -108,7 +130,7 @@ function handler:load_templates()
   local p = mt_io.subprocess('ls', {dirname}, nil, true)
   for name in p:read_line_iterator(true) do
     if name:endswith('.html') then
-      self.templates[name] = liluat.compile_file("templates/" .. name)
+      self.templates[name] = liluat.compile_file(TEMPLATE_PATH .. name)
     end
   end
   p:close()
@@ -206,14 +228,14 @@ function handler:add_device_seen(mac, name, timestamp)
     if self.devices_seen[mac] ~= nil then
         self.devices_seen[mac]['lastSeen'] = timestamp
         self.devices_seen[mac]['name'] = name
-        self.devices_seen[mac]['appliedProfiles'] = self.profile_manager:get_device_profiles(mac) 
+        self.devices_seen[mac]['appliedProfiles'] = self.profile_manager:get_device_profiles(mac)
     else
         local device_data = {}
         device_data['lastSeen'] = timestamp
         device_data['name'] = name
         device_data['new'] = true
         device_data['mac'] = mac
-        device_data['appliedProfiles'] = self.profile_manager:get_device_profiles(mac) 
+        device_data['appliedProfiles'] = self.profile_manager:get_device_profiles(mac)
         device_data['enforcement'] = ""
         device_data['logging'] = ""
 
@@ -223,6 +245,7 @@ function handler:add_device_seen(mac, name, timestamp)
         local notification_txt = "New device on network! Please set a profile"
         self:create_notification(notification_txt, mac, name)
     end
+    self.devices_seen_updated = get_time_string()
 end
 
 function handler:handle_traffic_message(data, orig_data)
@@ -266,6 +289,7 @@ end
 
 function handler:handle_index(request, response)
     html, err = self:render("index.html", {mqtt_host = self.config['mqtt']['host']})
+    response:set_header("Last-Modified", get_file_timestamp(TEMPLATE_PATH .. "index.html"))
     if html == nil then
         response:set_status(500, "Internal Server Error")
         response.content = "Template error: " .. err
@@ -418,6 +442,7 @@ function handler:handle_tcpdump_manage(request, response)
     end
 
     html, err = self:render_raw("tcpdump.html", { device=device, running=running, bytes_sent=bytes_sent })
+    response:set_header("Last-Modified", get_file_timestamp(TEMPLATE_PATH .. "tcpdump.html"))
 
     if html == nil then
         response:set_status(500, "Internal Server Error")
@@ -444,6 +469,7 @@ function handler:handle_configuration(request, response)
     if request.method == "GET" then
         -- read the config, we don't use it ourselves just yet
         local fr, err = mt_io.file_reader("/etc/spin/spin_webui.conf")
+        response:set_header("Last-Modified", get_file_timestamp("/etc/spin/spin_webui.conf"))
         if fr ~= nil then
           response.content = fr:read_lines_single_str()
         else
@@ -474,6 +500,9 @@ end
 function handler:handle_device_list(request, response)
     self:set_api_headers(response)
     response.content = json.encode(self.devices_seen)
+
+    response:set_header("Last-Modified", self.devices_seen_updated)
+
     return response
 end
 
@@ -484,13 +513,17 @@ function handler:handle_profile_list(request, response)
         table.insert(profile_list, v)
     end
     response.content = json.encode(profile_list)
+    response:set_header("Last-Modified", self.profile_manager.profiles_updated)
     return response
 end
 
 function handler:handle_device_profiles(request, response, device_mac)
     self:set_api_headers(response)
-    if request.method == "GET" then
-        response.content = json.encode(self.profile_manager:get_device_profiles(device_mac))
+    if request.method == "GET" or request.method == "HEAD" then
+        local content_json, updated = self.profile_manager:get_device_profiles(device_mac)
+        response.content = json.encode(content_json)
+	print("[XX] ytoyoyo lu: " .. updated)
+        response:set_header("Last-Modified", updated)
     else
         if request.post_data ~= nil and request.post_data.profile_id ~= nil then
             local profile_id = request.post_data.profile_id
@@ -532,8 +565,9 @@ end
 function handler:handle_toggle_new(request, response, device_mac)
     self:set_api_headers(response)
     if request.method == "POST" then
-        if self.devices_seen[device_mac] ~= nil then
-            self.devices_seen[device_mac].new = not self.devices_seen[device_mac].new
+        if self.devices_seen[device_mac] ~= nil and self.devices_seen[device_mac].new then
+            self.devices_seen[device_mac].new = false
+            self.devices_seen_updated = get_time_string()
         else
             response:set_status(400, "Bad request")
             response.content = json.encode({status = 400, error = "Unknown device: " .. device_mac})
@@ -557,6 +591,7 @@ function handler:create_notification(text, device_mac, device_name)
         new_notification['deviceName'] = device_name
     end
     table.insert(self.notifications, new_notification)
+    self.notifications_updated = get_time_string()
 end
 
 function handler:delete_notification(id)
@@ -566,12 +601,16 @@ function handler:delete_notification(id)
             to_remove = i
         end
     end
-    if to_remove ~= nil then table.remove(self.notifications, to_remove) end
+    if to_remove ~= nil then
+        table.remove(self.notifications, to_remove)
+        self.notifications_updated = get_time_string()
+    end
 end
 
 function handler:handle_notification_list(request, response)
     self:set_api_headers(response)
     response.content = json.encode(self.notifications)
+    response:set_header("Last-Modified", self.notifications_updated)
     return response
 end
 
@@ -611,11 +650,12 @@ function handler:init(args)
 
     self:read_config(args)
     self:load_templates()
-    
+
     self.profile_manager = profile_manager_m.create_profile_manager()
     self.profile_manager:load_all_profiles()
     self.profile_manager:load_device_profiles()
     self.notifications = {}
+    self.notifications_updated = get_time_string()
     self.notification_counter = 1
 
     -- We will use this list for the fixed url mappings
@@ -655,6 +695,7 @@ function handler:init(args)
 
     local client = mqtt.new()
     self.devices_seen = {}
+    self.devices_seen_updated = get_time_string()
 
     client.ON_CONNECT = function()
         vprint("Connected to MQTT broker")
