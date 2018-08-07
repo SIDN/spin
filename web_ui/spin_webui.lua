@@ -9,6 +9,8 @@ local sys_stat = require "posix.sys.stat"
 local mqtt = require 'mosquitto'
 local json = require 'json'
 
+local ws_ext = require 'ws_ext'
+
 local TRAFFIC_CHANNEL = "SPIN/traffic"
 local HISTORY_SIZE = 600
 
@@ -229,6 +231,7 @@ function handler:add_device_seen(mac, name, timestamp)
         self.devices_seen[mac]['lastSeen'] = timestamp
         self.devices_seen[mac]['name'] = name
         self.devices_seen[mac]['appliedProfiles'] = self.profile_manager:get_device_profiles(mac)
+        self:send_websocket_update("deviceUpdate", self.devices_seen[mac])
     else
         local device_data = {}
         device_data['lastSeen'] = timestamp
@@ -244,6 +247,7 @@ function handler:add_device_seen(mac, name, timestamp)
         -- this device is new, so send a notification
         local notification_txt = "New device on network! Please set a profile"
         self:create_notification("new_device", {}, notification_txt, mac, name)
+        self:send_websocket_update("newDevice", self.devices_seen[mac])
     end
     self.devices_seen_updated = get_time_string()
 end
@@ -506,6 +510,20 @@ function handler:handle_device_list(request, response)
     return response
 end
 
+function handler:send_websocket_update(name, arguments)
+    print("[XX] WEBSOCKCLIENTCOUNT: " .. table.getn(self.websocket_clients))
+    local msg = ""
+    if args == nil then
+        c:send('{"type": "update", "name": "' + name + '"}')
+    else
+        c:send('{"type": "update", "name": "' + name + '", "args": ' + json.encode(args) + '}')
+    end
+
+    for i,c in pairs(self.websocket_clients) do
+        c:send(msg)
+    end
+end
+
 function handler:handle_profile_list(request, response)
     self:set_api_headers(response)
     local profile_list = {}
@@ -549,6 +567,7 @@ function handler:handle_device_profiles(request, response, device_mac)
                 if status then
                   local notification_txt = "Profile set to " .. profile_name
                   self:create_notification("profile_set_to", { profile_name }, notification_txt, device_mac, device_name)
+                  self:send_websocket_update("deviceProfileUpdate", { deviceName=device_name, profileName=profile_name })
                 else
                   local notification_txt = "Error setting device profile: " .. err
                   self:create_notification("profile_set_error", { err }, notification_txt, device_mac, device_name)
@@ -669,6 +688,79 @@ function handler:handle_notification_add(request, response)
     return response
 end
 
+
+local data_printer = function(ws)
+  print("data_printer")
+  local message = "{\"foo\": \"bar\"}"
+  --copas.send(ws, message)
+  -- any messages we want to have sent by default could go here.
+  -- in principle we only send stuff from other methods
+  --for i=1,3 do
+  --  print("send "..i)
+  --  ws:send(message)
+  --  copas.sleep(1)
+  --end
+  --ws:close()
+  return "foo"
+end
+
+local ws_opts =
+{
+  -- listen on port 8080
+  --port = 8080,
+  -- the protocols field holds
+  --   key: protocol name
+  --   value: callback on new connection
+  protocols = {
+    -- this callback is called, whenever a new client connects.
+    -- ws is a new websocket instance
+    echo = echo_handler
+  },
+  default = data_printer
+}
+
+
+function handler:handle_websocket(request, response)
+    -- try to upgrade to a websocket connection.
+    -- if successful, we add it to the list of websockets (there may be more...)
+    print(request.raw_sock)
+    local flat_headers = {}
+    table.insert(flat_headers, request.http_line)
+    for h,v in pairs(request.headers) do
+        table.insert(flat_headers, h:lower() .. ": " .. v)
+    end
+    table.insert(flat_headers, "\r\n")
+    --print("[XX] FLAT HEADERS:")
+    --for fh,fv in pairs(flat_headers) do
+    --    print("[XX]    " .. fv)
+    --end
+    --print("[XX] END OF FLAT HEADERS OF TYPE " .. type(flat_headers))
+    request.raw_sock:settimeout(1)
+    print("[XX] AAAAAA")
+    status, err = self.ws_handler.add_client(flat_headers, request.raw_sock, self)
+    print("[XX] BBBBBB")
+    if not status then
+        print("[XX] CCCCCC")
+        response:set_status(400, "Bad request")
+        response.content = err
+        return response
+    else
+        print("[XX] DDDDDD")
+        table.insert(self.websocket_clients, status)
+        print("[XX] NEW CONNECT NOW COUNT: " .. table.getn(self.websocket_clients))
+    end
+    print("[XX] yoyo yoyo")
+
+    -- websocket took over the connection, return nil so minittp
+    -- does not send a response
+    return nil
+end
+
+function handler:do_add_ws_c(client)
+  print("[XX] FOO ADDING CLINET")
+  table.insert(self.websocket_clients, client)
+end
+
 -- TODO_MOVE_ENDS_HERE
 
 function handler:init(args)
@@ -686,6 +778,9 @@ function handler:init(args)
     self.notifications_updated = get_time_string()
     self.notification_counter = 1
 
+    self.websocket_clients = {}
+    self.ws_handler = ws_ext.ws_server_create(ws_opts)
+
     -- We will use this list for the fixed url mappings
     -- Fixed handlers are interpreted as they are; they are
     -- ONLY valid for the EXACT path identified in this list
@@ -701,7 +796,8 @@ function handler:init(args)
         ["/spin_api/profiles"] = self.handle_profile_list,
         ["/spin_api/notifications"] = self.handle_notification_list,
         ["/spin_api/notifications/create"] = self.handle_notification_add,
-        ["/spin_api/configuration"] = self.handle_configuration
+        ["/spin_api/configuration"] = self.handle_configuration,
+        ["/spin_api/ws"] = self.handle_websocket
     }
 
     -- Pattern handlers are more flexible than fixed handlers;
