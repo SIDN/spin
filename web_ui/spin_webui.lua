@@ -144,31 +144,18 @@ function handler:read_config(args)
 end
 
 function handler:add_device_seen(mac, name, timestamp)
-    if self.devices_seen[mac] ~= nil then
-        self.devices_seen[mac]['lastSeen'] = timestamp
-        self.devices_seen[mac]['name'] = name
-        self.devices_seen[mac]['appliedProfiles'] = self.profile_manager:get_device_profiles(mac)
-        self:send_websocket_update("deviceUpdate", self.devices_seen[mac])
-    else
-        local device_data = {}
-        device_data['lastSeen'] = timestamp
-        device_data['name'] = name
-        device_data['new'] = true
-        device_data['mac'] = mac
-        device_data['appliedProfiles'] = self.profile_manager:get_device_profiles(mac)
-        device_data['enforcement'] = ""
-        device_data['logging'] = ""
-
-        self.devices_seen[mac] = device_data
-
-        -- this device is new, so send a notification
+    -- add_device_seen returns True if the device is 'new' (i.e. wasn't seen
+    -- before)
+    if (self.device_manager:add_device_seen(mac, name, timestamp)) then
         local notification_txt = "New device on network! Please set a profile"
         self:create_notification("new_device", {}, notification_txt, mac, name)
-        self:send_websocket_update("newDevice", self.devices_seen[mac])
+        self:send_websocket_update("newDevice", self.device_manager:get_device_seen(mac))
+    else
+        self:send_websocket_update("deviceUpdate", self.device_manager:get_device_seen(mac))
     end
-    self.devices_seen_updated = spin_util.get_time_string()
 end
 
+-- TODO: should the device manager do this part too?
 function handler:handle_traffic_message(data, orig_data)
     if data.flows == nil then return end
     for i, d in ipairs(data.flows) do
@@ -346,20 +333,20 @@ end
 
 function handler:handle_device_list(request, response)
     self:set_api_headers(response)
-    response.content = json.encode(self.devices_seen)
+    response.content = json.encode(self.device_manager:get_devices_seen())
 
-    response:set_header("Last-Modified", self.devices_seen_updated)
+    response:set_header("Last-Modified", self.device_manager.last_update)
 
     return response
 end
 
 function handler:send_websocket_update(name, arguments)
-    print("[XX] WEBSOCKCLIENTCOUNT: " .. table.getn(self.websocket_clients))
+    if table.getn(self.websocket_clients) == 0 then return end
     local msg = ""
     if args == nil then
-        c:send('{"type": "update", "name": "' + name + '"}')
+        msg = '{"type": "update", "name": "' .. name .. '"}'
     else
-        c:send('{"type": "update", "name": "' + name + '", "args": ' + json.encode(args) + '}')
+        msg = '{"type": "update", "name": "' .. name .. '", "args": ' .. json.encode(args) .. '}'
     end
 
     for i,c in pairs(self.websocket_clients) do
@@ -403,9 +390,9 @@ function handler:handle_device_profiles(request, response, device_mac)
             local profile_id = request.post_data.profile_id
             local status = nil
             local err = ""
-            if self.devices_seen[device_mac] ~= nil then
+            if self.device_manager:get_device_seen(device_mac) ~= nil then
                 status, err = self.profile_manager:set_device_profile(device_mac, request.post_data.profile_id)
-                local device_name = self.devices_seen[device_mac].name
+                local device_name = self.device_manager:get_device_seen(device_mac).name
                 local profile_name = self.profile_manager.profiles[profile_id].name
                 if status then
                   local notification_txt = "Profile set to " .. profile_name
@@ -440,9 +427,9 @@ end
 function handler:handle_toggle_new(request, response, device_mac)
     self:set_api_headers(response)
     if request.method == "POST" then
-        if self.devices_seen[device_mac] ~= nil and self.devices_seen[device_mac].new then
-            self.devices_seen[device_mac].new = false
-            self.devices_seen_updated = spin_util.get_time_string()
+        if self.device_manager:device_is_new(device_mac) then
+            self.device_manager:set_device_is_new(device_mac, false)
+            
         else
             response:set_status(400, "Bad request")
             response.content = json.encode({status = 400, error = "Unknown device: " .. device_mac})
@@ -617,6 +604,9 @@ function handler:init(args)
     self.profile_manager = profile_manager_m.create_profile_manager()
     self.profile_manager:load_all_profiles()
     self.profile_manager:load_device_profiles()
+
+    self.device_manager = device_manager_m.create(self.profile_manager)
+
     self.notifications = {}
     self.notifications_updated = spin_util.get_time_string()
     self.notification_counter = 1
@@ -627,6 +617,7 @@ function handler:init(args)
     -- We will use this list for the fixed url mappings
     -- Fixed handlers are interpreted as they are; they are
     -- ONLY valid for the EXACT path identified in this list
+    -- (for more flexibility, see the pattern handlers below)
     self.fixed_handlers = {
         ["/"] = handler.handle_index,
         ["/spin_api"] = self.handle_index,
@@ -661,9 +652,6 @@ function handler:init(args)
     }
 
     local client = mqtt.new()
-    self.devices_seen = {}
-    self.devices_seen_updated = spin_util.get_time_string()
-
     client.ON_CONNECT = function()
         vprint("Connected to MQTT broker")
         client:subscribe(TRAFFIC_CHANNEL)
