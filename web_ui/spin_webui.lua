@@ -1,19 +1,33 @@
+--
+-- This is the main spin web UI handling code
+--
+-- This class handles the incoming HTTP and websocket requests and
+-- responses.
+--
+-- Internal SPIN functionality is generally handled by the _manager
+-- classes
+
 local mt_engine = require 'minittp_engine'
 local mt_io = require 'minittp_io'
 local mt_util = require 'minittp_util'
 
+local spin_util = require 'spin_util'
+
 local copas = require 'copas'
 local liluat = require 'liluat'
-local sys_stat = require "posix.sys.stat"
 
 local mqtt = require 'mosquitto'
 local json = require 'json'
 
+-- Additional supporting tools
 local ws_ext = require 'ws_ext'
+local tcpdumper = require 'tcpdumper'
 
 local TRAFFIC_CHANNEL = "SPIN/traffic"
 local HISTORY_SIZE = 600
 
+-- The managers implement the main functionality
+local device_manager_m = require 'device_manager'
 local profile_manager_m = require 'profile_manager'
 
 local TEMPLATE_PATH = "templates/"
@@ -21,110 +35,13 @@ local TEMPLATE_PATH = "templates/"
 posix = require 'posix'
 
 --
--- config file parser, reads config files
--- in the 'luci-style' form of
---
--- config <name>
---     option <name> '<value>'
---     option <name> '<value>'
--- config <name>
---     option <name> '<value>'
---
--- returns a straight list of all the whitespace-separated tokens
--- in the given filename
--- or nil, err on error
-function file_tokenize(filename)
-    local result = {}
-    local fr, err = mt_io.file_reader(filename)
-    if fr == nil then return nil, err end
-
-    for line in fr:read_line_iterator(true) do
-        for token in line:gmatch("%S+") do table.insert(result, token) end
-    end
-
-    return result
-end
-
-function file_tokenize_iterator(filename)
-    local data, err = file_tokenize(filename)
-    if data == nil then return nil, err end
-
-    result = {}
-    result.index = 1
-    result.done = false
-    result.data = data
-
-    function result:nxt()
-        if not self.done then
-            local value = self.data[self.index]
-            self.index = self.index + 1
-            if self.index > table.getn(self.data) then self.done = true end
-            return value
-        else
-            return nil
-        end
-    end
-    return result
-end
-
-function strip_quotes(value)
-    if value:len() == 1 then return value end
-    if value:startswith("'") and value:endswith("'") then
-        return value:sub(2, value:len()-1)
-    elseif value:startswith('"') and value:endswith('"') then
-        return value:sub(2, value:len()-1)
-    else
-        return value
-    end
-end
-
--- very basic config parser; hardly any checking
-function config_parse(filename)
-    local config = {}
-    local tokens, err = file_tokenize_iterator(filename)
-    if tokens == nil then return nil, err end
-
-    local cur_section = "main"
-
-    while not tokens.done do
-        local token = tokens:nxt()
-        if token == "config" then
-            cur_section = tokens:nxt()
-        elseif token == "option" then
-            local option_name = tokens:nxt()
-            local option_val = strip_quotes(tokens:nxt())
-            if config[cur_section] == nil then config[cur_section] = {} end
-            config[cur_section][option_name] = option_val
-            print(config[cur_section][option_name])
-        end
-    end
-    return config
-end
-
--- return the current time, or given timestamp in the format of RFC7232 section 2.2
-function get_time_string(timestamp)
-    if timestamp ~= nil then
-      return os.date("%a, %d %b %Y %X %z", timestamp)
-    else
-      return os.date("%a, %d %b %Y %X %z")
-    end
-end
-
--- return the file timestamp in the format of RFC7232 section 2.2
-function get_file_timestamp(file_path)
-    local fstat, err = sys_stat.stat(file_path)
-    if fstat == nil then
-        return nil, err
-    end
-
-    return os.date("%a, %d %b %Y %X %z", fstat.st_mtime)
-end
-
---
 -- minittp handler functionality
 --
 handler = {}
 
+--
+-- Loader for the templates in case of HTML responses
+--
 function handler:load_templates()
   self.templates = {}
   self.base_template_name = "base.html"
@@ -214,7 +131,7 @@ function handler:read_config(args)
     config['mqtt']['host'] = "127.0.0.1"
     config['mqtt']['port'] = 1883
     if config_file ~= nil then
-        config, err = config_parse(config_file)
+        config, err = spin_util.config_parse(config_file)
         if config == nil then return nil, err end
     end
     if mqtt_host ~= nil then
@@ -249,7 +166,7 @@ function handler:add_device_seen(mac, name, timestamp)
         self:create_notification("new_device", {}, notification_txt, mac, name)
         self:send_websocket_update("newDevice", self.devices_seen[mac])
     end
-    self.devices_seen_updated = get_time_string()
+    self.devices_seen_updated = spin_util.get_time_string()
 end
 
 function handler:handle_traffic_message(data, orig_data)
@@ -293,7 +210,7 @@ end
 
 function handler:handle_index(request, response)
     html, err = self:render("index.html", {mqtt_host = self.config['mqtt']['host']})
-    response:set_header("Last-Modified", get_file_timestamp(TEMPLATE_PATH .. "index.html"))
+    response:set_header("Last-Modified", spin_util.get_file_timestamp(TEMPLATE_PATH .. "index.html"))
     if html == nil then
         response:set_status(500, "Internal Server Error")
         response.content = "Template error: " .. err
@@ -305,80 +222,6 @@ end
 
 function get_tcpdump_pname(request, mac)
     return request.client_address .. "-" .. mac
-end
-
---
--- Class for managing tcpdump processes
---
-local tcpdumper = {}
-tcpdumper.__index = tcpdumper
-
-function tcpdumper.create(device, response)
-    local td = {}
-    setmetatable(td, tcpdumper)
-    -- check device for format here or at caller?
-    -- should be aa:bb:cc:dd:ee:ff
-    td.running = true
-    td.bytes_sent = 0
-    td.response = response
-
-    local subp, err = mt_io.subprocess("tcpdump", {"-U", "-i", "br-lan", "-s", "1600", "-w", "-", "ether", "host", device}, 0, true, false, false)
-    if subp == nil then
-        return nil
-    end
-    td.subp = subp
-
-    return td
-end
-
-function tcpdumper:read_and_send(size)
-    line, err = self.subp:read_bytes(size)
-    if line == nil then
-        if err ~= "read timed out" then
-            print("Error reading from subprocess: " .. err)
-            sent, err = response:send_chunk("")
-            subp:kill()
-            subp:close()
-            return nil, err
-        end
-    else
-        sent, err = self.response:send_chunk(line)
-        if sent == nil then
-            sent, err = self.response:send_chunk("")
-            print("Error sending data: " .. err)
-            subp:kill()
-            subp:close()
-            return nil, err
-        else
-            -- do not count the \r\n that signals end of chunk
-            self.bytes_sent = self.bytes_sent + sent - 2
-            return sent - 2
-        end
-    end
-end
-
-function tcpdumper:run()
-    while self.running do
-        self:read_and_send(1600)
-        copas.sleep(0.1)
-    end
-    self.subp:kill()
-    self.subp:close()
-
-    -- End with an empty chunk, as per transfer-encoding: chunked protocol
-    sent, err = self.response:send_chunk("")
-    if sent == nil then
-        print("Error sending data: " .. err)
-    else
-        print("Sent " .. " bytes");
-    end
-    -- just to make sure
-    self.running = false
-    return nil
-end
-
-function tcpdumper:stop()
-    self.running = false
 end
 
 function handler:handle_tcpdump_start(request, response)
@@ -446,7 +289,7 @@ function handler:handle_tcpdump_manage(request, response)
     end
 
     html, err = self:render_raw("tcpdump.html", { device=device, running=running, bytes_sent=bytes_sent })
-    response:set_header("Last-Modified", get_file_timestamp(TEMPLATE_PATH .. "tcpdump.html"))
+    response:set_header("Last-Modified", spin_util.get_file_timestamp(TEMPLATE_PATH .. "tcpdump.html"))
 
     if html == nil then
         response:set_status(500, "Internal Server Error")
@@ -473,7 +316,7 @@ function handler:handle_configuration(request, response)
     if request.method == "GET" then
         -- read the config, we don't use it ourselves just yet
         local fr, err = mt_io.file_reader("/etc/spin/spin_webui.conf")
-        response:set_header("Last-Modified", get_file_timestamp("/etc/spin/spin_webui.conf"))
+        response:set_header("Last-Modified", spin_util.get_file_timestamp("/etc/spin/spin_webui.conf"))
         if fr ~= nil then
           response.content = fr:read_lines_single_str()
         else
@@ -599,7 +442,7 @@ function handler:handle_toggle_new(request, response, device_mac)
     if request.method == "POST" then
         if self.devices_seen[device_mac] ~= nil and self.devices_seen[device_mac].new then
             self.devices_seen[device_mac].new = false
-            self.devices_seen_updated = get_time_string()
+            self.devices_seen_updated = spin_util.get_time_string()
         else
             response:set_status(400, "Bad request")
             response.content = json.encode({status = 400, error = "Unknown device: " .. device_mac})
@@ -625,7 +468,7 @@ function handler:create_notification(msg_key, msg_args, text, device_mac, device
         new_notification['deviceName'] = device_name
     end
     table.insert(self.notifications, new_notification)
-    self.notifications_updated = get_time_string()
+    self.notifications_updated = spin_util.get_time_string()
 end
 
 function handler:delete_notification(id)
@@ -637,7 +480,7 @@ function handler:delete_notification(id)
     end
     if to_remove ~= nil then
         table.remove(self.notifications, to_remove)
-        self.notifications_updated = get_time_string()
+        self.notifications_updated = spin_util.get_time_string()
     end
 end
 
@@ -775,7 +618,7 @@ function handler:init(args)
     self.profile_manager:load_all_profiles()
     self.profile_manager:load_device_profiles()
     self.notifications = {}
-    self.notifications_updated = get_time_string()
+    self.notifications_updated = spin_util.get_time_string()
     self.notification_counter = 1
 
     self.websocket_clients = {}
@@ -819,7 +662,7 @@ function handler:init(args)
 
     local client = mqtt.new()
     self.devices_seen = {}
-    self.devices_seen_updated = get_time_string()
+    self.devices_seen_updated = spin_util.get_time_string()
 
     client.ON_CONNECT = function()
         vprint("Connected to MQTT broker")
