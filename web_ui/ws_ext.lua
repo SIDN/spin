@@ -1,3 +1,4 @@
+require 'coxpcall'
 local socket = require'socket'
 local copas = require'copas'
 local tools = require'websocket.tools'
@@ -6,6 +7,8 @@ local handshake = require'websocket.handshake'
 local sync = require'websocket.sync'
 local tconcat = table.concat
 local tinsert = table.insert
+
+local json = require('json')
 
 local clients = {}
 
@@ -43,6 +46,20 @@ local client = function(sock,protocol)
       end
     end
     self:send(...)
+  end
+
+  self.orig_send = self.send
+
+  self.dsend = function(self,data,opcode)
+    if self.state ~= 'OPEN' then
+      return nil,false,1006,'wrong state'
+    end
+    local encoded = frame.encode(data,opcode or frame.TEXT,not self.is_server)
+    local n,err = sock:send(encoded)
+    if n ~= #encoded then
+      return nil,self:close(1006,err)
+    end
+    return true
   end
   
   return self
@@ -85,15 +102,23 @@ local ws_server_create = function (opts)
       print("[XX] REQUEST:")
       print(upgrade_request)
       print("[XX] END OF REQUEST")
-      --local status,response,protocol = handshake.accept_upgrade(upgrade_request,protocols)
-      local status,response,protocol = pcall(handshake.accept_upgrade, upgrade_request,protocols)
+      local response,protocol = handshake.accept_upgrade(upgrade_request,protocols)
+      local status = true
+      --local status,response,protocol = pcall(handshake.accept_upgrade, upgrade_request,protocols)
       if not status then
         print("[XX] error: Client request does not appear to be a websocket\n")
         --copas.send(sock,protocol)
         --sock:close()
         return nil, "Client request does not appear to be a websocket"
       end
-      copas.send(sock,response)
+      print("[XX] ABOUT TO SEND OK RESPONSE (status was " .. json.encode(status) .. ")")
+      if sock ~= nil then
+        print("[XX] HAVE SOCK")
+      else
+        print("[XX] SOCK NIL")
+      end
+      print("[XX] RESP: " .. json.encode(response))
+      copas.send(sock, response)
       local handler
       local new_client
       local protocol_index
@@ -114,20 +139,22 @@ local ws_server_create = function (opts)
       new_client = client(sock,protocol_index)
       clients[protocol_index][new_client] = true
       --handler(new_client)
-      print("[XX] ADD TO SERVER")
+      print("[XX] ADD TO SERVER1")
       main_handler:do_add_ws_c(new_client)
-      print("[XX] ADDED TO SERVER")
+      print("[XX] ADDED TO SERVER!")
       -- this is a dirty trick for preventing
       -- copas from automatically and prematurely closing
       -- the socket
-      while new_client.state ~= 'CLOSED' do
-        local dummy = {
-          send = function() end,
-          close = function() end
-        }
-        copas.send(dummy)
-      end
-      return true
+      --print("[XX] STARTING ETERNAL LOOP. SEE YOU AT THE END OF THE UNIVERSE")
+      --while new_client.state ~= 'CLOSED' do
+      --  local dummy = {
+      --    send = function() end,
+      --    close = function() end
+      --  }
+      --  copas.send(dummy)
+      --end
+      --print("[XX] LOOP ENDED ANYWAY")
+      return new_client
     end
 
   self.close = function(_,keep_clients)

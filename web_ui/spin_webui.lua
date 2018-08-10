@@ -7,6 +7,7 @@
 -- Internal SPIN functionality is generally handled by the _manager
 -- classes
 
+local coxpcall = require 'coxpcall'
 local mt_engine = require 'minittp_engine'
 local mt_io = require 'minittp_io'
 local mt_util = require 'minittp_util'
@@ -334,28 +335,37 @@ end
 function handler:handle_device_list(request, response)
     self:set_api_headers(response)
     response.content = json.encode(self.device_manager:get_devices_seen())
-
     response:set_header("Last-Modified", self.device_manager.last_update)
-
     return response
 end
 
 function handler:send_websocket_update(name, arguments)
     if table.getn(self.websocket_clients) == 0 then return end
     local msg = ""
-    if args == nil then
+    if arguments == nil then
         msg = '{"type": "update", "name": "' .. name .. '"}'
     else
-        msg = '{"type": "update", "name": "' .. name .. '", "args": ' .. json.encode(args) .. '}'
+        msg = '{"type": "update", "name": "' .. name .. '", "args": ' .. json.encode(arguments) .. '}'
     end
 
     for i,c in pairs(self.websocket_clients) do
-        c:send(msg)
+        c:dsend(msg)
     end
 end
 
-function handler:handle_profile_list(request, response)
-    self:set_api_headers(response)
+-- note, client needs to be passed here (this data is only sent to the given client)
+local function send_websocket_initialdata(client, name, arguments)
+    local msg = ""
+    if arguments == nil then
+        msg = '{"type": "data", "name": "' .. name .. '"}'
+    else
+        msg = '{"type": "data", "name": "' .. name .. '", "args": ' .. json.encode(arguments) .. '}'
+    end
+
+    client:send(msg)
+end
+
+function handler:get_filtered_profile_list()
     local profile_list = {}
     -- we'll make a selective deep copy of the data, since for now we
     -- want to leave out some of the fields
@@ -373,7 +383,12 @@ function handler:handle_profile_list(request, response)
       v.rules_v4 = nil
       v.rules_v6 = nil
     end
-    response.content = json.encode(profile_list)
+    return profile_list
+end
+
+function handler:handle_profile_list(request, response)
+    self:set_api_headers(response)
+    response.content = json.encode(self:get_filtered_profile_list())
     response:set_header("Last-Modified", self.profile_manager.profiles_updated)
     return response
 end
@@ -383,7 +398,6 @@ function handler:handle_device_profiles(request, response, device_mac)
     if request.method == "GET" or request.method == "HEAD" then
         local content_json, updated = self.profile_manager:get_device_profiles(device_mac)
         response.content = json.encode(content_json)
-	print("[XX] ytoyoyo lu: " .. updated)
         response:set_header("Last-Modified", updated)
     else
         if request.post_data ~= nil and request.post_data.profile_id ~= nil then
@@ -427,12 +441,12 @@ end
 function handler:handle_toggle_new(request, response, device_mac)
     self:set_api_headers(response)
     if request.method == "POST" then
-        if self.device_manager:device_is_new(device_mac) then
-            self.device_manager:set_device_is_new(device_mac, false)
-            
-        else
+        local seen = self.device_manager:device_is_new(device_mac)
+        if seen == nil then
             response:set_status(400, "Bad request")
             response.content = json.encode({status = 400, error = "Unknown device: " .. device_mac})
+        else
+            self.device_manager:set_device_is_new(device_mac, not seen)
         end
     end
     return response
@@ -456,6 +470,8 @@ function handler:create_notification(msg_key, msg_args, text, device_mac, device
     end
     table.insert(self.notifications, new_notification)
     self.notifications_updated = spin_util.get_time_string()
+
+    self:send_websocket_update("newNotification", new_notification)
 end
 
 function handler:delete_notification(id)
@@ -567,9 +583,9 @@ function handler:handle_websocket(request, response)
     --print("[XX] END OF FLAT HEADERS OF TYPE " .. type(flat_headers))
     request.raw_sock:settimeout(1)
     print("[XX] AAAAAA")
-    status, err = self.ws_handler.add_client(flat_headers, request.raw_sock, self)
+    client, err = self.ws_handler.add_client(flat_headers, request.raw_sock, self)
     print("[XX] BBBBBB")
-    if not status then
+    if not client then
         print("[XX] CCCCCC")
         response:set_status(400, "Bad request")
         response.content = err
@@ -577,7 +593,22 @@ function handler:handle_websocket(request, response)
     else
         print("[XX] DDDDDD")
         table.insert(self.websocket_clients, status)
+        -- send any initial client information here
+        client:send('{"message": "hello, world"}')
+        -- Send the overview of profiles
+        send_websocket_initialdata(client, "profiles", self:get_filtered_profile_list())
+        -- Send the overview of known devices so far, which includes their profiles
+        send_websocket_initialdata(client, "devices", self.device_manager:get_devices_seen())
+        -- Send all notifications
+        send_websocket_initialdata(client, "notifications", self.notifications)
         print("[XX] NEW CONNECT NOW COUNT: " .. table.getn(self.websocket_clients))
+        while client.state ~= 'CLOSED' do
+          local dummy = {
+            send = function() end,
+            close = function() end
+          }
+          copas.send(dummy)
+        end
     end
     print("[XX] yoyo yoyo")
 
@@ -666,7 +697,7 @@ function handler:init(args)
 
     client.ON_MESSAGE = function(mid, topic, payload)
         --print("[XX] message for you, sir!")
-        local success, pd = pcall(json.decode, payload)
+        local success, pd = coxpcall.pcall(json.decode, payload)
         if success and pd then
             if topic == TRAFFIC_CHANNEL then
                 if pd["command"] and pd["command"] == "traffic" then

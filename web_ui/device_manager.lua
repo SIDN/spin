@@ -29,8 +29,13 @@ function device_manager:get_devices_seen()
     return self.devices_seen
 end
 
+-- Returns one of three options:
+-- true if the device has been seen and is marked as 'new'
+-- false if the device has been seen and is not marked as 'new'
+-- nil if the device has not been seen
 function device_manager:device_is_new(mac)
-    return (self.devices_seen[mac] ~= nil) and (self.devices_seen[mac].new)
+    if self.devices_seen[mac] == nil then return nil end
+    return self.devices_seen[mac].new
 end
 
 function device_manager:set_device_is_new(mac, value)
