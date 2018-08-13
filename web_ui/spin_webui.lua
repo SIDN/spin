@@ -196,6 +196,33 @@ function handler:mqtt_looper()
     end
 end
 
+function handler:handle_mqtt_queue_msg(msg)
+    local success, pd = coxpcall.pcall(json.decode, msg)
+    if success and pd then
+        --print("[XX] msg: " .. msg)
+        if pd["command"] and pd["command"] == "traffic" then
+            self:handle_traffic_message(pd["result"], payload)
+        elseif pd["incident"] ~= nil then
+            local incident = pd["incident"]
+            local ts = incident["incident_timestamp"]
+            for i=ts-5,ts+5 do
+                if self:handle_incident_report(incident, i) then break end
+            end
+        end
+    end
+end
+
+function handler:mqtt_queue_looper()
+    self.mqtt_queue_msgs = {}
+    while true do
+        while table.getn(self.mqtt_queue_msgs) > 0 do
+          local msg = table.remove(self.mqtt_queue_msgs, 1)
+          self:handle_mqtt_queue_msg(msg)
+        end
+        copas.sleep(0.1)
+    end
+end
+
 function handler:handle_index(request, response)
     html, err = self:render("index.html", {mqtt_host = self.config['mqtt']['host']})
     response:set_header("Last-Modified", spin_util.get_file_timestamp(TEMPLATE_PATH .. "index.html"))
@@ -339,6 +366,7 @@ function handler:handle_device_list(request, response)
     return response
 end
 
+-- this *queues* a message to send to all active clients
 function handler:send_websocket_update(name, arguments)
     if table.getn(self.websocket_clients) == 0 then return end
     local msg = ""
@@ -347,9 +375,9 @@ function handler:send_websocket_update(name, arguments)
     else
         msg = '{"type": "update", "name": "' .. name .. '", "args": ' .. json.encode(arguments) .. '}'
     end
-
     for i,c in pairs(self.websocket_clients) do
-        c:dsend(msg)
+        --c:send(msg)
+        c:queue_message(msg)
     end
 end
 
@@ -583,7 +611,7 @@ function handler:handle_websocket(request, response)
     --print("[XX] END OF FLAT HEADERS OF TYPE " .. type(flat_headers))
     request.raw_sock:settimeout(1)
     print("[XX] AAAAAA")
-    client, err = self.ws_handler.add_client(flat_headers, request.raw_sock, self)
+    client, err = self.ws_handler.add_client(flat_headers, request.raw_sock, request.connection, self)
     print("[XX] BBBBBB")
     if not client then
         print("[XX] CCCCCC")
@@ -603,11 +631,18 @@ function handler:handle_websocket(request, response)
         send_websocket_initialdata(client, "notifications", self.notifications)
         print("[XX] NEW CONNECT NOW COUNT: " .. table.getn(self.websocket_clients))
         while client.state ~= 'CLOSED' do
-          local dummy = {
-            send = function() end,
-            close = function() end
-          }
-          copas.send(dummy)
+          print("[XX] NOTCLOSED")
+          if client:has_queued_messages() then
+            print("[XX] have messages to send!")
+            client:send_queued_messages()
+          else
+            copas.sleep(1)
+          end
+          --local dummy = {
+          --  send = function() end,
+          --  close = function() end
+          --}
+          --copas.send(dummy)
         end
     end
     print("[XX] yoyo yoyo")
@@ -615,6 +650,10 @@ function handler:handle_websocket(request, response)
     -- websocket took over the connection, return nil so minittp
     -- does not send a response
     return nil
+end
+
+function handler:have_websocket_messages()
+  return table.getn(self.websocket_messages) > 0
 end
 
 function handler:do_add_ws_c(client)
@@ -643,7 +682,10 @@ function handler:init(args)
     self.notification_counter = 1
 
     self.websocket_clients = {}
+    self.websocket_messages = {}
     self.ws_handler = ws_ext.ws_server_create(ws_opts)
+
+    self.mqtt_queue_msgs = {}
 
     -- We will use this list for the fixed url mappings
     -- Fixed handlers are interpreted as they are; they are
@@ -696,27 +738,31 @@ function handler:init(args)
     local h = self
 
     client.ON_MESSAGE = function(mid, topic, payload)
-        --print("[XX] message for you, sir!")
-        local success, pd = coxpcall.pcall(json.decode, payload)
-        if success and pd then
-            if topic == TRAFFIC_CHANNEL then
-                if pd["command"] and pd["command"] == "traffic" then
-                    h:handle_traffic_message(pd["result"], payload)
-                end
-            elseif handle_incidents and topic == INCIDENT_CHANNEL then
-                if pd["incident"] == nil then
-                    print("Error: no incident data found in " .. payload)
-                    print("Incident report ignored")
-                else
-                    local incident = pd["incident"]
-                    local ts = incident["incident_timestamp"]
-                    for i=ts-5,ts+5 do
-                        if handle_incident_report(incident, i) then break end
-                    end
-                end
-            end
-        end
+      table.insert(h.mqtt_queue_msgs, payload)
     end
+
+--    client.ORIG_ON_MESSAGE = function(mid, topic, payload)
+--        --print("[XX] message for you, sir!")
+--        local success, pd = coxpcall.pcall(json.decode, payload)
+--        if success and pd then
+--            if topic == TRAFFIC_CHANNEL then
+--                if pd["command"] and pd["command"] == "traffic" then
+--                    h:handle_traffic_message(pd["result"], payload)
+--                end
+--            elseif handle_incidents and topic == INCIDENT_CHANNEL then
+--                if pd["incident"] == nil then
+--                    print("Error: no incident data found in " .. payload)
+--                    print("Incident report ignored")
+--                else
+--                    local incident = pd["incident"]
+--                    local ts = incident["incident_timestamp"]
+--                    for i=ts-5,ts+5 do
+--                        if handle_incident_report(incident, i) then break end
+--                    end
+--                end
+--            end
+--        end
+--    end
 
     print("[XX] connecting to " .. self.config.mqtt.host .. ":" .. self.config.mqtt.port)
     a,b,c,d = client:connect(self.config.mqtt.host, self.config.mqtt.port)
@@ -729,6 +775,7 @@ function handler:init(args)
 
     self.client = client
     copas.addthread(self.mqtt_looper, self)
+    copas.addthread(self.mqtt_queue_looper, self)
 
     return true
 end

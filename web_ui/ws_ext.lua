@@ -19,12 +19,15 @@ local client = function(sock,protocol)
   
   self.state = 'OPEN'
   self.is_server = true
+  self.queued_messages = {}
   
   self.sock_send = function(self,...)
+    print("[XX] calling copas.send!")
     return copas.send(sock,...)
   end
   
   self.sock_receive = function(self,...)
+    print("[XX] calling copas.receive!")
     return copas.receive(sock,...)
   end
   
@@ -48,8 +51,6 @@ local client = function(sock,protocol)
     self:send(...)
   end
 
-  self.orig_send = self.send
-
   self.dsend = function(self,data,opcode)
     if self.state ~= 'OPEN' then
       return nil,false,1006,'wrong state'
@@ -61,7 +62,24 @@ local client = function(sock,protocol)
     end
     return true
   end
-  
+
+  self.queue_message = function(self, message)
+    table.insert(self.queued_messages, message)
+  end
+
+  self.has_queued_messages = function(self)
+    return table.getn(self.queued_messages) > 0
+  end
+
+  self.send_queued_messages = function(self)
+    while table.getn(self.queued_messages) > 0 do
+      local msg = json.encode(table.remove(self.queued_messages, 1))
+      print("[XX] SENDING MESSAGE: " .. msg)
+      self:send(msg)
+    end
+    print("[XX] QUEUE SENT")
+  end
+
   return self
 end
 
@@ -83,7 +101,7 @@ local ws_server_create = function (opts)
   clients[true] = {}
 
   local self = {}
-  self.add_client = function(request, sock, main_handler)
+  self.add_client = function(request, raw_sock, copas_sock, main_handler)
       --local request = {}
       --repeat
       --  -- no timeout used, so should either return with line or err
@@ -117,8 +135,12 @@ local ws_server_create = function (opts)
       else
         print("[XX] SOCK NIL")
       end
+      if resp == nil then
+        print("[XX] COULD NOT UPGRADE REQUEST")
+        print(protocol)
+      end
       print("[XX] RESP: " .. json.encode(response))
-      copas.send(sock, response)
+      copas.send(copas_sock, response)
       local handler
       local new_client
       local protocol_index
@@ -130,13 +152,13 @@ local ws_server_create = function (opts)
         protocol_index = true
         handler = opts.default
       else
-        sock:close()
+        copas_sock:close()
         if on_error then
           on_error('bad protocol, and no default set')
         end
         return nil, 'Unknown protocol and no default protocol set'
       end
-      new_client = client(sock,protocol_index)
+      new_client = client(copas_sock,protocol_index)
       clients[protocol_index][new_client] = true
       --handler(new_client)
       print("[XX] ADD TO SERVER1")
