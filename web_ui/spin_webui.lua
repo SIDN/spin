@@ -197,6 +197,7 @@ function handler:mqtt_looper()
 end
 
 function handler:handle_mqtt_queue_msg(msg)
+    -- TODO: pass topic? (traffic/incident)
     local success, pd = coxpcall.pcall(json.decode, msg)
     if success and pd then
         --print("[XX] msg: " .. msg)
@@ -220,6 +221,12 @@ function handler:mqtt_queue_looper()
           self:handle_mqtt_queue_msg(msg)
         end
         copas.sleep(0.1)
+        for i,c in pairs(self.websocket_clients) do
+          if c:has_queued_messages() then
+            c:send_queued_messages()
+            print("[XX] still queueud msgs")
+          end
+        end
     end
 end
 
@@ -376,6 +383,7 @@ function handler:send_websocket_update(name, arguments)
         msg = '{"type": "update", "name": "' .. name .. '", "args": ' .. json.encode(arguments) .. '}'
     end
     for i,c in pairs(self.websocket_clients) do
+        print("[XX] send msg to client")
         --c:send(msg)
         c:queue_message(msg)
     end
@@ -632,17 +640,17 @@ function handler:handle_websocket(request, response)
         print("[XX] NEW CONNECT NOW COUNT: " .. table.getn(self.websocket_clients))
         while client.state ~= 'CLOSED' do
           print("[XX] NOTCLOSED")
-          if client:has_queued_messages() then
-            print("[XX] have messages to send!")
-            client:send_queued_messages()
-          else
-            copas.sleep(1)
-          end
-          --local dummy = {
-          --  send = function() end,
-          --  close = function() end
-          --}
-          --copas.send(dummy)
+          --if client:has_queued_messages() then
+          --  print("[XX] have messages to send!")
+          --  client:send_queued_messages()
+          --else
+          --  copas.sleep(0.1)
+          --end
+          local dummy = {
+            send = function() end,
+            close = function() end
+          }
+          copas.send(dummy)
         end
     end
     print("[XX] yoyo yoyo")

@@ -32,10 +32,10 @@ local client = function(sock,protocol)
   end
   
   self.sock_close = function(self)
-    sock:shutdown()
+    --sock:shutdown()
     sock:close()
   end
-  
+
   self = sync.extend(self)
   
   self.on_close = function(self)
@@ -168,13 +168,13 @@ local ws_server_create = function (opts)
       -- copas from automatically and prematurely closing
       -- the socket
       --print("[XX] STARTING ETERNAL LOOP. SEE YOU AT THE END OF THE UNIVERSE")
-      --while new_client.state ~= 'CLOSED' do
-      --  local dummy = {
-      --    send = function() end,
-      --    close = function() end
-      --  }
-      --  copas.send(dummy)
-      --end
+      while new_client.state ~= 'CLOSED' do
+        local dummy = {
+          send = function() end,
+          close = function() end
+        }
+        copas.send(dummy)
+      end
       --print("[XX] LOOP ENDED ANYWAY")
       return new_client
     end
