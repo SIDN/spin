@@ -3,7 +3,7 @@
 --
 
 local mt_io = require 'minittp_io'
-
+local copas = require 'copas'
 
 local _M = {}
 
