@@ -45,6 +45,9 @@ AC_ARG_WITH(linux-headers,
 
 MAKEFILES="Makefile src/Makefile kernelmod/Makefile"
 
+AC_SEARCH_LIBS([nfct_query], [netfilter_conntrack],,[
+    AC_MSG_ERROR([libnetfilter-conntrack library not found])])
+
 AC_ARG_ENABLE(tests,
               AC_HELP_STRING([--enable-tests], [enable unit tests and code coverage]),
               [

@@ -48,12 +48,12 @@ typedef enum {
 typedef struct packet_info {
 	uint8_t family; // 4, 6, etc
 	uint8_t protocol; // value for tcp/udp/icmp/etc.
-	uint8_t src_addr[16]; // v4 just uses first 4 bytes
-	uint8_t dest_addr[16]; // v4 just uses first 4 bytes
+	uint8_t src_addr[16]; // v4 just uses last 4 bytes
+	uint8_t dest_addr[16]; // v4 just uses last 4 bytes
 	uint16_t src_port;
 	uint16_t dest_port;
-	uint32_t payload_size;
-	uint16_t packet_count; // amount of packets for this set of
+	uint64_t payload_size;
+	uint64_t packet_count; // amount of packets for this set of
 	                       // fam, proto, source, dest, and ports
 	uint16_t payload_offset; // only relevant if packet_count == 1
 } pkt_info_t;
