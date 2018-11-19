@@ -1,0 +1,23 @@
+==> Wireshark randpkt
+
+Some fuzzing is done using the randpkt utility from Wireshark.
+
+  $ git clone WIRESHARK
+  $ cd wireshark
+  $ mkdir _build
+  $ cd _build
+  $ cmake .. -DBUILD_randpkt=true
+  $ make
+
+  $ ./run/randpkt
+
+See https://wiki.wireshark.org/FuzzTesting
+
+
+==> Wireshark editcap
+
+Part of the wireshark-common Debian package.
+
+  $ editcap
+  $ man editcap
+

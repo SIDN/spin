@@ -1,0 +1,9 @@
+Testcases created as follows:
+
+$ editcap -r iot-lab-6-20180501.pcap ../afl/testcases/dns1.pcap 140
+$ editcap -r iot-lab-6-20180501.pcap ../afl/testcases/tcpsyn1.pcap 148
+$ editcap -r iot-lab-6-20180501.pcap ../afl/testcases/arp1.pcap 178
+$ editcap -r iot-lab-6-20180501.pcap ../afl/testcases/arp2.pcap 179
+
+And so on.
+
