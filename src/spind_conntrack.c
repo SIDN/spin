@@ -17,6 +17,8 @@
 
 #include "version.h"
 
+#include <libnetfilter_queue/libnetfilter_queue.h>
+
 #define MOSQUITTO_KEEPALIVE_TIME 60
 #define MQTT_CHANNEL_TRAFFIC "SPIN/traffic"
 #define MQTT_CHANNEL_COMMANDS "SPIN/commands"
@@ -54,7 +56,7 @@ static inline u_int64_t get_u64_attr(struct nf_conntrack *ct, char ATTR) {
   return nfct_get_attr_u64(ct, ATTR);
 }
 
-int nfct_to_pkt_info(pkt_info_t* pkt_info_orig, pkt_info_t* reply, struct nf_conntrack *ct) {
+int nfct_to_pkt_info(pkt_info_t* pkt_info_orig, pkt_info_t* pkt_info_reply, struct nf_conntrack *ct) {
   unsigned int offset = 0;
   u_int32_t tmp;
   
@@ -67,23 +69,42 @@ int nfct_to_pkt_info(pkt_info_t* pkt_info_orig, pkt_info_t* reply, struct nf_con
     memcpy((pkt_info_orig->src_addr) + 12, &tmp, 4);
     tmp = nfct_get_attr_u32(ct, ATTR_IPV4_DST);
     memcpy((pkt_info_orig->dest_addr) + 12, &tmp, 4);
-    //pkt_info_orig->src_port = ntohs(nfct_get_attr_u16(ct, ATTR_ORIG_PORT_SRC));
     pkt_info_orig->src_port = get_u16_attr(ct, ATTR_ORIG_PORT_SRC);
     pkt_info_orig->dest_port = get_u16_attr(ct, ATTR_ORIG_PORT_DST);
-    
-    //pkt_info_orig->payload_size = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS);
-    // can we get this from ct itself? need to pass nlh i suspect
-    //printf("[XX] SIZE: %lu\n", nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_BYTES));
-    //printf("[XX] SIZE: %lu\n", nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_BYTES));
-    //printf("[XX] SIZE: %lu\n", nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS));
-    //printf("[XX] SIZE: %lu\n", nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS));
     pkt_info_orig->payload_size = get_u64_attr(ct, ATTR_ORIG_COUNTER_BYTES);
     pkt_info_orig->packet_count = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS);
+    pkt_info_orig->payload_size += get_u64_attr(ct, ATTR_REPL_COUNTER_BYTES);
+    pkt_info_orig->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
     pkt_info_orig->payload_offset = 0;
-    
+
+    /*
+    tmp = nfct_get_attr_u32(ct, ATTR_IPV4_SRC);
+    memset(pkt_info_reply->src_addr, 0, 12);
+    memset(pkt_info_reply->dest_addr, 0, 12);
+    memcpy((pkt_info_reply->src_addr) + 12, &tmp, 4);
+    tmp = nfct_get_attr_u32(ct, ATTR_IPV4_DST);
+    memcpy((pkt_info_reply->dest_addr) + 12, &tmp, 4);
+    pkt_info_reply->src_port = get_u16_attr(ct, ATTR_REPL_PORT_SRC);
+    pkt_info_reply->dest_port = get_u16_attr(ct, ATTR_REPL_PORT_DST);
+    pkt_info_reply->payload_size = get_u64_attr(ct, ATTR_REPL_COUNTER_BYTES);
+    pkt_info_reply->packet_count = nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
+    pkt_info_reply->payload_offset = 0;
+    */
+    pkt_info_reply->src_port = get_u16_attr(ct, ATTR_REPL_PORT_SRC);
+    pkt_info_reply->dest_port = get_u16_attr(ct, ATTR_REPL_PORT_DST);
+
     break;
   case AF_INET6:
-    printf("[XX] IS IPV6!");
+    memcpy((&pkt_info_orig->src_addr[0]), nfct_get_attr(ct, ATTR_IPV6_SRC), 16);
+    memcpy((&pkt_info_orig->dest_addr[0]) + 12, nfct_get_attr(ct, ATTR_IPV6_DST), 16);
+    pkt_info_orig->src_port = get_u16_attr(ct, ATTR_ORIG_PORT_SRC);
+    pkt_info_orig->dest_port = get_u16_attr(ct, ATTR_ORIG_PORT_DST);
+    pkt_info_orig->payload_size = get_u64_attr(ct, ATTR_ORIG_COUNTER_BYTES);
+    pkt_info_orig->packet_count = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS);
+    pkt_info_orig->payload_size += get_u64_attr(ct, ATTR_REPL_COUNTER_BYTES);
+    pkt_info_orig->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
+    pkt_info_orig->payload_offset = 0;
+    break;
     // note: ipv6 is u128
   }
 }
@@ -122,9 +143,21 @@ void do_flow_list(flow_list_t* flow_list, uint32_t now, pkt_info_t* pkt) {
 }
 */
 
+void phexdump(uint8_t* data, unsigned int size) {
+    unsigned int i;
+    printf("00: ");
+    for (i = 0; i < size; i++) {
+        if (i > 0 && i % 10 == 0) {
+            printf("\n%u: ", i);
+        }
+        printf("%02x ", data[i]);
+    }
+    printf("\n");
+}
+
 /* this function is called for each flow info data */
 /* *data is set by the register function mnl_cb_run */
-static int data_cb(const struct nlmsghdr *nlh, void *data)
+static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
 {
   struct nf_conntrack *ct;
   char buf[4096];
@@ -141,15 +174,23 @@ static int data_cb(const struct nlmsghdr *nlh, void *data)
 
   nfct_nlmsg_parse(nlh, ct);
 
-  nfct_snprintf(buf, sizeof(buf), ct, NFCT_T_UNKNOWN, NFCT_O_DEFAULT, 0);
+  //nfct_snprintf(buf, sizeof(buf), ct, NFCT_T_UNKNOWN, NFCT_O_DEFAULT, 0);
+  //printf("[XX] %s\n", buf);
   
+  // TODO: remove repl?
   nfct_to_pkt_info(&orig, &reply, ct);
-  pktinfo2str(new_buf, &orig, 4096);
-  printf("[ME] port=22 %s\n", new_buf);
-  printf("[NF] %s\n", buf);
-  node_cache_add_pkt_info(cb_data->node_cache, &orig, now);
+  //printf("[ME] port=22 %s\n", new_buf);
+  //pktinfo2str(new_buf, &orig, 4096);
+  //printf("[NF] %s\n", buf);
+  if (orig.packet_count > 0 || orig.payload_size > 0) {
+      node_cache_add_pkt_info(cb_data->node_cache, &orig, now);
+      //node_cache_add_pkt_info(cb_data->node_cache, &reply, now);
+      flow_list_add_pktinfo(cb_data->flow_list, &orig);
+      //flow_list_add_pktinfo(cb_data->flow_list, &reply);
+      //printf("[XX] add pkt infos to flow list, tree size now %d\n", tree_size(cb_data->flow_list->flows));
+  }
   //node_cache_add_pkt_info(cb_data->node_cache, &reply, now);
-  do_flow_list(cb_data->flow_list, now, &orig);
+  //do_flow_list(cb_data->flow_list, now, &orig);
   //do_flow_list(cb_data->flow_list, now, &reply);
 
   nfct_destroy(ct);
@@ -184,7 +225,7 @@ int do_read(cb_data_t* cb_data) {
   portid = mnl_socket_get_portid(nl);
 
   nlh = mnl_nlmsg_put_header(buf);
-  nlh->nlmsg_type = (NFNL_SUBSYS_CTNETLINK << 8) | IPCTNL_MSG_CT_GET;
+  nlh->nlmsg_type = (NFNL_SUBSYS_CTNETLINK << 8) | IPCTNL_MSG_CT_GET_CTRZERO;
   nlh->nlmsg_flags = NLM_F_REQUEST|NLM_F_DUMP;
   nlh->nlmsg_seq = seq = time(NULL);
 
@@ -201,7 +242,7 @@ int do_read(cb_data_t* cb_data) {
 
   ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
   while (ret > 0) {
-    ret = mnl_cb_run(buf, ret, seq, portid, data_cb, cb_data);
+    ret = mnl_cb_run(buf, ret, seq, portid, conntrack_cb, cb_data);
     if (ret <= MNL_CB_STOP)
       break;
     ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
@@ -299,6 +340,37 @@ void cleanup_cache() {
     node_cache_destroy(node_cache);
 }
 
+/* ----------- */
+/* DNS Capture */
+/* ----------- */
+
+u_int32_t treat_pkt(struct nfq_data *nfa, int* verdict) {
+    (void)nfa;
+    *verdict = 1;
+    printf("[XX] GOT PKT TO TREAT\n");
+    return 1;
+}
+
+/* Definition of callback function */
+static int dns_cap_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
+              struct nfq_data *nfa, void *data)
+{
+    int verdict;
+    u_int32_t id = treat_pkt(nfa, &verdict); /* Treat packet */
+    return nfq_set_verdict(qh, id, verdict, 0, NULL); /* Verdict packet */
+}
+ 
+
+/* Set callback function */
+/*
+for (;;) {
+}
+*/
+
+/* ------------------ */
+/* end of DNS Capture */
+/* ------------------ */
+
 void int_handler(int signal) {
     if (running) {
         spin_log(LOG_INFO, "Got interrupt, quitting\n");
@@ -363,9 +435,42 @@ int main_loop() {
     cb_data->flow_list = flow_list;
     cb_data->node_cache = node_cache;
 
-    /* Read message from kernel */
+    /* specific queue for DNS traffic */
+    //int qh = nfq_create_queue(h,  0, &dns_cap_cb, NULL);
+
+    /* Read message from kernel or mqtt */
     while (running) {
-        rs = poll(fds, 2, 1000);
+
+        /* check DNS traffic queue */
+        /*
+        if ((rv = recv(fd, buf, sizeof(buf), 0)) >= 0) {
+            nfq_handle_packet(h, buf, rv); // send packet to callback
+            continue;
+        }*/
+
+        do_read(cb_data);
+        if (flow_list_should_send(flow_list, now)) {
+            //printf("[XX] should send flow list A (total size %d)\n", tree_size(flow_list->flows));
+            if (!flow_list_empty(flow_list)) {
+                // create json, send it
+                buffer_reset(json_buf);
+                create_traffic_command(node_cache, flow_list, json_buf, now);
+                if (buffer_finish(json_buf)) {
+                    //printf("[XX] SENDING: %s\n", buffer_str(json_buf));
+                    mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
+                } else {
+                    printf("[XX] unable to finish buffer\n");
+                }
+            } else {
+                //printf("[XX] but it is empty\n");
+            }
+            flow_list_clear(flow_list, now);
+        }
+
+
+        // check mqtt fd as well
+
+        rs = poll(fds, 1, 1000);
         now = time(NULL);
 
         if (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME / 2) {
@@ -377,23 +482,15 @@ int main_loop() {
         if (rs < 0) {
             spin_log(LOG_ERR, "error in poll(): %s\n", strerror(errno));
         } else if (rs == 0) {
-            if (flow_list_should_send(flow_list, now)) {
-                if (!flow_list_empty(flow_list)) {
-                    // create json, send it
-                    buffer_reset(json_buf);
-                    create_traffic_command(node_cache, flow_list, json_buf, now);
-                    if (buffer_finish(json_buf)) {
-                        mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
-                    }
-                }
-                flow_list_clear(flow_list, now);
-            }
+            // do nothing further
         } else {
+/*
             if (1) {
                 printf("[XX] CALL do_read()\n");
                 
                 do_read(cb_data);
                 printf("[XX] DONE do_read()\n");
+*/
 /*
                 c++;
                 //printf("C: %u RS: %u\n", c, rs);
@@ -484,7 +581,9 @@ int main_loop() {
                     printf("unknown type? %u\n", type);
                 }
 */
+/*
             }
+*/
             printf("[XX] check mosq\n");
             if ((fds[0].revents & POLLIN) || (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME)) {
                 printf("[XX] have some message on mosq\n");
@@ -505,11 +604,13 @@ int main_loop() {
 
             }
         }
-        printf("[XX] end of loop body\n");
+        //printf("[XX] end of loop body\n");
+
         sleep(1);
     }
     flow_list_destroy(flow_list);
     buffer_destroy(json_buf);
+    free(cb_data);
     return 0;
 }
 
@@ -584,15 +685,6 @@ int main(int argc, char** argv) {
     mosquitto_lib_cleanup();
 
     return 0;
-
-
-/*
-  while (1) {
-    printf("[XX] DATA:\n");
-    do_read();
-    sleep(1);
-  }
-*/
 }
 
 
