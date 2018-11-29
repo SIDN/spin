@@ -17,6 +17,7 @@
 
 #include "version.h"
 
+#include <linux/netfilter.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
 
 #define MOSQUITTO_KEEPALIVE_TIME 60
@@ -24,6 +25,7 @@
 #define MQTT_CHANNEL_COMMANDS "SPIN/commands"
 
 #include <poll.h>
+#include <ldns/ldns.h>
 
 static dns_cache_t* dns_cache;
 static node_cache_t* node_cache;
@@ -76,27 +78,15 @@ int nfct_to_pkt_info(pkt_info_t* pkt_info_orig, pkt_info_t* pkt_info_reply, stru
     pkt_info_orig->payload_size += get_u64_attr(ct, ATTR_REPL_COUNTER_BYTES);
     pkt_info_orig->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
     pkt_info_orig->payload_offset = 0;
+    pkt_info_orig->protocol = 6;
 
-    /*
-    tmp = nfct_get_attr_u32(ct, ATTR_IPV4_SRC);
-    memset(pkt_info_reply->src_addr, 0, 12);
-    memset(pkt_info_reply->dest_addr, 0, 12);
-    memcpy((pkt_info_reply->src_addr) + 12, &tmp, 4);
-    tmp = nfct_get_attr_u32(ct, ATTR_IPV4_DST);
-    memcpy((pkt_info_reply->dest_addr) + 12, &tmp, 4);
-    pkt_info_reply->src_port = get_u16_attr(ct, ATTR_REPL_PORT_SRC);
-    pkt_info_reply->dest_port = get_u16_attr(ct, ATTR_REPL_PORT_DST);
-    pkt_info_reply->payload_size = get_u64_attr(ct, ATTR_REPL_COUNTER_BYTES);
-    pkt_info_reply->packet_count = nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
-    pkt_info_reply->payload_offset = 0;
-    */
     pkt_info_reply->src_port = get_u16_attr(ct, ATTR_REPL_PORT_SRC);
     pkt_info_reply->dest_port = get_u16_attr(ct, ATTR_REPL_PORT_DST);
 
     break;
   case AF_INET6:
     memcpy((&pkt_info_orig->src_addr[0]), nfct_get_attr(ct, ATTR_IPV6_SRC), 16);
-    memcpy((&pkt_info_orig->dest_addr[0]) + 12, nfct_get_attr(ct, ATTR_IPV6_DST), 16);
+    memcpy((&pkt_info_orig->dest_addr[0]), nfct_get_attr(ct, ATTR_IPV6_DST), 16);
     pkt_info_orig->src_port = get_u16_attr(ct, ATTR_ORIG_PORT_SRC);
     pkt_info_orig->dest_port = get_u16_attr(ct, ATTR_ORIG_PORT_DST);
     pkt_info_orig->payload_size = get_u64_attr(ct, ATTR_ORIG_COUNTER_BYTES);
@@ -109,41 +99,22 @@ int nfct_to_pkt_info(pkt_info_t* pkt_info_orig, pkt_info_t* pkt_info_reply, stru
   }
 }
 
-void do_flow_list(flow_list_t* flow_list, uint32_t now, pkt_info_t* pkt) {
-  buffer_t* json_buf = buffer_create(4096);
+unsigned int
+create_dnsquery_command(node_cache_t* node_cache, flow_list_t* flow_list, buffer_t* json_buf, uint32_t timestamp) {
+    unsigned int s = 0;
 
-  flow_list_add_pktinfo(flow_list, pkt);
-  buffer_reset(json_buf);
-  create_traffic_command(node_cache, flow_list, json_buf, now);
-  if (buffer_finish(json_buf)) {
-      mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
-  }
-  flow_list_clear(flow_list, now);
+    buffer_write(json_buf, "{ \"command\": \"traffic\", \"argument\": \"\", ");
+    buffer_write(json_buf, "\"result\": { \"flows\": [ ");
+    s += flow_list2json(node_cache, flow_list, json_buf);
+    buffer_write(json_buf, "], ");
+    buffer_write(json_buf, " \"timestamp\": %u, ", timestamp);
+    buffer_write(json_buf, " \"total_size\": %u, ", flow_list->total_size);
+    buffer_write(json_buf, " \"total_count\": %u } }", flow_list->total_count);
+    return s;
 }
-/*
-void do_flow_list(flow_list_t* flow_list, uint32_t now, pkt_info_t* pkt) {
-  buffer_t* json_buf = buffer_create(4096);
 
-  if (flow_list_should_send(flow_list, now)) {
-      printf("[XX] SEND FLOW LIST\n");
-      if (!flow_list_empty(flow_list)) {
-          // create json, send it
-          buffer_reset(json_buf);
-          create_traffic_command(node_cache, flow_list, json_buf, now);
-          if (buffer_finish(json_buf)) {
-              mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
-          }
-      }
-      flow_list_clear(flow_list, now);
-  } else {
-      // add the current one
-      printf("[XX] ADD TO FLOW LIST\n");
-      flow_list_add_pktinfo(flow_list, pkt);
-  }
-}
-*/
 
-void phexdump(uint8_t* data, unsigned int size) {
+void phexdump(const uint8_t* data, unsigned int size) {
     unsigned int i;
     printf("00: ");
     for (i = 0; i < size; i++) {
@@ -174,31 +145,19 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
 
   nfct_nlmsg_parse(nlh, ct);
 
-  //nfct_snprintf(buf, sizeof(buf), ct, NFCT_T_UNKNOWN, NFCT_O_DEFAULT, 0);
-  //printf("[XX] %s\n", buf);
-  
   // TODO: remove repl?
   nfct_to_pkt_info(&orig, &reply, ct);
-  //printf("[ME] port=22 %s\n", new_buf);
-  //pktinfo2str(new_buf, &orig, 4096);
-  //printf("[NF] %s\n", buf);
   if (orig.packet_count > 0 || orig.payload_size > 0) {
       node_cache_add_pkt_info(cb_data->node_cache, &orig, now);
-      //node_cache_add_pkt_info(cb_data->node_cache, &reply, now);
       flow_list_add_pktinfo(cb_data->flow_list, &orig);
-      //flow_list_add_pktinfo(cb_data->flow_list, &reply);
-      //printf("[XX] add pkt infos to flow list, tree size now %d\n", tree_size(cb_data->flow_list->flows));
   }
-  //node_cache_add_pkt_info(cb_data->node_cache, &reply, now);
-  //do_flow_list(cb_data->flow_list, now, &orig);
-  //do_flow_list(cb_data->flow_list, now, &reply);
 
   nfct_destroy(ct);
 
   return MNL_CB_OK;
 }
 
-/* note, this opens a socket every call (i.e. every second)
+/* note, this opens a socket every call (i.e. every loop. twice.)
  * we may want to put that outside of the main loop and add it to the poll thing
  * Then again, now we can take our time without worrying about the socket buffer
  * filling
@@ -231,6 +190,60 @@ int do_read(cb_data_t* cb_data) {
 
   nfh = mnl_nlmsg_put_extra_header(nlh, sizeof(struct nfgenmsg));
   nfh->nfgen_family = AF_INET;
+  nfh->version = NFNETLINK_V0;
+  nfh->res_id = 0;
+
+  ret = mnl_socket_sendto(nl, nlh, nlh->nlmsg_len);
+  if (ret == -1) {
+    perror("mnl_socket_recvfrom");
+    exit(EXIT_FAILURE);
+  }
+
+  ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
+  while (ret > 0) {
+    ret = mnl_cb_run(buf, ret, seq, portid, conntrack_cb, cb_data);
+    if (ret <= MNL_CB_STOP)
+      break;
+    ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
+  }
+  if (ret == -1) {
+    perror("mnl_socket_recvfrom");
+    exit(EXIT_FAILURE);
+  }
+
+  mnl_socket_close(nl);
+
+  return 0;
+}
+
+int do_read_ipv6(cb_data_t* cb_data) {
+  struct mnl_socket *nl;
+  struct nlmsghdr *nlh;
+  struct nfgenmsg *nfh;
+  char buf[MNL_SOCKET_BUFFER_SIZE];
+  unsigned int seq, portid;
+  int ret;
+  int i = 0;
+
+  nl = mnl_socket_open(NETLINK_NETFILTER);
+  if (nl == NULL) {
+    perror("mnl_socket_open");
+    exit(EXIT_FAILURE);
+  }
+
+  if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
+    perror("mnl_socket_bind");
+    exit(EXIT_FAILURE);
+  }
+  portid = mnl_socket_get_portid(nl);
+
+  nlh = mnl_nlmsg_put_header(buf);
+  nlh->nlmsg_type = (NFNL_SUBSYS_CTNETLINK << 8) | IPCTNL_MSG_CT_GET_CTRZERO;
+  nlh->nlmsg_flags = NLM_F_REQUEST|NLM_F_DUMP;
+  nlh->nlmsg_seq = seq = time(NULL);
+
+  nfh = mnl_nlmsg_put_extra_header(nlh, sizeof(struct nfgenmsg));
+  nfh->nfgen_family = AF_INET6;
   nfh->version = NFNETLINK_V0;
   nfh->res_id = 0;
 
@@ -343,23 +356,157 @@ void cleanup_cache() {
 /* ----------- */
 /* DNS Capture */
 /* ----------- */
+void
+handle_dns(const u_char *bp, u_int length, long long timestamp)
+{
+    ldns_status status;
+    ldns_pkt *p = NULL;
+    ldns_rr_list *answers;
+    ldns_rr *rr;
+    ldns_rdf *rdf;
+#if unused
+    ldns_rr_type type;
+#endif
+    size_t count;
+    char *query = NULL;
+    char *s;
+    char **ips = NULL;
+    size_t ips_len = 0;
+    size_t i;
 
-u_int32_t treat_pkt(struct nfq_data *nfa, int* verdict) {
-    (void)nfa;
-    *verdict = 1;
-    printf("[XX] GOT PKT TO TREAT\n");
-    return 1;
+    phexdump(bp, length);
+    status = ldns_wire2pkt(&p, bp, length);
+    if (status != LDNS_STATUS_OK) {
+        printf("DNS: could not parse packet: %s\n",
+            ldns_get_errorstr_by_id(status));
+        goto out;
+    }
+
+    count = ldns_rr_list_rr_count(ldns_pkt_question(p));
+    if (count == 0) {
+        printf("DNS: no owner?\n");
+        goto out;
+    } else if (count > 1) {
+        printf("DNS: not supported: > 1 RR in question section\n");
+        goto out;
+    }
+
+    answers = ldns_rr_list_new();
+    ldns_rr_list_cat(answers, ldns_pkt_rr_list_by_type(p, LDNS_RR_TYPE_A,
+        LDNS_SECTION_ANSWER));
+    ldns_rr_list_cat(answers, ldns_pkt_rr_list_by_type(p, LDNS_RR_TYPE_AAAA,
+        LDNS_SECTION_ANSWER));
+
+    ips_len = ldns_rr_list_rr_count(answers);
+
+    if (ips_len <= 0) {
+        printf("DNS: no A or AAAA in answer section\n");
+        goto out;
+    }
+
+    ips = calloc(ips_len, sizeof(char *));
+    if (!ips) {
+        fprintf(stderr, "calloc");
+    }
+
+    query = ldns_rdf2str(ldns_rr_owner(ldns_rr_list_rr(ldns_pkt_question(p),
+        0)));
+    if (!query) {
+        printf("DNS: ldns_rdf2str failure\n");
+        goto out;
+    }
+
+    i = 0;
+    rr = ldns_rr_list_pop_rr(answers);
+    while (rr && i < ips_len) {
+#if unused
+        type = ldns_rr_get_type(rr);
+#endif
+
+        // XXX TTL ldns_rr_ttl
+        rdf = ldns_rr_rdf(rr, 0);
+        s = ldns_rdf2str(rdf);
+        if (!s) {
+            printf("DNS: ldns_rdf2str failure\n");
+            goto out;
+        }
+        ips[i] = s;
+
+        ip_t ip;
+
+        ldns_rdf* query_rdf = ldns_rr_owner(ldns_rr_list_rr(ldns_pkt_question(p),
+        0));
+        
+        
+        dns_pkt_info_t dns_pkt;
+        dns_pkt.family = AF_INET;
+        memset(dns_pkt.ip, 0, 12);
+        memcpy(dns_pkt.ip+12, rdf->_data, rdf->_size);
+        memcpy(dns_pkt.dname, query_rdf->_data, query_rdf->_size);
+        // TODO
+        dns_pkt.ttl = 1234;
+        time_t now = time(NULL);
+
+        if (rdf->_size == 4) {
+            printf("[XX] ADD IPV4 ANSWER TO DNS CACHE:\n");
+            char pktinfo_str[2048];
+            dns_pktinfo2str(pktinfo_str, &dns_pkt, 2048);
+            printf("[XX] PKTINFO: %s\n", pktinfo_str);
+            
+            dns_cache_add(dns_cache, &dns_pkt, now);
+            node_cache_add_dns_info(node_cache, &dns_pkt, now);
+        } else {
+            printf("[XX] ADD IPV6 ANSWER TO DNS CACHE\n");
+            dns_cache_add(dns_cache, &dns_pkt, now);
+            node_cache_add_dns_info(node_cache, &dns_pkt, now);
+        }
+
+        ++i;
+        rr = ldns_rr_list_pop_rr(answers);
+
+    }
+    for (i = 0; i < ips_len; ++i) {
+        printf("[XX] DNS ANSWER: %s %s\n", query, ips[i]);
+    }
+
+    //print_dnsquery(query, (const char **)ips, ips_len, timestamp);
+
+ out:
+    for (i = 0; i < ips_len; ++i) {
+        free(ips[i]);
+    }
+    free(ips);
+    free(query);
+    ldns_pkt_free(p);
+}
+
+
+u_int32_t treat_pkt(struct nfq_data *nfa) {
+    int id = 0;
+    struct nfqnl_msg_packet_hdr *ph;
+    unsigned char* data;
+    int ret;
+
+    ph = nfq_get_msg_packet_hdr(nfa);
+    if (ph) {
+        id = ntohl(ph->packet_id);
+        ret = nfq_get_payload(nfa, &data);
+        if (ret >= 28) {
+            handle_dns(data+28, ret-28, 0); 
+        }
+    }
+    return id;
 }
 
 /* Definition of callback function */
-static int dns_cap_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
+int dns_cap_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
               struct nfq_data *nfa, void *data)
 {
-    int verdict;
-    u_int32_t id = treat_pkt(nfa, &verdict); /* Treat packet */
-    return nfq_set_verdict(qh, id, verdict, 0, NULL); /* Verdict packet */
+    printf("[XX] dns cb called\n");
+    u_int32_t id = treat_pkt(nfa); /* Treat packet */
+    return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 }
- 
+
 
 /* Set callback function */
 /*
@@ -408,7 +555,7 @@ int main_loop() {
     int rs;
     message_type_t type;
     struct timeval tv;
-    struct pollfd fds[1];
+    struct pollfd fds[2];
     uint32_t now, last_mosq_poll;
 
     cb_data_t* cb_data = (cb_data_t*)malloc(sizeof(cb_data_t));
@@ -419,10 +566,6 @@ int main_loop() {
 
     tv.tv_sec = 0;
     tv.tv_usec = 500;
-
-    // set all fds. currently only one
-    fds[0].fd = mosquitto_socket(mosq);
-    fds[0].events = POLLIN;
 
     now = time(NULL);
     last_mosq_poll = now;
@@ -436,19 +579,50 @@ int main_loop() {
     cb_data->node_cache = node_cache;
 
     /* specific queue for DNS traffic */
-    //int qh = nfq_create_queue(h,  0, &dns_cap_cb, NULL);
+    struct nfq_handle* dns_qh = nfq_open();
+    if (!dns_qh) {
+        fprintf(stderr, "error during nfq_open()\n");
+        exit(1);
+    }
+    printf("unbinding existing nf_queue handler for AF_INET (if any)\n");
+    if (nfq_unbind_pf(dns_qh, AF_INET) < 0) {
+        fprintf(stderr, "error during nfq_unbind_pf()\n");
+        exit(1);
+    }
 
+    printf("binding nfnetlink_queue as nf_queue handler for AF_INET\n");
+    if (nfq_bind_pf(dns_qh, AF_INET) < 0) {
+        fprintf(stderr, "error during nfq_bind_pf()\n");
+        exit(1);
+    }
+
+    struct nfq_q_handle* dns_q_qh = nfq_create_queue(dns_qh,  0, &dns_cap_cb, NULL);
+
+    if (nfq_set_mode(dns_q_qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
+        fprintf(stderr, "can't set packet_copy mode\n");
+        exit(1);
+    }
+
+    int dns_q_fd = nfq_fd(dns_qh);
+    char dns_q_buf[4096] __attribute__ ((aligned));
+    int dns_q_rv;
+
+    // set all fds. 0 is the mosquitto socket
+    // 1 is the dns nfqueue
+    fds[0].fd = mosquitto_socket(mosq);
+    fds[0].events = POLLIN;
+    fds[1].fd = dns_q_fd;
+    fds[1].events = POLLIN;
+    
     /* Read message from kernel or mqtt */
     while (running) {
 
         /* check DNS traffic queue */
-        /*
-        if ((rv = recv(fd, buf, sizeof(buf), 0)) >= 0) {
-            nfq_handle_packet(h, buf, rv); // send packet to callback
-            continue;
-        }*/
+        // Do the entire nfq dns queue first
+        // or at least a 100 at a time (TODO: make this part of the poll() loop)
 
         do_read(cb_data);
+        do_read_ipv6(cb_data);
         if (flow_list_should_send(flow_list, now)) {
             //printf("[XX] should send flow list A (total size %d)\n", tree_size(flow_list->flows));
             if (!flow_list_empty(flow_list)) {
@@ -470,7 +644,7 @@ int main_loop() {
 
         // check mqtt fd as well
 
-        rs = poll(fds, 1, 1000);
+        rs = poll(fds, 2, 1000);
         now = time(NULL);
 
         if (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME / 2) {
@@ -484,106 +658,6 @@ int main_loop() {
         } else if (rs == 0) {
             // do nothing further
         } else {
-/*
-            if (1) {
-                printf("[XX] CALL do_read()\n");
-                
-                do_read(cb_data);
-                printf("[XX] DONE do_read()\n");
-*/
-/*
-                c++;
-                //printf("C: %u RS: %u\n", c, rs);
-                //printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
-                pkt_info_t pkt;
-                dns_pkt_info_t dns_pkt;
-                char pkt_str[2048];
-                type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
-                if (type == SPIN_BLOCKED) {
-                    //pktinfo2str(pkt_str, &pkt, 2048);
-                    //printf("[BLOCKED] %s\n", pkt_str);
-                    node_cache_add_pkt_info(node_cache, &pkt, now);
-                    send_command_blocked(&pkt);
-                    check_send_ack();
-                } else if (type == SPIN_TRAFFIC_DATA) {
-                    //pktinfo2str(pkt_str, &pkt, 2048);
-                    //printf("[TRAFFIC] %s\n", pkt_str);
-                    //print_pktinfo_wirehex(&pkt);
-                    node_cache_add_pkt_info(node_cache, &pkt, now);
-
-                    // small experiment; check if either endpoint is an internal device, if not,
-                    // skip reporting it
-                    // (if this is useful, we should do this check in add_pkt_info above, probably)
-                    ip_t ip;
-                    node_t* src_node;
-                    node_t* dest_node;
-                    ip.family = pkt.family;
-                    memcpy(ip.addr, pkt.src_addr, 16);
-                    src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
-                    memcpy(ip.addr, pkt.dest_addr, 16);
-                    dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
-                    if (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL && !local_mode)) {
-                        continue;
-                    }
-
-                    if (flow_list_should_send(flow_list, now)) {
-                        if (!flow_list_empty(flow_list)) {
-                            // create json, send it
-                            buffer_reset(json_buf);
-                            create_traffic_command(node_cache, flow_list, json_buf, now);
-                            if (buffer_finish(json_buf)) {
-                                mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
-                            }
-                        }
-                        flow_list_clear(flow_list, now);
-                    } else {
-                        // add the current one
-                        flow_list_add_pktinfo(flow_list, &pkt);
-                    }
-                    check_send_ack();
-                } else if (type == SPIN_DNS_ANSWER) {
-                    // note: bad version would have been caught in wire2pktinfo
-                    // in this specific case
-                    wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
-
-                    // DNS answers are not relayed as traffic; we only
-                    // store them internally, so later traffic can be
-                    // matched to the DNS answer by IP address lookup
-                    dns_cache_add(dns_cache, &dns_pkt, now);
-                    node_cache_add_dns_info(node_cache, &dns_pkt, now);
-                    // TODO do we need to send nodeUpdate?
-                    check_send_ack();
-                } else if (type == SPIN_DNS_QUERY) {
-                    // We do want to relay dns query information to
-                    // clients; it should be sent as command of
-                    // type 'dnsquery'
-
-
-                    // the info now contains:
-                    // - domain name queried
-                    // - ip address doing the query
-                    // - 0 ttl value
-                    wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
-                    // XXXXX this would add wrong ip
-                    // If the queried domain name isn't known, we add it as a new node
-                    // (with only a domain name)
-                    node_cache_add_dns_query_info(node_cache, &dns_pkt, now);
-                    //node_cache_add_pkt_info(node_cache, &dns_pkt, now, 1);
-                    // We do send a separate notification for the clients that are interested
-                    send_command_dnsquery(&dns_pkt);
-
-
-                    // TODO do we need to send nodeUpdate?
-                    check_send_ack();
-                } else if (type == SPIN_ERR_BADVERSION) {
-                    printf("Error: version mismatch between client and kernel module\n");
-                } else {
-                    printf("unknown type? %u\n", type);
-                }
-*/
-/*
-            }
-*/
             printf("[XX] check mosq\n");
             if ((fds[0].revents & POLLIN) || (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME)) {
                 printf("[XX] have some message on mosq\n");
@@ -603,10 +677,19 @@ int main_loop() {
                 spin_log(LOG_ERR, " Reconnected, mosq fd now %d\n", mosquitto_socket(mosq));
 
             }
+            printf("[XX] check nfq\n");
+            if ((fds[1].revents & POLLIN)) {
+                if ((dns_q_rv = recv(dns_q_fd, dns_q_buf, sizeof(dns_q_buf), 0)) >= 0) {
+                    // TODO we should add this one to the poll part
+                    // now this is slow and once per loop is not enough
+                    nfq_handle_packet(dns_qh, dns_q_buf, dns_q_rv); // send packet to callback
+                }
+                printf("[XX] rest of loop\n");
+            }
         }
         //printf("[XX] end of loop body\n");
 
-        sleep(1);
+        //sleep(1);
     }
     flow_list_destroy(flow_list);
     buffer_destroy(json_buf);
@@ -667,12 +750,8 @@ int main(int argc, char** argv) {
     log_version();
 
     init_cache();
-    printf("[XX] A\n");
     init_mosquitto(mosq_host, mosq_port);
-    printf("[XX] B\n");
     signal(SIGINT, int_handler);
-    printf("[XX] C\n");
-    fflush(stdout);
 
     running = 1;
     //result = init_netlink();

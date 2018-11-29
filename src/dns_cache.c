@@ -39,6 +39,37 @@ dns_cache_create() {
     return dns_cache;
 }
 
+// Add name and ip directly (ie. we wrap in dns_pkt_info ourselves
+void dns_cache_add_dname_ip(dns_cache_t* cache, uint8_t family, uint32_t ttl, char* dname, const ip_t* ip, uint32_t timestamp) {
+    dns_pkt_info_t* dns_pkt_info = (dns_pkt_info_t*)malloc(sizeof(dns_pkt_info_t));
+    dns_pkt_info->family = family;
+    memcpy(dns_pkt_info->ip, ip, sizeof(ip));
+    strcpy(dns_pkt_info->dname, dname);
+    dns_pkt_info->ttl = ttl;
+
+    tree_entry_t* t_entry = tree_find(cache->entries, sizeof(ip_t), dns_pkt_info);
+    dns_cache_entry_t* entry;
+
+    timestamp += dns_pkt_info->ttl;
+
+    if (t_entry == NULL) {
+        entry = dns_cache_entry_create();
+        //spin_log(LOG_DEBUG, "[XX] create new IP entry for %s (%p)\n", dname, entry);
+        //spin_log(LOG_DEBUG, "[XX] created entry at %p\n", entry);
+        tree_add(entry->domains, strlen(dname)+1, dname, sizeof(timestamp), &timestamp, 1);
+        // todo, make noncopy?
+        tree_add(cache->entries, sizeof(ip_t), dns_pkt_info, sizeof(entry), entry, 1);
+        // free the outer shell but not the inner data
+        //free(entry->domains);
+        free(entry);
+        //dns_cache_entry_destroy(entry);
+    } else {
+        entry = (dns_cache_entry_t*)t_entry->data;
+        //spin_log(LOG_DEBUG, "[XX] add domain %s to existing IP entry (%p)\n", dname, entry);
+        tree_add(entry->domains, strlen(dname)+1, dname, sizeof(timestamp), &timestamp, 1);
+    }
+}
+
 void
 dns_cache_add(dns_cache_t* cache, dns_pkt_info_t* dns_pkt_info, uint32_t timestamp) {
     tree_entry_t* t_entry = tree_find(cache->entries, sizeof(ip_t), dns_pkt_info);
