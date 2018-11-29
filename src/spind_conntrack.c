@@ -78,7 +78,7 @@ int nfct_to_pkt_info(pkt_info_t* pkt_info_orig, pkt_info_t* pkt_info_reply, stru
     pkt_info_orig->payload_size += get_u64_attr(ct, ATTR_REPL_COUNTER_BYTES);
     pkt_info_orig->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
     pkt_info_orig->payload_offset = 0;
-    pkt_info_orig->protocol = 6;
+    pkt_info_orig->protocol = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
 
     pkt_info_reply->src_port = get_u16_attr(ct, ATTR_REPL_PORT_SRC);
     pkt_info_reply->dest_port = get_u16_attr(ct, ATTR_REPL_PORT_DST);
@@ -94,6 +94,7 @@ int nfct_to_pkt_info(pkt_info_t* pkt_info_orig, pkt_info_t* pkt_info_reply, stru
     pkt_info_orig->payload_size += get_u64_attr(ct, ATTR_REPL_COUNTER_BYTES);
     pkt_info_orig->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
     pkt_info_orig->payload_offset = 0;
+    pkt_info_orig->protocol = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
     break;
     // note: ipv6 is u128
   }
