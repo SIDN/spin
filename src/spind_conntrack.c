@@ -584,6 +584,7 @@ int main_loop() {
         fprintf(stderr, "error during nfq_open()\n");
         exit(1);
     }
+    /* these are obsolete 
     printf("unbinding existing nf_queue handler for AF_INET (if any)\n");
     if (nfq_unbind_pf(dns_qh, AF_INET) < 0) {
         fprintf(stderr, "error during nfq_unbind_pf()\n");
@@ -595,7 +596,7 @@ int main_loop() {
         fprintf(stderr, "error during nfq_bind_pf()\n");
         exit(1);
     }
-
+    */
     struct nfq_q_handle* dns_q_qh = nfq_create_queue(dns_qh,  0, &dns_cap_cb, NULL);
 
     if (nfq_set_mode(dns_q_qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
