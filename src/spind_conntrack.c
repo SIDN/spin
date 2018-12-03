@@ -408,6 +408,7 @@ handle_dns(const u_char *bp, u_int length, long long timestamp)
     ips = calloc(ips_len, sizeof(char *));
     if (!ips) {
         fprintf(stderr, "calloc");
+        goto out;
     }
 
     query = ldns_rdf2str(ldns_rr_owner(ldns_rr_list_rr(ldns_pkt_question(p),
