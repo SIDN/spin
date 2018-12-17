@@ -14,6 +14,7 @@
 #include "dns_cache.h"
 #include "node_cache.h"
 #include "spin_log.h"
+#include "ip_store.h"
 
 #include "version.h"
 
@@ -37,6 +38,10 @@ static int local_mode;
 const char* mosq_host;
 int mosq_port;
 int stop_on_error;
+
+ip_store_t* ignore_ips;
+ip_store_t* block_ips;
+ip_store_t* except_ips;
 
 
 typedef struct {
@@ -601,6 +606,7 @@ int main_loop() {
     */
     struct nfq_q_handle* dns_q_qh = nfq_create_queue(dns_qh,  0, &dns_cap_cb, NULL);
 
+
     if (nfq_set_mode(dns_q_qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
         fprintf(stderr, "can't set packet_copy mode\n");
         exit(1);
@@ -624,9 +630,12 @@ int main_loop() {
         // Do the entire nfq dns queue first
         // or at least a 100 at a time (TODO: make this part of the poll() loop)
 
+        //printf("[XX] do_read()\n");
         do_read(cb_data);
+        //printf("[XX] do_read_ipv6()\n");
         do_read_ipv6(cb_data);
         if (flow_list_should_send(flow_list, now)) {
+            //printf("[XX] should send flow list\n");
             //printf("[XX] should send flow list A (total size %d)\n", tree_size(flow_list->flows));
             if (!flow_list_empty(flow_list)) {
                 // create json, send it
@@ -636,7 +645,7 @@ int main_loop() {
                     //printf("[XX] SENDING: %s\n", buffer_str(json_buf));
                     mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
                 } else {
-                    printf("[XX] unable to finish buffer\n");
+                    //printf("[XX] unable to finish buffer\n");
                 }
             } else {
                 //printf("[XX] but it is empty\n");
@@ -647,11 +656,14 @@ int main_loop() {
 
         // check mqtt fd as well
 
-        rs = poll(fds, 2, 1000);
+        //printf("[XX] poll()\n");
+        //rs = poll(fds, 2, 1000);
+        rs = poll(fds, 2, 100);
         now = time(NULL);
 
         if (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME / 2) {
             //spin_log(LOG_DEBUG, "Calling loop for keepalive check\n");
+            //printf("[XX] call mosq loop()\n");
             mosquitto_loop_misc(mosq);
             last_mosq_poll = now;
         }
@@ -659,16 +671,17 @@ int main_loop() {
         if (rs < 0) {
             spin_log(LOG_ERR, "error in poll(): %s\n", strerror(errno));
         } else if (rs == 0) {
+            //printf("[XX] no error, no data on poll\n");
             // do nothing further
         } else {
-            printf("[XX] check mosq\n");
+            //printf("[XX] check which events fired\n");
             if ((fds[0].revents & POLLIN) || (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME)) {
-                printf("[XX] have some message on mosq\n");
+                //printf("[XX] have some message on mosq\n");
                 //spin_log(LOG_DEBUG, "Calling loop for data\n");
                 mosquitto_loop(mosq, 0, 10);
                 last_mosq_poll = now;
             } else if (fds[0].revents) {
-                printf("[XX] have bad message on mosq\n");
+                //printf("[XX] have bad message on mosq\n");
                 spin_log(LOG_ERR, "Unexpected result from mosquitto socket (%d)\n", fds[1].revents);
                 spin_log(LOG_ERR, "Socket fd: %d, mosq struct has %d\n", fds[1].fd, mosquitto_socket(mosq));
                 if (stop_on_error) {
@@ -680,20 +693,24 @@ int main_loop() {
                 spin_log(LOG_ERR, " Reconnected, mosq fd now %d\n", mosquitto_socket(mosq));
 
             }
-            printf("[XX] check nfq\n");
+            //printf("[XX] check nfq\n");
             if ((fds[1].revents & POLLIN)) {
+                //printf("[XX] nfq has data\n");
                 if ((dns_q_rv = recv(dns_q_fd, dns_q_buf, sizeof(dns_q_buf), 0)) >= 0) {
                     // TODO we should add this one to the poll part
                     // now this is slow and once per loop is not enough
                     nfq_handle_packet(dns_qh, dns_q_buf, dns_q_rv); // send packet to callback
                 }
-                printf("[XX] rest of loop\n");
+                //printf("[XX] rest of loop\n");
             }
         }
         //printf("[XX] end of loop body\n");
 
         //sleep(1);
     }
+    nfq_destroy_queue(dns_q_qh);
+    nfq_close(dns_qh);
+    
     flow_list_destroy(flow_list);
     buffer_destroy(json_buf);
     free(cb_data);
@@ -756,10 +773,19 @@ int main(int argc, char** argv) {
     init_mosquitto(mosq_host, mosq_port);
     signal(SIGINT, int_handler);
 
+    ignore_ips = ip_store_create();
+    block_ips = ip_store_create();
+    except_ips = ip_store_create();
+
     running = 1;
     //result = init_netlink();
     // main loop goes here
     main_loop();
+
+    ip_store_destroy(ignore_ips);
+    ip_store_destroy(block_ips);
+    ip_store_destroy(except_ips);
+
 
     cleanup_cache();
 

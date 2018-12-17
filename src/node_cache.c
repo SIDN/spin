@@ -30,9 +30,11 @@ node_destroy(node_t* node) {
     node->domains = NULL;
     if (node->mac) {
         free(node->mac);
+        node->mac = NULL;
     }
     if (node->name) {
         free(node->name);
+        node->name = NULL;
     }
     free(node);
 }
@@ -218,10 +220,10 @@ node2json(node_t* node, buffer_t* json_buf) {
         buffer_write(json_buf, " \"mac\": \"%s\", ", node->mac);
     }
     if (node->is_blocked) {
-        buffer_write(json_buf, " \"is_blocked\": \"true\", ", node->mac);
+        buffer_write(json_buf, " \"is_blocked\": \"true\", ");
     }
     if (node->is_excepted) {
-        buffer_write(json_buf, " \"is_excepted\": \"true\", ", node->mac);
+        buffer_write(json_buf, " \"is_excepted\": \"true\", ");
     }
     buffer_write(json_buf, " \"lastseen\": %u, ", node->last_seen);
 
@@ -357,17 +359,20 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
         mac = arp_table_find_by_ip(node_cache->arp_table, ip);
     }
     if (mac) {
+        printf("[XX] mac found: %s\n", mac);
         node_set_mac(node, mac);
         name = node_names_find_mac(node_cache->names, mac);
         if (name != NULL) {
             node_set_name(node, name);
         }
     } else {
+        printf("[XX] mac not found\n");
         name = node_names_find_ip(node_cache->names, ip);
         if (name != NULL) {
             node_set_name(node, name);
         }
     }
+    printf("[XX] mac at %p\n", node->mac);
 }
 
 void
