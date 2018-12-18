@@ -66,7 +66,7 @@ static inline u_int64_t get_u64_attr(struct nf_conntrack *ct, char ATTR) {
 int nfct_to_pkt_info(pkt_info_t* pkt_info_orig, pkt_info_t* pkt_info_reply, struct nf_conntrack *ct) {
   unsigned int offset = 0;
   u_int32_t tmp;
-  
+
   pkt_info_orig->family = nfct_get_attr_u8(ct, ATTR_ORIG_L3PROTO);
   switch (pkt_info_orig->family) {
   case AF_INET:
@@ -443,8 +443,8 @@ handle_dns(const u_char *bp, u_int length, long long timestamp)
 
         ldns_rdf* query_rdf = ldns_rr_owner(ldns_rr_list_rr(ldns_pkt_question(p),
         0));
-        
-        
+
+
         dns_pkt_info_t dns_pkt;
         dns_pkt.family = AF_INET;
         memset(dns_pkt.ip, 0, 12);
@@ -459,7 +459,7 @@ handle_dns(const u_char *bp, u_int length, long long timestamp)
             char pktinfo_str[2048];
             dns_pktinfo2str(pktinfo_str, &dns_pkt, 2048);
             printf("[XX] PKTINFO: %s\n", pktinfo_str);
-            
+
             dns_cache_add(dns_cache, &dns_pkt, now);
             node_cache_add_dns_info(node_cache, &dns_pkt, now);
         } else {
@@ -499,14 +499,14 @@ u_int32_t treat_pkt(struct nfq_data *nfa) {
         id = ntohl(ph->packet_id);
         ret = nfq_get_payload(nfa, &data);
         if (ret >= 28) {
-            handle_dns(data+28, ret-28, 0); 
+            handle_dns(data+28, ret-28, 0);
         }
     }
     return id;
 }
 
 /* Definition of callback function */
-int dns_cap_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
+static int dns_cap_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
               struct nfq_data *nfa, void *data)
 {
     printf("[XX] dns cb called\n");
@@ -591,7 +591,7 @@ int main_loop() {
         fprintf(stderr, "error during nfq_open()\n");
         exit(1);
     }
-    /* these are obsolete 
+    /* these are obsolete
     printf("unbinding existing nf_queue handler for AF_INET (if any)\n");
     if (nfq_unbind_pf(dns_qh, AF_INET) < 0) {
         fprintf(stderr, "error during nfq_unbind_pf()\n");
@@ -605,7 +605,11 @@ int main_loop() {
     }
     */
     struct nfq_q_handle* dns_q_qh = nfq_create_queue(dns_qh,  0, &dns_cap_cb, NULL);
-
+    if (dns_q_qh == NULL) {
+        fprintf(stderr, "unable to create Netfilter Queue: %s\n", strerror(errno));
+        exit(1);
+    }
+    printf("[XX] DNS_Q_QH: %p\n", dns_q_qh);
 
     if (nfq_set_mode(dns_q_qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
         fprintf(stderr, "can't set packet_copy mode\n");
@@ -622,7 +626,7 @@ int main_loop() {
     fds[0].events = POLLIN;
     fds[1].fd = dns_q_fd;
     fds[1].events = POLLIN;
-    
+
     /* Read message from kernel or mqtt */
     while (running) {
 
@@ -710,7 +714,7 @@ int main_loop() {
     }
     nfq_destroy_queue(dns_q_qh);
     nfq_close(dns_qh);
-    
+
     flow_list_destroy(flow_list);
     buffer_destroy(json_buf);
     free(cb_data);
