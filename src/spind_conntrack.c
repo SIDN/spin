@@ -168,7 +168,7 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
  * Then again, now we can take our time without worrying about the socket buffer
  * filling
  */
-int do_read(cb_data_t* cb_data) {
+int do_read_common(cb_data_t* cb_data, uint8_t family) {
   struct mnl_socket *nl;
   struct nlmsghdr *nlh;
   struct nfgenmsg *nfh;
@@ -195,7 +195,7 @@ int do_read(cb_data_t* cb_data) {
   nlh->nlmsg_seq = seq = time(NULL);
 
   nfh = mnl_nlmsg_put_extra_header(nlh, sizeof(struct nfgenmsg));
-  nfh->nfgen_family = AF_INET;
+  nfh->nfgen_family = family;
   nfh->version = NFNETLINK_V0;
   nfh->res_id = 0;
 
@@ -222,58 +222,14 @@ int do_read(cb_data_t* cb_data) {
   return 0;
 }
 
+int do_read(cb_data_t* cb_data) {
+
+    return do_read_common(cb_data, AF_INET);
+}
+
 int do_read_ipv6(cb_data_t* cb_data) {
-  struct mnl_socket *nl;
-  struct nlmsghdr *nlh;
-  struct nfgenmsg *nfh;
-  char buf[MNL_SOCKET_BUFFER_SIZE];
-  unsigned int seq, portid;
-  int ret;
-  int i = 0;
 
-  nl = mnl_socket_open(NETLINK_NETFILTER);
-  if (nl == NULL) {
-    perror("mnl_socket_open");
-    exit(EXIT_FAILURE);
-  }
-
-  if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
-    perror("mnl_socket_bind");
-    exit(EXIT_FAILURE);
-  }
-  portid = mnl_socket_get_portid(nl);
-
-  nlh = mnl_nlmsg_put_header(buf);
-  nlh->nlmsg_type = (NFNL_SUBSYS_CTNETLINK << 8) | IPCTNL_MSG_CT_GET_CTRZERO;
-  nlh->nlmsg_flags = NLM_F_REQUEST|NLM_F_DUMP;
-  nlh->nlmsg_seq = seq = time(NULL);
-
-  nfh = mnl_nlmsg_put_extra_header(nlh, sizeof(struct nfgenmsg));
-  nfh->nfgen_family = AF_INET6;
-  nfh->version = NFNETLINK_V0;
-  nfh->res_id = 0;
-
-  ret = mnl_socket_sendto(nl, nlh, nlh->nlmsg_len);
-  if (ret == -1) {
-    perror("mnl_socket_recvfrom");
-    exit(EXIT_FAILURE);
-  }
-
-  ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
-  while (ret > 0) {
-    ret = mnl_cb_run(buf, ret, seq, portid, conntrack_cb, cb_data);
-    if (ret <= MNL_CB_STOP)
-      break;
-    ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
-  }
-  if (ret == -1) {
-    perror("mnl_socket_recvfrom");
-    exit(EXIT_FAILURE);
-  }
-
-  mnl_socket_close(nl);
-
-  return 0;
+    return do_read_common(cb_data, AF_INET6);
 }
 
 void handle_json_command(const char* data) {
