@@ -586,9 +586,9 @@ int main_loop() {
     /* Read message from kernel or mqtt */
     while (running) {
 
-        /* check DNS traffic queue */
-        // Do the entire nfq dns queue first
-        // or at least a 100 at a time (TODO: make this part of the poll() loop)
+	//
+	// Read potential v4 and v6 conntrack traffic
+	//
 
         //printf("[XX] do_read()\n");
         do_read(cb_data);
@@ -638,11 +638,20 @@ int main_loop() {
         } else {
             //printf("[XX] check which events fired\n");
             if ((fds[0].revents & POLLIN) || (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME)) {
+		//
+		// Mosquitto message arrived
+		//
+
                 //printf("[XX] have some message on mosq\n");
-                //spin_log(LOG_DEBUG, "Calling loop for data\n");
+                /spin_log(LOG_DEBUG, "Calling loop for data\n");
                 mosquitto_loop(mosq, 0, 10);
                 last_mosq_poll = now;
             } else if (fds[0].revents) {
+
+		//
+		// Something wrong with Mosquitto
+		//
+
                 //printf("[XX] have bad message on mosq\n");
                 spin_log(LOG_ERR, "Unexpected result from mosquitto socket (%d)\n", fds[1].revents);
                 spin_log(LOG_ERR, "Socket fd: %d, mosq struct has %d\n", fds[1].fd, mosquitto_socket(mosq));
