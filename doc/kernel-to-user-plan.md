@@ -23,9 +23,9 @@ SPIN code currently gives commands to kernel:
 
 #### Proposed functional changes
 
-#####Arp
+##### Arp
 The ARP cache information is already from userspace, so no changes required here
-#####DNS
+##### DNS
 The DNS requests and responses can be acquired from the kernel using a netfilter chain
 1) Allocate a netfilter chain number
 >TODO: is there a standard mechanism/registry for this? If not other software might duplicate this stream number by accident.
@@ -35,7 +35,7 @@ The DNS requests and responses can be acquired from the kernel using a netfilter
 Basically specifying packets to/from port 53
 
 3)Connect to the queue of this chain and decode packets just like it is now done in the kernel, or, preferably, use standard software for this
-#####Packetstreams
+##### Packetstreams
 We will make use of the Conntrack feature of Netfilter that reads accounting data.
 Prerequisites are:
 - Kernel modules for conntrack must be loaded
@@ -43,7 +43,7 @@ Prerequisites are:
 
 Conntrack data can now be read using standard netlink calls and processed
 
-#####Commands
+##### Commands
 The commands for the IGNORE and EXCEPT lists can now functionally be handled in usermode, with a possible performance loss
 
 The commands for the BLOCK list will have to be changed to use the standard iptable mechanism
