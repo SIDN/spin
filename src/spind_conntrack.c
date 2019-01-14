@@ -471,12 +471,6 @@ static int dns_cap_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
 }
 
 
-/* Set callback function */
-/*
-for (;;) {
-}
-*/
-
 /* ------------------ */
 /* end of DNS Capture */
 /* ------------------ */
