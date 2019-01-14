@@ -657,6 +657,8 @@ int main_loop() {
             flow_list_clear(flow_list, now);
         }
 
+	/* end DNS traffic */
+
 
         // check mqtt fd as well
 
