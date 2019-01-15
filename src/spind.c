@@ -1,5 +1,3 @@
-# Slightly edited by Hans van Staveren
-
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <linux/netlink.h>
@@ -34,7 +32,7 @@
 #define NETLINK_CONFIG_PORT 30
 #define NETLINK_TRAFFIC_PORT 31
 
-#define MOSQUITTO_KEEPALIVE_TIME 60
+#define MOSQUITTO_KEEPALIVE_TIME 60	/* Seconds */
 
 #define MAX_NETLINK_PAYLOAD 1024 /* maximum payload size*/
 struct sockaddr_nl src_addr, dest_addr;
@@ -53,11 +51,18 @@ static struct mosquitto* mosq;
 static int running;
 static int local_mode;
 
+// MQTT+
+
 const char* mosq_host;
 int mosq_port;
 
 #define MQTT_CHANNEL_TRAFFIC "SPIN/traffic"
 #define MQTT_CHANNEL_COMMANDS "SPIN/commands"
+
+// MQTT-
+
+
+// NL+
 
 void send_ack()
 {
@@ -92,6 +97,9 @@ void check_send_ack() {
     }
 }
 
+// NL-
+
+/*
 static inline void
 print_pktinfo_wirehex(pkt_info_t* pkt_info) {
     uint8_t* wire = (char*)malloc(46);
@@ -125,6 +133,7 @@ print_dnspktinfo_wirehex(dns_pkt_info_t* pkt_info) {
 
     free(wire);
 }
+*/
 
 unsigned int netlink_command_result2json(netlink_command_result_t* command_result, buffer_t* buf) {
     unsigned int s = 0;
@@ -566,6 +575,8 @@ tree_t* send_netlink_command_for_node_ips(config_command_t cmd, int node_id) {
     return node->ips;
 }
 
+// MQTT+
+
 void handle_command_add_filter(int node_id) {
     tree_t* ips = send_netlink_command_for_node_ips(SPIN_CMD_ADD_IGNORE, node_id);
     if (ips != NULL) {
@@ -887,14 +898,8 @@ void handle_json_command(const char* data) {
                           data, tokens, 4);
 }
 
-/*
-void handle_command(const struct mosquitto_message* msg, void* user_data) {
-    // commands are in json format of the form:
-    // { "command": <command name> (string)
-    //   "arguments": <arguments> (type depends on command)
-    // we should
-}
-*/
+
+// Hook from Mosquitto code called with incoming messages
 
 void on_message(struct mosquitto* mosq, void* user_data, const struct mosquitto_message* msg) {
     if (strcmp(msg->topic, MQTT_CHANNEL_COMMANDS) == 0) {
@@ -938,6 +943,9 @@ void init_mosquitto(const char* host, int port) {
     handle_command_get_list(SPIN_CMD_GET_BLOCK, "blocks");
     handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
 }
+
+
+// MQTT-
 
 void init_cache() {
     dns_cache = dns_cache_create();
