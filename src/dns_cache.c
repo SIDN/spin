@@ -6,6 +6,8 @@
 
 #include <assert.h>
 
+#include <time.h>
+
 #include "tree.h"
 #include "util.h"
 
@@ -116,14 +118,16 @@ dns_cache_destroy(dns_cache_t* dns_cache) {
 }
 
 void
-dns_cache_clean(dns_cache_t* dns_cache, uint32_t now) {
+dns_cache_clean(dns_cache_t* dns_cache) {
     uint32_t* expiry;
     dns_cache_entry_t* cur_dns;
     tree_entry_t* cur = tree_first(dns_cache->entries);
     tree_entry_t* nxt;
     tree_entry_t* cur_domain;
     tree_entry_t* nxt_domain;
+    time_t now;
 
+    time(&now);
     while (cur != NULL) {
         cur_dns = (dns_cache_entry_t*) cur->data;
         cur_domain = tree_first(cur_dns->domains);

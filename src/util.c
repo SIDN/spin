@@ -201,6 +201,7 @@ buffer_writev(buffer_t* buffer, const char* format, va_list args) {
 int buffer_write(buffer_t* buffer, const char* format, ...) {
     va_list args;
     int result;
+
     va_start(args, format);
     result = buffer_writev(buffer, format, args);
     va_end(args);
@@ -209,6 +210,7 @@ int buffer_write(buffer_t* buffer, const char* format, ...) {
 
 int
 buffer_ok(buffer_t* buffer) {
+
     return buffer->ok == 1;
 }
 
