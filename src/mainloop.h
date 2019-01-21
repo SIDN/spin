@@ -3,6 +3,6 @@
 
 typedef void (*workfunc)(int, int );
 
-void mainloop_register(workfunc wf, int fd, int toval);
+void mainloop_register(char *name, workfunc wf, int fd, int toval);
 void mainloop_run();
 #endif

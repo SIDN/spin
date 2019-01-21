@@ -20,6 +20,7 @@
 #define MAXMNR 10	/* More than this would be excessive */
 static
 struct mnreg {
+    char *		mnr_name;	/* Name of module for debugging */
     workfunc		mnr_wf;		/* The to-be-called work function */
     int			mnr_fd;		/* File descriptor if non zero */
     int			mnr_pollnumber; /* Index in poll() list if >= 0 */
@@ -34,7 +35,8 @@ static void panic(char *s) {
     exit(-1);
 }
 
-void mainloop_register(workfunc wf, int fd, int toval) {
+// Register work function:  timeout in millisec
+void mainloop_register(char*name, workfunc wf, int fd, int toval) {
     int i;
 
     if (n_mnr >= MAXMNR) {
@@ -48,6 +50,7 @@ void mainloop_register(workfunc wf, int fd, int toval) {
 	    }
 	}
     }
+    mnr[n_mnr].mnr_name = name;
     mnr[n_mnr].mnr_wf = wf;
     mnr[n_mnr].mnr_fd = fd;
     mnr[n_mnr].mnr_toval.tv_sec = 0;
@@ -108,6 +111,15 @@ void mainloop_end() {
     }
 }
 
+void wf_mainloop(int data, int timeout) {
+    int i;
+
+    spin_log(LOG_DEBUG, "Mainloop table");
+    for (i=0; i<n_mnr; i++) {
+	spin_log(LOG_DEBUG, "MLE: %s %d %d", mnr[i].mnr_name, mnr[i].mnr_pollnumber, mnr[i].mnr_nxttime.tv_usec);
+    }
+}
+
 void mainloop_run() {
     struct pollfd fds[MAXMNR];
     int nfds = 0;
@@ -117,6 +129,7 @@ void mainloop_run() {
     int millitime;
     int argdata, argtmout;
 
+    mainloop_register("mainloop", wf_mainloop, 0, 10000);
     init_mltime();
     for (i=0; i<n_mnr; i++) {
 	if (mnr[i].mnr_fd) {
@@ -132,6 +145,8 @@ void mainloop_run() {
     while (mainloop_running) {
 	millitime = mainloop_findtime(&time_now, &time_interesting);
 
+	spin_log(LOG_DEBUG, " Millitime = %d, polling", millitime);
+
 	// go poll and wait until something interesting is up
 	rs = poll(fds, nfds, millitime);
 
@@ -146,9 +161,12 @@ void mainloop_run() {
 	for (i=0; i<n_mnr; i++) {
 	    argdata = 0;
 	    argtmout = 0;
-	    if (timercmp(&time_now, &mnr[i].mnr_nxttime, >)) {
+	    if ( timerisset(&mnr[i].mnr_nxttime) && timercmp(&time_now, &mnr[i].mnr_nxttime, >)) {
 		// Timer of this event went off
 		argtmout = 1;
+
+		// Increase for next time
+		timeradd(&mnr[i].mnr_nxttime, &mnr[i].mnr_toval, &mnr[i].mnr_nxttime);
 	    }
 	    pollnum = mnr[i].mnr_pollnumber ;
 	    if ( pollnum >= 0) {
@@ -156,8 +174,10 @@ void mainloop_run() {
 		    argdata = 1;
 		}
 	    }
-	    if (argdata || argtmout)
+	    if (argdata || argtmout) {
+		spin_log(LOG_DEBUG, "Mainloop calling %s (%d, %d)", mnr[i].mnr_name, argdata, argtmout);
 		(*mnr[i].mnr_wf)(argdata, argtmout);
+	    }
 	}
     }
 }

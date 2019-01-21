@@ -31,6 +31,7 @@ static int local_mode;
 flow_list_t* flow_list;
 
 int ack_counter;
+static
 void send_ack()
 {
 
@@ -55,6 +56,7 @@ void send_ack()
 }
 
 #define MESSAGES_BEFORE_PING 50
+static
 void check_send_ack() {
     ack_counter++;
     if (ack_counter > MESSAGES_BEFORE_PING) {
@@ -63,6 +65,7 @@ void check_send_ack() {
     }
 }
 
+static
 void add_ip_to_file(uint8_t* ip, const char* filename) {
     tree_t *ip_tree = tree_create(cmp_ips);
     // if this fails, we simply try to write a new one anyway
@@ -71,6 +74,7 @@ void add_ip_to_file(uint8_t* ip, const char* filename) {
     store_ip_tree(ip_tree, filename);
 }
 
+static
 void add_ip_tree_to_file(tree_t* tree, const char* filename) {
     tree_entry_t* cur;
     tree_t *ip_tree = tree_create(cmp_ips);
@@ -85,6 +89,7 @@ void add_ip_tree_to_file(tree_t* tree, const char* filename) {
     store_ip_tree(ip_tree, filename);
 }
 
+static
 void remove_ip_tree_from_file(tree_t* tree, const char* filename) {
     tree_entry_t* cur;
     tree_t *ip_tree = tree_create(cmp_ips);
@@ -99,6 +104,7 @@ void remove_ip_tree_from_file(tree_t* tree, const char* filename) {
     store_ip_tree(ip_tree, filename);
 }
 
+static
 void remove_ip_from_file(ip_t* ip, const char* filename) {
     tree_t *ip_tree = tree_create(cmp_ips);
     // if this fails, we simply try to write a new one anyway
@@ -112,6 +118,7 @@ void remove_ip_from_file(ip_t* ip, const char* filename) {
 // ip addresses, such as print or save them)
 // note: caller does *not* get ownership of the tree
 // TODO: can we skip the lookup? make all callers do it first
+static
 tree_t* send_netlink_command_for_node_ips(config_command_t cmd, int node_id) {
     node_t* node = node_cache_find_by_id(node_cache, node_id);
     tree_entry_t* ip_entry;
@@ -275,6 +282,7 @@ void handle_command_stop_allow_data(int node_id) {
     }
 }
 
+static
 void wf_netlink(int data, int timeout) {
     int rs;
     message_type_t type;
@@ -427,7 +435,7 @@ int init_netlink(int local)
 
     flow_list = flow_list_create(now);
 
-    mainloop_register(wf_netlink, traffic_sock_fd, 0);
+    mainloop_register("netlink", wf_netlink, traffic_sock_fd, 0);
 
 #ifdef loop_in_init
     fds[0].fd = traffic_sock_fd;

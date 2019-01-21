@@ -297,7 +297,7 @@ void init_mosquitto(const char* host, int port) {
 
     connect_mosquitto(host, port);
 
-    mainloop_register(&wf_mosquitto, mosquitto_socket(mosq), MOSQUITTO_KEEPALIVE_TIME*1000/2);
+    mainloop_register("mosq", &wf_mosquitto, mosquitto_socket(mosq), MOSQUITTO_KEEPALIVE_TIME*1000/2);
     mosquitto_socket(mosq);
     send_command_restart();
     handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");

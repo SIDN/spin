@@ -17,10 +17,6 @@
 // perhaps remove
 #include "spin_cfg.h"
 
-#include <poll.h>
-
-#include <mosquitto.h>
-
 #include <signal.h>
 #include <time.h>
 
