@@ -36,9 +36,10 @@ static void panic(char *s) {
 }
 
 // Register work function:  timeout in millisec
-void mainloop_register(char*name, workfunc wf, int fd, int toval) {
+void mainloop_register(char *name, workfunc wf, int fd, int toval) {
     int i;
 
+    spin_log(LOG_DEBUG, Mainloop registered %s\n", name);
     if (n_mnr >= MAXMNR) {
 	panic("Ran out of MNR structs");
     }
