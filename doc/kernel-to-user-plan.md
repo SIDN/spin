@@ -5,11 +5,11 @@ SPIN code currenly uses three sources of information from the system:
 1) Information about (unidirectional) packetstreams
 >
 Per stream the following information
-1) The source and destination addresses (IPv4 or IPv6)
-2) The protocol (TCP or UDP)
-3) The source and destination port
-4) The amount of packets
-5) The amount of bytes
+> 1) The source and destination addresses (IPv4 or IPv6)
+> 2) The protocol (TCP or UDP)
+> 3) The source and destination port
+> 4) The amount of packets
+> 5) The amount of bytes
 >
 2) Information about DNS requests and responses
 3) The ARP cache
