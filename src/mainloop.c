@@ -39,7 +39,7 @@ static void panic(char *s) {
 void mainloop_register(char *name, workfunc wf, int fd, int toval) {
     int i;
 
-    spin_log(LOG_DEBUG, Mainloop registered %s\n", name);
+    spin_log(LOG_DEBUG, "Mainloop registered %s\n", name);
     if (n_mnr >= MAXMNR) {
 	panic("Ran out of MNR structs");
     }
