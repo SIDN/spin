@@ -17,10 +17,6 @@ spind_SOURCES = spind.c mainloop.c core2kernel.c core2pubsub.c ../kernelmod/pkt_
 spind_CFLAGS = -I../kernelmod
 spind_LDADD = -L../kernelmod
 
-spind_conntrack_SOURCES = spind_conntrack.c ../kernelmod/pkt_info.c spin_log.h spin_log.c dns_cache.h dns_cache.c tree.h tree.c node_cache.h node_cache.c util.h util.c arp.h arp.c node_names.h node_names.c jsmn.h jsmn.c netlink_commands.c version.c ip_store.c
-spind_conntrack_CFLAGS = -I../kernelmod -g -O0
-spind_conntrack_LDADD = -lnetfilter_queue -lnetfilter_conntrack -lmnl -lldns -L../kernelmod
-
 version.c:
 	./create_version_c.sh
 
