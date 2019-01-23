@@ -509,8 +509,6 @@ int init_netlink(int local)
     }
 
 #endif /* loop_in_init */
-    close(traffic_sock_fd);
-    flow_list_destroy(flow_list);
     return 0;
 }
 
@@ -521,6 +519,8 @@ void cleanup_cache() {
 
 cleanup_netlink() {
 
+    close(traffic_sock_fd);
+    flow_list_destroy(flow_list);
     free(traffic_nlh);
     cleanup_cache();
 }
