@@ -54,5 +54,11 @@ AC_ARG_ENABLE(tests,
                 CFLAGS="-g -O0"
               ], [])
 
-AC_CONFIG_FILES(Makefile spind/Makefile kernelmod/Makefile)
+AC_CONFIG_FILES(
+    Makefile
+    spind/Makefile
+    kernelmod/Makefile
+    tools/spin_print/Makefile
+    tools/spin_config/Makefile
+)
 AC_OUTPUT
