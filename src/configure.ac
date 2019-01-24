@@ -1,5 +1,5 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_INIT([spin], [0.5.0])
+AC_INIT([spin], [0.6.0])
 AC_PREREQ([2.50])
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([-Wall foreign tar-pax no-dist-gzip dist-bzip2 1.10b subdir-objects])
@@ -30,6 +30,8 @@ dnl Checks for library functions.
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS(socket strerror)
 
+AC_PROG_RANLIB
+
 regular_CFLAGS="-Wall -Wextra -Wno-unused-parameter -Werror -O0"
 AC_SUBST([regular_CFLAGS])
 
@@ -48,11 +50,18 @@ MAKEFILES="Makefile src/Makefile kernelmod/Makefile"
 AC_ARG_ENABLE(tests,
               AC_HELP_STRING([--enable-tests], [enable unit tests and code coverage]),
               [
-                MAKEFILES="$MAKEFILES src/tests/Makefile";
+                MAKEFILES="$MAKEFILES tests/Makefile";
                 AC_SUBST(TESTDIR, "tests")
-                AC_CONFIG_FILES(src/tests/Makefile)
+                AC_CONFIG_FILES(tests/Makefile)
                 CFLAGS="-g -O0"
               ], [])
 
-AC_CONFIG_FILES(Makefile src/Makefile kernelmod/Makefile)
+AC_CONFIG_FILES(
+    Makefile
+    lib/Makefile
+    spind/Makefile
+    kernelmod/Makefile
+    tools/spin_print/Makefile
+    tools/spin_config/Makefile
+)
 AC_OUTPUT

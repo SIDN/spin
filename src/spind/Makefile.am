@@ -1,0 +1,16 @@
+
+AM_CPPFLAGS = -I$(top_srcdir)/include
+AM_CFLAGS = ${regular_CFLAGS} -g -Wall -Werror
+
+SUBDIRS = @TESTDIR@
+
+bin_PROGRAMS = spind
+
+spind_SOURCES = spind.c
+spind_CFLAGS = 
+spind_LDADD = $(top_builddir)/lib/libspin.a
+
+version.c:
+	$(top_srcdir)/../scripts/create_version_c.sh $(top_srcdir)/../VERSION
+
+.PHONY: version.c
