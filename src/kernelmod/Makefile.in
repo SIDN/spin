@@ -26,9 +26,9 @@ prepare:
 ifneq ($(SRCDIR),$(BUILDDIR))
 	@cp -u $(SRCDIR)/*.c ./
 	@cp -u $(SRCDIR)/*.h ./
+endif
 	@cp -u $(TOP_SRCDIR)/include/pkt_info.h ./
 	@cp -u $(TOP_SRCDIR)/include/spin_cfg.h ./
-endif
 
 module:
 	$(MAKE) -I$(SRCDIR) -I$(TOP_SRCDIR)/include -C $(KERNELPATH) M=$(PWD) -I../src modules
