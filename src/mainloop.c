@@ -39,7 +39,7 @@ static void panic(char *s) {
 void mainloop_register(char *name, workfunc wf, int fd, int toval) {
     int i;
 
-    spin_log(LOG_DEBUG, "Mainloop registered %s\n", name);
+    spin_log(LOG_DEBUG, "Mainloop registered %s(..., %d, %d)\n", name, fd, toval);
     if (n_mnr >= MAXMNR) {
 	panic("Ran out of MNR structs");
     }
@@ -54,8 +54,9 @@ void mainloop_register(char *name, workfunc wf, int fd, int toval) {
     mnr[n_mnr].mnr_name = name;
     mnr[n_mnr].mnr_wf = wf;
     mnr[n_mnr].mnr_fd = fd;
-    mnr[n_mnr].mnr_toval.tv_sec = 0;
-    mnr[n_mnr].mnr_toval.tv_usec = 1000*toval;
+    /* Convert millisecs to secs and microsecs */
+    mnr[n_mnr].mnr_toval.tv_sec = toval/1000;
+    mnr[n_mnr].mnr_toval.tv_usec = 1000*(toval%1000);
     n_mnr++;
 }
 
@@ -127,6 +128,7 @@ void mainloop_run() {
     int i, pollnum;
     int rs;
     struct timeval time_now, time_interesting;
+    int oldmillitime = 0;
     int millitime;
     int argdata, argtmout;
 
@@ -146,7 +148,9 @@ void mainloop_run() {
     while (mainloop_running) {
 	millitime = mainloop_findtime(&time_now, &time_interesting);
 
-	spin_log(LOG_DEBUG, " Millitime = %d, polling", millitime);
+	if (millitime != oldmillitime)
+	    spin_log(LOG_DEBUG, " Millitime = %d, polling", millitime);
+	oldmillitime = millitime;
 
 	// go poll and wait until something interesting is up
 	rs = poll(fds, nfds, millitime);
