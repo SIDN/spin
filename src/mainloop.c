@@ -22,6 +22,7 @@ static
 struct mnreg {
     char *		mnr_name;	/* Name of module for debugging */
     workfunc		mnr_wf;		/* The to-be-called work function */
+    void *		mnr_wfarg;	/* Call back argument */
     int			mnr_fd;		/* File descriptor if non zero */
     int			mnr_pollnumber; /* Index in poll() list if >= 0 */
     struct timeval	mnr_toval;	/* Periodic timeouts so often */
@@ -36,7 +37,7 @@ static void panic(char *s) {
 }
 
 // Register work function:  timeout in millisec
-void mainloop_register(char *name, workfunc wf, int fd, int toval) {
+void mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval) {
     int i;
 
     spin_log(LOG_DEBUG, "Mainloop registered %s(..., %d, %d)\n", name, fd, toval);
@@ -53,6 +54,7 @@ void mainloop_register(char *name, workfunc wf, int fd, int toval) {
     }
     mnr[n_mnr].mnr_name = name;
     mnr[n_mnr].mnr_wf = wf;
+    mnr[n_mnr].mnr_wfarg = arg;
     mnr[n_mnr].mnr_fd = fd;
     /* Convert millisecs to secs and microsecs */
     mnr[n_mnr].mnr_toval.tv_sec = toval/1000;
@@ -74,30 +76,33 @@ static void init_mltime() {
     }
 }
 
+/*
+ * Find amount of time to wait to have some timeout
+ * At most one second, at least one millisecond
+ *
+ * Arguments seemed interesting, actually unused (TODO)
+ */
 static int mainloop_findtime(struct timeval *tnow, struct timeval *tint) {
-    struct timeval posnext, onesecond, earliest, interval;
+    struct timeval onesecond, earliest, interval;
     int i;
     int millitime;
 
     gettimeofday(tnow, 0);
-    onesecond.tv_sec = 1;
-    onesecond.tv_usec = 0;
+    onesecond.tv_sec = 0;
+    onesecond.tv_usec = 999999;
     timeradd(tnow, &onesecond, &earliest);
     for (i=0; i<n_mnr; i++) {
-	if (timerisset(&mnr[i].mnr_toval)) {
-	    timeradd(tnow, &mnr[i].mnr_toval, &posnext);
-	    if (timercmp(&posnext, &earliest, <)) {
-		earliest = posnext;
+	if (timerisset(&mnr[i].mnr_nxttime)) {
+	    if (timercmp(&mnr[i].mnr_nxttime, &earliest, <)) {
+		earliest = mnr[i].mnr_nxttime;
 	    }
 	}
     }
     *tint = earliest;
     timersub(&earliest, tnow, &interval);
-    if (interval.tv_sec > 10) {
-	millitime = 1000*interval.tv_sec;
-    } else {
-	millitime = (interval.tv_usec+999)/1000;
-    }
+
+    /* Interval guaranteed to be less than 1 second */
+    millitime = (interval.tv_usec+999)/1000;
     return millitime ? millitime : 1;
 }
 
@@ -113,12 +118,12 @@ void mainloop_end() {
     }
 }
 
-void wf_mainloop(int data, int timeout) {
+void wf_mainloop(void *arg, int data, int timeout) {
     int i;
 
-    spin_log(LOG_DEBUG, "Mainloop table");
+    spin_log(LOG_DEBUG, "Mainloop table\n");
     for (i=0; i<n_mnr; i++) {
-	spin_log(LOG_DEBUG, "MLE: %s %d %d", mnr[i].mnr_name, mnr[i].mnr_pollnumber, mnr[i].mnr_nxttime.tv_usec);
+	spin_log(LOG_DEBUG, "MLE: %s %d %d\n", mnr[i].mnr_name, mnr[i].mnr_pollnumber, mnr[i].mnr_nxttime.tv_usec);
     }
 }
 
@@ -132,7 +137,7 @@ void mainloop_run() {
     int millitime;
     int argdata, argtmout;
 
-    mainloop_register("mainloop", wf_mainloop, 0, 10000);
+    mainloop_register("mainloop", wf_mainloop, (void *) 0, 0, 10000);
     init_mltime();
     for (i=0; i<n_mnr; i++) {
 	if (mnr[i].mnr_fd) {
@@ -180,8 +185,8 @@ void mainloop_run() {
 		}
 	    }
 	    if (argdata || argtmout) {
-		spin_log(LOG_DEBUG, "Mainloop calling %s (%d, %d)", mnr[i].mnr_name, argdata, argtmout);
-		(*mnr[i].mnr_wf)(argdata, argtmout);
+		spin_log(LOG_DEBUG, "Mainloop calling %s (%d, %d)\n", mnr[i].mnr_name, argdata, argtmout);
+		(*mnr[i].mnr_wf)(mnr[i].mnr_wfarg, argdata, argtmout);
 	    }
 	}
     }

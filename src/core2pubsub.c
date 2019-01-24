@@ -281,7 +281,7 @@ void connect_mosquitto(const char* host, int port) {
 
 }
 
-void wf_mosquitto(int data, int timeout) {
+void wf_mosquitto(void* arg, int data, int timeout) {
 
     if (data) {
 	mosquitto_loop_read(mosq, 1);
@@ -297,7 +297,7 @@ void init_mosquitto(const char* host, int port) {
 
     connect_mosquitto(host, port);
 
-    mainloop_register("mosq", &wf_mosquitto, mosquitto_socket(mosq), MOSQUITTO_KEEPALIVE_TIME*1000/2);
+    mainloop_register("mosq", &wf_mosquitto, (void *) 0, mosquitto_socket(mosq), MOSQUITTO_KEEPALIVE_TIME*1000/2);
     mosquitto_socket(mosq);
     send_command_restart();
     handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");

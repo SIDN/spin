@@ -283,7 +283,7 @@ void handle_command_stop_allow_data(int node_id) {
 }
 
 static
-void wf_netlink(int data, int timeout) {
+void wf_netlink(void *arg, int data, int timeout) {
     int rs;
     message_type_t type;
     time_t now;
@@ -435,7 +435,7 @@ int init_netlink(int local)
 
     flow_list = flow_list_create(now);
 
-    mainloop_register("netlink", wf_netlink, traffic_sock_fd, 0);
+    mainloop_register("netlink", wf_netlink, (void *) 0, traffic_sock_fd, 0);
 
 #ifdef loop_in_init
     fds[0].fd = traffic_sock_fd;
