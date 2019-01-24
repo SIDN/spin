@@ -6,7 +6,7 @@ SUBDIRS = @TESTDIR@
 
 bin_PROGRAMS = spind
 
-spind_SOURCES = spind.c
+spind_SOURCES = spind.c core2kernel.c core2pubsub.c handle_command.h mainloop.h mainloop.c
 spind_CFLAGS = 
 spind_LDADD = $(top_builddir)/lib/libspin.a
 
