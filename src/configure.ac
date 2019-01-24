@@ -30,6 +30,8 @@ dnl Checks for library functions.
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS(socket strerror)
 
+AC_PROG_RANLIB
+
 regular_CFLAGS="-Wall -Wextra -Wno-unused-parameter -Werror -O0"
 AC_SUBST([regular_CFLAGS])
 
@@ -56,6 +58,7 @@ AC_ARG_ENABLE(tests,
 
 AC_CONFIG_FILES(
     Makefile
+    lib/Makefile
     spind/Makefile
     kernelmod/Makefile
     tools/spin_print/Makefile

@@ -1,6 +1,7 @@
 
 KERNELPATH=@KERNELPATH@
 SRCDIR=@srcdir@
+TOP_SRCDIR=@top_srcdir@
 BUILDDIR=@builddir@
 
 ifndef KERNELPATH
@@ -25,10 +26,12 @@ prepare:
 ifneq ($(SRCDIR),$(BUILDDIR))
 	@cp -u $(SRCDIR)/*.c ./
 	@cp -u $(SRCDIR)/*.h ./
+	@cp -u $(TOP_SRCDIR)/include/pkt_info.h ./
+	@cp -u $(TOP_SRCDIR)/include/spin_cfg.h ./
 endif
 
 module:
-	$(MAKE) -I$(SRCDIR) -C $(KERNELPATH) M=$(PWD) -I../src modules
+	$(MAKE) -I$(SRCDIR) -I$(TOP_SRCDIR)/include -C $(KERNELPATH) M=$(PWD) -I../src modules
 
 distclean: clean
 ifneq ($(SRCDIR),$(BUILDDIR))
@@ -38,4 +41,4 @@ endif
 
 clean:
 	rm -rf *.o *.ko *.mod.* *.cmd .module* modules* Module* .*.cmd .tmp*
-	make -C $(KERNELPATH) M=$(PWD) clean
+	make -C $(KERNELPATH) M=$(PWD) -I$(SRCDIR) clean
