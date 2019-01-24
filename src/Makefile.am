@@ -5,7 +5,7 @@ EXTRA_DIST = $(man_MANS)
 
 AM_CFLAGS=-O0
 AM_CPPFLAGS = -I$(top_srcdir)/include
-SUBDIRS = src kernelmod
+SUBDIRS = spind kernelmod
 
 CXXFLAGS=-O0
 CPPFLAGS=-O0

@@ -1,5 +1,5 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_INIT([spin], [0.5.0])
+AC_INIT([spin], [0.6.0])
 AC_PREREQ([2.50])
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([-Wall foreign tar-pax no-dist-gzip dist-bzip2 1.10b subdir-objects])
@@ -48,11 +48,11 @@ MAKEFILES="Makefile src/Makefile kernelmod/Makefile"
 AC_ARG_ENABLE(tests,
               AC_HELP_STRING([--enable-tests], [enable unit tests and code coverage]),
               [
-                MAKEFILES="$MAKEFILES src/tests/Makefile";
+                MAKEFILES="$MAKEFILES tests/Makefile";
                 AC_SUBST(TESTDIR, "tests")
-                AC_CONFIG_FILES(src/tests/Makefile)
+                AC_CONFIG_FILES(tests/Makefile)
                 CFLAGS="-g -O0"
               ], [])
 
-AC_CONFIG_FILES(Makefile src/Makefile kernelmod/Makefile)
+AC_CONFIG_FILES(Makefile spind/Makefile kernelmod/Makefile)
 AC_OUTPUT
