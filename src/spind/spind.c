@@ -13,16 +13,14 @@
 #include "tree.h"
 #include "netlink_commands.h"
 #include "spin_log.h"
+#include "core2pubsub.h"
+#include "core2kernel.h"
 
 // perhaps remove
 #include "spin_cfg.h"
 
 #include <signal.h>
 #include <time.h>
-
-#ifdef notdef
-#include "jsmn.h"
-#endif
 
 #include "mainloop.h"
 
@@ -36,8 +34,6 @@ static int local_mode;
 const char* mosq_host;
 int mosq_port;
 int stop_on_error;
-
-
 
 /*
 static inline void
