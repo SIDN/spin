@@ -265,6 +265,12 @@ node2json(node_t* node, buffer_t* json_buf) {
     return s;
 }
 
+/*
+ * Create and destroy node_cache
+ * As far as I can see only done once in current node, only one node cache in use
+ *
+ * Perhaps TODO
+ */
 
 node_cache_t*
 node_cache_create() {
@@ -370,20 +376,20 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
         mac = arp_table_find_by_ip(node_cache->arp_table, ip);
     }
     if (mac) {
-        printf("[XX] mac found: %s\n", mac);
+        spin_log(LOG_DEBUG, "[XX] mac found: %s\n", mac);
         node_set_mac(node, mac);
         name = node_names_find_mac(node_cache->names, mac);
         if (name != NULL) {
             node_set_name(node, name);
         }
     } else {
-        printf("[XX] mac not found\n");
+        spin_log(LOG_DEBUG, "[XX] mac not found\n");
         name = node_names_find_ip(node_cache->names, ip);
         if (name != NULL) {
             node_set_name(node, name);
         }
     }
-    printf("[XX] mac at %p\n", node->mac);
+    spin_log(LOG_DEBUG, "[XX] mac at %p\n", node->mac);
 }
 
 static void
@@ -513,17 +519,6 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     return 1;
 }
 
-/*
-{
-    "to": {"id":1,"lastseen":1502702327,"ips":["::1"],"domains":[]},
-    "from": {"id":1,"lastseen":1502702327,"ips":["::1"],"domains":[]},
-    "protocol":6,
-    "to_port":1883,
-    "size":744,
-    "count":2,
-    "from_port":56082
-}
-*/
 unsigned int
 pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf) {
     unsigned int s = 0;
@@ -621,8 +616,6 @@ dns_query_pkt_info2json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info, 
     //return s;
 }
 
-
-
 flow_list_t* flow_list_create(uint32_t timestamp) {
     flow_list_t* flow_list = (flow_list_t*)malloc(sizeof(flow_list_t));
     flow_list->flows = tree_create(cmp_pktinfos);
@@ -650,7 +643,6 @@ void flow_list_add_pktinfo(flow_list_t* flow_list, pkt_info_t* pkt_info) {
         fd.packet_count = pkt_info->packet_count;
         tree_add(flow_list->flows, 38, pkt_info, sizeof(fd), &fd, 1);
     }
-
 }
 
 int flow_list_should_send(flow_list_t* flow_list, uint32_t timestamp) {

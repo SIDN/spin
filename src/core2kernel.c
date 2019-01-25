@@ -437,78 +437,6 @@ int init_netlink(int local)
 
     mainloop_register("netlink", wf_netlink, (void *) 0, traffic_sock_fd, 0);
 
-#ifdef loop_in_init
-    fds[0].fd = traffic_sock_fd;
-    fds[0].events = POLLIN;
-
-    fds[1].fd = mosquitto_socket(mosq);
-    fds[1].events = POLLIN;
-
-    now = time(NULL);
-    last_mosq_poll = now;
-
-    //char str[1024];
-    size_t pos = 0;
-
-
-    /* Read message from kernel */
-    while (running) {
-        rs = poll(fds, 2, 1000);
-        now = time(NULL);
-        /*
-        memset(str, 0, 1024);
-        pos = 0;
-        pos += sprintf(&str[pos], "[XX] ");
-        pos += sprintf(&str[pos], " rs: %d ", rs);
-        pos += sprintf(&str[pos], "last: %u now: %u dif: %u", last_mosq_poll, now, now - last_mosq_poll);
-        pos += sprintf(&str[pos], " D: %02x (%d) ", fds[1].revents, fds[1].revents & POLLIN);
-        pos += sprintf(&str[pos], " TO: %d", now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME);
-        pos += sprintf(&str[pos], "\n");
-        spin_log(LOG_DEBUG, "%s", str);
-        */
-
-#ifdef notdef
-        if (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME / 2) {
-            //spin_log(LOG_DEBUG, "Calling loop for keepalive check\n");
-            mosquitto_loop_misc(mosq);
-            last_mosq_poll = now;
-        }
-#endif
-
-        if (rs < 0) {
-            spin_log(LOG_ERR, "error in poll(): %s\n", strerror(errno));
-        } else if (rs == 0) {
-	    maybe_sendflow(flow_list, now);
-        } else {
-            if (fds[0].revents) {
-                if (fds[0].revents & POLLIN) {
-
-#ifdef notdef
-            if ((fds[1].revents & POLLIN)
-#ifdef notdef
-	    	|| (now - last_mosq_poll >= MOSQUITTO_KEEPALIVE_TIME)
-#endif
-						) {
-                //spin_log(LOG_DEBUG, "Calling loop for data\n");
-                mosquitto_loop(mosq, 0, 10);
-                last_mosq_poll = now;
-            } else if (fds[1].revents) {
-                spin_log(LOG_ERR, "Unexpected result from mosquitto socket (%d)\n", fds[1].revents);
-                spin_log(LOG_ERR, "Socket fd: %d, mosq struct has %d\n", fds[1].fd, mosquitto_socket(mosq));
-                if (stop_on_error) {
-                    exit(1);
-                }
-                //usleep(500000);
-                spin_log(LOG_ERR, "Reconnecting to mosquitto server\n");
-                connect_mosquitto(mosq_host, mosq_port);
-                spin_log(LOG_ERR, " Reconnected, mosq fd now %d\n", mosquitto_socket(mosq));
-
-            }
-#endif
-        }
-    }
-
-#endif /* loop_in_init */
     return 0;
 }
 
@@ -517,7 +445,7 @@ void cleanup_cache() {
     node_cache_destroy(node_cache);
 }
 
-cleanup_netlink() {
+void cleanup_netlink() {
 
     close(traffic_sock_fd);
     flow_list_destroy(flow_list);
