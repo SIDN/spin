@@ -212,6 +212,212 @@ static int json_dump(const char *js, jsmntok_t *t, size_t count, int indent) {
 }
 #endif
 
+void add_ip_tree_to_file(tree_t* tree, const char* filename) {
+    tree_entry_t* cur;
+    tree_t *ip_tree = tree_create(cmp_ips);
+
+    // if this fails, we simply try to write a new one anyway
+    read_ip_tree(ip_tree, filename);
+    cur = tree_first(tree);
+    while(cur != NULL) {
+        tree_add(ip_tree, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        cur = tree_next(cur);
+    }
+    store_ip_tree(ip_tree, filename);
+}
+
+void remove_ip_tree_from_file(tree_t* tree, const char* filename) {
+    tree_entry_t* cur;
+    tree_t *ip_tree = tree_create(cmp_ips);
+
+    // if this fails, we simply try to write a new one anyway
+    read_ip_tree(ip_tree, filename);
+    cur = tree_first(tree);
+    while(cur != NULL) {
+        tree_remove(ip_tree, cur->key_size, cur->key);
+        cur = tree_next(cur);
+    }
+    store_ip_tree(ip_tree, filename);
+}
+
+static
+void remove_ip_from_file(ip_t* ip, const char* filename) {
+    tree_t *ip_tree = tree_create(cmp_ips);
+    // if this fails, we simply try to write a new one anyway
+    read_ip_tree(ip_tree, filename);
+    tree_remove(ip_tree, sizeof(ip_t), ip);
+    store_ip_tree(ip_tree, filename);
+}
+
+// returns the node->ips tree if successful, NULL if node not found
+// (this is useful if we have other actions to perform with the node's
+// ip addresses, such as print or save them)
+// note: caller does *not* get ownership of the tree
+// TODO: can we skip the lookup? make all callers do it first
+static
+tree_t* call_kernel_for_node_ips(config_command_t cmd, int node_id) {
+    node_t* node = node_cache_find_by_id(node_cache, node_id);
+    tree_entry_t* ip_entry;
+
+    if (node == NULL) {
+        return NULL;
+    }
+    ip_entry = tree_first(node->ips);
+    while (ip_entry != NULL) {
+	core2kernel_do_ip(cmd, ip_entry->key);
+        ip_entry = tree_next(ip_entry);
+    }
+    return node->ips;
+}
+
+void handle_command_add_filter(int node_id) {
+    tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_ADD_IGNORE, node_id);
+    if (ips != NULL) {
+        add_ip_tree_to_file(ips, "/etc/spin/ignore.list");
+    }
+}
+
+void handle_command_remove_filter(int node_id) {
+    node_t* node = node_cache_find_by_id(node_cache, node_id);
+    tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_REMOVE_IGNORE, node_id);
+    if (ips != NULL) {
+        remove_ip_tree_from_file(ips, "/etc/spin/ignore.list");
+    }
+}
+
+void handle_command_remove_ip(config_command_t cmd, ip_t* ip, const char* configfile_to_update) {
+
+
+    core2kernel_do_ip(cmd, ip);
+
+    if (configfile_to_update != NULL) {
+        remove_ip_from_file(ip, configfile_to_update);
+    }
+}
+
+void handle_command_block_data(int node_id) {
+    node_t* node = node_cache_find_by_id(node_cache, node_id);
+    tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_ADD_BLOCK, node_id);
+    if (ips != NULL) {
+        add_ip_tree_to_file(ips, "/etc/spin/block.list");
+    }
+    // the is_blocked status is only read if this node had a new ip address added, so update it now
+    if (node != NULL) {
+        node->is_blocked = 1;
+    }
+}
+
+void handle_command_stop_block_data(int node_id) {
+    node_t* node = node_cache_find_by_id(node_cache, node_id);
+    tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_REMOVE_BLOCK, node_id);
+    if (ips != NULL) {
+        remove_ip_tree_from_file(ips, "/etc/spin/block.list");
+    }
+    // the is_blocked status is only read if this node had a new ip address added, so update it now
+    if (node != NULL) {
+        node->is_blocked = 0;
+    }
+}
+
+void handle_command_allow_data(int node_id) {
+    // TODO store this in "/etc/spin/blocked.conf"
+    node_t* node = node_cache_find_by_id(node_cache, node_id);
+    tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_ADD_EXCEPT, node_id);
+    if (ips != NULL) {
+        add_ip_tree_to_file(ips, "/etc/spin/allow.list");
+    }
+    // the is_excepted status is only read if this node had a new ip address added, so update it now
+    if (node != NULL) {
+        node->is_excepted = 1;
+    }
+}
+
+void handle_command_stop_allow_data(int node_id) {
+    // TODO store this in "/etc/spin/blocked.conf"
+    node_t* node = node_cache_find_by_id(node_cache, node_id);
+    tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_REMOVE_EXCEPT, node_id);
+    if (ips != NULL) {
+        remove_ip_tree_from_file(ips, "/etc/spin/allow.list");
+    }
+    // the is_excepted status is only read if this node had a new ip address added, so update it now
+    if (node != NULL) {
+        node->is_excepted = 0;
+    }
+}
+
+void handle_command_reset_filters() {
+    // clear the filters; derive them from our own addresses again
+    // hmm, use a script for this?
+    //load_ips_from_file
+    system("/usr/lib/spin/show_ips.lua -o /etc/spin/ignore.list -f");
+    system("spin_config ignore load /etc/spin/ignore.list");
+}
+
+void handle_command_add_name(int node_id, char* name) {
+    // find the node
+    node_t* node = node_cache_find_by_id(node_cache, node_id);
+    tree_entry_t* ip_entry;
+
+    if (node == NULL) {
+        return;
+    }
+    node_set_name(node, name);
+
+    // re-read node names, just in case someone has been editing it
+    // TODO: make filename configurable? right now it will silently fail
+    node_names_read_userconfig(node_cache->names, "/etc/spin/names.conf");
+
+    // if it has a mac address, use that, otherwise, add for all its ip
+    // addresses
+    if (node->mac != NULL) {
+        node_names_add_user_name_mac(node_cache->names, node->mac, name);
+    } else {
+        ip_entry = tree_first(node->ips);
+        while (ip_entry != NULL) {
+            node_names_add_user_name_ip(node_cache->names, (ip_t*)ip_entry->key, name);
+            ip_entry = tree_next(ip_entry);
+        }
+    }
+    // TODO: make filename configurable? right now it will silently fail
+    node_names_write_userconfig(node_cache->names, "/etc/spin/names.conf");
+}
+
+void handle_command_get_list(config_command_t cmd, const char* json_command) {
+    netlink_command_result_t* command_result;
+    buffer_t* response_json = buffer_create(4096);
+    buffer_t* result_json = buffer_create(4096);
+    unsigned int response_size;
+
+    // ask the kernel module for the list of ignored nodes
+    command_result = send_netlink_command_noarg(cmd);
+    if (command_result == NULL) {
+        fprintf(stderr, "Error connecting to kernel, is the module running?\n");
+        return;
+    }
+    netlink_command_result2json(command_result, result_json);
+    if (!buffer_ok(result_json)) {
+        buffer_destroy(result_json);
+        buffer_destroy(response_json);
+        netlink_command_result_destroy(command_result);
+        return;
+    }
+    buffer_finish(result_json);
+    response_size = create_mqtt_command(response_json, json_command, NULL, buffer_str(result_json));
+    if (!buffer_ok(response_json)) {
+        buffer_destroy(result_json);
+        buffer_destroy(response_json);
+        netlink_command_result_destroy(command_result);
+        return;
+    }
+    buffer_finish(response_json);
+    // pubsub_publish(response_size, buffer_str(response_json));
+    core2pubsub_publish(response_json);
+
+    netlink_command_result_destroy(command_result);
+    buffer_destroy(result_json);
+    buffer_destroy(response_json);
+}
+
 void int_handler(int signal) {
 
     mainloop_end();
