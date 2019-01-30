@@ -15,6 +15,7 @@
 #include "spin_log.h"
 #include "core2pubsub.h"
 #include "core2kernel.h"
+#include "core2block.h"
 
 // perhaps remove
 #include "spin_cfg.h"
@@ -23,7 +24,6 @@
 #include <time.h>
 
 #include "mainloop.h"
-
 #include "version.h"
 
 
@@ -212,6 +212,54 @@ static int json_dump(const char *js, jsmntok_t *t, size_t count, int indent) {
 }
 #endif
 
+/*
+ * The three lists of IP addresses are now kept in memory in spind, with
+ * a copy written to file.
+ * The lists in the kernel module will not be read back, even while there is a
+ * kernel module.
+ */
+
+struct list_info {
+    tree_t *	li_tree;		// Tree of IP addresses
+    char *	li_filename;		// Name of shadow file
+    int		li_modified;		// File should be written
+} ipl_block, ipl_filter, ipl_allow;
+
+void backup_li(struct list_info *lip) {
+
+    if (lip->li_modified) {
+	store_ip_tree(lip->li_tree, lip->li_filename);
+	lip->li_modified = 0;
+    }
+}
+
+void wf_ipl(void *arg, int data, int timeout) {
+
+    if (timeout) {
+	backup_li(&ipl_block);
+	backup_li(&ipl_filter);
+	backup_li(&ipl_allow);
+    }
+}
+
+void init_ipl(struct list_info *lip, char *fname) {
+
+    lip->li_filename = fname;
+    lip->li_tree = tree_create(cmp_ips);
+    read_ip_tree(lip->li_tree, lip->li_filename);
+    lip->li_modified = 0;
+}
+
+void init_all_ipl() {
+
+    init_ipl(&ipl_block, "/etc/spin/block.list");
+    init_ipl(&ipl_filter, "/etc/spin/filter.list");
+    init_ipl(&ipl_allow, "/etc/spin/allow.list");
+
+    mainloop_register("IP list backup", wf_ipl, (void *) 0, 0, 2500);
+}
+
+#ifdef notdef
 void add_ip_tree_to_file(tree_t* tree, const char* filename) {
     tree_entry_t* cur;
     tree_t *ip_tree = tree_create(cmp_ips);
@@ -225,7 +273,37 @@ void add_ip_tree_to_file(tree_t* tree, const char* filename) {
     }
     store_ip_tree(ip_tree, filename);
 }
+#endif
 
+void add_ip_tree_to_li(tree_t* tree, struct list_info *lip) {
+    tree_entry_t* cur;
+
+    cur = tree_first(tree);
+    while(cur != NULL) {
+        tree_add(lip->li_tree, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        cur = tree_next(cur);
+    }
+    lip->li_modified++;
+}
+
+void remove_ip_tree_from_li(tree_t *tree, struct list_info *lip) {
+    tree_entry_t* cur;
+
+    cur = tree_first(tree);
+    while(cur != NULL) {
+        tree_remove(lip->li_tree, cur->key_size, cur->key);
+        cur = tree_next(cur);
+    }
+    lip->li_modified++;
+}
+
+void remove_ip_from_li(ip_t* ip, struct list_info *lip) {
+
+    tree_remove(lip->li_tree, sizeof(ip_t), ip);
+    lip->li_modified++;
+}
+
+#ifdef notdef
 void remove_ip_tree_from_file(tree_t* tree, const char* filename) {
     tree_entry_t* cur;
     tree_t *ip_tree = tree_create(cmp_ips);
@@ -248,6 +326,7 @@ void remove_ip_from_file(ip_t* ip, const char* filename) {
     tree_remove(ip_tree, sizeof(ip_t), ip);
     store_ip_tree(ip_tree, filename);
 }
+#endif
 
 // returns the node->ips tree if successful, NULL if node not found
 // (this is useful if we have other actions to perform with the node's
@@ -273,7 +352,8 @@ tree_t* call_kernel_for_node_ips(config_command_t cmd, int node_id) {
 void handle_command_add_filter(int node_id) {
     tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_ADD_IGNORE, node_id);
     if (ips != NULL) {
-        add_ip_tree_to_file(ips, "/etc/spin/ignore.list");
+	add_ip_tree_to_li(ips, &ipl_filter);
+        // add_ip_tree_to_file(ips, "/etc/spin/ignore.list");
     }
 }
 
@@ -281,17 +361,25 @@ void handle_command_remove_filter(int node_id) {
     node_t* node = node_cache_find_by_id(node_cache, node_id);
     tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_REMOVE_IGNORE, node_id);
     if (ips != NULL) {
-        remove_ip_tree_from_file(ips, "/etc/spin/ignore.list");
+	remove_ip_tree_from_li(ips, &ipl_filter);
+        // remove_ip_tree_from_file(ips, "/etc/spin/ignore.list");
     }
 }
 
-void handle_command_remove_ip(config_command_t cmd, ip_t* ip, const char* configfile_to_update) {
-
+void handle_command_remove_ip(config_command_t cmd, ip_t* ip) {
 
     core2kernel_do_ip(cmd, ip);
 
-    if (configfile_to_update != NULL) {
-        remove_ip_from_file(ip, configfile_to_update);
+    switch(cmd) {
+    case SPIN_CMD_REMOVE_BLOCK:
+	remove_ip_from_li(ip, &ipl_block);
+	break;
+    case SPIN_CMD_REMOVE_IGNORE:
+	remove_ip_from_li(ip, &ipl_filter);
+	break;
+    case SPIN_CMD_REMOVE_EXCEPT:
+	remove_ip_from_li(ip, &ipl_allow);
+	break;
     }
 }
 
@@ -299,7 +387,8 @@ void handle_command_block_data(int node_id) {
     node_t* node = node_cache_find_by_id(node_cache, node_id);
     tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_ADD_BLOCK, node_id);
     if (ips != NULL) {
-        add_ip_tree_to_file(ips, "/etc/spin/block.list");
+	add_ip_tree_to_li(ips, &ipl_block);
+        // add_ip_tree_to_file(ips, "/etc/spin/block.list");
     }
     // the is_blocked status is only read if this node had a new ip address added, so update it now
     if (node != NULL) {
@@ -311,7 +400,8 @@ void handle_command_stop_block_data(int node_id) {
     node_t* node = node_cache_find_by_id(node_cache, node_id);
     tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_REMOVE_BLOCK, node_id);
     if (ips != NULL) {
-        remove_ip_tree_from_file(ips, "/etc/spin/block.list");
+	remove_ip_tree_from_li(ips, &ipl_block);
+        // remove_ip_tree_from_file(ips, "/etc/spin/block.list");
     }
     // the is_blocked status is only read if this node had a new ip address added, so update it now
     if (node != NULL) {
@@ -324,7 +414,8 @@ void handle_command_allow_data(int node_id) {
     node_t* node = node_cache_find_by_id(node_cache, node_id);
     tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_ADD_EXCEPT, node_id);
     if (ips != NULL) {
-        add_ip_tree_to_file(ips, "/etc/spin/allow.list");
+	add_ip_tree_to_li(ips, &ipl_allow);
+        // add_ip_tree_to_file(ips, "/etc/spin/allow.list");
     }
     // the is_excepted status is only read if this node had a new ip address added, so update it now
     if (node != NULL) {
@@ -337,7 +428,8 @@ void handle_command_stop_allow_data(int node_id) {
     node_t* node = node_cache_find_by_id(node_cache, node_id);
     tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_REMOVE_EXCEPT, node_id);
     if (ips != NULL) {
-        remove_ip_tree_from_file(ips, "/etc/spin/allow.list");
+	remove_ip_tree_from_li(ips, &ipl_allow);
+        // remove_ip_tree_from_file(ips, "/etc/spin/allow.list");
     }
     // the is_excepted status is only read if this node had a new ip address added, so update it now
     if (node != NULL) {
@@ -497,15 +589,21 @@ int main(int argc, char** argv) {
     spin_log_init(use_syslog, log_verbosity, "spind");
     log_version();
 
+    init_all_ipl();
+
     init_mosquitto(mosq_host, mosq_port);
     signal(SIGINT, int_handler);
 
     result = init_netlink(local_mode);
 
+    init_core2block();
+
     mainloop_run();
 
     cleanup_cache();
     cleanup_netlink();
+
+    cleanup_core2block();
 
     finish_mosquitto();
 

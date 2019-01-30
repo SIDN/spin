@@ -6,7 +6,6 @@
 #include "spin_cfg.h"
 
 #include "dns_cache.h"
-#include "tree.h"
 #include "netlink_commands.h"
 #include "node_cache.h"
 
@@ -64,17 +63,6 @@ void check_send_ack() {
         ack_counter = 0;
     }
 }
-
-#ifdef notdef
-static
-void add_ip_to_file(uint8_t* ip, const char* filename) {
-    tree_t *ip_tree = tree_create(cmp_ips);
-    // if this fails, we simply try to write a new one anyway
-    read_ip_tree(ip_tree, filename);
-    tree_add(ip_tree, sizeof(ip_t), ip, 0, NULL, 1);
-    store_ip_tree(ip_tree, filename);
-}
-#endif
 
 int core2kernel_do(config_command_t cmd) {
     netlink_command_result_t* cr;

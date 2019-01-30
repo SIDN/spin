@@ -2,7 +2,6 @@
 #include <mosquitto.h>
 
 #include "node_cache.h"
-#include "tree.h"
 #include "jsmn.h"
 #include "mainloop.h"
 #include "spin_log.h"
@@ -58,7 +57,8 @@ void send_command_restart() {
 }
 
 // returns 1 on success, 0 on error
-int json_parse_int_arg(int* dest,
+static int
+json_parse_int_arg(int* dest,
                        const char* json_str,
                        jsmntok_t* tokens,
                        int argument_token_i) {
@@ -70,7 +70,8 @@ int json_parse_int_arg(int* dest,
     return 1;
 }
 
-int json_parse_string_arg(char* dest,
+static int
+json_parse_string_arg(char* dest,
                           size_t dest_size,
                           const char* json_str,
                           jsmntok_t* tokens,
@@ -84,7 +85,8 @@ int json_parse_string_arg(char* dest,
     return 1;
 }
 
-int json_parse_ip_arg(ip_t* dest,
+static int
+json_parse_ip_arg(ip_t* dest,
                       const char* json_str,
                       jsmntok_t* tokens,
                       int argument_token_i) {
@@ -100,7 +102,8 @@ int json_parse_ip_arg(ip_t* dest,
 
 // more complex argument, of the form
 // { "node_id": <int>, "name": <str> }
-int json_parse_node_id_name_arg(int* node_id,
+static int
+json_parse_node_id_name_arg(int* node_id,
                                 char* name,
                                 size_t name_size,
                                 const char* json_str,
@@ -252,7 +255,7 @@ void handle_json_command_detail(int verb, int object,
             handle_command_stop_block_data(node_id_arg);
 	    break;
 	case PSC_V_REM_IP:
-            handle_command_remove_ip(SPIN_CMD_REMOVE_BLOCK, &ip_arg, "/etc/spin/block.list");
+            handle_command_remove_ip(SPIN_CMD_REMOVE_BLOCK, &ip_arg);
             node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip_arg);
             if (node) {
                 node->is_blocked = 0;
@@ -274,7 +277,7 @@ void handle_json_command_detail(int verb, int object,
 	    handle_command_remove_filter(node_id_arg);
 	    break;
 	case PSC_V_REM_IP:
-	    handle_command_remove_ip(SPIN_CMD_REMOVE_IGNORE, &ip_arg, "/etc/spin/ignore.list");
+	    handle_command_remove_ip(SPIN_CMD_REMOVE_IGNORE, &ip_arg);
 	    break;
 	}
 	handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
@@ -283,7 +286,6 @@ void handle_json_command_detail(int verb, int object,
     case PSC_O_EXCEPT:
 	switch(verb) {
 	case PSC_V_GET:
-	    handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
 	    break;
 	case PSC_V_ADD:
             handle_command_allow_data(node_id_arg);
@@ -292,7 +294,7 @@ void handle_json_command_detail(int verb, int object,
             handle_command_stop_allow_data(node_id_arg);
 	    break;
 	case PSC_V_REM_IP:
-            handle_command_remove_ip(SPIN_CMD_REMOVE_EXCEPT, &ip_arg, "/etc/spin/allow.list");
+            handle_command_remove_ip(SPIN_CMD_REMOVE_EXCEPT, &ip_arg);
             node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip_arg);
             if (node) {
                 node->is_excepted = 0;
