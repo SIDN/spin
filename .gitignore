@@ -28,7 +28,6 @@ src/tests/*_test
 src/lib/version.c
 src/lib/.deps
 src/m4/
-src/spind
 src/kernelmod/.deps
 src/kernelmod/.dirstamp
 src/kernelmod/pkt_info.h
