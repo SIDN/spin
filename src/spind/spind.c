@@ -263,7 +263,7 @@ void init_all_ipl() {
 	spin_log(LOG_DEBUG, "File %s, read %d entries\n", lip->li_filename, cnt);
 
 	// Push into kernel
-	handle_command_push_ip_from_list_to_kernel(i);
+	push_ips_from_list_to_kernel(i);
     }
 
     // Sync trees to files every 2.5 seconds for now
@@ -384,7 +384,7 @@ void handle_command_remove_ip(config_command_t cmd, ip_t* ip) {
 }
 #endif
 
-void handle_command_push_ip_from_list_to_kernel(int iplist) {
+void push_ips_from_list_to_kernel(int iplist) {
     static config_command_t addip_cmds[] = {
 	SPIN_CMD_ADD_BLOCK,
 	SPIN_CMD_ADD_IGNORE,

@@ -220,11 +220,15 @@ void handle_json_command_detail(int verb, int object,
 	    spin_log(LOG_ERR, "Cannot parse node_id\n");
 	    return;
 	}
+	spin_log(LOG_DEBUG, "Spin verb %d, object %d, node-id %d\n", verb, object, node_id_arg);
+	break;
     case PSC_V_REM_IP:
 	if (!json_parse_ip_arg(&ip_arg, json_str, tokens, argument_token_i)) {
 	    spin_log(LOG_ERR, "Cannot parse ip-addr\n");
 	    return;
 	}
+	spin_log(LOG_DEBUG, "Spin verb %d, object %d, ip XX\n", verb, object);
+	break;
     }
 
     //
