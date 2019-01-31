@@ -68,30 +68,6 @@ print_dnspktinfo_wirehex(dns_pkt_info_t* pkt_info) {
 }
 */
 
-#ifdef notdef
-unsigned int netlink_command_result2json(netlink_command_result_t* command_result, buffer_t* buf) {
-    unsigned int s = 0;
-    int i;
-    char ip_str[INET6_ADDRSTRLEN];
-
-    if (command_result->error != NULL) {
-        buffer_write(buf, "\"%s\", ", command_result->error);
-    } else {
-        buffer_write(buf, " [ ");
-        for (i = 0; i < command_result->ip_count; i++) {
-            spin_ntop(ip_str, &command_result->ips[i], INET6_ADDRSTRLEN);
-
-            buffer_write(buf, "\"%s\" ", ip_str);
-            if (i < command_result->ip_count - 1) {
-                buffer_write(buf, ", ");
-            }
-        }
-        buffer_write(buf, "] ");
-    }
-    return s;
-}
-#endif
-
 unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argument, char* result) {
     buffer_write(buf, "{ \"command\": \"%s\"", command);
     if (argument != NULL) {
@@ -168,48 +144,6 @@ void maybe_sendflow(flow_list_t *flow_list, time_t now) {
     }
     buffer_destroy(json_buf);
 }
-
-#ifdef notdef
-static int json_dump(const char *js, jsmntok_t *t, size_t count, int indent) {
-    int i, j, k;
-    if (count == 0) {
-        return 0;
-    }
-    if (t->type == JSMN_PRIMITIVE) {
-        printf("%.*s", t->end - t->start, js+t->start);
-        return 1;
-    } else if (t->type == JSMN_STRING) {
-        printf("'%.*s'", t->end - t->start, js+t->start);
-        return 1;
-    } else if (t->type == JSMN_OBJECT) {
-        printf("\n");
-        j = 0;
-        for (k = 0; k < indent; k++) printf("  ");
-        printf("{\n");
-        for (i = 0; i < t->size; i++) {
-            for (k = 0; k < indent; k++) printf("  ");
-            j += json_dump(js, t+1+j, count-j, indent+1);
-            printf(": ");
-            j += json_dump(js, t+1+j, count-j, indent+1);
-            printf(" \n");
-        }
-        for (k = 0; k < indent; k++) printf("  ");
-        printf("}");
-        return j+1;
-    } else if (t->type == JSMN_ARRAY) {
-        j = 0;
-        printf("\n");
-        for (i = 0; i < t->size; i++) {
-            for (k = 0; k < indent-1; k++) printf("  ");
-            printf("   - ");
-            j += json_dump(js, t+1+j, count-j, indent+1);
-            printf("\n");
-        }
-        return j+1;
-    }
-    return 0;
-}
-#endif
 
 /*
  * The three lists of IP addresses are now kept in memory in spind, with
@@ -345,13 +279,45 @@ void remove_ip_from_file(ip_t* ip, const char* filename) {
 }
 #endif
 
+static void
+twomethods_do_ip(config_command_t cmd, ip_t *ip_addr) {
+
+    // old kernel
+    core2kernel_do_ip(cmd, ip_addr);
+
+    // new blocking code
+
+    switch(cmd) {
+    case SPIN_CMD_ADD_BLOCK:
+	c2b_changelist(IPLIST_BLOCK, 1, ip_addr);
+	break;
+    case SPIN_CMD_ADD_IGNORE:
+	c2b_changelist(IPLIST_IGNORE, 1, ip_addr);
+	break;
+    case SPIN_CMD_ADD_EXCEPT:
+	c2b_changelist(IPLIST_ALLOW, 1, ip_addr);
+	break;
+    case SPIN_CMD_REMOVE_BLOCK:
+	c2b_changelist(IPLIST_BLOCK, 0, ip_addr);
+	break;
+    case SPIN_CMD_REMOVE_IGNORE:
+	c2b_changelist(IPLIST_IGNORE, 0, ip_addr);
+	break;
+    case SPIN_CMD_REMOVE_EXCEPT:
+	c2b_changelist(IPLIST_ALLOW, 0, ip_addr);
+	break;
+    }
+}
+
 static
 call_kernel_for_tree(config_command_t cmd, tree_t *tree) {
     tree_entry_t* ip_entry;
 
     ip_entry = tree_first(tree);
     while (ip_entry != NULL) {
-	core2kernel_do_ip(cmd, ip_entry->key);
+	// spin_log(LOG_DEBUG, "ckft: %d %x\n", cmd, tree);
+	// "old" kernel code
+	twomethods_do_ip(cmd, ip_entry->key);
         ip_entry = tree_next(ip_entry);
     }
 }
@@ -378,25 +344,6 @@ call_kernel_for_node_ips(config_command_t cmd, node_t *node) {
     call_kernel_for_tree(cmd, node->ips);
 }
 
-#ifdef notdef
-void handle_command_remove_ip(config_command_t cmd, ip_t* ip) {
-
-    core2kernel_do_ip(cmd, ip);
-
-    switch(cmd) {
-    case SPIN_CMD_REMOVE_BLOCK:
-	remove_ip_from_li(ip, &ipl_block);
-	break;
-    case SPIN_CMD_REMOVE_IGNORE:
-	remove_ip_from_li(ip, &ipl_ignore);
-	break;
-    case SPIN_CMD_REMOVE_EXCEPT:
-	remove_ip_from_li(ip, &ipl_allow);
-	break;
-    }
-}
-#endif
-
 void handle_command_remove_ip_from_list(int iplist, ip_t* ip) {
     static config_command_t rmip_cmds[] = {
 	SPIN_CMD_REMOVE_BLOCK,
@@ -404,7 +351,7 @@ void handle_command_remove_ip_from_list(int iplist, ip_t* ip) {
 	SPIN_CMD_REMOVE_EXCEPT
     };
 
-    core2kernel_do_ip(rmip_cmds[iplist], ip);
+    twomethods_do_ip(rmip_cmds[iplist], ip);
     remove_ip_from_li(ip, &ipl_list_ar[iplist]);
 }
 
@@ -541,7 +488,6 @@ void handle_command_add_name(int node_id, char* name) {
 static void
 iptree2json(tree_t* tree, buffer_t* result) {
     tree_entry_t* cur;
-    ip_t *ip_addr;
     char ip_str[INET6_ADDRSTRLEN];
     char *prefix;
 
@@ -595,44 +541,6 @@ void handle_command_get_iplist(int iplist, const char* json_command) {
     buffer_destroy(response_json);
 
 }
-
-#ifdef notdef
-void handle_command_get_list(config_command_t cmd, const char* json_command) {
-    netlink_command_result_t* command_result;
-    buffer_t* response_json = buffer_create(4096);
-    buffer_t* result_json = buffer_create(4096);
-    unsigned int response_size;
-
-    // ask the kernel module for the list of ignored nodes
-    command_result = send_netlink_command_noarg(cmd);
-    if (command_result == NULL) {
-        fprintf(stderr, "Error connecting to kernel, is the module running?\n");
-        return;
-    }
-    netlink_command_result2json(command_result, result_json);
-    if (!buffer_ok(result_json)) {
-        buffer_destroy(result_json);
-        buffer_destroy(response_json);
-        netlink_command_result_destroy(command_result);
-        return;
-    }
-    buffer_finish(result_json);
-    response_size = create_mqtt_command(response_json, json_command, NULL, buffer_str(result_json));
-    if (!buffer_ok(response_json)) {
-        buffer_destroy(result_json);
-        buffer_destroy(response_json);
-        netlink_command_result_destroy(command_result);
-        return;
-    }
-    buffer_finish(response_json);
-    // pubsub_publish(response_size, buffer_str(response_json));
-    core2pubsub_publish(response_json);
-
-    netlink_command_result_destroy(command_result);
-    buffer_destroy(result_json);
-    buffer_destroy(response_json);
-}
-#endif
 
 void int_handler(int signal) {
 
@@ -713,6 +621,8 @@ int main(int argc, char** argv) {
     spin_log_init(use_syslog, log_verbosity, "spind");
     log_version();
 
+    init_core2block();
+
     init_all_ipl();
 
     init_mosquitto(mosq_host, mosq_port);
@@ -720,14 +630,13 @@ int main(int argc, char** argv) {
 
     result = init_netlink(local_mode);
 
-    // init_core2block();
 
     mainloop_run();
 
     cleanup_cache();
     cleanup_netlink();
 
-    // cleanup_core2block();
+    cleanup_core2block();
 
     finish_mosquitto();
 
