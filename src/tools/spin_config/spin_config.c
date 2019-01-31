@@ -10,10 +10,10 @@
 #include <errno.h>
 #include <string.h>
 
-#include "pkt_info.h"
-#include "spin_cfg.h"
-#include "tree.h"
-#include "util.h"
+#include <pkt_info.h>
+#include <spin_cfg.h>
+#include <tree.h>
+#include <util.h>
 
 #define NETLINK_CONFIG_PORT 30
 
