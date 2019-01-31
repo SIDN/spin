@@ -1,3 +1,4 @@
+#ifdef notdef
 #include <stdlib.h>
 #include <assert.h>
 #include <stdio.h>
@@ -99,3 +100,4 @@ void init_core2block() {
 
 void cleanup_core2block() {
 }
+#endif

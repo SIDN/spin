@@ -687,14 +687,14 @@ int main(int argc, char** argv) {
 
     result = init_netlink(local_mode);
 
-    init_core2block();
+    // init_core2block();
 
     mainloop_run();
 
     cleanup_cache();
     cleanup_netlink();
 
-    cleanup_core2block();
+    // cleanup_core2block();
 
     finish_mosquitto();
 
