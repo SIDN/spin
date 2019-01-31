@@ -249,11 +249,6 @@ int read_ip_tree(tree_t* dest, const char* filename) {
         if (index(rline, '\n') >= 0) {
             *index(rline, '\n') = '\0';
             if (spin_pton(&ip, line)) {
-{
-    char buf[100];
-    spin_ntop(buf, &ip, 100);
-    spin_log(LOG_DEBUG, "read ip addr %s\n", buf);
-}
                 tree_add(dest, sizeof(ip), &ip, 0, NULL, 1);
                 count++;
             }

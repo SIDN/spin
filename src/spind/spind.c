@@ -261,6 +261,9 @@ void init_all_ipl() {
 	lip->li_tree = tree_create(cmp_ips);
 	cnt = read_ip_tree(lip->li_tree, lip->li_filename);
 	spin_log(LOG_DEBUG, "File %s, read %d entries\n", lip->li_filename, cnt);
+
+	// Push into kernel
+	handle_command_push_ip_from_list_to_kernel(i);
     }
 
     // Sync trees to files every 2.5 seconds for now
@@ -342,18 +345,24 @@ void remove_ip_from_file(ip_t* ip, const char* filename) {
 }
 #endif
 
-static
-void call_kernel_for_node_ips(config_command_t cmd, node_t *node) {
+static void
+call_kernel_for_tree(config_command_t cmd, tree_t *tree) {
     tree_entry_t* ip_entry;
 
-    if (node == NULL) {
-        return;
-    }
-    ip_entry = tree_first(node->ips);
+    ip_entry = tree_first(tree);
     while (ip_entry != NULL) {
 	core2kernel_do_ip(cmd, ip_entry->key);
         ip_entry = tree_next(ip_entry);
     }
+}
+
+static void
+call_kernel_for_node_ips(config_command_t cmd, node_t *node) {
+
+    if (node == NULL) {
+        return;
+    }
+    call_kernel_for_tree(cmd, node->ips);
 }
 
 #ifdef notdef
@@ -374,6 +383,19 @@ void handle_command_remove_ip(config_command_t cmd, ip_t* ip) {
     }
 }
 #endif
+
+void handle_command_push_ip_from_list_to_kernel(int iplist) {
+    static config_command_t addip_cmds[] = {
+	SPIN_CMD_ADD_BLOCK,
+	SPIN_CMD_ADD_IGNORE,
+	SPIN_CMD_ADD_EXCEPT
+    };
+
+    //
+    // Make sure the kernel gets to know on init
+    //
+    call_kernel_for_tree(addip_cmds[iplist], ipl_list_ar[iplist].li_tree);
+}
 
 void handle_command_remove_ip_from_list(int iplist, ip_t* ip) {
     static config_command_t rmip_cmds[] = {
