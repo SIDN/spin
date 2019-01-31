@@ -21,25 +21,30 @@ typedef struct {
     char* mac;
     // some additional info about this node
     uint8_t is_blocked;
-    uint8_t is_excepted;
+    uint8_t is_allowed;
     // at some point we may want to clean up stuff, so keep track of
     // when we last saw it
     uint32_t last_seen;
 } node_t;
 
+/*
 node_t* node_create(int id);
 void node_destroy(node_t* node);
 node_t* node_clone(node_t* node);
 
 void node_add_ip(node_t* node, ip_t* ip);
 void node_add_domain(node_t* node, char* domain);
-void node_set_mac(node_t* node, char* mac);
+*/
+
 void node_set_name(node_t* node, char* name);
+/*
+void node_set_mac(node_t* node, char* mac);
 void node_set_blocked(node_t* node, uint8_t blocked);
 void node_set_excepted(node_t* node, uint8_t excepted);
 void node_set_last_seen(node_t* node, uint32_t lastg_seen);
 
 int node_shares_element(node_t* node, node_t* othernode);
+*/
 /*
  * Merge two nodes;
  * Add all IP addresses and domain names that are in src to dest
@@ -48,11 +53,11 @@ int node_shares_element(node_t* node, node_t* othernode);
  * value
  * If name of dest is not set, set it to name of src
  * If mac of dest is not set, set it to mac of src
- */
 void node_merge(node_t* dest, node_t* src);
 
 void node_print(node_t* node);
 unsigned int node2json(node_t* node, buffer_t* json_buf);
+ */
 
 #define MAX_NODES 2048
 
@@ -72,9 +77,11 @@ typedef struct {
 node_cache_t* node_cache_create(void);
 void node_cache_destroy(node_cache_t* node_cache);
 
+/*
 void node_cache_print(node_cache_t* node_cache);
 
 void node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp);
+ */
 void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp);
 void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp);
 void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp);
@@ -82,8 +89,8 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
 /**
  * this takes ownership of the given node pointer, do not use or free after!
  * Returns 1 if the added node is new, 0 if not
- */
 int node_cache_add_node(node_cache_t* node_cache, node_t* node);
+ */
 
 node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* ip);
 /**

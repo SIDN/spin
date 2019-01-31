@@ -1,4 +1,3 @@
-
 #include "arp.h"
 #include "spin_log.h"
 
@@ -11,6 +10,18 @@ arp_table_t* arp_table_create(void) {
 void arp_table_destroy(arp_table_t* arp_table) {
     tree_destroy(arp_table->entries);
     free(arp_table);
+}
+
+static
+void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
+    ip_t ip;
+
+    if (!spin_pton(&ip, ip_str)) {
+        //spin_log(LOG_ERR, "[XX] error, bad address, ignoring\n");
+        return;
+    }
+
+    tree_add(arp_table->entries, sizeof(ip_t), &ip, strlen(mac) + 1, mac, 1);
 }
 
 void arp_table_read(arp_table_t* arp_table) {
@@ -37,6 +48,7 @@ void arp_table_read(arp_table_t* arp_table) {
     pclose(fp);
 }
 
+static
 void arp_table_print(arp_table_t* arp_table) {
     char ip_str[INET6_ADDRSTRLEN];
     tree_entry_t* cur = tree_first(arp_table->entries);
@@ -50,17 +62,7 @@ void arp_table_print(arp_table_t* arp_table) {
     spin_log(LOG_DEBUG, "[end of arp table]\n");
 }
 
-void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
-    ip_t ip;
-
-    if (!spin_pton(&ip, ip_str)) {
-        //spin_log(LOG_ERR, "[XX] error, bad address, ignoring\n");
-        return;
-    }
-
-    tree_add(arp_table->entries, sizeof(ip_t), &ip, strlen(mac) + 1, mac, 1);
-}
-
+static
 int arp_table_size(arp_table_t* arp_table) {
     return tree_size(arp_table->entries);
 }
@@ -74,6 +76,8 @@ char* arp_table_find_by_ip(arp_table_t* arp_table, ip_t* ip) {
     }
 }
 
+#ifdef notdef
+static
 char* arp_table_find_by_str(arp_table_t* arp_table, char* ip_str) {
     ip_t ip;
     if (spin_pton(&ip, ip_str)) {
@@ -82,3 +86,4 @@ char* arp_table_find_by_str(arp_table_t* arp_table, char* ip_str) {
         return NULL;
     }
 }
+#endif

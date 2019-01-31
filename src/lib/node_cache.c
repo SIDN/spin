@@ -8,7 +8,9 @@
 #include "netlink_commands.h"
 #include "spin_cfg.h"
 
-node_t*
+static int node_cache_add_node(node_cache_t* node_cache, node_t* node);
+
+static node_t*
 node_create(int id) {
     node_t* node = (node_t*) malloc(sizeof(node_t));
     node->id = id;
@@ -17,12 +19,12 @@ node_create(int id) {
     node->name = NULL;
     node->mac = NULL;
     node->is_blocked = 0;
-    node->is_excepted = 0;
+    node->is_allowed = 0;
     node->last_seen = 0;
     return node;
 }
 
-void
+static void
 node_destroy(node_t* node) {
     tree_destroy(node->ips);
     node->ips = NULL;
@@ -30,13 +32,20 @@ node_destroy(node_t* node) {
     node->domains = NULL;
     if (node->mac) {
         free(node->mac);
+        node->mac = NULL;
     }
     if (node->name) {
         free(node->name);
+        node->name = NULL;
     }
     free(node);
 }
 
+#ifdef notdef
+
+/*
+ * Seems unused, HVS
+ */
 node_t* node_clone(node_t* node) {
     node_t* new = node_create(node->id);
     tree_entry_t *cur;
@@ -47,7 +56,7 @@ node_t* node_clone(node_t* node) {
         node_set_name(new, node->name);
     }
     new->is_blocked = node->is_blocked;
-    new->is_excepted = node->is_excepted;
+    new->is_allowed = node->is_allowed;
     new->last_seen = node->last_seen;
     cur = tree_first(node->ips);
     while (cur != NULL) {
@@ -61,18 +70,19 @@ node_t* node_clone(node_t* node) {
     }
     return new;
 }
+#endif
 
-void
+static void
 node_add_ip(node_t* node, ip_t* ip) {
     tree_add(node->ips, sizeof(ip_t), ip, 0, NULL, 1);
 }
 
-void
+static void
 node_add_domain(node_t* node, char* domain) {
     tree_add(node->domains, strlen(domain) + 1, domain, 0, NULL, 1);
 }
 
-void
+static void
 node_set_mac(node_t* node, char* mac) {
     if (mac == NULL) {
         return;
@@ -94,22 +104,22 @@ node_set_name(node_t* node, char* name) {
     node->name = strndup(name, 128);
 }
 
-void
+static void
 node_set_blocked(node_t* node, uint8_t blocked) {
     node->is_blocked = blocked;
 }
 
-void
-node_set_excepted(node_t* node, uint8_t excepted) {
-    node->is_excepted = excepted;
+static void
+node_set_allowed(node_t* node, uint8_t allowed) {
+    node->is_allowed = allowed;
 }
 
-void
+static void
 node_set_last_seen(node_t* node, uint32_t last_seen) {
     node->last_seen = last_seen;
 }
 
-int
+static int
 node_shares_element(node_t* node, node_t* othernode) {
     tree_entry_t* cur_me;
 
@@ -140,7 +150,7 @@ node_shares_element(node_t* node, node_t* othernode) {
     return 0;
 }
 
-void
+static void
 node_merge(node_t* dest, node_t* src) {
     tree_entry_t* cur;
 
@@ -153,10 +163,10 @@ node_merge(node_t* dest, node_t* src) {
     if (dest->last_seen < src->last_seen) {
         dest->last_seen = src->last_seen;
     }
-    // When merging nodes, set blocked and excepted to 1 if either
+    // When merging nodes, set blocked and allowed to 1 if either
     // of them were not 0
     node_set_blocked(dest, src->is_blocked | dest->is_blocked);
-    node_set_excepted(dest, src->is_excepted | dest->is_excepted);
+    node_set_allowed(dest, src->is_allowed | dest->is_allowed);
     cur = tree_first(src->ips);
     while (cur != NULL) {
         tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
@@ -169,7 +179,8 @@ node_merge(node_t* dest, node_t* src) {
     }
 }
 
-void node_print(node_t* node) {
+static void
+node_print(node_t* node) {
     tree_entry_t* cur;
     int fam;
     unsigned char* keyp;
@@ -204,7 +215,7 @@ void node_print(node_t* node) {
     }
 }
 
-unsigned int
+static unsigned int
 node2json(node_t* node, buffer_t* json_buf) {
     unsigned int s = 0;
     tree_entry_t* cur;
@@ -218,10 +229,10 @@ node2json(node_t* node, buffer_t* json_buf) {
         buffer_write(json_buf, " \"mac\": \"%s\", ", node->mac);
     }
     if (node->is_blocked) {
-        buffer_write(json_buf, " \"is_blocked\": \"true\", ", node->mac);
+        buffer_write(json_buf, " \"is_blocked\": \"true\", ");
     }
-    if (node->is_excepted) {
-        buffer_write(json_buf, " \"is_excepted\": \"true\", ", node->mac);
+    if (node->is_allowed) {
+        buffer_write(json_buf, " \"is_excepted\": \"true\", ");
     }
     buffer_write(json_buf, " \"lastseen\": %u, ", node->last_seen);
 
@@ -254,6 +265,12 @@ node2json(node_t* node, buffer_t* json_buf) {
     return s;
 }
 
+/*
+ * Create and destroy node_cache
+ * As far as I can see only done once in current node, only one node cache in use
+ *
+ * Perhaps TODO
+ */
 
 node_cache_t*
 node_cache_create() {
@@ -290,7 +307,8 @@ node_cache_destroy(node_cache_t* node_cache) {
     free(node_cache);
 }
 
-void node_cache_print(node_cache_t* node_cache) {
+static void
+node_cache_print(node_cache_t* node_cache) {
     tree_entry_t* cur = tree_first(node_cache->nodes);
     node_t* cur_node;
     spin_log(LOG_DEBUG, "[node cache]\n");
@@ -342,12 +360,13 @@ node_t* node_cache_find_by_id(node_cache_t* node_cache, int node_id) {
     }
 }
 
-int node_cache_get_new_id(node_cache_t* node_cache) {
+static int
+node_cache_get_new_id(node_cache_t* node_cache) {
     // just incremental for now
     return node_cache->available_id++;
 }
 
-void
+static void
 add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
     char* mac = arp_table_find_by_ip(node_cache->arp_table, ip);
     char* name;
@@ -357,20 +376,23 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
         mac = arp_table_find_by_ip(node_cache->arp_table, ip);
     }
     if (mac) {
+        spin_log(LOG_DEBUG, "[XX] mac found: %s\n", mac);
         node_set_mac(node, mac);
         name = node_names_find_mac(node_cache->names, mac);
         if (name != NULL) {
             node_set_name(node, name);
         }
     } else {
+        spin_log(LOG_DEBUG, "[XX] mac not found\n");
         name = node_names_find_ip(node_cache->names, ip);
         if (name != NULL) {
             node_set_name(node, name);
         }
     }
+    spin_log(LOG_DEBUG, "[XX] mac at %p\n", node->mac);
 }
 
-void
+static void
 node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
     // todo: add an search-by-ip tree and don't do anything if we
     // have this one already? (do set mac if now known,
@@ -447,7 +469,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
 
 // return 0 if it existed/was merged
 // return 1 if it was new
-int
+static int
 node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     int new_id, *new_id_mem;
     tree_entry_t* cur = tree_first(node_cache->nodes);
@@ -497,17 +519,6 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     return 1;
 }
 
-/*
-{
-    "to": {"id":1,"lastseen":1502702327,"ips":["::1"],"domains":[]},
-    "from": {"id":1,"lastseen":1502702327,"ips":["::1"],"domains":[]},
-    "protocol":6,
-    "to_port":1883,
-    "size":744,
-    "count":2,
-    "from_port":56082
-}
-*/
 unsigned int
 pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf) {
     unsigned int s = 0;
@@ -605,8 +616,6 @@ dns_query_pkt_info2json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info, 
     //return s;
 }
 
-
-
 flow_list_t* flow_list_create(uint32_t timestamp) {
     flow_list_t* flow_list = (flow_list_t*)malloc(sizeof(flow_list_t));
     flow_list->flows = tree_create(cmp_pktinfos);
@@ -634,7 +643,6 @@ void flow_list_add_pktinfo(flow_list_t* flow_list, pkt_info_t* pkt_info) {
         fd.packet_count = pkt_info->packet_count;
         tree_add(flow_list->flows, 38, pkt_info, sizeof(fd), &fd, 1);
     }
-
 }
 
 int flow_list_should_send(flow_list_t* flow_list, uint32_t timestamp) {

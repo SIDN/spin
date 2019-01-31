@@ -30,13 +30,14 @@ Build dependencies:
 - libnfnetlink-dev
 - linux-headers-<version>
 
-    `apt-get install gcc make autoconf libnfnetlink-dev`
+    `apt-get install gcc make autoconf libnfnetlink-dev libmnl-dev libnetfilter-queue-dev`
 
 Library dependencies:
 
 - libnfnetlink0
+- libmnl
 
-    `apt-get install libnfnetlink0`
+    `apt-get install libnfnetlink0 libmnl0`
 
 Lua dependencies (for client tooling and message broker):
 

@@ -1,20 +1,12 @@
-/**
- * Various utility structure and functions for the spin kernel module
- */
 
-#ifndef SPIN_UTIL_H
-#define SPIN_UTIL_H 1
-
-//#include <linux/cache.h>
-//#include <linux/kernel.h>
-//#include <linux/slab.h>
-//#include <linux/module.h>
+#ifndef SPIN_IP_STORE_H
+#define SPIN_IP_STORE_H 1
 
 #include "pkt_info.h"
 
 typedef struct ip_store_el {
-	u64 k1;
-	u64 k2;
+	uint64_t k1;
+	uint64_t k2;
 	char* val;
 	struct ip_store_el* next;
 } ip_store_el_t;
@@ -40,8 +32,4 @@ void printv(int module_verbosity, const char* format, ...);
 void hexdump_k(uint8_t* data, unsigned int offset, unsigned int size);
 
 
-#ifndef __GFP_WAIT
-#define __GFP_WAIT __GFP_RECLAIM
-#endif
-
-#endif // SPIN_UTIL_H
+#endif // SPIN_IP_STORE_H
