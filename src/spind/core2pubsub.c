@@ -216,7 +216,10 @@ void handle_json_command_detail(int verb, int object,
     switch(verb) {
     case PSC_V_ADD:
     case PSC_V_REM:
-	if (!json_parse_node_id_name_arg(&node_id_arg, str_arg, MAXNAMELEN, json_str, tokens, argument_token_i)) {
+	// Add names is different
+	if (object == PSC_O_NAME)
+	    break;
+	if (!json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
 	    spin_log(LOG_ERR, "Cannot parse node_id\n");
 	    return;
 	}
@@ -243,6 +246,10 @@ void handle_json_command_detail(int verb, int object,
 	    // handle_command_get_names();
 	    break;
 	case PSC_V_ADD:
+	    if (!json_parse_node_id_name_arg(&node_id_arg, str_arg, MAXNAMELEN, json_str, tokens, argument_token_i)) {
+		spin_log(LOG_ERR, "Cannot parse node_id\n");
+		return;
+	    }
 	    handle_command_add_name(node_id_arg, str_arg);
 	    break;
 	}
