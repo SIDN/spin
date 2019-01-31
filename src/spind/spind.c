@@ -528,7 +528,7 @@ iptree2json(tree_t* tree, buffer_t* result) {
 
     cur = tree_first(tree);
     while (cur != NULL) {
-        spin_ntop(ip_str, cur->key, cur->key_size);
+        spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
 	buffer_write(result, prefix);
 	buffer_write(result, "\"%s\" ", ip_str);
 	prefix = " , ";
