@@ -254,11 +254,13 @@ void wf_ipl(void *arg, int data, int timeout) {
 void init_all_ipl() {
     int i;
     struct list_info *lip;
+    int cnt;
 
     for (i=0; i<N_IPLISTS; i++) {
 	lip = &ipl_list_ar[i];
 	lip->li_tree = tree_create(cmp_ips);
-	read_ip_tree(lip->li_tree, lip->li_filename);
+	cnt = read_ip_tree(lip->li_tree, lip->li_filename);
+	spin_log(LOG_DEBUG, "File %s, read %d entries\n", lip->li_filename, cnt);
     }
 
     // Sync trees to files every 2.5 seconds for now
@@ -547,6 +549,8 @@ void handle_command_get_iplist(int iplist, const char* json_command) {
         return;
     }
     buffer_finish(result_json);
+
+    fprintf(stderr, "[XX] get_iplist result %s\n", buffer_str(result_json));
 
     response_size = create_mqtt_command(response_json, json_command, NULL, buffer_str(result_json));
     if (!buffer_ok(response_json)) {
