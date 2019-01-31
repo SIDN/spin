@@ -36,3 +36,4 @@ src/kernelmod/Module.symvers
 src/kernelmod/modules.order
 src/kernelmod/.tmp_versions/
 .idea/
+tags

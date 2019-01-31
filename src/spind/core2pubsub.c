@@ -6,7 +6,7 @@
 #include "mainloop.h"
 #include "spin_log.h"
 
-#include "spin_cfg.h"		/* Should go here */
+// #include "spin_cfg.h"		/* Should go here */
 #include "handle_command.h"
 
 #define MOSQUITTO_KEEPALIVE_TIME 60	/* Seconds */
@@ -255,14 +255,15 @@ void handle_json_command_detail(int verb, int object,
             handle_command_stop_block_data(node_id_arg);
 	    break;
 	case PSC_V_REM_IP:
-            handle_command_remove_ip(SPIN_CMD_REMOVE_BLOCK, &ip_arg);
+            handle_command_remove_ip_from_list(IPLIST_BLOCK, &ip_arg);
             node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip_arg);
             if (node) {
                 node->is_blocked = 0;
             }
 	    break;
 	}
-	handle_command_get_list(SPIN_CMD_GET_BLOCK, "blocks");
+	handle_command_get_iplist(IPLIST_BLOCK, "blocks");
+	// handle_command_get_list(SPIN_CMD_GET_BLOCK, "blocks");
 	break;	//BLOCK
 
     case PSC_O_IGNORE:
@@ -277,10 +278,11 @@ void handle_json_command_detail(int verb, int object,
 	    handle_command_remove_filter(node_id_arg);
 	    break;
 	case PSC_V_REM_IP:
-	    handle_command_remove_ip(SPIN_CMD_REMOVE_IGNORE, &ip_arg);
+	    handle_command_remove_ip_from_list(IPLIST_FILTER, &ip_arg);
 	    break;
 	}
-	handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
+	handle_command_get_iplist(IPLIST_FILTER, "filters");
+	// handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
 	break;	// IGNORE
 
     case PSC_O_EXCEPT:
@@ -294,14 +296,15 @@ void handle_json_command_detail(int verb, int object,
             handle_command_stop_allow_data(node_id_arg);
 	    break;
 	case PSC_V_REM_IP:
-            handle_command_remove_ip(SPIN_CMD_REMOVE_EXCEPT, &ip_arg);
+            handle_command_remove_ip_from_list(IPLIST_ALLOW, &ip_arg);
             node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip_arg);
             if (node) {
                 node->is_excepted = 0;
             }
 	    break;
 	}
-        handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
+        handle_command_get_iplist(IPLIST_ALLOW, "alloweds");
+        // handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
 	break;	// EXCEPT
     }
 }
@@ -399,9 +402,9 @@ void init_mosquitto(const char* host, int port) {
     mainloop_register("mosq", &wf_mosquitto, (void *) 0, mosquitto_socket(mosq), MOSQUITTO_KEEPALIVE_TIME*1000/2);
     mosquitto_socket(mosq);
     send_command_restart();
-    handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
-    handle_command_get_list(SPIN_CMD_GET_BLOCK, "blocks");
-    handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
+    handle_command_get_iplist(IPLIST_FILTER, "filters");
+    handle_command_get_iplist(IPLIST_BLOCK, "blocks");
+    handle_command_get_iplist(IPLIST_ALLOW, "alloweds");
 }
 
 void finish_mosquitto() {

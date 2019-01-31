@@ -5,8 +5,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
-
-#include <errno.h>
+#include <signal.h>
+#include <time.h>
 
 #include "pkt_info.h"
 #include "node_cache.h"
@@ -20,12 +20,9 @@
 // perhaps remove
 #include "spin_cfg.h"
 
-#include <signal.h>
-#include <time.h>
-
+#include "handle_command.h"
 #include "mainloop.h"
 #include "version.h"
-
 
 node_cache_t* node_cache;
 
@@ -71,6 +68,7 @@ print_dnspktinfo_wirehex(dns_pkt_info_t* pkt_info) {
 }
 */
 
+#ifdef notdef
 unsigned int netlink_command_result2json(netlink_command_result_t* command_result, buffer_t* buf) {
     unsigned int s = 0;
     int i;
@@ -92,6 +90,7 @@ unsigned int netlink_command_result2json(netlink_command_result_t* command_resul
     }
     return s;
 }
+#endif
 
 unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argument, char* result) {
     buffer_write(buf, "{ \"command\": \"%s\"", command);
@@ -148,7 +147,7 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
 }
 
 // function definition below
-void connect_mosquitto(const char* host, int port);
+// void connect_mosquitto(const char* host, int port);
 
 void maybe_sendflow(flow_list_t *flow_list, time_t now) {
     buffer_t* json_buf = buffer_create(4096);
@@ -215,48 +214,55 @@ static int json_dump(const char *js, jsmntok_t *t, size_t count, int indent) {
 /*
  * The three lists of IP addresses are now kept in memory in spind, with
  * a copy written to file.
+ * BLOCK, FILTER, ALLOW
  * The lists in the kernel module will not be read back, even while there is a
  * kernel module.
  */
+
+#define N_IPLISTS	3
 
 struct list_info {
     tree_t *	li_tree;		// Tree of IP addresses
     char *	li_filename;		// Name of shadow file
     int		li_modified;		// File should be written
-} ipl_block, ipl_filter, ipl_allow;
+} ipl_list_ar[N_IPLISTS] = {
+	{	0,	"/etc/spin/block.list",		0	},
+	{	0,	"/etc/spin/filter.list",	0	},
+	{	0,	"/etc/spin/allow.list",		0	},
+};
 
-void backup_li(struct list_info *lip) {
-
-    if (lip->li_modified) {
-	store_ip_tree(lip->li_tree, lip->li_filename);
-	lip->li_modified = 0;
-    }
-}
+#define ipl_block ipl_list_ar[IPLIST_BLOCK]
+#define ipl_filter ipl_list_ar[IPLIST_FILTER]
+#define ipl_allow ipl_list_ar[IPLIST_ALLOW]
 
 void wf_ipl(void *arg, int data, int timeout) {
+    int i;
+    struct list_info *lip;
 
     if (timeout) {
-	backup_li(&ipl_block);
-	backup_li(&ipl_filter);
-	backup_li(&ipl_allow);
+	// What else could it be ??
+	for (i=0; i<N_IPLISTS; i++) {
+	    lip = &ipl_list_ar[i];
+	    if (lip->li_modified) {
+		store_ip_tree(lip->li_tree, lip->li_filename);
+		lip->li_modified = 0;
+	    }
+	}
     }
-}
-
-void init_ipl(struct list_info *lip, char *fname) {
-
-    lip->li_filename = fname;
-    lip->li_tree = tree_create(cmp_ips);
-    read_ip_tree(lip->li_tree, lip->li_filename);
-    lip->li_modified = 0;
 }
 
 void init_all_ipl() {
+    int i;
+    struct list_info *lip;
 
-    init_ipl(&ipl_block, "/etc/spin/block.list");
-    init_ipl(&ipl_filter, "/etc/spin/filter.list");
-    init_ipl(&ipl_allow, "/etc/spin/allow.list");
+    for (i=0; i<N_IPLISTS; i++) {
+	lip = &ipl_list_ar[i];
+	lip->li_tree = tree_create(cmp_ips);
+	read_ip_tree(lip->li_tree, lip->li_filename);
+    }
 
-    mainloop_register("IP list backup", wf_ipl, (void *) 0, 0, 2500);
+    // Sync trees to files every 2.5 seconds for now
+    mainloop_register("IP list sync", wf_ipl, (void *) 0, 0, 2500);
 }
 
 #ifdef notdef
@@ -275,9 +281,12 @@ void add_ip_tree_to_file(tree_t* tree, const char* filename) {
 }
 #endif
 
-void add_ip_tree_to_li(tree_t* tree, struct list_info *lip) {
+static void
+add_ip_tree_to_li(tree_t* tree, struct list_info *lip) {
     tree_entry_t* cur;
 
+    if (tree == NULL)
+	return;
     cur = tree_first(tree);
     while(cur != NULL) {
         tree_add(lip->li_tree, cur->key_size, cur->key, cur->data_size, cur->data, 1);
@@ -286,9 +295,12 @@ void add_ip_tree_to_li(tree_t* tree, struct list_info *lip) {
     lip->li_modified++;
 }
 
-void remove_ip_tree_from_li(tree_t *tree, struct list_info *lip) {
+static void
+remove_ip_tree_from_li(tree_t *tree, struct list_info *lip) {
     tree_entry_t* cur;
 
+    if (tree == NULL)
+	return;
     cur = tree_first(tree);
     while(cur != NULL) {
         tree_remove(lip->li_tree, cur->key_size, cur->key);
@@ -328,44 +340,21 @@ void remove_ip_from_file(ip_t* ip, const char* filename) {
 }
 #endif
 
-// returns the node->ips tree if successful, NULL if node not found
-// (this is useful if we have other actions to perform with the node's
-// ip addresses, such as print or save them)
-// note: caller does *not* get ownership of the tree
-// TODO: can we skip the lookup? make all callers do it first
 static
-tree_t* call_kernel_for_node_ips(config_command_t cmd, int node_id) {
-    node_t* node = node_cache_find_by_id(node_cache, node_id);
+void call_kernel_for_node_ips(config_command_t cmd, node_t *node) {
     tree_entry_t* ip_entry;
 
     if (node == NULL) {
-        return NULL;
+        return;
     }
     ip_entry = tree_first(node->ips);
     while (ip_entry != NULL) {
 	core2kernel_do_ip(cmd, ip_entry->key);
         ip_entry = tree_next(ip_entry);
     }
-    return node->ips;
 }
 
-void handle_command_add_filter(int node_id) {
-    tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_ADD_IGNORE, node_id);
-    if (ips != NULL) {
-	add_ip_tree_to_li(ips, &ipl_filter);
-        // add_ip_tree_to_file(ips, "/etc/spin/ignore.list");
-    }
-}
-
-void handle_command_remove_filter(int node_id) {
-    node_t* node = node_cache_find_by_id(node_cache, node_id);
-    tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_REMOVE_IGNORE, node_id);
-    if (ips != NULL) {
-	remove_ip_tree_from_li(ips, &ipl_filter);
-        // remove_ip_tree_from_file(ips, "/etc/spin/ignore.list");
-    }
-}
-
+#ifdef notdef
 void handle_command_remove_ip(config_command_t cmd, ip_t* ip) {
 
     core2kernel_do_ip(cmd, ip);
@@ -382,59 +371,110 @@ void handle_command_remove_ip(config_command_t cmd, ip_t* ip) {
 	break;
     }
 }
+#endif
+
+void handle_command_remove_ip_from_list(int iplist, ip_t* ip) {
+    static config_command_t rmip_cmds[] = {
+	SPIN_CMD_REMOVE_BLOCK,
+	SPIN_CMD_REMOVE_IGNORE,
+	SPIN_CMD_REMOVE_EXCEPT
+    };
+
+    core2kernel_do_ip(rmip_cmds[iplist], ip);
+    remove_ip_from_li(ip, &ipl_list_ar[iplist]);
+}
+
+static node_t *
+find_node_id(int node_id) {
+    node_t *node;
+
+    /*
+     * Find it and give warning if non-existent. This should not happen.
+     */
+    node = node_cache_find_by_id(node_cache, node_id);
+    if (node == NULL) {
+	spin_log(LOG_WARNING, "Node-id %d not found!\n", node_id);
+	return NULL;
+    }
+    return node;
+}
 
 void handle_command_block_data(int node_id) {
-    node_t* node = node_cache_find_by_id(node_cache, node_id);
-    tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_ADD_BLOCK, node_id);
-    if (ips != NULL) {
-	add_ip_tree_to_li(ips, &ipl_block);
-        // add_ip_tree_to_file(ips, "/etc/spin/block.list");
-    }
+    node_t* node;
+
+    if ((node = find_node_id(node_id)) == NULL)
+    	return;
+
     // the is_blocked status is only read if this node had a new ip address added, so update it now
-    if (node != NULL) {
-        node->is_blocked = 1;
-    }
+    node->is_blocked = 1;
+
+    call_kernel_for_node_ips(SPIN_CMD_ADD_BLOCK, node);
+    add_ip_tree_to_li(node->ips, &ipl_block);
+    // add_ip_tree_to_file(ips, "/etc/spin/block.list");
 }
 
 void handle_command_stop_block_data(int node_id) {
-    node_t* node = node_cache_find_by_id(node_cache, node_id);
-    tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_REMOVE_BLOCK, node_id);
-    if (ips != NULL) {
-	remove_ip_tree_from_li(ips, &ipl_block);
-        // remove_ip_tree_from_file(ips, "/etc/spin/block.list");
-    }
+    node_t* node;
+
+    if ((node = find_node_id(node_id)) == NULL)
+    	return;
+
     // the is_blocked status is only read if this node had a new ip address added, so update it now
-    if (node != NULL) {
-        node->is_blocked = 0;
-    }
+    node->is_blocked = 0;
+
+    call_kernel_for_node_ips(SPIN_CMD_REMOVE_BLOCK, node);
+    remove_ip_tree_from_li(node->ips, &ipl_block);
+    // remove_ip_tree_from_file(ips, "/etc/spin/block.list");
+}
+
+void handle_command_add_filter(int node_id) {
+    node_t* node;
+
+    if ((node = find_node_id(node_id)) == NULL)
+    	return;
+
+    call_kernel_for_node_ips(SPIN_CMD_ADD_IGNORE, node);
+    add_ip_tree_to_li(node->ips, &ipl_filter);
+    // add_ip_tree_to_file(ips, "/etc/spin/ignore.list");
+}
+
+void handle_command_remove_filter(int node_id) {
+    node_t* node;
+
+    if ((node = find_node_id(node_id)) == NULL)
+    	return;
+
+    call_kernel_for_node_ips(SPIN_CMD_REMOVE_IGNORE, node);
+    remove_ip_tree_from_li(node->ips, &ipl_filter);
+    // remove_ip_tree_from_file(ips, "/etc/spin/ignore.list");
 }
 
 void handle_command_allow_data(int node_id) {
-    // TODO store this in "/etc/spin/blocked.conf"
-    node_t* node = node_cache_find_by_id(node_cache, node_id);
-    tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_ADD_EXCEPT, node_id);
-    if (ips != NULL) {
-	add_ip_tree_to_li(ips, &ipl_allow);
-        // add_ip_tree_to_file(ips, "/etc/spin/allow.list");
-    }
+    node_t* node;
+
+    if ((node = find_node_id(node_id)) == NULL)
+    	return;
+
     // the is_excepted status is only read if this node had a new ip address added, so update it now
-    if (node != NULL) {
-        node->is_excepted = 1;
-    }
+    node->is_excepted = 1;
+
+    call_kernel_for_node_ips(SPIN_CMD_ADD_EXCEPT, node);
+    add_ip_tree_to_li(node->ips, &ipl_allow);
+    // add_ip_tree_to_file(ips, "/etc/spin/allow.list");
 }
 
 void handle_command_stop_allow_data(int node_id) {
-    // TODO store this in "/etc/spin/blocked.conf"
-    node_t* node = node_cache_find_by_id(node_cache, node_id);
-    tree_t* ips = call_kernel_for_node_ips(SPIN_CMD_REMOVE_EXCEPT, node_id);
-    if (ips != NULL) {
-	remove_ip_tree_from_li(ips, &ipl_allow);
-        // remove_ip_tree_from_file(ips, "/etc/spin/allow.list");
-    }
+    node_t* node;
+
+    if ((node = find_node_id(node_id)) == NULL)
+    	return;
+
     // the is_excepted status is only read if this node had a new ip address added, so update it now
-    if (node != NULL) {
-        node->is_excepted = 0;
-    }
+    node->is_excepted = 0;
+
+    call_kernel_for_node_ips(SPIN_CMD_REMOVE_EXCEPT, node);
+    remove_ip_tree_from_li(node->ips, &ipl_allow);
+    // remove_ip_tree_from_file(ips, "/etc/spin/allow.list");
 }
 
 void handle_command_reset_filters() {
@@ -474,6 +514,56 @@ void handle_command_add_name(int node_id, char* name) {
     node_names_write_userconfig(node_cache->names, "/etc/spin/names.conf");
 }
 
+static void
+iptree2json(tree_t* tree, buffer_t* result) {
+    tree_entry_t* cur;
+    ip_t *ip_addr;
+    char ip_str[INET6_ADDRSTRLEN];
+    char *prefix;
+
+    // Prefix is [ at first, after that ,
+    prefix = " [ ";
+
+    cur = tree_first(tree);
+    while (cur != NULL) {
+        spin_ntop(ip_str, cur->key, cur->key_size);
+	buffer_write(result, prefix);
+	buffer_write(result, "\"%s\" ", ip_str);
+	prefix = " , ";
+        cur = tree_next(cur);
+    }
+    buffer_write(result, " ] ");
+}
+
+void handle_command_get_iplist(int iplist, const char* json_command) {
+    buffer_t* response_json = buffer_create(4096);
+    buffer_t* result_json = buffer_create(4096);
+    unsigned int response_size;
+
+    iptree2json(ipl_list_ar[iplist].li_tree, result_json);
+    if (!buffer_ok(result_json)) {
+        buffer_destroy(result_json);
+        buffer_destroy(response_json);
+        return;
+    }
+    buffer_finish(result_json);
+
+    response_size = create_mqtt_command(response_json, json_command, NULL, buffer_str(result_json));
+    if (!buffer_ok(response_json)) {
+        buffer_destroy(result_json);
+        buffer_destroy(response_json);
+        return;
+    }
+    buffer_finish(response_json);
+
+    core2pubsub_publish(response_json);
+
+    buffer_destroy(result_json);
+    buffer_destroy(response_json);
+
+}
+
+#ifdef notdef
 void handle_command_get_list(config_command_t cmd, const char* json_command) {
     netlink_command_result_t* command_result;
     buffer_t* response_json = buffer_create(4096);
@@ -509,6 +599,7 @@ void handle_command_get_list(config_command_t cmd, const char* json_command) {
     buffer_destroy(result_json);
     buffer_destroy(response_json);
 }
+#endif
 
 void int_handler(int signal) {
 
