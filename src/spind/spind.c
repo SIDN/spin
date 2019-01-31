@@ -345,7 +345,7 @@ void remove_ip_from_file(ip_t* ip, const char* filename) {
 }
 #endif
 
-static void
+static
 call_kernel_for_tree(config_command_t cmd, tree_t *tree) {
     tree_entry_t* ip_entry;
 
@@ -354,6 +354,19 @@ call_kernel_for_tree(config_command_t cmd, tree_t *tree) {
 	core2kernel_do_ip(cmd, ip_entry->key);
         ip_entry = tree_next(ip_entry);
     }
+}
+
+push_ips_from_list_to_kernel(int iplist) {
+    static config_command_t addip_cmds[] = {
+	SPIN_CMD_ADD_BLOCK,
+	SPIN_CMD_ADD_IGNORE,
+	SPIN_CMD_ADD_EXCEPT
+    };
+
+    //
+    // Make sure the kernel gets to know on init
+    //
+    call_kernel_for_tree(addip_cmds[iplist], ipl_list_ar[iplist].li_tree);
 }
 
 static void
@@ -383,19 +396,6 @@ void handle_command_remove_ip(config_command_t cmd, ip_t* ip) {
     }
 }
 #endif
-
-void push_ips_from_list_to_kernel(int iplist) {
-    static config_command_t addip_cmds[] = {
-	SPIN_CMD_ADD_BLOCK,
-	SPIN_CMD_ADD_IGNORE,
-	SPIN_CMD_ADD_EXCEPT
-    };
-
-    //
-    // Make sure the kernel gets to know on init
-    //
-    call_kernel_for_tree(addip_cmds[iplist], ipl_list_ar[iplist].li_tree);
-}
 
 void handle_command_remove_ip_from_list(int iplist, ip_t* ip) {
     static config_command_t rmip_cmds[] = {
@@ -545,10 +545,17 @@ iptree2json(tree_t* tree, buffer_t* result) {
     char ip_str[INET6_ADDRSTRLEN];
     char *prefix;
 
+    cur = tree_first(tree);
+
+    if (cur == NULL) {
+	// empty tree
+	buffer_write(result, " [ ] ");
+	return;
+    }
+
     // Prefix is [ at first, after that ,
     prefix = " [ ";
 
-    cur = tree_first(tree);
     while (cur != NULL) {
         spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
 	buffer_write(result, prefix);
