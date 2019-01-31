@@ -21,7 +21,7 @@ typedef struct {
     char* mac;
     // some additional info about this node
     uint8_t is_blocked;
-    uint8_t is_excepted;
+    uint8_t is_allowed;
     // at some point we may want to clean up stuff, so keep track of
     // when we last saw it
     uint32_t last_seen;

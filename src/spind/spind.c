@@ -227,12 +227,12 @@ struct list_info {
     int		li_modified;		// File should be written
 } ipl_list_ar[N_IPLISTS] = {
 	{	0,	"/etc/spin/block.list",		0	},
-	{	0,	"/etc/spin/filter.list",	0	},
+	{	0,	"/etc/spin/ignore.list",	0	},
 	{	0,	"/etc/spin/allow.list",		0	},
 };
 
 #define ipl_block ipl_list_ar[IPLIST_BLOCK]
-#define ipl_filter ipl_list_ar[IPLIST_FILTER]
+#define ipl_ignore ipl_list_ar[IPLIST_IGNORE]
 #define ipl_allow ipl_list_ar[IPLIST_ALLOW]
 
 void wf_ipl(void *arg, int data, int timeout) {
@@ -366,7 +366,7 @@ void handle_command_remove_ip(config_command_t cmd, ip_t* ip) {
 	remove_ip_from_li(ip, &ipl_block);
 	break;
     case SPIN_CMD_REMOVE_IGNORE:
-	remove_ip_from_li(ip, &ipl_filter);
+	remove_ip_from_li(ip, &ipl_ignore);
 	break;
     case SPIN_CMD_REMOVE_EXCEPT:
 	remove_ip_from_li(ip, &ipl_allow);
@@ -429,25 +429,25 @@ void handle_command_stop_block_data(int node_id) {
     // remove_ip_tree_from_file(ips, "/etc/spin/block.list");
 }
 
-void handle_command_add_filter(int node_id) {
+void handle_command_add_ignore(int node_id) {
     node_t* node;
 
     if ((node = find_node_id(node_id)) == NULL)
     	return;
 
     call_kernel_for_node_ips(SPIN_CMD_ADD_IGNORE, node);
-    add_ip_tree_to_li(node->ips, &ipl_filter);
+    add_ip_tree_to_li(node->ips, &ipl_ignore);
     // add_ip_tree_to_file(ips, "/etc/spin/ignore.list");
 }
 
-void handle_command_remove_filter(int node_id) {
+void handle_command_remove_ignore(int node_id) {
     node_t* node;
 
     if ((node = find_node_id(node_id)) == NULL)
     	return;
 
     call_kernel_for_node_ips(SPIN_CMD_REMOVE_IGNORE, node);
-    remove_ip_tree_from_li(node->ips, &ipl_filter);
+    remove_ip_tree_from_li(node->ips, &ipl_ignore);
     // remove_ip_tree_from_file(ips, "/etc/spin/ignore.list");
 }
 
@@ -457,8 +457,8 @@ void handle_command_allow_data(int node_id) {
     if ((node = find_node_id(node_id)) == NULL)
     	return;
 
-    // the is_excepted status is only read if this node had a new ip address added, so update it now
-    node->is_excepted = 1;
+    // the is_allowed status is only read if this node had a new ip address added, so update it now
+    node->is_allowed = 1;
 
     call_kernel_for_node_ips(SPIN_CMD_ADD_EXCEPT, node);
     add_ip_tree_to_li(node->ips, &ipl_allow);
@@ -471,16 +471,16 @@ void handle_command_stop_allow_data(int node_id) {
     if ((node = find_node_id(node_id)) == NULL)
     	return;
 
-    // the is_excepted status is only read if this node had a new ip address added, so update it now
-    node->is_excepted = 0;
+    // the is_allowed status is only read if this node had a new ip address added, so update it now
+    node->is_allowed = 0;
 
     call_kernel_for_node_ips(SPIN_CMD_REMOVE_EXCEPT, node);
     remove_ip_tree_from_li(node->ips, &ipl_allow);
     // remove_ip_tree_from_file(ips, "/etc/spin/allow.list");
 }
 
-void handle_command_reset_filters() {
-    // clear the filters; derive them from our own addresses again
+void handle_command_reset_ignores() {
+    // clear the ignores; derive them from our own addresses again
     // hmm, use a script for this?
     //load_ips_from_file
     system("/usr/lib/spin/show_ips.lua -o /etc/spin/ignore.list -f");

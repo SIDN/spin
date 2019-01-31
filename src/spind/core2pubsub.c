@@ -144,7 +144,7 @@ json_parse_node_id_name_arg(int* node_id,
 
 // Types
 #define PSC_O_IGNORE		1
-#define PSC_O_EXCEPT		2
+#define PSC_O_ALLOW		2
 #define PSC_O_BLOCK		3
 #define PSC_O_NAME		4
 
@@ -158,20 +158,20 @@ static struct pubsub_commands {
 } pubsub_commands[] = {
     { STR_AND_LEN("get_filters"),	PSC_V_GET,	PSC_O_IGNORE},
     { STR_AND_LEN("get_blocks"),	PSC_V_GET,	PSC_O_BLOCK},
-    { STR_AND_LEN("get_alloweds"),	PSC_V_GET,	PSC_O_EXCEPT},
+    { STR_AND_LEN("get_alloweds"),	PSC_V_GET,	PSC_O_ALLOW},
     { STR_AND_LEN("get_names"),		PSC_V_GET,	PSC_O_NAME },
     { STR_AND_LEN("add_filter"),	PSC_V_ADD,	PSC_O_IGNORE}, // Backw
     { STR_AND_LEN("add_filter_node"),	PSC_V_ADD,	PSC_O_IGNORE},
     { STR_AND_LEN("add_name"),		PSC_V_ADD,	PSC_O_NAME},
     { STR_AND_LEN("add_block_node"),	PSC_V_ADD,	PSC_O_BLOCK},
-    { STR_AND_LEN("add_allowed_node"),	PSC_V_ADD,	PSC_O_EXCEPT},
+    { STR_AND_LEN("add_allowed_node"),	PSC_V_ADD,	PSC_O_ALLOW},
     { STR_AND_LEN("remove_filter"),	PSC_V_REM_IP,	PSC_O_IGNORE}, // Backw
     { STR_AND_LEN("remove_filter_node"),PSC_V_REM,	PSC_O_IGNORE},
     { STR_AND_LEN("remove_filter_ip"),	PSC_V_REM_IP,	PSC_O_IGNORE},
     { STR_AND_LEN("remove_block_node"),	PSC_V_REM,	PSC_O_BLOCK},
     { STR_AND_LEN("remove_block_ip"),	PSC_V_REM_IP,	PSC_O_BLOCK},
-    { STR_AND_LEN("remove_allow_node"),	PSC_V_REM,	PSC_O_EXCEPT},
-    { STR_AND_LEN("remove_allow_ip"),	PSC_V_REM_IP,	PSC_O_EXCEPT},
+    { STR_AND_LEN("remove_allow_node"),	PSC_V_REM,	PSC_O_ALLOW},
+    { STR_AND_LEN("remove_allow_ip"),	PSC_V_REM_IP,	PSC_O_ALLOW},
     { STR_AND_LEN("reset_filters"),	PSC_V_RESET,	PSC_O_IGNORE},
     { 0, 0, 0, 0 }
 };
@@ -271,21 +271,21 @@ void handle_json_command_detail(int verb, int object,
 	case PSC_V_GET:
 	    break;
 	case PSC_V_ADD:
-	    handle_command_add_filter(node_id_arg);
+	    handle_command_add_ignore(node_id_arg);
 	    break;
 	case PSC_V_REM:
 	    // TODO
-	    handle_command_remove_filter(node_id_arg);
+	    handle_command_remove_ignore(node_id_arg);
 	    break;
 	case PSC_V_REM_IP:
-	    handle_command_remove_ip_from_list(IPLIST_FILTER, &ip_arg);
+	    handle_command_remove_ip_from_list(IPLIST_IGNORE, &ip_arg);
 	    break;
 	}
-	handle_command_get_iplist(IPLIST_FILTER, "filters");
+	handle_command_get_iplist(IPLIST_IGNORE, "filters");
 	// handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
 	break;	// IGNORE
 
-    case PSC_O_EXCEPT:
+    case PSC_O_ALLOW:
 	switch(verb) {
 	case PSC_V_GET:
 	    break;
@@ -299,7 +299,7 @@ void handle_json_command_detail(int verb, int object,
             handle_command_remove_ip_from_list(IPLIST_ALLOW, &ip_arg);
             node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip_arg);
             if (node) {
-                node->is_excepted = 0;
+                node->is_allowed = 0;
             }
 	    break;
 	}
@@ -402,7 +402,7 @@ void init_mosquitto(const char* host, int port) {
     mainloop_register("mosq", &wf_mosquitto, (void *) 0, mosquitto_socket(mosq), MOSQUITTO_KEEPALIVE_TIME*1000/2);
     mosquitto_socket(mosq);
     send_command_restart();
-    handle_command_get_iplist(IPLIST_FILTER, "filters");
+    handle_command_get_iplist(IPLIST_IGNORE, "filters");
     handle_command_get_iplist(IPLIST_BLOCK, "blocks");
     handle_command_get_iplist(IPLIST_ALLOW, "alloweds");
 }

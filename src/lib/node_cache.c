@@ -19,7 +19,7 @@ node_create(int id) {
     node->name = NULL;
     node->mac = NULL;
     node->is_blocked = 0;
-    node->is_excepted = 0;
+    node->is_allowed = 0;
     node->last_seen = 0;
     return node;
 }
@@ -56,7 +56,7 @@ node_t* node_clone(node_t* node) {
         node_set_name(new, node->name);
     }
     new->is_blocked = node->is_blocked;
-    new->is_excepted = node->is_excepted;
+    new->is_allowed = node->is_allowed;
     new->last_seen = node->last_seen;
     cur = tree_first(node->ips);
     while (cur != NULL) {
@@ -110,8 +110,8 @@ node_set_blocked(node_t* node, uint8_t blocked) {
 }
 
 static void
-node_set_excepted(node_t* node, uint8_t excepted) {
-    node->is_excepted = excepted;
+node_set_allowed(node_t* node, uint8_t allowed) {
+    node->is_allowed = allowed;
 }
 
 static void
@@ -163,10 +163,10 @@ node_merge(node_t* dest, node_t* src) {
     if (dest->last_seen < src->last_seen) {
         dest->last_seen = src->last_seen;
     }
-    // When merging nodes, set blocked and excepted to 1 if either
+    // When merging nodes, set blocked and allowed to 1 if either
     // of them were not 0
     node_set_blocked(dest, src->is_blocked | dest->is_blocked);
-    node_set_excepted(dest, src->is_excepted | dest->is_excepted);
+    node_set_allowed(dest, src->is_allowed | dest->is_allowed);
     cur = tree_first(src->ips);
     while (cur != NULL) {
         tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
@@ -231,7 +231,7 @@ node2json(node_t* node, buffer_t* json_buf) {
     if (node->is_blocked) {
         buffer_write(json_buf, " \"is_blocked\": \"true\", ");
     }
-    if (node->is_excepted) {
+    if (node->is_allowed) {
         buffer_write(json_buf, " \"is_excepted\": \"true\", ");
     }
     buffer_write(json_buf, " \"lastseen\": %u, ", node->last_seen);
