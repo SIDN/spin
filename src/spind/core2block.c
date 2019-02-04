@@ -26,7 +26,6 @@ void iptab_system(char *s) {
     int result;
 
     fprintf(logfile, "%s\n", s);
-    return;
     result = system(s);
     assert (result == 0);
 }
