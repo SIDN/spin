@@ -118,7 +118,8 @@ function initGraphs() {
             my: "left top",
             at: "left top",
             of: "#mynetwork"
-        }
+        },
+        close: nodeInfoClosed,
     });
 
     // create the ignore node dialog
@@ -1101,4 +1102,13 @@ function cleanNetwork() {
 
 
     }
+}
+
+
+/* 
+ On close of NodeInfo window
+ */
+function nodeInfoClosed(event, ui) {
+    console.log("Closed NodeInfo");
+    selectedNodeId = -1;
 }
