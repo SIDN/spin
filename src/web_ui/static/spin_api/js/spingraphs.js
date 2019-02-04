@@ -13,6 +13,7 @@
 
 var traffic_dataset = new vis.DataSet([]);
 var graph2d_1;
+var graph_peak;
 var selectedNodeId;
 // list of filters
 var filterList = [];
@@ -1135,4 +1136,21 @@ function cleanNetwork() {
 function nodeInfoClosed(event, ui) {
     console.log("Closed NodeInfo");
     selectedNodeId = -1;
+}
+
+/* 
+ * Request peak information for a particular nodeId.
+ * Uses MQTT to query any running peak detection.
+ */
+function getPeakInformation() {
+    sendCommand("get_peak_information", selectedNodeId);
+}
+
+/* Handle peak information.
+ * Only when information window for a local node is open.
+ * If closed, stop streaming of information
+ */
+function handlePeakInformation(result) {
+	
+	
 }
