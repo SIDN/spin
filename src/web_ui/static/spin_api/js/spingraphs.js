@@ -613,11 +613,36 @@ function showNetwork() {
 
 function updateNodeInfo(nodeId) {
     var node = nodes.get(nodeId);
-    writeToScreen("trafficcount", "Connections seen: " + node.count);
-    writeToScreen("trafficsize", "Traffic size: " + node.size);
+	var sizeblabel = 'B';
+	var sizeb = 0;
+	if (node.size > 0) {
+		sizeblabel = ['B','KiB', 'MiB', 'GiB', 'TiB'][Math.floor(Math.log2(node.size)/10)]
+		sizeb = Math.floor(node.size / ([1,1024, 1024**2, 1024**3, 1024**4][Math.floor(Math.log2(node.size)/10)]))
+	} 
+
+    writeToScreen("trafficcount", "<b>Packets seen</b>: " + node.count);
+    writeToScreen("trafficsize", "<b>Traffic size</b>: " + sizeb + " " + sizeblabel);
     writeToScreen("ipaddress", "");
-    writeToScreen("lastseen", "Last seen: " + node.lastseen + " (" + new Date(node.lastseen * 1000) + ")");
-    // TODO: mark that this is hw not ip
+	var d = new Date(node.lastseen * 1000);
+    writeToScreen("lastseen", "<b>Last seen</b>: " + d.toLocaleDateString() + " " + d.toLocaleTimeString() + " (" + node.lastseen + ")");
+
+    writeToScreen("nodeid", "<b>Node</b>: " + nodeId);
+    //sendCommand("arp2ip", node.address); // talk to Websocket
+    if (node.mac) {
+        writeToScreen("mac", "<b>HW Addr</b>: " + node.mac);
+    } else {
+        writeToScreen("mac", "");
+    }
+    if (node.ips) {
+        writeToScreen("ipaddress", "<b>IP</b>: " + node.ips.join("</br>"));
+    } else {
+        writeToScreen("ipaddress", "<b>IP</b>: ");
+    }
+    if (node.domains) {
+        writeToScreen("reversedns", "<b>DNS</b>: " + node.domains.join("</br>"));
+    } else {
+        writeToScreen("reversedns", "<b>DNS</b>: ");
+    }
 
     return node;
 }
@@ -627,26 +652,10 @@ function nodeSelected(event) {
     if (typeof(nodeId) == 'number' && selectedNodeId != nodeId) {
         var node = updateNodeInfo(nodeId);
         selectedNodeId = nodeId;
-        writeToScreen("nodeid", "Node: " + nodeId);
-        //sendCommand("arp2ip", node.address); // talk to Websocket
-        if (node.mac) {
-            writeToScreen("mac", "HW Addr: " + node.mac);
-        } else {
-            writeToScreen("mac", "");
-        }
-        if (node.ips) {
-            writeToScreen("ipaddress", "IP: " + node.ips.join());
-        } else {
-            writeToScreen("ipaddress", "IP: ");
-        }
-        if (node.domains) {
-            writeToScreen("reversedns", "DNS: " + node.domains.join());
-        } else {
-            writeToScreen("reversedns", "DNS: ");
-        }
 
         updateBlockedButton();
         updateAllowedButton();
+
 
         //sendCommand("ip2hostname", node.address);
         //writeToScreen("netowner", "Network owner: &lt;searching&gt;");
@@ -826,6 +835,8 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
         enode.lastseen = timestamp;
         enode.is_blocked = node.is_blocked;
         enode.is_excepted = node.is_excepted;
+		enode.size += size;
+		enode.count += count;
         nodes.update(enode);
     } else {
         // it's new
@@ -851,6 +862,10 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
                 }
             }
         });
+    }
+	// If node is selected, update labels
+    if (node.id == selectedNodeId) {
+        updateNodeInfo(node.id);
     }
 }
 
