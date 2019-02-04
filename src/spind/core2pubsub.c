@@ -164,7 +164,7 @@ static struct pubsub_commands {
     { STR_AND_LEN("add_filter_node"),	PSC_V_ADD,	PSC_O_IGNORE},
     { STR_AND_LEN("add_name"),		PSC_V_ADD,	PSC_O_NAME},
     { STR_AND_LEN("add_block_node"),	PSC_V_ADD,	PSC_O_BLOCK},
-    { STR_AND_LEN("add_allowed_node"),	PSC_V_ADD,	PSC_O_ALLOW},
+    { STR_AND_LEN("add_allow_node"),	PSC_V_ADD,	PSC_O_ALLOW},
     { STR_AND_LEN("remove_filter"),	PSC_V_REM_IP,	PSC_O_IGNORE}, // Backw
     { STR_AND_LEN("remove_filter_node"),PSC_V_REM,	PSC_O_IGNORE},
     { STR_AND_LEN("remove_filter_ip"),	PSC_V_REM_IP,	PSC_O_IGNORE},

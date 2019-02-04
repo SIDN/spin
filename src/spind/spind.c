@@ -204,22 +204,6 @@ void init_all_ipl() {
     mainloop_register("IP list sync", wf_ipl, (void *) 0, 0, 2500);
 }
 
-#ifdef notdef
-void add_ip_tree_to_file(tree_t* tree, const char* filename) {
-    tree_entry_t* cur;
-    tree_t *ip_tree = tree_create(cmp_ips);
-
-    // if this fails, we simply try to write a new one anyway
-    read_ip_tree(ip_tree, filename);
-    cur = tree_first(tree);
-    while(cur != NULL) {
-        tree_add(ip_tree, cur->key_size, cur->key, cur->data_size, cur->data, 1);
-        cur = tree_next(cur);
-    }
-    store_ip_tree(ip_tree, filename);
-}
-#endif
-
 static void
 add_ip_tree_to_li(tree_t* tree, struct list_info *lip) {
     tree_entry_t* cur;
@@ -254,36 +238,12 @@ void remove_ip_from_li(ip_t* ip, struct list_info *lip) {
     lip->li_modified++;
 }
 
-#ifdef notdef
-void remove_ip_tree_from_file(tree_t* tree, const char* filename) {
-    tree_entry_t* cur;
-    tree_t *ip_tree = tree_create(cmp_ips);
-
-    // if this fails, we simply try to write a new one anyway
-    read_ip_tree(ip_tree, filename);
-    cur = tree_first(tree);
-    while(cur != NULL) {
-        tree_remove(ip_tree, cur->key_size, cur->key);
-        cur = tree_next(cur);
-    }
-    store_ip_tree(ip_tree, filename);
-}
-
-static
-void remove_ip_from_file(ip_t* ip, const char* filename) {
-    tree_t *ip_tree = tree_create(cmp_ips);
-    // if this fails, we simply try to write a new one anyway
-    read_ip_tree(ip_tree, filename);
-    tree_remove(ip_tree, sizeof(ip_t), ip);
-    store_ip_tree(ip_tree, filename);
-}
-#endif
-
 static void
 twomethods_do_ip(config_command_t cmd, ip_t *ip_addr) {
 
     // old kernel
-    core2kernel_do_ip(cmd, ip_addr);
+    if (cmd != SPIN_CMD_ADD_BLOCK)
+	core2kernel_do_ip(cmd, ip_addr);
 
     // new blocking code
 

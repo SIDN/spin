@@ -118,7 +118,8 @@ void mainloop_end() {
     }
 }
 
-void wf_mainloop(void *arg, int data, int timeout) {
+static void
+wf_mainloop(void *arg, int data, int timeout) {
     int i;
 
     spin_log(LOG_DEBUG, "Mainloop table\n");
