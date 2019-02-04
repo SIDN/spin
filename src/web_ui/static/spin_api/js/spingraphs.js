@@ -776,45 +776,6 @@ function updateAllowedButton() {
 
 */
 
-function updateNode(node) {
-    if (!node) { return; }
-    var enode = nodes.get(node.id);
-    if (!enode) { return; }
-
-    var label = node.id;
-    // should only change color if it was recent and is no longer so
-    // but that is for a separate loop (unless it's internal device
-    // and we just discovered that, in which case we set it to _src)
-    //var colour = node.blocked ? colour_blocked : colour_recent;
-    var ips = node.ips ? node.ips : [];
-    var domains = node.domains ? node.domains : [];
-    if (node.name) {
-        label = node.name;
-    } else if (node.mac) {
-        label = node.mac;
-    } else if (domains.length > 0) {
-        label = node.domains[0];
-    } else if (ips.length > 0) {
-        label = node.ips[0];
-    }
-
-    if (node.mac) {
-        node.color = colour_src;
-    } else {
-        node.color = colour_recent;
-    }
-
-    enode.label = label;
-    enode.ips = ips;
-    enode.domains = domains;
-
-    nodes.update(enode);
-
-    if (node.id == selectedNodeId) {
-        updateNodeInfo(node.id);
-    }
-}
-
 // Used in AddFlow()
 function addNode(timestamp, node, scale, count, size, lwith, type) {
     // why does this happen
