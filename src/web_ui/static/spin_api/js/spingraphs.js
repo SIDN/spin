@@ -656,6 +656,54 @@ function nodeSelected(event) {
         updateBlockedButton();
         updateAllowedButton();
 
+		/* Load peak detection graph */
+		if (node.mac) {
+			$("#nodeinfo-peakdet").show();
+			// writeToScreen("nodeinfo-peakdetvis", "Loading data...");
+		
+			var container = document.getElementById('nodeinfo-peakdetvis');
+			var items = [
+				{x: '2019-01-01 00:01', y: 10, group: 0},
+				{x: '2019-01-01 00:02', y: 25, group: 0},
+				{x: '2019-01-01 00:03', y: 30, group: 0},
+				{x: '2019-01-01 00:04', y: 10, group: 0},
+				{x: '2019-01-01 00:05', y: 15, group: 0},
+				{x: '2019-01-01 00:06', y: 30, group: 0},
+				// And now the horizontal
+				{x: '2019-01-01 00:01', y: 40, group: 1},
+				{x: '2019-01-01 00:06', y: 40, group: 1}
+			];
+ 
+			var dataset = new vis.DataSet(items);
+			var options = {
+				//start: '0',
+				//end: '60',
+				graphHeight: '100px',
+				showMajorLabels: false,
+				showMinorLabels: false,
+				dataAxis: {
+					visible: false,
+					left: { range: { min: 0 }}
+				},
+				drawPoints: { enabled: false }
+			};
+			if (graph_peak != null) {
+				// If we have an old graph in memory (e.g. dialog not closed)
+				graph_peak.destroy();
+				graph_peak = null;
+			}
+			graph_peak = new vis.Graph2d(container, dataset, options);
+		
+			// On dialog close, destroy graph (no need to keep in memory) and unsubscribe
+		    $('#nodeinfo').on( "dialogclose", function( event, ui ) {
+				if (graph_peak != null) {
+					graph_peak.destroy();
+					graph_peak = null
+				}
+		    } );
+		} else {
+			$("#nodeinfo-peakdet").hide();
+		}
 
         //sendCommand("ip2hostname", node.address);
         //writeToScreen("netowner", "Network owner: &lt;searching&gt;");
