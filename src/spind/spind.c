@@ -529,12 +529,12 @@ int main(int argc, char** argv) {
 
     init_all_ipl();
 
-    push_all_ipl();
     init_mosquitto(mosq_host, mosq_port);
     signal(SIGINT, int_handler);
 
     result = init_netlink(local_mode);
 
+    push_all_ipl();
 
     mainloop_run();
 
