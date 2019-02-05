@@ -3,8 +3,10 @@
 
 #include "node_cache.h"
 #include "jsmn.h"
+#include "util.h"
 #include "mainloop.h"
 #include "spin_log.h"
+#include "spin_list.h"
 
 // #include "spin_cfg.h"		/* Should go here */
 #include "handle_command.h"
@@ -136,17 +138,17 @@ json_parse_node_id_name_arg(int* node_id,
  */
 
 // Commands
-#define PSC_V_GET		1
-#define PSC_V_ADD		2
-#define PSC_V_REM		3
-#define PSC_V_REM_IP		4
-#define PSC_V_RESET		5
+#define PSC_V_ADD		SF_ADD
+#define PSC_V_REM		SF_REM
+#define PSC_V_REM_IP		N_SF + 0
+#define PSC_V_RESET		N_SF + 1
+#define PSC_V_GET		N_SF + 2
 
 // Types
-#define PSC_O_IGNORE		1
-#define PSC_O_ALLOW		2
-#define PSC_O_BLOCK		3
-#define PSC_O_NAME		4
+#define PSC_O_BLOCK		IPLIST_BLOCK
+#define PSC_O_IGNORE		IPLIST_IGNORE
+#define PSC_O_ALLOW		IPLIST_ALLOW
+#define PSC_O_NAME		N_IPLIST + 0
 
 #define STR_AND_LEN(s)	s, (sizeof(s)-1)
 
@@ -176,6 +178,12 @@ static struct pubsub_commands {
     { 0, 0, 0, 0 }
 };
 
+static char *getnames[N_IPLIST] = {
+    "blocks",
+    "filters",
+    "alloweds"
+};
+
 static int find_command(int name_len, const char *name_str, int *verb, int *object) {
     struct pubsub_commands *p;
 
@@ -198,6 +206,7 @@ static int find_command(int name_len, const char *name_str, int *verb, int *obje
 }
 
 #define MAXNAMELEN	80	// Maximum identifier length; TODO */
+
 
 void handle_json_command_detail(int verb, int object,
                            const char* json_str,
@@ -256,27 +265,29 @@ void handle_json_command_detail(int verb, int object,
 	break;	//NAME
 
     case PSC_O_BLOCK:
+    case PSC_O_IGNORE:
+    case PSC_O_ALLOW:
 	switch(verb) {
 	case PSC_V_GET:
 	    break;
 	case PSC_V_ADD:
-	    handle_command_block_data(node_id_arg);
-	    break;
 	case PSC_V_REM:
-            handle_command_stop_block_data(node_id_arg);
+	    handle_list_membership(object, verb, node_id_arg);
+	    // handle_command_block_data(node_id_arg);
 	    break;
 	case PSC_V_REM_IP:
-            handle_command_remove_ip_from_list(IPLIST_BLOCK, &ip_arg);
+            handle_command_remove_ip_from_list_X(object, &ip_arg);
             node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip_arg);
             if (node) {
-                node->is_blocked = 0;
+                node->is_onlist[object] = 0;
             }
 	    break;
 	}
-	handle_command_get_iplist(IPLIST_BLOCK, "blocks");
+	handle_command_get_iplist(object, getnames[object]);
 	// handle_command_get_list(SPIN_CMD_GET_BLOCK, "blocks");
 	break;	//BLOCK
 
+#ifdef notdef
     case PSC_O_IGNORE:
 	switch(verb) {
 	case PSC_V_GET:
@@ -317,6 +328,7 @@ void handle_json_command_detail(int verb, int object,
         handle_command_get_iplist(IPLIST_ALLOW, "alloweds");
         // handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
 	break;	// EXCEPT
+#endif
     }
 }
 

@@ -1,6 +1,8 @@
 #ifndef SPIN_NODE_CACHE_H
 #define SPIN_NODE_CACHE_H 1
 
+#include "util.h"
+#include "spin_list.h"
 #include "pkt_info.h"
 #include "tree.h"
 #include "arp.h"
@@ -20,12 +22,18 @@ typedef struct {
     // can be null
     char* mac;
     // some additional info about this node
+    int is_onlist[N_IPLIST];
+#ifdef notdef
     uint8_t is_blocked;
     uint8_t is_allowed;
+#endif
     // at some point we may want to clean up stuff, so keep track of
     // when we last saw it
     uint32_t last_seen;
 } node_t;
+
+#define is_blocked is_onlist[IPLIST_BLOCK]
+#define is_allowed is_onlist[IPLIST_ALLOW]
 
 /*
 node_t* node_create(int id);
@@ -39,8 +47,8 @@ void node_add_domain(node_t* node, char* domain);
 void node_set_name(node_t* node, char* name);
 /*
 void node_set_mac(node_t* node, char* mac);
-void node_set_blocked(node_t* node, uint8_t blocked);
-void node_set_excepted(node_t* node, uint8_t excepted);
+void node_set_blocked(node_t* node, int blocked);
+void node_set_excepted(node_t* node, int excepted);
 void node_set_last_seen(node_t* node, uint32_t lastg_seen);
 
 int node_shares_element(node_t* node, node_t* othernode);

@@ -7,8 +7,11 @@
 #include <unistd.h>
 #include <signal.h>
 #include <time.h>
+#include <assert.h>
 
 #include "pkt_info.h"
+#include "util.h"
+#include "spin_list.h"
 #include "node_cache.h"
 #include "tree.h"
 #include "netlink_commands.h"
@@ -153,13 +156,11 @@ void maybe_sendflow(flow_list_t *flow_list, time_t now) {
  * kernel module.
  */
 
-#define N_IPLISTS	3
-
 struct list_info {
     tree_t *	li_tree;		// Tree of IP addresses
     char *	li_filename;		// Name of shadow file
     int		li_modified;		// File should be written
-} ipl_list_ar[N_IPLISTS] = {
+} ipl_list_ar[N_IPLIST] = {
 	{	0,	"/etc/spin/block.list",		0	},
 	{	0,	"/etc/spin/ignore.list",	0	},
 	{	0,	"/etc/spin/allow.list",		0	},
@@ -175,7 +176,7 @@ void wf_ipl(void *arg, int data, int timeout) {
 
     if (timeout) {
 	// What else could it be ??
-	for (i=0; i<N_IPLISTS; i++) {
+	for (i=0; i<N_IPLIST; i++) {
 	    lip = &ipl_list_ar[i];
 	    if (lip->li_modified) {
 		store_ip_tree(lip->li_tree, lip->li_filename);
@@ -190,14 +191,14 @@ void init_all_ipl() {
     struct list_info *lip;
     int cnt;
 
-    for (i=0; i<N_IPLISTS; i++) {
+    for (i=0; i<N_IPLIST; i++) {
 	lip = &ipl_list_ar[i];
 	lip->li_tree = tree_create(cmp_ips);
 	cnt = read_ip_tree(lip->li_tree, lip->li_filename);
 	spin_log(LOG_DEBUG, "File %s, read %d entries\n", lip->li_filename, cnt);
 
 	// Push into kernel
-	push_ips_from_list_to_kernel(i);
+	push_ips_from_list_to_kernel_X(i);
     }
 
     // Sync trees to files every 2.5 seconds for now
@@ -238,6 +239,45 @@ void remove_ip_from_li(ip_t* ip, struct list_info *lip) {
     lip->li_modified++;
 }
 
+#define MAXSR 3	/* More than this would be excessive */
+static
+struct sreg {
+    char *	sr_name;		/* Name of module for debugging */
+    spinfunc	sr_wf;			/* The to-be-called work function */
+    void *	sr_wfarg;		/* Call back argument */
+    int		sr_list[N_IPLIST];	/* Which lists to subscribe to */
+} sr[MAXSR];
+
+static int n_sr = 0;
+void spin_register(char *name, spinfunc wf, void *arg, int list[N_IPLIST]) {
+    int i;
+
+    spin_log(LOG_DEBUG, "Spind registered %s(..., (%d,%d,%d))\n", name, list[0], list[1], list[2]);
+    assert(n_sr < MAXSR);
+    sr[n_sr].sr_name = name;
+    sr[n_sr].sr_wf = wf;
+    sr[n_sr].sr_wfarg = arg;
+    for (i=0;i<N_IPLIST;i++) {
+	sr[n_sr].sr_list[i] = list[i];
+    }
+    n_sr++;
+}
+
+static void
+list_inout_do_ip(int iplist, int addrem, ip_t *ip_addr) {
+    int i;
+
+    for (i = 0; i < n_sr; i++) {
+	if (sr[i].sr_list[iplist]) {
+	    // This one is interested
+	    spin_log(LOG_DEBUG, "Called spin list func %s(%d,%d)\n",
+		    sr[i].sr_name, iplist, addrem);
+	    (*sr[i].sr_wf)(sr[i].sr_wfarg, iplist, addrem, ip_addr);
+	}
+    }
+}
+
+#ifdef notdef
 static void
 twomethods_do_ip(config_command_t cmd, ip_t *ip_addr) {
 
@@ -249,26 +289,47 @@ twomethods_do_ip(config_command_t cmd, ip_t *ip_addr) {
 
     switch(cmd) {
     case SPIN_CMD_ADD_BLOCK:
-	c2b_changelist(IPLIST_BLOCK, 1, ip_addr);
+	c2b_changelist(IPLIST_BLOCK, SF_ADD, ip_addr);
 	break;
     case SPIN_CMD_ADD_IGNORE:
-	c2b_changelist(IPLIST_IGNORE, 1, ip_addr);
+	c2b_changelist(IPLIST_IGNORE, SF_ADD, ip_addr);
 	break;
     case SPIN_CMD_ADD_EXCEPT:
-	c2b_changelist(IPLIST_ALLOW, 1, ip_addr);
+	c2b_changelist(IPLIST_ALLOW, SF_ADD, ip_addr);
 	break;
     case SPIN_CMD_REMOVE_BLOCK:
-	c2b_changelist(IPLIST_BLOCK, 0, ip_addr);
+	c2b_changelist(IPLIST_BLOCK, SF_REM, ip_addr);
 	break;
     case SPIN_CMD_REMOVE_IGNORE:
-	c2b_changelist(IPLIST_IGNORE, 0, ip_addr);
+	c2b_changelist(IPLIST_IGNORE, SF_REM, ip_addr);
 	break;
     case SPIN_CMD_REMOVE_EXCEPT:
-	c2b_changelist(IPLIST_ALLOW, 0, ip_addr);
+	c2b_changelist(IPLIST_ALLOW, SF_REM, ip_addr);
 	break;
     }
 }
+#endif
 
+static
+call_kernel_for_tree_X(int iplist, int addrem, tree_t *tree) {
+    tree_entry_t* ip_entry;
+
+    ip_entry = tree_first(tree);
+    while (ip_entry != NULL) {
+	// spin_log(LOG_DEBUG, "ckft: %d %x\n", cmd, tree);
+	list_inout_do_ip(iplist, addrem, ip_entry->key);
+        ip_entry = tree_next(ip_entry);
+    }
+}
+
+push_ips_from_list_to_kernel_X(int iplist) {
+
+    //
+    // Make sure the kernel gets to know on init
+    //
+    call_kernel_for_tree_X(iplist, SF_ADD, ipl_list_ar[iplist].li_tree);
+}
+#ifdef notdef
 static
 call_kernel_for_tree(config_command_t cmd, tree_t *tree) {
     tree_entry_t* ip_entry;
@@ -294,7 +355,25 @@ push_ips_from_list_to_kernel(int iplist) {
     //
     call_kernel_for_tree(addip_cmds[iplist], ipl_list_ar[iplist].li_tree);
 }
+#endif
 
+static void
+call_kernel_for_node_ips_X(int listid, int addrem, node_t *node) {
+
+    if (node == NULL) {
+        return;
+    }
+    call_kernel_for_tree_X(listid, addrem, node->ips);
+}
+
+void handle_command_remove_ip_from_list_X(int iplist, ip_t* ip) {
+
+    list_inout_do_ip(iplist, SF_REM, ip);
+    // twomethods_do_ip(rmip_cmds[iplist], ip);
+    remove_ip_from_li(ip, &ipl_list_ar[iplist]);
+}
+
+#ifdef notdef
 static void
 call_kernel_for_node_ips(config_command_t cmd, node_t *node) {
 
@@ -314,6 +393,7 @@ void handle_command_remove_ip_from_list(int iplist, ip_t* ip) {
     twomethods_do_ip(rmip_cmds[iplist], ip);
     remove_ip_from_li(ip, &ipl_list_ar[iplist]);
 }
+#endif
 
 static node_t *
 find_node_id(int node_id) {
@@ -330,6 +410,25 @@ find_node_id(int node_id) {
     return node;
 }
 
+// Switch code
+void handle_list_membership(int listid, int addrem, int node_id) {
+    node_t* node;
+
+    if ((node = find_node_id(node_id)) == NULL)
+    	return;
+
+    node->is_onlist[listid] = addrem == SF_ADD ? 1 : 0;
+
+    call_kernel_for_node_ips_X(listid, addrem, node);
+    if (addrem == SF_ADD) {
+	add_ip_tree_to_li(node->ips, &ipl_list_ar[listid]);
+    } else {
+	remove_ip_tree_from_li(node->ips, &ipl_list_ar[listid]);
+    }
+}
+
+#ifdef notdef
+// add block SWITCH
 void handle_command_block_data(int node_id) {
     node_t* node;
 
@@ -341,9 +440,9 @@ void handle_command_block_data(int node_id) {
 
     call_kernel_for_node_ips(SPIN_CMD_ADD_BLOCK, node);
     add_ip_tree_to_li(node->ips, &ipl_block);
-    // add_ip_tree_to_file(ips, "/etc/spin/block.list");
 }
 
+//remove block SWITCH
 void handle_command_stop_block_data(int node_id) {
     node_t* node;
 
@@ -355,9 +454,9 @@ void handle_command_stop_block_data(int node_id) {
 
     call_kernel_for_node_ips(SPIN_CMD_REMOVE_BLOCK, node);
     remove_ip_tree_from_li(node->ips, &ipl_block);
-    // remove_ip_tree_from_file(ips, "/etc/spin/block.list");
 }
 
+// add ignore SWITCH
 void handle_command_add_ignore(int node_id) {
     node_t* node;
 
@@ -366,9 +465,9 @@ void handle_command_add_ignore(int node_id) {
 
     call_kernel_for_node_ips(SPIN_CMD_ADD_IGNORE, node);
     add_ip_tree_to_li(node->ips, &ipl_ignore);
-    // add_ip_tree_to_file(ips, "/etc/spin/ignore.list");
 }
 
+// remove ignore SWITCH
 void handle_command_remove_ignore(int node_id) {
     node_t* node;
 
@@ -377,9 +476,9 @@ void handle_command_remove_ignore(int node_id) {
 
     call_kernel_for_node_ips(SPIN_CMD_REMOVE_IGNORE, node);
     remove_ip_tree_from_li(node->ips, &ipl_ignore);
-    // remove_ip_tree_from_file(ips, "/etc/spin/ignore.list");
 }
 
+// add allow SWITCH
 void handle_command_allow_data(int node_id) {
     node_t* node;
 
@@ -391,9 +490,9 @@ void handle_command_allow_data(int node_id) {
 
     call_kernel_for_node_ips(SPIN_CMD_ADD_EXCEPT, node);
     add_ip_tree_to_li(node->ips, &ipl_allow);
-    // add_ip_tree_to_file(ips, "/etc/spin/allow.list");
 }
 
+// remove allow SWITCH
 void handle_command_stop_allow_data(int node_id) {
     node_t* node;
 
@@ -405,8 +504,8 @@ void handle_command_stop_allow_data(int node_id) {
 
     call_kernel_for_node_ips(SPIN_CMD_REMOVE_EXCEPT, node);
     remove_ip_tree_from_li(node->ips, &ipl_allow);
-    // remove_ip_tree_from_file(ips, "/etc/spin/allow.list");
 }
+#endif
 
 void handle_command_reset_ignores() {
     // clear the ignores; derive them from our own addresses again

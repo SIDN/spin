@@ -1,10 +1,11 @@
 
-#include "node_cache.h"
 #include "spin_log.h"
 
 #include <assert.h>
 #include <arpa/inet.h>
 #include "util.h"
+#include "spin_list.h"
+#include "node_cache.h"
 #include "netlink_commands.h"
 #include "spin_cfg.h"
 
@@ -12,14 +13,21 @@ static int node_cache_add_node(node_cache_t* node_cache, node_t* node);
 
 static node_t*
 node_create(int id) {
+    int i;
+
     node_t* node = (node_t*) malloc(sizeof(node_t));
     node->id = id;
     node->ips = tree_create(cmp_ips);
     node->domains = tree_create(cmp_domains);
     node->name = NULL;
     node->mac = NULL;
+    for (i=0;i<N_IPLIST;i++) {
+	node->is_onlist[i] = 0;
+    }
+#ifdef notdef
     node->is_blocked = 0;
     node->is_allowed = 0;
+#endif
     node->last_seen = 0;
     return node;
 }
@@ -47,6 +55,8 @@ node_destroy(node_t* node) {
  * Seems unused, HVS
  */
 node_t* node_clone(node_t* node) {
+    int i;
+
     node_t* new = node_create(node->id);
     tree_entry_t *cur;
     if (node->mac) {
@@ -55,9 +65,14 @@ node_t* node_clone(node_t* node) {
     if (node->name) {
         node_set_name(new, node->name);
     }
+    for (i=0;i<N_IPLIST;i++) {
+	new->is_onlist[i] = node->is_onlist[i];
+    }
     new->is_blocked = node->is_blocked;
+#ifdef notdef
     new->is_allowed = node->is_allowed;
     new->last_seen = node->last_seen;
+#endif
     cur = tree_first(node->ips);
     while (cur != NULL) {
         tree_add(new->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
@@ -153,6 +168,7 @@ node_shares_element(node_t* node, node_t* othernode) {
 static void
 node_merge(node_t* dest, node_t* src) {
     tree_entry_t* cur;
+    int i;
 
     if (dest->name == NULL) {
         node_set_name(dest, src->name);
@@ -163,10 +179,15 @@ node_merge(node_t* dest, node_t* src) {
     if (dest->last_seen < src->last_seen) {
         dest->last_seen = src->last_seen;
     }
+    for (i=0;i<N_IPLIST;i++) {
+	dest->is_onlist[i] |= src->is_onlist[i];
+    }
+#ifdef notdef
     // When merging nodes, set blocked and allowed to 1 if either
     // of them were not 0
     node_set_blocked(dest, src->is_blocked | dest->is_blocked);
     node_set_allowed(dest, src->is_allowed | dest->is_allowed);
+#endif
     cur = tree_first(src->ips);
     while (cur != NULL) {
         tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);

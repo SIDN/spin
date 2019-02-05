@@ -12,7 +12,13 @@
 #include "spin_log.h"
 #include "mainloop.h"
 
+#include "spin_list.h"
+
 #define MAXSTR 1024
+
+// #define SF_ADD			0
+// #define SF_REM			1
+
 
 FILE *logfile;
 
@@ -115,13 +121,13 @@ static char *iptables_command[2] = { "iptables", "ip6tables" };
 static char *srcdst[2] = { "-s", "-d" };
 
 static void
-c2b_do_rule(char *table, int ipv6, int add, char *ip_str, char *target) {
+c2b_do_rule(char *table, int ipv6, int addrem, char *ip_str, char *target) {
     char *cmd, *flag;
     char str[MAXSTR];
     int i;
 
     cmd = iptables_command[ipv6];
-    flag = add ? "-I": "-D";
+    flag = addrem == SF_ADD ? "-I": "-D";
     for (i=0; i<2; i++) {
 	sprintf(str, "%s %s %s %s %s -j %s", cmd, flag, table, srcdst[i], ip_str, target);
 	iptab_system(str);
@@ -132,7 +138,7 @@ static char *targets[] = { SpinBlock, Return, Return };
 static char *tables[] = { SpinCheck, SpinLog, SpinBlock };
 
 // Entry point
-void c2b_changelist(int iplist, int add, ip_t *ip_addr) {
+void c2b_changelist(void* arg, int iplist, int addrem, ip_t *ip_addr) {
     int ipv6 = 0;
     char ip_str[INET6_ADDRSTRLEN];
 
@@ -141,9 +147,9 @@ void c2b_changelist(int iplist, int add, ip_t *ip_addr) {
     if (ip_addr->family != AF_INET)
 	ipv6 = 1;
     spin_ntop(ip_str, ip_addr, INET6_ADDRSTRLEN);
-    spin_log(LOG_DEBUG, "Change list %d %d %d %s\n", iplist, add, ipv6, ip_str);
+    spin_log(LOG_DEBUG, "Change list %d %d %d %s\n", iplist, addrem, ipv6, ip_str);
 
-    c2b_do_rule(tables[iplist], ipv6, add, ip_str, targets[iplist]);
+    c2b_do_rule(tables[iplist], ipv6, addrem, ip_str, targets[iplist]);
 }
 
 
@@ -164,12 +170,14 @@ wf_core2block(void *arg, int data, int timeout) {
 }
 
 void init_core2block() {
+    static int all_lists[N_IPLIST] = { 1, 1, 1 };
 
     setup_catch();
     setup_debug();
     setup_tables();
 
     mainloop_register("core2block", wf_core2block, (void *) 0, 0, 10000);
+    spin_register("core2block", c2b_changelist, (void *) 0, all_lists);
 }
 
 void cleanup_core2block() {

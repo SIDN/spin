@@ -7,6 +7,7 @@
 
 #include "dns_cache.h"
 #include "netlink_commands.h"
+#include "spin_list.h"
 #include "node_cache.h"
 
 #include "mainloop.h"
@@ -78,6 +79,27 @@ int core2kernel_do_ip(config_command_t cmd, ip_t* ip) {
     cr = send_netlink_command_iparg(cmd, ip);
     netlink_command_result_destroy(cr);
     return cr != NULL;
+}
+
+static void
+wf_do_ip(void *arg, int iplist, int addrem, ip_t *ip_addr) {
+    config_command_t cmd;
+
+    switch (iplist) {
+    case IPLIST_BLOCK:
+	cmd = addrem == SF_ADD ? SPIN_CMD_ADD_BLOCK : SPIN_CMD_REMOVE_BLOCK;
+	break;
+    case IPLIST_IGNORE:
+	cmd = addrem == SF_ADD ? SPIN_CMD_ADD_IGNORE : SPIN_CMD_REMOVE_IGNORE;
+	break;
+    case IPLIST_ALLOW:
+	cmd = addrem == SF_ADD ? SPIN_CMD_ADD_EXCEPT : SPIN_CMD_REMOVE_EXCEPT;
+	break;
+    }
+
+    // Do not get in the way of iptables block
+    if (cmd != SPIN_CMD_ADD_BLOCK)
+	core2kernel_do_ip(cmd, ip_addr);
 }
 
 static
@@ -198,7 +220,7 @@ int init_netlink(int local)
     struct pollfd fds[2];
 #endif
     uint32_t now, last_mosq_poll;
-
+    static int all_lists[N_IPLIST] = { 1, 1, 1 };
 
     local_mode = local;
     init_cache();
@@ -234,6 +256,7 @@ int init_netlink(int local)
     flow_list = flow_list_create(now);
 
     mainloop_register("netlink", wf_netlink, (void *) 0, traffic_sock_fd, 0);
+    spin_register("netlink", wf_do_ip, (void *) 0, all_lists);
 
     return 0;
 }
