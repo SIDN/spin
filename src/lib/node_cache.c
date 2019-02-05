@@ -24,10 +24,6 @@ node_create(int id) {
     for (i=0;i<N_IPLIST;i++) {
 	node->is_onlist[i] = 0;
     }
-#ifdef notdef
-    node->is_blocked = 0;
-    node->is_allowed = 0;
-#endif
     node->last_seen = 0;
     return node;
 }
@@ -68,11 +64,7 @@ node_t* node_clone(node_t* node) {
     for (i=0;i<N_IPLIST;i++) {
 	new->is_onlist[i] = node->is_onlist[i];
     }
-    new->is_blocked = node->is_blocked;
-#ifdef notdef
-    new->is_allowed = node->is_allowed;
     new->last_seen = node->last_seen;
-#endif
     cur = tree_first(node->ips);
     while (cur != NULL) {
         tree_add(new->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
@@ -120,12 +112,12 @@ node_set_name(node_t* node, char* name) {
 }
 
 static void
-node_set_blocked(node_t* node, uint8_t blocked) {
+node_set_blocked(node_t* node, int blocked) {
     node->is_blocked = blocked;
 }
 
 static void
-node_set_allowed(node_t* node, uint8_t allowed) {
+node_set_allowed(node_t* node, int allowed) {
     node->is_allowed = allowed;
 }
 

@@ -273,7 +273,6 @@ void handle_json_command_detail(int verb, int object,
 	case PSC_V_ADD:
 	case PSC_V_REM:
 	    handle_list_membership(object, verb, node_id_arg);
-	    // handle_command_block_data(node_id_arg);
 	    break;
 	case PSC_V_REM_IP:
             handle_command_remove_ip_from_list(object, &ip_arg);
@@ -284,51 +283,7 @@ void handle_json_command_detail(int verb, int object,
 	    break;
 	}
 	handle_command_get_iplist(object, getnames[object]);
-	// handle_command_get_list(SPIN_CMD_GET_BLOCK, "blocks");
-	break;	//BLOCK
-
-#ifdef notdef
-    case PSC_O_IGNORE:
-	switch(verb) {
-	case PSC_V_GET:
-	    break;
-	case PSC_V_ADD:
-	    handle_command_add_ignore(node_id_arg);
-	    break;
-	case PSC_V_REM:
-	    // TODO
-	    handle_command_remove_ignore(node_id_arg);
-	    break;
-	case PSC_V_REM_IP:
-	    handle_command_remove_ip_from_list(IPLIST_IGNORE, &ip_arg);
-	    break;
-	}
-	handle_command_get_iplist(IPLIST_IGNORE, "filters");
-	// handle_command_get_list(SPIN_CMD_GET_IGNORE, "filters");
-	break;	// IGNORE
-
-    case PSC_O_ALLOW:
-	switch(verb) {
-	case PSC_V_GET:
-	    break;
-	case PSC_V_ADD:
-            handle_command_allow_data(node_id_arg);
-	    break;
-	case PSC_V_REM:
-            handle_command_stop_allow_data(node_id_arg);
-	    break;
-	case PSC_V_REM_IP:
-            handle_command_remove_ip_from_list(IPLIST_ALLOW, &ip_arg);
-            node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip_arg);
-            if (node) {
-                node->is_allowed = 0;
-            }
-	    break;
-	}
-        handle_command_get_iplist(IPLIST_ALLOW, "alloweds");
-        // handle_command_get_list(SPIN_CMD_GET_EXCEPT, "alloweds");
-	break;	// EXCEPT
-#endif
+	break;	//BLOCK IGNORE and ALLOW
     }
 }
 
