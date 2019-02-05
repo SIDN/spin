@@ -1,4 +1,4 @@
-int init_netlink(int);
+int init_netlink(int, node_cache_t*, dns_cache_t*);
 void cleanup_cache();
 void cleanup_netlink();
 

@@ -19,6 +19,7 @@ static struct nfq_q_handle* dns_q_qh = NULL;
 // todo: pass this from main spind.c
 static node_cache_t* node_cache;
 static dns_cache_t* dns_cache;
+static int dns_q_fd;
 
 void phexdump(const uint8_t* data, unsigned int size) {
     unsigned int i;
@@ -133,10 +134,14 @@ handle_dns(const u_char *bp, u_int length, long long timestamp)
 
             dns_cache_add(dns_cache, &dns_pkt, now);
             node_cache_add_dns_info(node_cache, &dns_pkt, now);
+            printf("[XX] SEND_COMMAND_DNSQUERY\n");
+            send_command_dnsquery(&dns_pkt);
+            printf("[XX] SEND_COMMAND_DNSQUERY CALLED\n");
         } else {
             printf("[XX] ADD IPV6 ANSWER TO DNS CACHE\n");
             dns_cache_add(dns_cache, &dns_pkt, now);
             node_cache_add_dns_info(node_cache, &dns_pkt, now);
+            send_command_dnsquery(&dns_pkt);
         }
 
         ++i;
@@ -198,7 +203,29 @@ static int dns_cap_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
             }
 */
 
-void init_core2nfq_dns() {
+wf_core2nfq_dns(void *arg, int data, int timeout) {
+    char buf[1024];
+    int dns_q_rv;
+    char dns_q_buf[4096] __attribute__ ((aligned));
+
+    if (timeout) {
+	printf("wf_core2nfq_dns called (timeout)\n");
+	// TODO Do something with kernel messages
+    } else {
+	printf("wf_core2nfq_dns called (data)\n");
+        if ((dns_q_rv = recv(dns_q_fd, dns_q_buf, sizeof(dns_q_buf), 0)) >= 0) {
+            // TODO we should add this one to the poll part
+            // now this is slow and once per loop is not enough
+            nfq_handle_packet(dns_qh, dns_q_buf, dns_q_rv); // send packet to callback
+        }
+    }
+}
+
+
+void init_core2nfq_dns(node_cache_t* node_cache_a, dns_cache_t* dns_cache_a) {
+    node_cache = node_cache_a;
+    dns_cache = dns_cache_a;
+
     // TODO: set up nfq here or in startup script?
     dns_qh = nfq_open();
     if (!dns_qh) {
@@ -216,10 +243,9 @@ void init_core2nfq_dns() {
         exit(1);
     }
     // for register
-    int dns_q_fd = nfq_fd(dns_qh);
-    char dns_q_buf[4096] __attribute__ ((aligned));
-    int dns_q_rv;
-
+    dns_q_fd = nfq_fd(dns_qh);
+    mainloop_register("core2nfq_dns", wf_core2nfq_dns, (void *) 0, dns_q_fd, 10000);
+    printf("[XX] registered core2nfq_dns with fd %d\n", dns_q_fd);
 }
 
 void cleanup_core2nfq_dns() {

@@ -67,7 +67,7 @@ void check_send_ack() {
 
 int core2kernel_do(config_command_t cmd) {
     netlink_command_result_t* cr;
-    
+
     cr = send_netlink_command_noarg(cmd);
     netlink_command_result_destroy(cr);
     return cr != NULL;
@@ -75,7 +75,7 @@ int core2kernel_do(config_command_t cmd) {
 
 int core2kernel_do_ip(config_command_t cmd, ip_t* ip) {
     netlink_command_result_t* cr;
-    
+
     cr = send_netlink_command_iparg(cmd, ip);
     netlink_command_result_destroy(cr);
     return cr != NULL;
@@ -187,7 +187,7 @@ void wf_netlink(void *arg, int data, int timeout) {
 	    node_cache_add_dns_query_info(node_cache, &dns_pkt, now);
 	    //node_cache_add_pkt_info(node_cache, &dns_pkt, now, 1);
 	    // We do send a separate notification for the clients that are interested
-	    send_command_dnsquery(&dns_pkt);
+	    //send_command_dnsquery(&dns_pkt);
 
 
 	    // TODO do we need to send nodeUpdate?
@@ -206,12 +206,7 @@ void wf_netlink(void *arg, int data, int timeout) {
 #endif
 }
 
-void init_cache() {
-    dns_cache = dns_cache_create();
-    node_cache = node_cache_create();
-}
-
-int init_netlink(int local)
+int init_netlink(int local, node_cache_t* node_cache_a, dns_cache_t* dns_cache_a)
 {
     //ssize_t c = 0;
     int rs;
@@ -220,8 +215,10 @@ int init_netlink(int local)
     uint32_t now, last_mosq_poll;
     static int all_lists[N_IPLIST] = { 1, 1, 1 };
 
+    node_cache = node_cache_a;
+    dns_cache = dns_cache_a;
+
     local_mode = local;
-    init_cache();
 
     traffic_nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_NETLINK_PAYLOAD));
 

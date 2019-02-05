@@ -13,6 +13,7 @@
 #include "util.h"
 #include "spin_list.h"
 #include "node_cache.h"
+#include "dns_cache.h"
 #include "tree.h"
 #include "netlink_commands.h"
 #include "spin_log.h"
@@ -25,6 +26,7 @@
 #include "version.h"
 
 node_cache_t* node_cache;
+dns_cache_t* dns_cache;
 
 static int local_mode;
 
@@ -99,27 +101,28 @@ void send_command_blocked(pkt_info_t* pkt_info) {
 }
 
 void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
-	unsigned int response_size;
-	buffer_t* response_json = buffer_create(2048);
-	buffer_t* pkt_json = buffer_create(2048);
-	unsigned int p_size;
+    unsigned int response_size;
+    buffer_t* response_json = buffer_create(2048);
+    buffer_t* pkt_json = buffer_create(2048);
+    unsigned int p_size;
 
-	spin_log(LOG_DEBUG, "[XX] jsonify that pkt info to get dns query command\n");
-	p_size = dns_query_pkt_info2json(node_cache, pkt_info, pkt_json);
-	if (p_size > 0) {
-		spin_log(LOG_DEBUG, "[XX] got an actual dns query command (size >0)\n");
-		buffer_finish(pkt_json);
-		response_size = create_mqtt_command(response_json, "dnsquery", NULL, buffer_str(pkt_json));
-		if (buffer_finish(response_json)) {
-			core2pubsub_publish(response_json);
-		} else {
-			spin_log(LOG_WARNING, "Error converting dnsquery pkt_info to JSON; partial packet: %s\n", buffer_str(response_json));
-		}
-	} else {
-		spin_log(LOG_DEBUG, "[XX] did not get an actual dns query command (size 0)\n");
-	}
-	buffer_destroy(response_json);
-	buffer_destroy(pkt_json);
+    printf("[XX] jsonify that pkt info to get dns query command\n");
+    spin_log(LOG_DEBUG, "[XX] jsonify that pkt info to get dns query command\n");
+    p_size = dns_query_pkt_info2json(node_cache, pkt_info, pkt_json);
+    if (p_size > 0) {
+        spin_log(LOG_DEBUG, "[XX] got an actual dns query command (size >0)\n");
+        buffer_finish(pkt_json);
+        response_size = create_mqtt_command(response_json, "dnsquery", NULL, buffer_str(pkt_json));
+        if (buffer_finish(response_json)) {
+            core2pubsub_publish(response_json);
+        } else {
+            spin_log(LOG_WARNING, "Error converting dnsquery pkt_info to JSON; partial packet: %s\n", buffer_str(response_json));
+        }
+    } else {
+        spin_log(LOG_DEBUG, "[XX] did not get an actual dns query command (size 0)\n");
+    }
+    buffer_destroy(response_json);
+    buffer_destroy(pkt_json);
 }
 
 // function definition below
@@ -470,6 +473,12 @@ void print_help() {
 	printf("-v\t\t\tprint the version of spind and exit\n");
 }
 
+void init_cache() {
+    dns_cache = dns_cache_create();
+    node_cache = node_cache_create();
+}
+
+
 int main(int argc, char** argv) {
     int result;
     int c;
@@ -522,7 +531,9 @@ int main(int argc, char** argv) {
     spin_log_init(use_syslog, log_verbosity, "spind");
     log_version();
 
-    //init_core2nfq_dns();
+    init_cache();
+
+    init_core2nfq_dns(node_cache, dns_cache);
     init_core2block();
 
     init_all_ipl();
@@ -530,9 +541,9 @@ int main(int argc, char** argv) {
     init_mosquitto(mosq_host, mosq_port);
     signal(SIGINT, int_handler);
 
-    result = init_netlink(local_mode);
-
     push_all_ipl();
+
+    result = init_netlink(local_mode, node_cache, dns_cache);
 
     mainloop_run();
 
