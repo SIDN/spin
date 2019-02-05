@@ -112,7 +112,7 @@ function onTrafficMessage(msg) {
                 updateAllowedList();
                 break;
 			case 'peakinfo':
-				console.log("Got peak information: " + msg);
+				//console.log("Got peak information: " + msg);
 				handlePeakInformation(result);
 				break;
             case 'nodeUpdate':

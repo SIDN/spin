@@ -13,7 +13,8 @@
 
 var traffic_dataset = new vis.DataSet([]);
 var graph2d_1;
-var graph_peak;
+var graph_peak_packets;
+var graph_peak_bytes;
 var selectedNodeId;
 // list of filters
 var filterList = [];
@@ -498,6 +499,9 @@ function initGraphs() {
 
     // clean up every X seconds
     setInterval(cleanNetwork, 5000);
+    
+    // Refresh peak information every 30 seconds
+    setInterval(getPeakInformation, 30000);
 }
 
 //
@@ -657,51 +661,23 @@ function nodeSelected(event) {
         updateBlockedButton();
         updateAllowedButton();
 
-		/* Load peak detection graph */
+		/* Arrange peak detection graph */
+        if (graph_peak_packets != null){
+            graph_peak_packets.destroy();
+            graph_peak_packets = null;
+        }
+        if (graph_peak_bytes != null){
+            graph_peak_bytes.destroy();
+            graph_peak_bytes = null;
+        }
+        
 		if (node.mac) {
-			$("#nodeinfo-peakdet").show();
-			// writeToScreen("nodeinfo-peakdetvis", "Loading data...");
-		
-			var container = document.getElementById('nodeinfo-peakdetvis');
-			var items = [
-				{x: '2019-01-01 00:01', y: 10, group: 0},
-				{x: '2019-01-01 00:02', y: 25, group: 0},
-				{x: '2019-01-01 00:03', y: 30, group: 0},
-				{x: '2019-01-01 00:04', y: 10, group: 0},
-				{x: '2019-01-01 00:05', y: 15, group: 0},
-				{x: '2019-01-01 00:06', y: 30, group: 0},
-				// And now the horizontal
-				{x: '2019-01-01 00:01', y: 40, group: 1},
-				{x: '2019-01-01 00:06', y: 40, group: 1}
-			];
- 
-			var dataset = new vis.DataSet(items);
-			var options = {
-				//start: '0',
-				//end: '60',
-				graphHeight: '100px',
-				showMajorLabels: false,
-				showMinorLabels: false,
-				dataAxis: {
-					visible: false,
-					left: { range: { min: 0 }}
-				},
-				drawPoints: { enabled: false }
-			};
-			if (graph_peak != null) {
-				// If we have an old graph in memory (e.g. dialog not closed)
-				graph_peak.destroy();
-				graph_peak = null;
-			}
-			graph_peak = new vis.Graph2d(container, dataset, options);
-		
-			// On dialog close, destroy graph (no need to keep in memory) and unsubscribe
-		    $('#nodeinfo').on( "dialogclose", function( event, ui ) {
-				if (graph_peak != null) {
-					graph_peak.destroy();
-					graph_peak = null
-				}
-		    } );
+            // Obtain peak information from server.
+            // Uses variable selectedNodeId as set above.
+            getPeakInformation();
+            $("#nodeinfo-peakdet").show();
+            $("#nodeinfo-peakdetvis").html("Loading...")
+            $("#nodeinfo-peakdetvis2").html("Loading...")
 		} else {
 			$("#nodeinfo-peakdet").hide();
 		}
@@ -1134,8 +1110,16 @@ function cleanNetwork() {
  On close of NodeInfo window
  */
 function nodeInfoClosed(event, ui) {
-    console.log("Closed NodeInfo");
-    selectedNodeId = -1;
+    selectedNodeId = 0;
+    $("#nodeinfo-peakdet").hide(); // Hide just to be sure.
+    if (graph_peak_packets != null){
+        graph_peak_packets.destroy();
+        graph_peak_packets = null;
+    }
+    if (graph_peak_bytes != null){
+        graph_peak_bytes.destroy();
+        graph_peak_bytes = null;
+    }
 }
 
 /* 
@@ -1143,7 +1127,9 @@ function nodeInfoClosed(event, ui) {
  * Uses MQTT to query any running peak detection.
  */
 function getPeakInformation() {
-    sendCommand("get_peak_information", selectedNodeId);
+    if (selectedNodeId > 0) {
+        sendCommand("get_peak_info", selectedNodeId);
+    }
 }
 
 /* Handle peak information.
@@ -1151,6 +1137,114 @@ function getPeakInformation() {
  * If closed, stop streaming of information
  */
 function handlePeakInformation(result) {
-	
-	
+	var container = document.getElementById('nodeinfo-peakdetvis');
+    //
+
+    /*
+     * If there is no graph yet, make one.
+     * Otherwise, change only the inner dataset.
+     */
+	var options = {
+        start: "2019-01-01 00:00",
+        end: "2019-01-01 00:59",
+		graphHeight: '100px',
+		showMajorLabels: false,
+		showMinorLabels: false,
+        zoomable: false,
+        moveable: false,
+        legend: false,
+		dataAxis: {
+			visible: false,
+			left: { range: { min: 0 }}
+		},
+		drawPoints: { enabled: false }
+	};
+
+    if (graph_peak_bytes == null) {
+        // Remove loading text
+        $("#nodeinfo-peakdetvis").html("");
+
+        graph_peak_bytes = new vis.Graph2d(container, new vis.DataSet(), options);
+        var groups = new vis.DataSet();
+        groups.add({
+            id: 0,
+            content: "Bytes",
+            style:   "stroke: blue"
+        });
+        groups.add({
+            id: 1,
+            style:   "stroke: red",
+            options: {
+                excludeFromLegend: "true"
+            }
+        });
+        graph_peak_bytes.setGroups(groups);
+    }
+
+    if (graph_peak_packets == null) {
+        graph_peak_packets = new vis.Graph2d(container, new vis.DataSet(), options);
+        var groups = new vis.DataSet();
+        groups.add({
+            id: 0,
+            content: "Packets",
+            style:   "stroke: black"
+        });
+        groups.add({
+            id: 1,
+            style:   "stroke: red",
+            options: {
+                excludeFromLegend: true
+            }
+        });
+        graph_peak_packets.setGroups(groups);
+    }
+    
+    // Clear dataset, re-add changed values.
+    graph_peak_bytes.itemsData.clear();
+    graph_peak_packets.itemsData.clear();
+
+    Object.keys(result["items"]).forEach(function (element){
+        var elemi = parseInt(element);
+        if (elemi < -59 || elemi > 0) {
+            // We accept only -59 <= x <= 0
+            return;
+        }
+        var m = 59 + elemi; // Compute: -1 goes to 58 seconds, Basically inverse all values.
+        graph_peak_bytes.itemsData.add({
+            x: "2019-01-01 00:" + String(m).padStart(2,'0'),
+            y: result["items"][element]["bytes"],
+            group: 0
+        });
+
+        graph_peak_packets.itemsData.add({
+            x: "2019-01-01 00:" + String(m).padStart(2,'0'),
+            y: result["items"][element]["packets"],
+            group: 0
+        });
+    });
+    graph_peak_bytes.redraw();
+
+    // Now add limits
+
+    graph_peak_bytes.itemsData.add({
+        x: "2019-01-01 00:00",
+        y: result["maxbytes"],
+        group: 1
+    });
+    graph_peak_bytes.itemsData.add({
+        x: "2019-01-01 00:59",
+        y: result["maxbytes"],
+        group: 1
+    });
+    
+    graph_peak_packets.itemsData.add({
+        x: "2019-01-01 00:00",
+        y: result["maxpackets"],
+        group: 1
+    });
+    graph_peak_packets.itemsData.add({
+        x: "2019-01-01 00:59",
+        y: result["maxpackets"],
+        group: 1
+    });
 }
