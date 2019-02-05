@@ -112,6 +112,7 @@ void wf_netlink(void *arg, int data, int timeout) {
     if (timeout) {
 
 	// do timeout things
+	// nothing so far
     }
     if (data) {
 	rs = recvmsg(traffic_sock_fd, &traffic_msg, 0);
@@ -216,9 +217,6 @@ int init_netlink(int local)
     int rs;
     message_type_t type;
     struct timeval tv;
-#ifdef notdef
-    struct pollfd fds[2];
-#endif
     uint32_t now, last_mosq_poll;
     static int all_lists[N_IPLIST] = { 1, 1, 1 };
 

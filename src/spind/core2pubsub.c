@@ -8,7 +8,6 @@
 #include "spin_log.h"
 #include "spin_list.h"
 
-// #include "spin_cfg.h"		/* Should go here */
 #include "handle_command.h"
 
 #define MOSQUITTO_KEEPALIVE_TIME 60	/* Seconds */

@@ -20,9 +20,6 @@
 #include "core2kernel.h"
 #include "core2block.h"
 
-// perhaps remove
-// #include "spin_cfg.h"
-
 #include "handle_command.h"
 #include "mainloop.h"
 #include "version.h"
