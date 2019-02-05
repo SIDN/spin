@@ -389,20 +389,20 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
         mac = arp_table_find_by_ip(node_cache->arp_table, ip);
     }
     if (mac) {
-        spin_log(LOG_DEBUG, "[XX] mac found: %s\n", mac);
+        // spin_log(LOG_DEBUG, "[XX] mac found: %s\n", mac);
         node_set_mac(node, mac);
         name = node_names_find_mac(node_cache->names, mac);
         if (name != NULL) {
             node_set_name(node, name);
         }
     } else {
-        spin_log(LOG_DEBUG, "[XX] mac not found\n");
+        // spin_log(LOG_DEBUG, "[XX] mac not found\n");
         name = node_names_find_ip(node_cache->names, ip);
         if (name != NULL) {
             node_set_name(node, name);
         }
     }
-    spin_log(LOG_DEBUG, "[XX] mac at %p\n", node->mac);
+    // spin_log(LOG_DEBUG, "[XX] mac at %p\n", node->mac);
 }
 
 static void
