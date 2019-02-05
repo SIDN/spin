@@ -114,6 +114,10 @@ setup_tables() {
 
     iptab_do_table(SpinLog, IDT_MAKE);
     iptab_add_jump(SpinLog, IAJ_ADD, 0, "LOG --log-prefix \"Spin blocked: \"");
+    // Forward all (udp) DNS queries to nfqueue (for core2nfq_dns)
+    // Note: only UDP for now, we'll need to reconstruct TCP packets
+    // to support that
+    iptab_add_jump(SpinCheck, IAJ_ADD, "-p udp --sport 53", "NFQUEUE --queue-bypass");
 
     iptab_do_table(SpinBlock, IDT_MAKE);
     iptab_add_jump(SpinBlock, IAJ_ADD, 0, SpinLog);
