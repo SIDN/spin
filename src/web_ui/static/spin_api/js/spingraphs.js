@@ -1225,26 +1225,43 @@ function handlePeakInformation(result) {
     graph_peak_bytes.redraw();
 
     // Now add limits
+    if (result["maxbytes"] > 0) {
+        graph_peak_bytes.itemsData.add({
+            x: "2019-01-01 00:00",
+            y: result["maxbytes"],
+            group: 1
+        });
+        graph_peak_bytes.itemsData.add({
+            x: "2019-01-01 00:59",
+            y: result["maxbytes"],
+            group: 1
+        });
+    }
 
-    graph_peak_bytes.itemsData.add({
-        x: "2019-01-01 00:00",
-        y: result["maxbytes"],
-        group: 1
-    });
-    graph_peak_bytes.itemsData.add({
-        x: "2019-01-01 00:59",
-        y: result["maxbytes"],
-        group: 1
-    });
+    if (result["maxpackets"] > 0) {
+        graph_peak_packets.itemsData.add({
+            x: "2019-01-01 00:00",
+            y: result["maxpackets"],
+            group: 1
+        });
+        graph_peak_packets.itemsData.add({
+            x: "2019-01-01 00:59",
+            y: result["maxpackets"],
+            group: 1
+        });
+    }
     
-    graph_peak_packets.itemsData.add({
-        x: "2019-01-01 00:00",
-        y: result["maxpackets"],
-        group: 1
-    });
-    graph_peak_packets.itemsData.add({
-        x: "2019-01-01 00:59",
-        y: result["maxpackets"],
-        group: 1
-    });
+    if (result["maxbytes"] == 0 || result["maxpackets"] == 0) {
+        $("#nodeinfo-notenoughdata:hidden").show();
+    } else {
+        $("#nodeinfo-notenoughdata:visible").hide();
+    }
+    
+    if (Object.keys(result["items"]).length <= 59 && 
+            result["maxbytes"] > 0 && result["maxpackets"] > 0) {
+        $("#nodeinfo-training:hidden").show();
+    } else {
+        $("#nodeinfo-training:visible").hide();
+    }
+
 }
