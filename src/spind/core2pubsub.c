@@ -276,7 +276,7 @@ void handle_json_command_detail(int verb, int object,
 	    // handle_command_block_data(node_id_arg);
 	    break;
 	case PSC_V_REM_IP:
-            handle_command_remove_ip_from_list_X(object, &ip_arg);
+            handle_command_remove_ip_from_list(object, &ip_arg);
             node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip_arg);
             if (node) {
                 node->is_onlist[object] = 0;

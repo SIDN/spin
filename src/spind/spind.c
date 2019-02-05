@@ -21,7 +21,7 @@
 #include "core2block.h"
 
 // perhaps remove
-#include "spin_cfg.h"
+// #include "spin_cfg.h"
 
 #include "handle_command.h"
 #include "mainloop.h"
@@ -196,9 +196,6 @@ void init_all_ipl() {
 	lip->li_tree = tree_create(cmp_ips);
 	cnt = read_ip_tree(lip->li_tree, lip->li_filename);
 	spin_log(LOG_DEBUG, "File %s, read %d entries\n", lip->li_filename, cnt);
-
-	// Push into kernel
-	push_ips_from_list_to_kernel_X(i);
     }
 
     // Sync trees to files every 2.5 seconds for now
@@ -277,41 +274,8 @@ list_inout_do_ip(int iplist, int addrem, ip_t *ip_addr) {
     }
 }
 
-#ifdef notdef
 static void
-twomethods_do_ip(config_command_t cmd, ip_t *ip_addr) {
-
-    // old kernel
-    if (cmd != SPIN_CMD_ADD_BLOCK)
-	core2kernel_do_ip(cmd, ip_addr);
-
-    // new blocking code
-
-    switch(cmd) {
-    case SPIN_CMD_ADD_BLOCK:
-	c2b_changelist(IPLIST_BLOCK, SF_ADD, ip_addr);
-	break;
-    case SPIN_CMD_ADD_IGNORE:
-	c2b_changelist(IPLIST_IGNORE, SF_ADD, ip_addr);
-	break;
-    case SPIN_CMD_ADD_EXCEPT:
-	c2b_changelist(IPLIST_ALLOW, SF_ADD, ip_addr);
-	break;
-    case SPIN_CMD_REMOVE_BLOCK:
-	c2b_changelist(IPLIST_BLOCK, SF_REM, ip_addr);
-	break;
-    case SPIN_CMD_REMOVE_IGNORE:
-	c2b_changelist(IPLIST_IGNORE, SF_REM, ip_addr);
-	break;
-    case SPIN_CMD_REMOVE_EXCEPT:
-	c2b_changelist(IPLIST_ALLOW, SF_REM, ip_addr);
-	break;
-    }
-}
-#endif
-
-static
-call_kernel_for_tree_X(int iplist, int addrem, tree_t *tree) {
+call_kernel_for_tree(int iplist, int addrem, tree_t *tree) {
     tree_entry_t* ip_entry;
 
     ip_entry = tree_first(tree);
@@ -322,78 +286,39 @@ call_kernel_for_tree_X(int iplist, int addrem, tree_t *tree) {
     }
 }
 
-push_ips_from_list_to_kernel_X(int iplist) {
+static void
+push_ips_from_list_to_kernel(int iplist) {
 
     //
     // Make sure the kernel gets to know on init
     //
-    call_kernel_for_tree_X(iplist, SF_ADD, ipl_list_ar[iplist].li_tree);
+    call_kernel_for_tree(iplist, SF_ADD, ipl_list_ar[iplist].li_tree);
 }
-#ifdef notdef
-static
-call_kernel_for_tree(config_command_t cmd, tree_t *tree) {
-    tree_entry_t* ip_entry;
 
-    ip_entry = tree_first(tree);
-    while (ip_entry != NULL) {
-	// spin_log(LOG_DEBUG, "ckft: %d %x\n", cmd, tree);
-	// "old" kernel code
-	twomethods_do_ip(cmd, ip_entry->key);
-        ip_entry = tree_next(ip_entry);
+void push_all_ipl() {
+    int i;
+
+    for (i=0; i<N_IPLIST; i++) {
+	// Push into kernel
+	push_ips_from_list_to_kernel(i);
     }
 }
 
-push_ips_from_list_to_kernel(int iplist) {
-    static config_command_t addip_cmds[] = {
-	SPIN_CMD_ADD_BLOCK,
-	SPIN_CMD_ADD_IGNORE,
-	SPIN_CMD_ADD_EXCEPT
-    };
-
-    //
-    // Make sure the kernel gets to know on init
-    //
-    call_kernel_for_tree(addip_cmds[iplist], ipl_list_ar[iplist].li_tree);
-}
-#endif
-
 static void
-call_kernel_for_node_ips_X(int listid, int addrem, node_t *node) {
+call_kernel_for_node_ips(int listid, int addrem, node_t *node) {
 
     if (node == NULL) {
         return;
     }
-    call_kernel_for_tree_X(listid, addrem, node->ips);
+    call_kernel_for_tree(listid, addrem, node->ips);
 }
 
-void handle_command_remove_ip_from_list_X(int iplist, ip_t* ip) {
+void handle_command_remove_ip_from_list(int iplist, ip_t* ip) {
 
     list_inout_do_ip(iplist, SF_REM, ip);
     // twomethods_do_ip(rmip_cmds[iplist], ip);
     remove_ip_from_li(ip, &ipl_list_ar[iplist]);
 }
-
-#ifdef notdef
-static void
-call_kernel_for_node_ips(config_command_t cmd, node_t *node) {
-
-    if (node == NULL) {
-        return;
-    }
-    call_kernel_for_tree(cmd, node->ips);
-}
-
-void handle_command_remove_ip_from_list(int iplist, ip_t* ip) {
-    static config_command_t rmip_cmds[] = {
-	SPIN_CMD_REMOVE_BLOCK,
-	SPIN_CMD_REMOVE_IGNORE,
-	SPIN_CMD_REMOVE_EXCEPT
-    };
-
-    twomethods_do_ip(rmip_cmds[iplist], ip);
-    remove_ip_from_li(ip, &ipl_list_ar[iplist]);
-}
-#endif
 
 static node_t *
 find_node_id(int node_id) {
@@ -419,93 +344,13 @@ void handle_list_membership(int listid, int addrem, int node_id) {
 
     node->is_onlist[listid] = addrem == SF_ADD ? 1 : 0;
 
-    call_kernel_for_node_ips_X(listid, addrem, node);
+    call_kernel_for_node_ips(listid, addrem, node);
     if (addrem == SF_ADD) {
 	add_ip_tree_to_li(node->ips, &ipl_list_ar[listid]);
     } else {
 	remove_ip_tree_from_li(node->ips, &ipl_list_ar[listid]);
     }
 }
-
-#ifdef notdef
-// add block SWITCH
-void handle_command_block_data(int node_id) {
-    node_t* node;
-
-    if ((node = find_node_id(node_id)) == NULL)
-    	return;
-
-    // the is_blocked status is only read if this node had a new ip address added, so update it now
-    node->is_blocked = 1;
-
-    call_kernel_for_node_ips(SPIN_CMD_ADD_BLOCK, node);
-    add_ip_tree_to_li(node->ips, &ipl_block);
-}
-
-//remove block SWITCH
-void handle_command_stop_block_data(int node_id) {
-    node_t* node;
-
-    if ((node = find_node_id(node_id)) == NULL)
-    	return;
-
-    // the is_blocked status is only read if this node had a new ip address added, so update it now
-    node->is_blocked = 0;
-
-    call_kernel_for_node_ips(SPIN_CMD_REMOVE_BLOCK, node);
-    remove_ip_tree_from_li(node->ips, &ipl_block);
-}
-
-// add ignore SWITCH
-void handle_command_add_ignore(int node_id) {
-    node_t* node;
-
-    if ((node = find_node_id(node_id)) == NULL)
-    	return;
-
-    call_kernel_for_node_ips(SPIN_CMD_ADD_IGNORE, node);
-    add_ip_tree_to_li(node->ips, &ipl_ignore);
-}
-
-// remove ignore SWITCH
-void handle_command_remove_ignore(int node_id) {
-    node_t* node;
-
-    if ((node = find_node_id(node_id)) == NULL)
-    	return;
-
-    call_kernel_for_node_ips(SPIN_CMD_REMOVE_IGNORE, node);
-    remove_ip_tree_from_li(node->ips, &ipl_ignore);
-}
-
-// add allow SWITCH
-void handle_command_allow_data(int node_id) {
-    node_t* node;
-
-    if ((node = find_node_id(node_id)) == NULL)
-    	return;
-
-    // the is_allowed status is only read if this node had a new ip address added, so update it now
-    node->is_allowed = 1;
-
-    call_kernel_for_node_ips(SPIN_CMD_ADD_EXCEPT, node);
-    add_ip_tree_to_li(node->ips, &ipl_allow);
-}
-
-// remove allow SWITCH
-void handle_command_stop_allow_data(int node_id) {
-    node_t* node;
-
-    if ((node = find_node_id(node_id)) == NULL)
-    	return;
-
-    // the is_allowed status is only read if this node had a new ip address added, so update it now
-    node->is_allowed = 0;
-
-    call_kernel_for_node_ips(SPIN_CMD_REMOVE_EXCEPT, node);
-    remove_ip_tree_from_li(node->ips, &ipl_allow);
-}
-#endif
 
 void handle_command_reset_ignores() {
     // clear the ignores; derive them from our own addresses again
@@ -684,6 +529,7 @@ int main(int argc, char** argv) {
 
     init_all_ipl();
 
+    push_all_ipl();
     init_mosquitto(mosq_host, mosq_port);
     signal(SIGINT, int_handler);
 
