@@ -6,9 +6,8 @@ SUBDIRS = @TESTDIR@
 
 bin_PROGRAMS = spind
 
-spind_SOURCES = spind.c core2block.c core2kernel.c core2pubsub.c handle_command.h mainloop.h mainloop.c nfqroutines.c
-spind_CFLAGS = 
-spind_LDADD = $(top_builddir)/lib/libspin.a -lnetfilter_queue
+spind_SOURCES = spind.c core2block.c core2kernel.c core2pubsub.c handle_command.h mainloop.h mainloop.c nfqroutines.c core2nfq_dns.c
+spind_LDADD = $(top_builddir)/lib/libspin.a -lnetfilter_queue -lldns
 
 version.c:
 	$(top_srcdir)/../scripts/create_version_c.sh $(top_srcdir)/../VERSION

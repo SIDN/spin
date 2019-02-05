@@ -471,76 +471,77 @@ void print_help() {
 }
 
 int main(int argc, char** argv) {
-	int result;
-	int c;
-	int log_verbosity = 6;
-	int use_syslog = 1;
+    int result;
+    int c;
+    int log_verbosity = 6;
+    int use_syslog = 1;
 
-	mosq_host = "127.0.0.1";
-	mosq_port = 1883;
-	stop_on_error = 0;
+    mosq_host = "127.0.0.1";
+    mosq_port = 1883;
+    stop_on_error = 0;
 
-	while ((c = getopt (argc, argv, "dehlm:op:v")) != -1) {
-		switch (c) {
-		case 'd':
-			log_verbosity = 7;
-			break;
-		case 'e':
-			stop_on_error = 1;
-			break;
-		case 'h':
-			print_help();
-			exit(0);
-			break;
-		case 'l':
-			spin_log(LOG_INFO, "Running in local mode; traffic without either entry in arp cache will be shown too\n");
-			local_mode = 1;
-			break;
-		case 'm':
-			mosq_host = optarg;
-			break;
-		case 'o':
-			printf("Logging to stdout instead of syslog\n");
-			use_syslog = 0;
-			break;
-		case 'p':
-			mosq_port = strtol(optarg, NULL, 10);
-			if (mosq_port <= 0 || mosq_port > 65535) {
-				fprintf(stderr, "Error, not a valid port number: %s\n", optarg);
-				exit(1);
-			}
-			break;
-		case 'v':
-			print_version();
-			exit(0);
-			break;
-		default:
-			abort ();
-		}
-	}
+    while ((c = getopt (argc, argv, "dehlm:op:v")) != -1) {
+        switch (c) {
+        case 'd':
+            log_verbosity = 7;
+            break;
+        case 'e':
+            stop_on_error = 1;
+            break;
+        case 'h':
+            print_help();
+            exit(0);
+            break;
+        case 'l':
+            spin_log(LOG_INFO, "Running in local mode; traffic without either entry in arp cache will be shown too\n");
+            local_mode = 1;
+            break;
+        case 'm':
+            mosq_host = optarg;
+            break;
+        case 'o':
+            printf("Logging to stdout instead of syslog\n");
+            use_syslog = 0;
+            break;
+        case 'p':
+            mosq_port = strtol(optarg, NULL, 10);
+            if (mosq_port <= 0 || mosq_port > 65535) {
+                fprintf(stderr, "Error, not a valid port number: %s\n", optarg);
+                exit(1);
+            }
+            break;
+        case 'v':
+            print_version();
+            exit(0);
+            break;
+        default:
+            abort ();
+        }
+    }
 
-	spin_log_init(use_syslog, log_verbosity, "spind");
-	log_version();
+    spin_log_init(use_syslog, log_verbosity, "spind");
+    log_version();
 
-	init_core2block();
+    //init_core2nfq_dns();
+    init_core2block();
 
-	init_all_ipl();
+    init_all_ipl();
 
-	init_mosquitto(mosq_host, mosq_port);
-	signal(SIGINT, int_handler);
+    init_mosquitto(mosq_host, mosq_port);
+    signal(SIGINT, int_handler);
 
-	result = init_netlink(local_mode);
+    result = init_netlink(local_mode);
 
-	push_all_ipl();
+    push_all_ipl();
 
-	mainloop_run();
+    mainloop_run();
 
-	cleanup_cache();
-	cleanup_netlink();
+    cleanup_cache();
+    cleanup_netlink();
 
-	cleanup_core2block();
+    cleanup_core2block();
 
-	finish_mosquitto();
+    finish_mosquitto();
 
-	return 0;
+    return 0;
 }
