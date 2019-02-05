@@ -22,7 +22,8 @@ On the SPIN/traffic topic, commands can be one of:
   currently filtered (not shown) by the SPIN system.
 * "names": result is a map containing IP address -> domain name values;
   these are user-set names.
-
+* "peakinfo": lists information for a specific node from the peak-based 
+  anomaly detection.
 
 
 ### Traffic information
@@ -162,4 +163,45 @@ The following commands can be issued:
 * "stopblockdata": Tells the SPIN system to stop blocking traffic to and from a node; argument is the node id (int)
 * "allowdata": Tells the SPIN system to accept all traffic from and to a node, even though this traffic would be blocked otherwise (for instance, if the traffic is from a node that was blocked); argument is the node id (int)
 * "stopallowdata": Tells the SPIN system to no longer accept all traffic from and to a node, even though this traffic would be blocked otherwise (for instance, if the traffic is from a node that was blocked); argument is the node id (int)
+* "get_peak_info": Asks the peak detection to return information about a node; argument is the node id (int)
 
+### Peak-based anomaly detection
+As a provisional module, the Network Measurement Center can include an anomaly detection module.
+This runs a basic peak detection algorithm, included as a demonstration of the options.
+
+To obtain information about a particular node, send the "get_peak_info" command to SPIN/commands and give a node identifier as an argument.
+If the peak detection is running, it will reply with the current limits of that device (in bytes/packets per minute), as well as the previously observed traffic (bytes/packets per minute) for the last hour.
+The index goes from 0 to -59 for the last minute till 59 minutes ago, respectively.
+An example is shown below.
+
+    {
+        "command": "peakinfo",
+        "argument": "32",
+        "result": {
+            "items": {
+                "0": {
+                    "bytes": 5800,
+                    "packets": 92
+                },
+                "-1": {
+                    "bytes": 229932,
+                    "packets": 1516
+                },
+                "-2": {
+                    "bytes": 17232,
+                    "packets": 213
+                },
+                "-3": {
+                    "bytes": 57892,
+                    "packets": 406
+                },
+                {...},
+                "-59": {
+                    "bytes": 200862,
+                    "packets": 1426
+                }
+            },
+            "maxbytes": 61388796,
+            "maxpackets": 81543
+        }
+    }
