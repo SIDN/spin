@@ -478,6 +478,10 @@ void init_cache() {
     node_cache = node_cache_create();
 }
 
+void cleanup_cache() {
+    dns_cache_destroy(dns_cache);
+    node_cache_destroy(node_cache);
+}
 
 int main(int argc, char** argv) {
     int result;
@@ -543,7 +547,7 @@ int main(int argc, char** argv) {
 
     push_all_ipl();
 
-    result = init_netlink(local_mode, node_cache, dns_cache);
+    result = init_netlink(local_mode, node_cache);
 
     mainloop_run();
 

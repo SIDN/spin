@@ -5,7 +5,6 @@
 
 #include "spin_cfg.h"
 
-#include "dns_cache.h"
 #include "netlink_commands.h"
 #include "spin_list.h"
 #include "node_cache.h"
@@ -13,7 +12,6 @@
 #include "mainloop.h"
 #include "spin_log.h"
 
-static dns_cache_t* dns_cache;
 extern node_cache_t* node_cache;
 
 #define NETLINK_CONFIG_PORT 30
@@ -51,7 +49,6 @@ void send_ack()
 
     sendmsg(traffic_sock_fd, &traffic_msg, 0);
 
-    dns_cache_clean(dns_cache);
     // hey, how about we clean here?_
 }
 
@@ -159,39 +156,9 @@ void wf_netlink(void *arg, int data, int timeout) {
 	    flow_list_add_pktinfo(flow_list, &pkt);
 	    check_send_ack();
 	} else if (type == SPIN_DNS_ANSWER) {
-	    // note: bad version would have been caught in wire2pktinfo
-	    // in this specific case
-	    wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
-
-	    // DNS answers are not relayed as traffic; we only
-	    // store them internally, so later traffic can be
-	    // matched to the DNS answer by IP address lookup
-	    dns_cache_add(dns_cache, &dns_pkt, now);
-	    node_cache_add_dns_info(node_cache, &dns_pkt, now);
-	    // TODO do we need to send nodeUpdate?
-	    check_send_ack();
+	    // this is now handled by core2nfq_dns
 	} else if (type == SPIN_DNS_QUERY) {
-	    // We do want to relay dns query information to
-	    // clients; it should be sent as command of
-	    // type 'dnsquery'
-
-
-	    // the info now contains:
-	    // - domain name queried
-	    // - ip address doing the query
-	    // - 0 ttl value
-	    wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
-	    // XXXXX this would add wrong ip
-	    // If the queried domain name isn't known, we add it as a new node
-	    // (with only a domain name)
-	    node_cache_add_dns_query_info(node_cache, &dns_pkt, now);
-	    //node_cache_add_pkt_info(node_cache, &dns_pkt, now, 1);
-	    // We do send a separate notification for the clients that are interested
-	    //send_command_dnsquery(&dns_pkt);
-
-
-	    // TODO do we need to send nodeUpdate?
-	    check_send_ack();
+        // this is now handled by core2nfq_dns
 	} else if (type == SPIN_ERR_BADVERSION) {
 	    printf("Error: version mismatch between client and kernel module\n");
 	} else {
@@ -206,7 +173,7 @@ void wf_netlink(void *arg, int data, int timeout) {
 #endif
 }
 
-int init_netlink(int local, node_cache_t* node_cache_a, dns_cache_t* dns_cache_a)
+int init_netlink(int local, node_cache_t* node_cache_a)
 {
     //ssize_t c = 0;
     int rs;
@@ -216,7 +183,6 @@ int init_netlink(int local, node_cache_t* node_cache_a, dns_cache_t* dns_cache_a
     static int all_lists[N_IPLIST] = { 1, 1, 1 };
 
     node_cache = node_cache_a;
-    dns_cache = dns_cache_a;
 
     local_mode = local;
 
@@ -256,15 +222,8 @@ int init_netlink(int local, node_cache_t* node_cache_a, dns_cache_t* dns_cache_a
     return 0;
 }
 
-void cleanup_cache() {
-    dns_cache_destroy(dns_cache);
-    node_cache_destroy(node_cache);
-}
-
 void cleanup_netlink() {
-
     close(traffic_sock_fd);
     flow_list_destroy(flow_list);
     free(traffic_nlh);
-    cleanup_cache();
 }
