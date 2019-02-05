@@ -131,30 +131,7 @@ void wf_netlink(void *arg, int data, int timeout) {
 	    send_command_blocked(&pkt);
 	    check_send_ack();
 	} else if (type == SPIN_TRAFFIC_DATA) {
-	    //pktinfo2str(pkt_str, &pkt, 2048);
-	    //printf("[TRAFFIC] %s\n", pkt_str);
-	    //print_pktinfo_wirehex(&pkt);
-	    node_cache_add_pkt_info(node_cache, &pkt, now);
-
-	    // small experiment; check if either endpoint is an internal device, if not,
-	    // skip reporting it
-	    // (if this is useful, we should do this check in add_pkt_info above, probably)
-	    ip_t ip;
-	    node_t* src_node;
-	    node_t* dest_node;
-	    ip.family = pkt.family;
-	    memcpy(ip.addr, pkt.src_addr, 16);
-	    src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
-	    memcpy(ip.addr, pkt.dest_addr, 16);
-	    dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
-	    if (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL && !local_mode)) {
-		return;
-	    }
-
-	    maybe_sendflow(flow_list, now);
-	    // add the current one
-	    flow_list_add_pktinfo(flow_list, &pkt);
-	    check_send_ack();
+        // this is now handled by core2conntrack
 	} else if (type == SPIN_DNS_ANSWER) {
 	    // this is now handled by core2nfq_dns
 	} else if (type == SPIN_DNS_QUERY) {

@@ -69,6 +69,18 @@ int nfct_to_pkt_info(pkt_info_t* pkt_info_orig, pkt_info_t* pkt_info_reply, stru
   }
 }
 
+static int check_ignore_local(pkt_info_t* pkt, node_cache_t* node_cache) {
+    ip_t ip;
+    node_t* src_node;
+    node_t* dest_node;
+    ip.family = pkt->family;
+    memcpy(ip.addr, pkt->src_addr, 16);
+    src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    memcpy(ip.addr, pkt->dest_addr, 16);
+    dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    return (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL));
+}
+
 static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
 {
     struct nf_conntrack *ct;
@@ -91,22 +103,16 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
     // TODO: remove repl?
     nfct_to_pkt_info(&orig, &reply, ct);
 
-    ip_t ip;
-    node_t* src_node;
-    node_t* dest_node;
-    ip.family = orig.family;
-    memcpy(ip.addr, orig.src_addr, 16);
-    src_node = node_cache_find_by_ip(cb_data->node_cache, sizeof(ip_t), &ip);
-    memcpy(ip.addr, orig.dest_addr, 16);
-    dest_node = node_cache_find_by_ip(cb_data->node_cache, sizeof(ip_t), &ip);
-    if (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL && !cb_data->local_mode)) {
-        nfct_destroy(ct);
-        return;
-    }
-
-
     if (orig.packet_count > 0 || orig.payload_size > 0) {
         node_cache_add_pkt_info(cb_data->node_cache, &orig, now);
+
+        // small experiment, try to ignore messages from and to
+        // this device, unless local_mode is set
+        if (!cb_data->local_mode && check_ignore_local(&orig, cb_data->node_cache)) {
+            nfct_destroy(ct);
+            return;
+        }
+
         flow_list_add_pktinfo(cb_data->flow_list, &orig);
     }
 
@@ -142,7 +148,8 @@ int do_read(cb_data_t* cb_data, int inet_family) {
     nlh->nlmsg_seq = seq = time(NULL);
 
     nfh = mnl_nlmsg_put_extra_header(nlh, sizeof(struct nfgenmsg));
-    nfh->nfgen_family = inet_family;
+    //nfh->nfgen_family = inet_family;
+    nfh->nfgen_family = AF_INET;
     nfh->version = NFNETLINK_V0;
     nfh->res_id = 0;
 
