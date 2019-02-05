@@ -106,11 +106,8 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
     buffer_t* pkt_json = buffer_create(2048);
     unsigned int p_size;
 
-    printf("[XX] jsonify that pkt info to get dns query command\n");
-    spin_log(LOG_DEBUG, "[XX] jsonify that pkt info to get dns query command\n");
     p_size = dns_query_pkt_info2json(node_cache, pkt_info, pkt_json);
     if (p_size > 0) {
-        spin_log(LOG_DEBUG, "[XX] got an actual dns query command (size >0)\n");
         buffer_finish(pkt_json);
         response_size = create_mqtt_command(response_json, "dnsquery", NULL, buffer_str(pkt_json));
         if (buffer_finish(response_json)) {
@@ -118,8 +115,6 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
         } else {
             spin_log(LOG_WARNING, "Error converting dnsquery pkt_info to JSON; partial packet: %s\n", buffer_str(response_json));
         }
-    } else {
-        spin_log(LOG_DEBUG, "[XX] did not get an actual dns query command (size 0)\n");
     }
     buffer_destroy(response_json);
     buffer_destroy(pkt_json);

@@ -15,6 +15,10 @@
 
 #include "spin_list.h"
 
+// needed for the CORE2NFQ_DNS_QUEUE_NUMBER value
+// (we will probably make this configurable)
+#include "core2nfq_dns.h"
+
 #define MAXSTR 1024
 
 // #define SF_ADD			0
@@ -102,6 +106,7 @@ clean_old_tables() {
 static void
 setup_tables() {
     char str[MAXSTR];
+    char nfq_queue_str[MAXSTR];
 
     ignore_system_errors = 1;
     clean_old_tables();
@@ -117,7 +122,8 @@ setup_tables() {
     // Forward all (udp) DNS queries to nfqueue (for core2nfq_dns)
     // Note: only UDP for now, we'll need to reconstruct TCP packets
     // to support that
-    iptab_add_jump(SpinCheck, IAJ_ADD, "-p udp --sport 53", "NFQUEUE --queue-bypass");
+    sprintf(nfq_queue_str, "NFQUEUE --queue-bypass --queue-num %d", CORE2NFQ_DNS_QUEUE_NUMBER);
+    iptab_add_jump(SpinCheck, IAJ_ADD, "-p udp --sport 53", nfq_queue_str);
 
     iptab_do_table(SpinBlock, IDT_MAKE);
     iptab_add_jump(SpinBlock, IAJ_ADD, 0, SpinLog);
