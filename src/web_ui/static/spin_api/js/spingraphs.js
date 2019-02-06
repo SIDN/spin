@@ -1257,8 +1257,7 @@ function handlePeakInformation(result) {
         $("#nodeinfo-notenoughdata:visible").hide();
     }
     
-    if (Object.keys(result["items"]).length <= 59 && 
-            result["maxbytes"] > 0 && result["maxpackets"] > 0) {
+    if (!result["enforcing"]) {
         $("#nodeinfo-training:hidden").show();
     } else {
         $("#nodeinfo-training:visible").hide();
