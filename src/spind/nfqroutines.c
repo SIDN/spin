@@ -70,7 +70,7 @@ static u_int32_t print_pkt (struct nfq_data *tb)
 	ret = nfq_get_payload(tb, &data);
 	if (ret >= 0) {
 		printf("payload_len=%d ", ret);
-		processPacketData (data, ret);
+		// processPacketData (data, ret);
 	}
 	fputc('\n', stdout);
 
@@ -129,7 +129,7 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
 	// TODO what is verdict here
 	verdict = (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, nfr_mapproto(proto),				payload, payloadsize);
 	id = ntohl(ph->packet_id);
-	return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
+	return nfq_set_verdict(qh, id, verdict ? NF_ACCEPT : NF_DROP, 0, NULL);
 }
 
 static struct nfq_handle *library_handle;

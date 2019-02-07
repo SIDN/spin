@@ -160,7 +160,7 @@ static int
 c2b_catch(void *arg, int proto, char* data, int size) {
 
     spin_log(LOG_DEBUG, "c2b_catch %x (%x, %x, %x) %d\n", proto, data[0], data[1], data[2], size);
-    return 1;
+    return 0;		// DROP
 }
 
 static void
