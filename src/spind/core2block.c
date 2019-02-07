@@ -11,6 +11,7 @@
 #include "handle_command.h"
 #include "spin_log.h"
 #include "mainloop.h"
+#include "nfqroutines.h"
 
 #include "spin_list.h"
 
@@ -19,6 +20,7 @@
 // #define SF_ADD			0
 // #define SF_REM			1
 
+#define QUEUE_BLOCK	2
 
 FILE *logfile;
 
@@ -152,11 +154,17 @@ void c2b_changelist(void* arg, int iplist, int addrem, ip_t *ip_addr) {
     c2b_do_rule(tables[iplist], ipv6, addrem, ip_str, targets[iplist]);
 }
 
+static void
+c2b_catch(void *arg, char* data) {
+
+    spin_log(LOG_DEBUG, "c2b_catch");
+}
 
 static void
 setup_catch() {
 
     // Here we set up the catching of kernel messages for LOGed packets
+    nfqroutine_register("core2block", c2b_catch, (void *) 0, QUEUE_BLOCK);
 }
 
 static void
