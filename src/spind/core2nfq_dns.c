@@ -23,7 +23,7 @@ static dns_cache_t* dns_cache;
 static int dns_q_fd;
 
 void
-handle_dns(const u_char *bp, u_int length, long long timestamp)
+handle_dns(const u_char *bp, u_int length, long long timestamp, int protocol)
 {
     ldns_status status;
     ldns_pkt *p = NULL;
@@ -98,9 +98,13 @@ handle_dns(const u_char *bp, u_int length, long long timestamp)
 
 
         dns_pkt_info_t dns_pkt;
-        dns_pkt.family = AF_INET;
-        memset(dns_pkt.ip, 0, 12);
-        memcpy(dns_pkt.ip+12, rdf->_data, rdf->_size);
+        dns_pkt.family = protocol;
+        if (protocol == AF_INET) {
+            memset(dns_pkt.ip, 0, 12);
+            memcpy(dns_pkt.ip+12, rdf->_data, rdf->_size);
+        } else {
+            memcpy(dns_pkt.ip, rdf->_data, rdf->_size);
+        }
         memcpy(dns_pkt.dname, query_rdf->_data, query_rdf->_size);
         // TODO
         dns_pkt.ttl = 1234;
@@ -135,79 +139,17 @@ handle_dns(const u_char *bp, u_int length, long long timestamp)
     ldns_pkt_free(p);
 }
 
-u_int32_t treat_pkt(struct nfq_data *nfa) {
-    int id = 0;
-    struct nfqnl_msg_packet_hdr *ph;
-    unsigned char* data;
-    int ret;
-
-    ph = nfq_get_msg_packet_hdr(nfa);
-    if (ph) {
-        id = ntohl(ph->packet_id);
-        ret = nfq_get_payload(nfa, &data);
-        if (ret >= 28) {
-            handle_dns(data+28, ret-28, 0);
-        }
-    }
-    return id;
-}
-
-//
-// This is the callback called by nfq_handle_packet
-//
-static int nfq_handle_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
-              struct nfq_data *nfa, void *data)
-{
-    u_int32_t id = treat_pkt(nfa); /* Treat packet */
-    return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
-}
-
-//
-// this is the callback called by main loop
-//
-static void core2nfq_dns_mainloop_callback(void *arg, int data, int timeout) {
-    char buf[1024];
-    int dns_q_rv;
-    char dns_q_buf[4096] __attribute__ ((aligned));
-
-    if (timeout) {
-        return;
-    } else {
-        if ((dns_q_rv = recv(dns_q_fd, dns_q_buf, sizeof(dns_q_buf), 0)) >= 0) {
-            nfq_handle_packet(dns_qh, dns_q_buf, dns_q_rv);
-        }
-    }
+static int nfq_dns_callback(void* arg, int protocol, void* data, size_t size) {
+    handle_dns(data, size, 0, protocol);
+    return 1;
 }
 
 void init_core2nfq_dns(node_cache_t* node_cache_a, dns_cache_t* dns_cache_a) {
     node_cache = node_cache_a;
     dns_cache = dns_cache_a;
-
-    // libnetfilter_queue initialization
-    dns_qh = nfq_open();
-    if (!dns_qh) {
-        spin_log(LOG_ERR, "error during nfq_open()\n");
-        exit(1);
-    }
-    dns_q_qh = nfq_create_queue(dns_qh, CORE2NFQ_DNS_QUEUE_NUMBER, &nfq_handle_callback, NULL);
-    if (dns_q_qh == NULL) {
-        spin_log(LOG_ERR, "unable to create Netfilter Queue: %s\n", strerror(errno));
-        exit(1);
-    }
-    if (nfq_set_mode(dns_q_qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
-        spin_log(LOG_ERR, "can't set packet_copy mode\n");
-        exit(1);
-    }
-    dns_q_fd = nfq_fd(dns_qh);
-
-    // Register this module's callback. We only need the callback
-    // called when there is data, so we set the timeout to 0
-    mainloop_register("core2nfq_dns", core2nfq_dns_mainloop_callback, (void *) 0, dns_q_fd, 0);
-
-    spin_log(LOG_DEBUG, "spin core2nfq_dns module initialized and registered\n");
+    
+    nfqroutine_register("core2block", nfq_dns_callback, (void *) 0, CORE2NFQ_DNS_QUEUE_NUMBER);
 }
 
 void cleanup_core2nfq_dns() {
-    nfq_destroy_queue(dns_q_qh);
-    nfq_close(dns_qh);
 }
