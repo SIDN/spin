@@ -156,10 +156,11 @@ void c2b_changelist(void* arg, int iplist, int addrem, ip_t *ip_addr) {
     c2b_do_rule(tables[iplist], ipv6, addrem, ip_str, targets[iplist]);
 }
 
-static void
-c2b_catch(void *arg, char* data) {
+static int
+c2b_catch(void *arg, int proto, char* data, int size) {
 
-    spin_log(LOG_DEBUG, "c2b_catch");
+    spin_log(LOG_DEBUG, "c2b_catch %x (%x, %x, %x) %d\n", proto, data[0], data[1], data[2], size);
+    return 1;
 }
 
 static void

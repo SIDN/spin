@@ -89,15 +89,46 @@ struct nfreg {
 static int n_nfr = 0;
 
 static int
+nfr_find_qh(struct nfq_q_handle *qh) {
+    int i;
+
+    for (i=0; i<n_nfr; i++) {
+	if (nfr[i].nfr_qh == qh)
+	    return i;
+    }
+    return -1;
+}
+
+static int
+nfr_mapproto(int p) {
+
+    if (p == 0x800)
+	return 4;
+    if (p == 0x86DD)
+	return 6;
+    return 0;
+}
+
+static int
 nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
 {
 	u_int32_t id = print_pkt(nfa);
 	//u_int32_t id;
-
+	int proto;
+	char *payload;
+	int payloadsize;
         struct nfqnl_msg_packet_hdr *ph;
-	ph = nfq_get_msg_packet_hdr(nfa);	
-	id = ntohl(ph->packet_id);
+	int fr_n;
+	int verdict;
+
 	printf("entering callback\n");
+	ph = nfq_get_msg_packet_hdr(nfa);	
+	proto = ntohs(ph->hw_protocol);
+	payloadsize = nfq_get_payload(nfa, &payload);
+	fr_n = nfr_find_qh(qh);
+	// TODO what is verdict here
+	verdict = (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, nfr_mapproto(proto),				payload, payloadsize);
+	id = ntohl(ph->packet_id);
 	return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 }
 
