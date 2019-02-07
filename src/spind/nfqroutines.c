@@ -5,11 +5,26 @@
 #include <linux/types.h>
 #include <linux/netfilter.h>		
 #include <libnetfilter_queue/libnetfilter_queue.h>
+#include <fcntl.h>
 
 #include <assert.h>
 
 #include "spin_log.h"
 #include "nfqroutines.h"
+
+static int
+fd_set_blocking(int fd, int blocking) {
+    /* Save the current flags */
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1)
+	return 0;
+
+    if (blocking)
+	flags &= ~O_NONBLOCK;
+    else
+	flags |= O_NONBLOCK;
+    return fcntl(fd, F_SETFL, flags) != -1;
+}
 
 static void
 processPacketData (char *data, int ret) {
@@ -172,6 +187,7 @@ void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
 	    exit(1);
 	}
 	library_fd = nfq_fd(library_handle);
+	fd_set_blocking(library_fd, 0);
 	mainloop_register("nfq", wf_nfq, (void *) 0, library_fd, 0);
     }
 
