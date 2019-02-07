@@ -141,7 +141,7 @@ wf_nfq(void *arg, int data, int timeout) {
     int rv;
 
     if (data) {
-	while ((rv = recv(library_fd, buf, sizeof(buf), 0)))
+	while ((rv = recv(library_fd, buf, sizeof(buf), 0)) > 0)
 	{
 	    printf("pkt received\n");
 	    nfq_handle_packet(library_handle, buf, rv);
