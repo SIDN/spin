@@ -140,11 +140,9 @@ void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
 	    fprintf(stderr, "error during nfq_open()\n");
 	    exit(1);
 	}
+	library_fd = nfq_fd(library_handle);
+	mainloop_register("nfq", wf_nfq, (void *) 0, library_fd, 0);
     }
-
-    library_fd = nfq_fd(library_handle);
-
-    mainloop_register("nfq", wf_nfq, (void *) 0, library_fd, 0);
 
     printf("binding this socket to queue '%d'\n", queue);
     qh = nfq_create_queue(library_handle, queue, &nfq_cb, NULL);

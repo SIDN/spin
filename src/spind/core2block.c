@@ -101,6 +101,7 @@ clean_old_tables() {
 
 static void
 setup_tables() {
+    char str[MAXSTR];
 
     ignore_system_errors = 1;
     clean_old_tables();
@@ -116,7 +117,8 @@ setup_tables() {
 
     iptab_do_table(SpinBlock, IDT_MAKE);
     iptab_add_jump(SpinBlock, IAJ_ADD, 0, SpinLog);
-    iptab_add_jump(SpinBlock, IAJ_ADD, 0, "DROP");
+    sprintf(str, "NFQUEUE --queue-num %d", QUEUE_BLOCK);
+    iptab_add_jump(SpinBlock, IAJ_ADD, 0, str);
 }
 
 static char *iptables_command[2] = { "iptables", "ip6tables" };
