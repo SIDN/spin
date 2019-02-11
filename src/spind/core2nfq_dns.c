@@ -34,8 +34,55 @@ void phexdump(const uint8_t* data, unsigned int size) {
     printf("\n");
 }
 
+// ip: source address of the query sender
+// bp: query packet data
+// length: query packet size
+// timestamp: query time
+// protocol: AF_INET or AF_INET6 (copied to dns_pkt_info)
 void
-handle_dns(const u_char *bp, u_int length, long long timestamp, int protocol)
+handle_dns_query(const u_char *bp, u_int length, uint8_t* src_addr, long long timestamp, int family)
+{
+    ldns_status status;
+    ldns_pkt *p = NULL;
+    ldns_rdf* query_rdf;
+    dns_pkt_info_t dns_pkt;
+    size_t count;
+    char *s;
+    size_t i;
+
+    spin_log(LOG_INFO, "[XX] HANDLE DNS QUERY\n");
+    status = ldns_wire2pkt(&p, bp, length);
+    if (status != LDNS_STATUS_OK) {
+        spin_log(LOG_WARNING, "DNS: could not parse packet: %s\n",
+                 ldns_get_errorstr_by_id(status));
+        goto out;
+    }
+
+    count = ldns_rr_list_rr_count(ldns_pkt_question(p));
+    if (count == 0) {
+        spin_log(LOG_DEBUG, "DNS: no question section\n");
+        goto out;
+    } else if (count > 1) {
+        spin_log(LOG_DEBUG, "DNS: not supported: > 1 RR in question section\n");
+        goto out;
+    }
+
+    query_rdf = ldns_rr_owner(ldns_rr_list_rr(ldns_pkt_question(p), 0));
+
+    dns_pkt.family = family;
+    memcpy(dns_pkt.ip, src_addr, 16);
+    // wireformat or string?
+    // maybe convert now that we have access to lib?
+    memcpy(dns_pkt.dname, query_rdf->_data, query_rdf->_size);
+
+    send_command_dnsquery(&dns_pkt);
+
+out:
+    ldns_pkt_free(p);
+}
+
+void
+handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int protocol)
 {
     ldns_status status;
     ldns_pkt *p = NULL;
@@ -48,6 +95,8 @@ handle_dns(const u_char *bp, u_int length, long long timestamp, int protocol)
     char **ips = NULL;
     size_t ips_len = 0;
     size_t i;
+    
+    spin_log(LOG_INFO, "[XX] HANDLE DNS ANSWER\n");
 
     status = ldns_wire2pkt(&p, bp, length);
     if (status != LDNS_STATUS_OK) {
@@ -122,22 +171,14 @@ handle_dns(const u_char *bp, u_int length, long long timestamp, int protocol)
         dns_pkt.ttl = 1234;
         time_t now = time(NULL);
 
-        if (rdf->_size == 4) {
-            char pktinfo_str[2048];
-            dns_pktinfo2str(pktinfo_str, &dns_pkt, 2048);
-
-            dns_cache_add(dns_cache, &dns_pkt, now);
-            node_cache_add_dns_info(node_cache, &dns_pkt, now);
-        } else {
-            dns_cache_add(dns_cache, &dns_pkt, now);
-            node_cache_add_dns_info(node_cache, &dns_pkt, now);
-        }
-        send_command_dnsquery(&dns_pkt);
+        dns_cache_add(dns_cache, &dns_pkt, now);
+        node_cache_add_dns_info(node_cache, &dns_pkt, now);
 
         ++i;
         rr = ldns_rr_list_pop_rr(answers);
 
     }
+
     for (i = 0; i < ips_len; ++i) {
         spin_log(LOG_DEBUG, "DNS ANSWER: %s %s\n", query, ips[i]);
     }
@@ -151,24 +192,22 @@ handle_dns(const u_char *bp, u_int length, long long timestamp, int protocol)
     ldns_pkt_free(p);
 }
 
-static int nfq_dns_callback(void* arg, int protocol, void* data, size_t size) {
-    size_t header_size = 0;
+
+static int nfq_dns_callback(void* arg, int family, int protocol,
+                            void* data, size_t size,
+                            uint8_t* src_addr, uint8_t* dest_addr,
+                            unsigned int src_port, unsigned int dest_port) {
+    // skip udp header (all packets are udp atm)
+    size_t header_size = 8;
     spin_log(LOG_INFO, "[XX] DNS CALLBACK PROTOCOL %d (4: %d 6: %d)\n", protocol, AF_INET, AF_INET6);
     phexdump(data, size);
-    if (protocol == 4) {
-        header_size = ((uint8_t*)data)[0] & 0x0f;
-        header_size = header_size * 4;
-        header_size += 8;
-        spin_log(LOG_INFO, "[XX] ipv4 dns\n");
-        spin_log(LOG_INFO, "[XX] HEADER SIZE: %u\n", header_size);
-        handle_dns(data+header_size, size-header_size, 0, AF_INET);
-    } else {
-        // IPv6 has a fixed header size, assume no extensions for now
-        header_size = 48;
-        spin_log(LOG_INFO, "[XX] ipv6 dns\n");
-        spin_log(LOG_INFO, "[XX] HEADER SIZE: %u\n", header_size);
-        handle_dns(data+header_size, size-header_size, 0, AF_INET6);
+
+    if (src_port == 53) {
+        handle_dns_answer(data + header_size, size - header_size, 0, family);
+    } else if (dest_port == 53) {
+        handle_dns_query(data + header_size, size - header_size, src_addr, family, 0);
     }
+
     return 1;
 }
 
