@@ -167,9 +167,9 @@ void c2b_changelist(void* arg, int iplist, int addrem, ip_t *ip_addr) {
 }
 
 static int
-c2b_catch(void *arg, int proto, char* data, int size) {
+c2b_catch(void *arg, int af, int proto, char* data, int size, uint8_t *src_addr, uint8_t *dest_addr, unsigned src_port, unsigned dest_port) {
 
-    spin_log(LOG_DEBUG, "c2b_catch %x (%x, %x, %x) %d\n", proto, data[0], data[1], data[2], size);
+    spin_log(LOG_DEBUG, "c2b_catch %d %d %d %d (%x, %x, %x) %d\n", af, proto, src_port, dest_port, data[0], data[1], data[2], size);
     return 0;		// DROP
 }
 

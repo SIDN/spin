@@ -1,15 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <netinet/in.h>
 #include <linux/types.h>
 #include <linux/netfilter.h>		
+#include <linux/udp.h>
+#include <linux/tcp.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
 #include <fcntl.h>
 
 #include <assert.h>
 
 #include "spin_log.h"
+//#include "pkt_info.h"
 #include "nfqroutines.h"
 
 static int
@@ -92,6 +98,146 @@ static u_int32_t print_pkt (struct nfq_data *tb)
 	return id;
 }
 	
+#define UDP_HEADER_SIZE 8
+#define TCP_HEADER_SIZE 20
+
+#define IPV6_HEADER_SIZE 40
+
+#ifdef notdef
+int parse_ipv6_packet(char *data, nt len, pkt_info_t* pkt_info) {
+    //uint8_t* b;
+    struct udphdr *udp_header;
+    struct tcphdr *tcp_header;
+    struct ipv6hdr *ipv6_header;
+
+    ipv6_header = (struct ipv6hdr *) data;
+
+    // hard-code a number of things to ignore; such as broadcasts (for now)
+    /*
+    b = (uint8_t*)(&ipv6_header->daddr);
+    if (*b == 255) {
+        return -1;
+    }*/
+
+    if (ipv6_header->nexthdr == 17) {
+        udp_header = (struct udphdr *) data+IPV6_HEADER_SIZE;
+        pkt_info->src_port = ntohs(udp_header->source);
+        pkt_info->dest_port = ntohs(udp_header->dest);
+        pkt_info->payload_size = (uint32_t)ntohs(udp_header->len) - UDP_HEADER_SIZE;
+        pkt_info->payload_offset = data+IPV6_HEADER_SIZE + UDP_HEADER_SIZE;
+    } else if (ipv6_header->nexthdr == 6) {
+        tcp_header = (struct tcphdr *) data+IPV6_HEADER_SIZE;
+        pkt_info->src_port = ntohs(tcp_header->source);
+        pkt_info->dest_port = ntohs(tcp_header->dest);
+        pkt_info->payload_size = (uint32_t)len - TCP_HEADER_SIZE - (4*tcp_header->doff);
+        if (pkt_info->payload_size > 2) {
+            pkt_info->payload_size = pkt_info->payload_size - 2;
+            pkt_info->payload_offset = data+IPV6_HEADER_SIZE + TCP_HEADER_SIZE + (4*tcp_header->doff) + 2;
+        } else {
+            // if size is zero, ignore tcp packet
+            printf(stderr, "Zero length TCP packet, ignoring\n");
+            pkt_info->payload_size = 0;
+            //pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
+            pkt_info->payload_offset = 0;
+        }
+    } else if (ipv6_header->nexthdr != 58) {
+        if (ipv6_header->nexthdr == 0) {
+            // ignore hop-by-hop option header
+            return 1;
+        } else if (ipv6_header->nexthdr == 44) {
+            // what to do with fragments?
+            return 1;
+        }
+        printf(stderr, "unsupported IPv6 next header: %u\n", ipv6_header->nexthdr);
+        return -1;
+    } else {
+        pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff);
+        pkt_info->payload_offset = skb_network_header_len(sockbuff);
+    }
+
+    // rest of basic info
+    pkt_info->packet_count = 1;
+    pkt_info->family = AF_INET6;
+    pkt_info->protocol = ipv6_header->nexthdr;
+    memcpy(pkt_info->src_addr, &ipv6_header->saddr, 16);
+    memcpy(pkt_info->dest_addr, &ipv6_header->daddr, 16);
+    return 0;
+}
+
+#define IPV4_HEADER_SIZE 20
+
+// Parse packet into pkt_info structure
+// Return values:
+// 0: all ok, structure filled
+// 1: zero-size packet, structure not filled
+// -1: error
+int parse_packet(char *data, len, pkt_info_t* pkt_info) {
+    //uint8_t* b;
+    struct udphdr *udp_header;
+    struct tcphdr *tcp_header;
+    struct ipvhdr *ip_header;
+
+    ip_header = (struct iphdr *)skb_network_header(sockbuff);
+    if (ip_header->version == 6) {
+        return parse_ipv6_packet(sockbuff, pkt_info);
+    }
+
+    // hard-code a number of things to ignore; such as broadcasts (for now)
+    // TODO: this should be based on netmask...
+    /*
+    b = (uint8_t*)(&ip_header->daddr);
+    if (*b == 255 ||
+        *b == 224 ||
+        *b == 239) {
+        return -1;
+    }*/
+
+    if (ip_header->protocol == 17) {
+        udp_header = (struct udphdr *)skb_transport_header(sockbuff);
+        pkt_info->src_port = ntohs(udp_header->source);
+        pkt_info->dest_port = ntohs(udp_header->dest);
+        pkt_info->payload_size = (uint32_t)ntohs(udp_header->len) - 8;
+        pkt_info->payload_offset = skb_network_header_len(sockbuff) + 8;
+    } else if (ip_header->protocol == 6) {
+        tcp_header = (struct tcphdr*)((char*)ip_header + (ip_header->ihl * 4));
+        pkt_info->src_port = ntohs(tcp_header->source);
+        pkt_info->dest_port = ntohs(tcp_header->dest);
+        pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff) - (4*tcp_header->doff);
+        if (pkt_info->payload_size > 2) {
+            pkt_info->payload_size = pkt_info->payload_size - 2;
+            //pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
+            pkt_info->payload_offset = 0;
+        } else {
+            // if size is zero, ignore tcp packet
+            printf(stderr "Payload size: %u\n", pkt_info->payload_size);
+            pkt_info->payload_size = 0;
+            pkt_info->payload_offset = skb_network_header_len(sockbuff) + (4*tcp_header->doff) + 2;
+        }
+    /* ignore some protocols */
+    // TODO: de-capsulate encapsulated ipv6?
+    } else if (ip_header->protocol != 1 &&
+               ip_header->protocol != 2 &&
+               ip_header->protocol != 41
+              ) {
+        printf(stderr "unsupported IPv4 protocol: %u\n", ip_header->protocol);
+        return -1;
+    } else {
+        pkt_info->payload_size = (uint32_t)sockbuff->len - skb_network_header_len(sockbuff);
+        pkt_info->payload_offset = skb_network_header_len(sockbuff);
+    }
+
+    // rest of basic info
+    pkt_info->packet_count = 1;
+    pkt_info->family = AF_INET;
+    pkt_info->protocol = ip_header->protocol;
+    memset(pkt_info->src_addr, 0, 12);
+    memcpy(pkt_info->src_addr + 12, &ip_header->saddr, 4);
+    memset(pkt_info->dest_addr, 0, 12);
+    memcpy(pkt_info->dest_addr + 12, &ip_header->daddr, 4);
+    return 0;
+}
+#endif
+
 #define MAXNFR 5	/* More than this would be excessive */
 static
 struct nfreg {
@@ -125,6 +271,105 @@ nfr_mapproto(int p) {
 }
 
 static int
+nfq_cb_tcp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t *d) {
+    struct tcphdr *tcp_header;
+    unsigned src_port, dest_port;
+    int hdrsize;
+
+    fprintf(stderr, "nfq_cb_tcp %x %d\n", payload, payloadsize);
+
+    tcp_header = (struct tcphdr *) payload;
+    src_port = ntohs(tcp_header->source);
+    dest_port = ntohs(tcp_header->dest);
+
+    hdrsize = 4*tcp_header->doff;
+    return (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, af, 6,
+    		payload+hdrsize, payloadsize-hdrsize, s, d, src_port, dest_port);
+}
+
+static int
+nfq_cb_udp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t *d) {
+    struct udphdr *udp_header;
+    unsigned src_port, dest_port;
+    int hdrsize;
+
+    fprintf(stderr, "nfq_cb_udp %x %d\n", payload, payloadsize);
+
+    udp_header = (struct udphdr *) payload;
+    src_port = ntohs(udp_header->source);
+    dest_port = ntohs(udp_header->dest);
+
+    hdrsize = 8;
+    return (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, af, 17,
+    		payload+hdrsize, payloadsize-hdrsize, s, d, src_port, dest_port);
+}
+
+static int
+nfq_cb_rest(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t *d) {
+
+    fprintf(stderr, "nfq_cb_rest %x %d\n", payload, payloadsize);
+
+    return (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, af, 0,
+    		payload, payloadsize, s, d, 0, 0);
+}
+
+static int
+nfq_cb_ipv4(int fr_n, char *payload, int payloadsize) {
+    struct iphdr *ip_header;
+    uint8_t src_addr[16], dest_addr[16];
+    int hdrsize;
+
+    fprintf(stderr, "nfq_cb_ipv4 %x %d\n", payload, payloadsize);
+    ip_header = (struct iphdr *) payload;
+
+    memset(src_addr, 0, 12);
+    memcpy(src_addr + 12, &ip_header->saddr, 4);
+    memset(dest_addr, 0, 12);
+    memcpy(dest_addr + 12, &ip_header->daddr, 4);
+
+    // handle options etc TODO
+    hdrsize = ip_header->ihl * 4;
+
+    switch(ip_header->protocol) {
+    case 6:
+	// tcp
+	return nfq_cb_tcp(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET, src_addr, dest_addr);
+    case 17:
+	// udp
+	return nfq_cb_udp(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET, src_addr, dest_addr);
+    }
+    fprintf(stderr, "Return unknown ipv4 protocol %x\n", ip_header->protocol);
+    return nfq_cb_rest(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET, src_addr, dest_addr);
+}
+
+static int
+nfq_cb_ipv6(int fr_n, char *payload, int payloadsize) {
+    struct ipv6hdr *ipv6_header;
+    uint8_t src_addr[16], dest_addr[16];
+    int hdrsize;
+
+    fprintf(stderr, "nfq_cb_ipv6 %x %d\n", payload, payloadsize);
+    ipv6_header = (struct ipv6hdr *) payload;
+
+    memcpy(src_addr, &ipv6_header->saddr, 16);
+    memcpy(dest_addr, &ipv6_header->daddr, 16);
+
+    // handle options etc TODO
+    hdrsize = IPV6_HEADER_SIZE;
+
+    switch(ipv6_header->nexthdr) {
+    case 6:
+	// tcp
+	return nfq_cb_tcp(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET6, src_addr, dest_addr);
+    case 17:
+	// udp
+	return nfq_cb_udp(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET6, src_addr, dest_addr);
+    }
+    return 1;	// let's pass anyhow
+}
+
+
+static int
 nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
 {
 	u_int32_t id = print_pkt(nfa);
@@ -138,12 +383,23 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
 
 	printf("entering callback\n");
 	ph = nfq_get_msg_packet_hdr(nfa);	
+	id = ntohl(ph->packet_id);
 	proto = ntohs(ph->hw_protocol);
 	payloadsize = nfq_get_payload(nfa, &payload);
 	fr_n = nfr_find_qh(qh);
+	switch (nfr_mapproto(proto)) {
+	case 4:
+	    verdict = nfq_cb_ipv4(fr_n, payload, payloadsize);
+	    break;
+	case 6:
+	    verdict = nfq_cb_ipv6(fr_n, payload, payloadsize);
+	    break;
+	default:
+	    fprintf(stderr, "Unknown protocol %x\n", proto);
+	    // Who knows? Let's pass it on just in case
+	    verdict = 1;
+	}
 	// TODO what is verdict here
-	verdict = (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, nfr_mapproto(proto),				payload, payloadsize);
-	id = ntohl(ph->packet_id);
 	return nfq_set_verdict(qh, id, verdict ? NF_ACCEPT : NF_DROP, 0, NULL);
 }
 
