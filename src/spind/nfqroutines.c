@@ -281,7 +281,7 @@ nfq_cb_tcp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t
     dest_port = ntohs(tcp_header->dest);
 
     hdrsize = 4*tcp_header->doff;
-    return (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, af,
+    return (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, af, 6,
     		payload+hdrsize, payloadsize-hdrsize, s, d, src_port, dest_port);
 }
 
@@ -296,7 +296,7 @@ nfq_cb_udp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t
     dest_port = ntohs(udp_header->dest);
 
     hdrsize = 8;
-    return (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, af,
+    return (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, af, 17,
     		payload+hdrsize, payloadsize-hdrsize, s, d, src_port, dest_port);
 }
 
@@ -306,6 +306,7 @@ nfq_cb_ipv4(int fr_n, char *payload, int payloadsize) {
     uint8_t src_addr[16], dest_addr[16];
     int hdrsize;
 
+    fprintf(stderr, "nfq_cb_ipv4 %x %d\n", payload, payloadsize);
     ip_header = (struct iphdr *) payload;
 
     memset(src_addr, 0, 12);
@@ -333,6 +334,7 @@ nfq_cb_ipv6(int fr_n, char *payload, int payloadsize) {
     uint8_t src_addr[16], dest_addr[16];
     int hdrsize;
 
+    fprintf(stderr, "nfq_cb_ipv6 %x %d\n", payload, payloadsize);
     ipv6_header = (struct ipv6hdr *) payload;
 
     memcpy(src_addr, &ipv6_header->saddr, 16);
@@ -379,6 +381,7 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
 	    verdict = nfq_cb_ipv6(fr_n, payload, payloadsize);
 	    break;
 	default:
+	    fprintf(stderr, "Unknown protocol %x\n", proto);
 	    // Who knows? Let's pass it on just in case
 	    verdict = 1;
 	}
