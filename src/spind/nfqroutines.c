@@ -276,6 +276,8 @@ nfq_cb_tcp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t
     unsigned src_port, dest_port;
     int hdrsize;
 
+    fprintf(stderr, "nfq_cb_tcp %x %d\n", payload, payloadsize);
+
     tcp_header = (struct tcphdr *) payload;
     src_port = ntohs(tcp_header->source);
     dest_port = ntohs(tcp_header->dest);
@@ -291,6 +293,8 @@ nfq_cb_udp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t
     unsigned src_port, dest_port;
     int hdrsize;
 
+    fprintf(stderr, "nfq_cb_udp %x %d\n", payload, payloadsize);
+
     udp_header = (struct udphdr *) payload;
     src_port = ntohs(udp_header->source);
     dest_port = ntohs(udp_header->dest);
@@ -298,6 +302,15 @@ nfq_cb_udp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t
     hdrsize = 8;
     return (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, af, 17,
     		payload+hdrsize, payloadsize-hdrsize, s, d, src_port, dest_port);
+}
+
+static int
+nfq_cb_rest(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t *d) {
+
+    fprintf(stderr, "nfq_cb_rest %x %d\n", payload, payloadsize);
+
+    return (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, af, 0,
+    		payload, payloadsize, s, d, 0, 0);
 }
 
 static int
@@ -325,7 +338,8 @@ nfq_cb_ipv4(int fr_n, char *payload, int payloadsize) {
 	// udp
 	return nfq_cb_udp(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET, src_addr, dest_addr);
     }
-    return 1;	// let's pass anyhow
+    fprintf(stderr, "Return unknown ipv4 protocol %x\n", ip_header->protocol);
+    return nfq_cb_rest(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET, src_addr, dest_addr);
 }
 
 static int
