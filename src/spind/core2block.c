@@ -160,6 +160,7 @@ static int
 c2b_catch(void *arg, int af, int proto, char* data, int size, uint8_t *src_addr, uint8_t *dest_addr, unsigned src_port, unsigned dest_port) {
 
     spin_log(LOG_DEBUG, "c2b_catch %d %d %d %d (%x, %x, %x) %d\n", af, proto, src_port, dest_port, data[0], data[1], data[2], size);
+    report_block(af, proto, src_addr, dest_addr, src_port, dest_port, size);
     return 0;		// DROP
 }
 

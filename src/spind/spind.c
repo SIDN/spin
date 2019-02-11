@@ -145,6 +145,22 @@ void maybe_sendflow(flow_list_t *flow_list, time_t now) {
 	buffer_destroy(json_buf);
 }
 
+void
+report_block(int af, int proto, uint8_t *src_addr, uint8_t *dest_addr, unsigned src_port, unsigned dest_port, int payloadsize) {
+    pkt_info_t pkt;
+
+    pkt.family = af;
+    pkt.protocol = proto;
+    memcpy(pkt.src_addr, src_addr, 16);
+    memcpy(pkt.dest_addr, dest_addr, 16);
+    pkt.src_port = src_port;
+    pkt.dest_port = dest_port;
+    pkt.payload_size = payloadsize;
+    pkt.packet_count = 1;
+
+    send_command_blocked(&pkt);
+}
+
 /*
  * The three lists of IP addresses are now kept in memory in spind, with
  * a copy written to file.
