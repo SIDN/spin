@@ -16,6 +16,7 @@
 
 #include "spin_log.h"
 //#include "pkt_info.h"
+#include "mainloop.h"
 #include "nfqroutines.h"
 
 static int
@@ -53,7 +54,7 @@ static u_int32_t print_pkt (struct nfq_data *tb)
     struct nfqnl_msg_packet_hw *hwph;
     u_int32_t mark,ifi; 
     int ret;
-    char *data;
+    unsigned char *data;
 
     ph = nfq_get_msg_packet_hdr(tb);
     if (ph) {
@@ -226,7 +227,7 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
         // u_int32_t id = print_pkt(nfa);
         u_int32_t id;
         int proto;
-        char *payload;
+        unsigned char *payload;
         int payloadsize;
         struct nfqnl_msg_packet_hdr *ph;
         int fr_n;
@@ -289,7 +290,7 @@ void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
         spin_log(LOG_DEBUG, "opening library handle\n");
         library_handle = nfq_open();
         if (!library_handle) {
-            spin_log(LOG_ERROR, "error during nfq_open()\n");
+            spin_log(LOG_ERR, "error during nfq_open()\n");
             exit(1);
         }
         library_fd = nfq_fd(library_handle);
@@ -300,13 +301,13 @@ void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
     spin_log(LOG_DEBUG, "binding this socket to queue '%d'\n", queue);
     qh = nfq_create_queue(library_handle, queue, &nfq_cb, NULL);
     if (!qh) {
-        spin_log(LOG_ERROR, "error during nfq_create_queue()\n");
+        spin_log(LOG_ERR, "error during nfq_create_queue()\n");
         exit(1);
     }
 
     spin_log(LOG_DEBUG, "setting copy_packet mode\n");
     if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
-        spin_log(LOG_ERROR, "can't set packet_copy mode\n");
+        spin_log(LOG_ERR, "can't set packet_copy mode\n");
         exit(1);
     }
 

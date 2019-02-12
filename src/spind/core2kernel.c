@@ -128,13 +128,16 @@ void wf_netlink(void *arg, int data, int timeout) {
         dns_pkt_info_t dns_pkt;
         char pkt_str[2048];
         type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
+#ifdef notdef
         if (type == SPIN_BLOCKED) {
             //pktinfo2str(pkt_str, &pkt, 2048);
             //printf("[BLOCKED] %s\n", pkt_str);
             node_cache_add_pkt_info(node_cache, &pkt, now);
             send_command_blocked(&pkt);
             check_send_ack();
-        } else if (type == SPIN_TRAFFIC_DATA) {
+        } else
+#endif
+        if (type == SPIN_TRAFFIC_DATA) {
             //pktinfo2str(pkt_str, &pkt, 2048);
             //printf("[TRAFFIC] %s\n", pkt_str);
             //print_pktinfo_wirehex(&pkt);
