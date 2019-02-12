@@ -136,8 +136,6 @@ nfq_cb_tcp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t
     unsigned src_port, dest_port;
     int hdrsize;
 
-    // fprintf(stderr, "nfq_cb_tcp %x %d\n", payload, payloadsize);
-
     tcp_header = (struct tcphdr *) payload;
     src_port = ntohs(tcp_header->source);
     dest_port = ntohs(tcp_header->dest);
@@ -153,8 +151,6 @@ nfq_cb_udp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t
     unsigned src_port, dest_port;
     int hdrsize;
 
-    // fprintf(stderr, "nfq_cb_udp %x %d\n", payload, payloadsize);
-
     udp_header = (struct udphdr *) payload;
     src_port = ntohs(udp_header->source);
     dest_port = ntohs(udp_header->dest);
@@ -167,8 +163,6 @@ nfq_cb_udp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t
 static int
 nfq_cb_rest(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t *d) {
 
-    // fprintf(stderr, "nfq_cb_rest %x %d\n", payload, payloadsize);
-
     return (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, af, 0,
                 payload, payloadsize, s, d, 0, 0);
 }
@@ -179,7 +173,6 @@ nfq_cb_ipv4(int fr_n, char *payload, int payloadsize) {
     uint8_t src_addr[16], dest_addr[16];
     int hdrsize;
 
-    // fprintf(stderr, "nfq_cb_ipv4 %x %d\n", payload, payloadsize);
     ip_header = (struct iphdr *) payload;
 
     memset(src_addr, 0, 12);
@@ -198,7 +191,6 @@ nfq_cb_ipv4(int fr_n, char *payload, int payloadsize) {
         // udp
         return nfq_cb_udp(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET, src_addr, dest_addr);
     }
-    fprintf(stderr, "Return unknown ipv4 protocol %x\n", ip_header->protocol);
     return nfq_cb_rest(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET, src_addr, dest_addr);
 }
 
@@ -208,7 +200,6 @@ nfq_cb_ipv6(int fr_n, char *payload, int payloadsize) {
     uint8_t src_addr[16], dest_addr[16];
     int hdrsize;
 
-    // fprintf(stderr, "nfq_cb_ipv6 %x %d\n", payload, payloadsize);
     ipv6_header = (struct ipv6hdr *) payload;
 
     memcpy(src_addr, &ipv6_header->saddr, 16);
@@ -255,7 +246,7 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
             verdict = nfq_cb_ipv6(fr_n, payload, payloadsize);
             break;
         default:
-            fprintf(stderr, "Unknown protocol %x\n", proto);
+            spin_log(LOG_DEBUG, "Unknown protocol %x\n", proto);
             // Who knows? Let's pass it on just in case
             verdict = 1;
         }
@@ -274,7 +265,6 @@ wf_nfq(void *arg, int data, int timeout) {
     if (data) {
         while ((rv = recv(library_fd, buf, sizeof(buf), 0)) > 0)
         {
-            printf("pkt received\n");
             nfq_handle_packet(library_handle, buf, rv);
         }
     }
@@ -299,7 +289,7 @@ void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
         spin_log(LOG_DEBUG, "opening library handle\n");
         library_handle = nfq_open();
         if (!library_handle) {
-            fprintf(stderr, "error during nfq_open()\n");
+            spin_log(LOG_ERROR, "error during nfq_open()\n");
             exit(1);
         }
         library_fd = nfq_fd(library_handle);
@@ -310,13 +300,13 @@ void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
     spin_log(LOG_DEBUG, "binding this socket to queue '%d'\n", queue);
     qh = nfq_create_queue(library_handle, queue, &nfq_cb, NULL);
     if (!qh) {
-        fprintf(stderr, "error during nfq_create_queue()\n");
+        spin_log(LOG_ERROR, "error during nfq_create_queue()\n");
         exit(1);
     }
 
     spin_log(LOG_DEBUG, "setting copy_packet mode\n");
     if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
-        fprintf(stderr, "can't set packet_copy mode\n");
+        spin_log(LOG_ERROR, "can't set packet_copy mode\n");
         exit(1);
     }
 
