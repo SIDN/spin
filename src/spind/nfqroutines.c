@@ -296,7 +296,7 @@ void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
      * At first call open library and call mainloop_register
      */
     if (n_nfr == 0) {
-        printf("opening library handle\n");
+        spin_log(LOG_DEBUG, "opening library handle\n");
         library_handle = nfq_open();
         if (!library_handle) {
             fprintf(stderr, "error during nfq_open()\n");
@@ -307,14 +307,14 @@ void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
         mainloop_register("nfq", wf_nfq, (void *) 0, library_fd, 0);
     }
 
-    printf("binding this socket to queue '%d'\n", queue);
+    spin_log(LOG_DEBUG, "binding this socket to queue '%d'\n", queue);
     qh = nfq_create_queue(library_handle, queue, &nfq_cb, NULL);
     if (!qh) {
         fprintf(stderr, "error during nfq_create_queue()\n");
         exit(1);
     }
 
-    printf("setting copy_packet mode\n");
+    spin_log(LOG_DEBUG, "setting copy_packet mode\n");
     if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
         fprintf(stderr, "can't set packet_copy mode\n");
         exit(1);

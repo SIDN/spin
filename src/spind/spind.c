@@ -444,7 +444,7 @@ void handle_command_get_iplist(int iplist, const char* json_command) {
     }
     buffer_finish(result_json);
 
-    fprintf(stderr, "[XX] get_iplist result %s\n", buffer_str(result_json));
+    spin_log(LOG_DEBUG, "get_iplist result %s\n", buffer_str(result_json));
 
     response_size = create_mqtt_command(response_json, json_command, NULL, buffer_str(result_json));
     if (!buffer_ok(response_json)) {

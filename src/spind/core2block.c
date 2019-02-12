@@ -31,6 +31,9 @@ setup_debug() {
     setbuf(logfile, NULL);
 }
 
+/*
+ * At startup cleaning up could cause errors
+ */
 static int ignore_system_errors;
 
 static void
