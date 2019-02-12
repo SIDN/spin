@@ -22,25 +22,13 @@ static node_cache_t* node_cache;
 static dns_cache_t* dns_cache;
 static int dns_q_fd;
 
-void phexdump(const uint8_t* data, unsigned int size) {
-    unsigned int i;
-    printf("00: ");
-    for (i = 0; i < size; i++) {
-        if (i > 0 && i % 10 == 0) {
-            printf("\n%u: ", i);
-        }
-        printf("%02x ", data[i]);
-    }
-    printf("\n");
-}
-
 // ip: source address of the query sender
 // bp: query packet data
 // length: query packet size
 // timestamp: query time
 // protocol: AF_INET or AF_INET6 (copied to dns_pkt_info)
 void
-handle_dns_query(const u_char *bp, u_int length, uint8_t* src_addr, long long timestamp, int family)
+handle_dns_query(const u_char *bp, u_int length, uint8_t* src_addr, int family, long long timestamp)
 {
     ldns_status status;
     ldns_pkt *p = NULL;
@@ -50,11 +38,11 @@ handle_dns_query(const u_char *bp, u_int length, uint8_t* src_addr, long long ti
     char *s;
     size_t i;
 
-    spin_log(LOG_INFO, "[XX] HANDLE DNS QUERY\n");
     status = ldns_wire2pkt(&p, bp, length);
     if (status != LDNS_STATUS_OK) {
         spin_log(LOG_WARNING, "DNS: could not parse packet: %s\n",
                  ldns_get_errorstr_by_id(status));
+        phexdump(bp, length);
         goto out;
     }
 
@@ -71,10 +59,12 @@ handle_dns_query(const u_char *bp, u_int length, uint8_t* src_addr, long long ti
 
     dns_pkt.family = family;
     memcpy(dns_pkt.ip, src_addr, 16);
+    dns_pkt.ttl = 0;
     // wireformat or string?
     // maybe convert now that we have access to lib?
     memcpy(dns_pkt.dname, query_rdf->_data, query_rdf->_size);
 
+    node_cache_add_dns_query_info(node_cache, &dns_pkt, timestamp);
     send_command_dnsquery(&dns_pkt);
 
 out:
@@ -96,12 +86,11 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
     size_t ips_len = 0;
     size_t i;
     
-    spin_log(LOG_INFO, "[XX] HANDLE DNS ANSWER\n");
-
     status = ldns_wire2pkt(&p, bp, length);
     if (status != LDNS_STATUS_OK) {
         spin_log(LOG_WARNING, "DNS: could not parse packet: %s\n",
                  ldns_get_errorstr_by_id(status));
+        phexdump(bp, length);
         goto out;
     }
 
@@ -198,14 +187,14 @@ static int nfq_dns_callback(void* arg, int family, int protocol,
                             uint8_t* src_addr, uint8_t* dest_addr,
                             unsigned int src_port, unsigned int dest_port) {
     // skip udp header (all packets are udp atm)
-    size_t header_size = 8;
-    spin_log(LOG_INFO, "[XX] DNS CALLBACK PROTOCOL %d (4: %d 6: %d)\n", protocol, AF_INET, AF_INET6);
-    phexdump(data, size);
+    size_t header_size = 0;
 
     if (src_port == 53) {
         handle_dns_answer(data + header_size, size - header_size, 0, family);
     } else if (dest_port == 53) {
-        handle_dns_query(data + header_size, size - header_size, src_addr, family, 0);
+        time_t now = time(NULL);
+
+        handle_dns_query(data + header_size, size - header_size, src_addr, family, now);
     }
 
     return 1;

@@ -11,6 +11,18 @@
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
 #define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); }
 
+void phexdump(const uint8_t* data, unsigned int size) {
+    unsigned int i;
+    printf("00: ");
+    for (i = 0; i < size; i++) {
+        if (i > 0 && i % 10 == 0) {
+            printf("\n%u: ", i);
+        }
+        printf("%02x ", data[i]);
+    }
+    printf("\n");
+}
+
 int cmp_ints(size_t size_a, const void* key_a, size_t size_b, const void* key_b) {
     int *a, *b;
     assert(size_a == sizeof(*a));

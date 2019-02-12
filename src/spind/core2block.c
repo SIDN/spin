@@ -124,6 +124,7 @@ setup_tables() {
     // to support that
     sprintf(nfq_queue_str, "NFQUEUE --queue-bypass --queue-num %d", CORE2NFQ_DNS_QUEUE_NUMBER);
     iptab_add_jump(SpinCheck, IAJ_ADD, "-p udp --sport 53", nfq_queue_str);
+    iptab_add_jump(SpinCheck, IAJ_ADD, "-p udp --dport 53", nfq_queue_str);
 
     iptab_do_table(SpinBlock, IDT_MAKE);
     iptab_add_jump(SpinBlock, IAJ_ADD, 0, SpinLog);
