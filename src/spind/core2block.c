@@ -14,6 +14,7 @@
 #include "nfqroutines.h"
 
 #include "spin_list.h"
+#include "spind.h"
 
 // needed for the CORE2NFQ_DNS_QUEUE_NUMBER value
 // (we will probably make this configurable)

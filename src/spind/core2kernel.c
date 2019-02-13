@@ -9,6 +9,7 @@
 #include "spin_list.h"
 #include "node_cache.h"
 
+#include "spind.h"
 #include "mainloop.h"
 #include "spin_log.h"
 
