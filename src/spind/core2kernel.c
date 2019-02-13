@@ -84,19 +84,20 @@ wf_do_ip(void *arg, int iplist, int addrem, ip_t *ip_addr) {
 
     switch (iplist) {
     case IPLIST_BLOCK:
-	cmd = addrem == SF_ADD ? SPIN_CMD_ADD_BLOCK : SPIN_CMD_REMOVE_BLOCK;
-	break;
+        cmd = addrem == SF_ADD ? SPIN_CMD_ADD_BLOCK : SPIN_CMD_REMOVE_BLOCK;
+        break;
     case IPLIST_IGNORE:
-	cmd = addrem == SF_ADD ? SPIN_CMD_ADD_IGNORE : SPIN_CMD_REMOVE_IGNORE;
-	break;
+        cmd = addrem == SF_ADD ? SPIN_CMD_ADD_IGNORE : SPIN_CMD_REMOVE_IGNORE;
+        break;
     case IPLIST_ALLOW:
-	cmd = addrem == SF_ADD ? SPIN_CMD_ADD_EXCEPT : SPIN_CMD_REMOVE_EXCEPT;
-	break;
+        cmd = addrem == SF_ADD ? SPIN_CMD_ADD_EXCEPT : SPIN_CMD_REMOVE_EXCEPT;
+        break;
     }
 
     // Do not get in the way of iptables block
-    if (cmd != SPIN_CMD_ADD_BLOCK)
-	core2kernel_do_ip(cmd, ip_addr);
+    if (cmd != SPIN_CMD_ADD_BLOCK) {
+        core2kernel_do_ip(cmd, ip_addr);
+    }
 }
 
 static
@@ -108,44 +109,100 @@ void wf_netlink(void *arg, int data, int timeout) {
     now = time(NULL);
     if (timeout) {
 
-	// do timeout things
-	// nothing so far
+        // do timeout things
+        // nothing so far
     }
     if (data) {
-	rs = recvmsg(traffic_sock_fd, &traffic_msg, 0);
+        rs = recvmsg(traffic_sock_fd, &traffic_msg, 0);
 
-	if (rs < 0) {
-	    return;
-	}
-	// c++;
-	//printf("C: %u RS: %u\n", c, rs);
-	//printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
-	pkt_info_t pkt;
-	dns_pkt_info_t dns_pkt;
-	char pkt_str[2048];
-	type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
-	if (type == SPIN_BLOCKED) {
-	    //pktinfo2str(pkt_str, &pkt, 2048);
-	    //printf("[BLOCKED] %s\n", pkt_str);
-	    node_cache_add_pkt_info(node_cache, &pkt, now);
-	    send_command_blocked(&pkt);
-	    check_send_ack();
-	} else if (type == SPIN_TRAFFIC_DATA) {
-        // this is now handled by core2conntrack
-	} else if (type == SPIN_DNS_ANSWER) {
-	    // this is now handled by core2nfq_dns
-	} else if (type == SPIN_DNS_QUERY) {
-        // this is now handled by core2nfq_dns
-	} else if (type == SPIN_ERR_BADVERSION) {
-	    printf("Error: version mismatch between client and kernel module\n");
-	} else {
-	    printf("unknown type? %u\n", type);
-	}
+        if (rs < 0) {
+            return;
+        }
+        // c++;
+        //printf("C: %u RS: %u\n", c, rs);
+        //printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
+        pkt_info_t pkt;
+        dns_pkt_info_t dns_pkt;
+        char pkt_str[2048];
+        type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
+#ifdef notdef
+        if (type == SPIN_BLOCKED) {
+            //pktinfo2str(pkt_str, &pkt, 2048);
+            //printf("[BLOCKED] %s\n", pkt_str);
+            node_cache_add_pkt_info(node_cache, &pkt, now);
+            send_command_blocked(&pkt);
+            check_send_ack();
+        } else
+#endif
+        if (type == SPIN_TRAFFIC_DATA) {
+            //pktinfo2str(pkt_str, &pkt, 2048);
+            //printf("[TRAFFIC] %s\n", pkt_str);
+            //print_pktinfo_wirehex(&pkt);
+            node_cache_add_pkt_info(node_cache, &pkt, now);
+
+            // small experiment; check if either endpoint is an internal device, if not,
+            // skip reporting it
+            // (if this is useful, we should do this check in add_pkt_info above, probably)
+            ip_t ip;
+            node_t* src_node;
+            node_t* dest_node;
+            ip.family = pkt.family;
+            memcpy(ip.addr, pkt.src_addr, 16);
+            src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+            memcpy(ip.addr, pkt.dest_addr, 16);
+            dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+            if (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL && !local_mode)) {
+                return;
+            }
+
+            maybe_sendflow(flow_list, now);
+            // add the current one
+            flow_list_add_pktinfo(flow_list, &pkt);
+            check_send_ack();
+        } else if (type == SPIN_DNS_ANSWER) {
+            // note: bad version would have been caught in wire2pktinfo
+            // in this specific case
+            wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
+
+            // DNS answers are not relayed as traffic; we only
+            // store them internally, so later traffic can be
+            // matched to the DNS answer by IP address lookup
+            dns_cache_add(dns_cache, &dns_pkt, now);
+            node_cache_add_dns_info(node_cache, &dns_pkt, now);
+            // TODO do we need to send nodeUpdate?
+            check_send_ack();
+        } else if (type == SPIN_DNS_QUERY) {
+            // We do want to relay dns query information to
+            // clients; it should be sent as command of
+            // type 'dnsquery'
+
+
+            // the info now contains:
+            // - domain name queried
+            // - ip address doing the query
+            // - 0 ttl value
+            wire2dns_pktinfo(&dns_pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
+            // XXXXX this would add wrong ip
+            // If the queried domain name isn't known, we add it as a new node
+            // (with only a domain name)
+            node_cache_add_dns_query_info(node_cache, &dns_pkt, now);
+            //node_cache_add_pkt_info(node_cache, &dns_pkt, now, 1);
+            // We do send a separate notification for the clients that are interested
+            send_command_dnsquery(&dns_pkt);
+
+
+            // TODO do we need to send nodeUpdate?
+            check_send_ack();
+        } else if (type == SPIN_ERR_BADVERSION) {
+            printf("Error: version mismatch between client and kernel module\n");
+        } else {
+            printf("unknown type? %u\n", type);
+        }
     }
 #ifdef notdef
     else {
-	spin_log(LOG_ERR, "Unexpected result from netlink socket (%d)\n", fds[0].revents);
-	usleep(500000);
+        spin_log(LOG_ERR, "Unexpected result from netlink socket (%d)\n", fds[0].revents);
+        usleep(500000);
     }
 #endif
 }

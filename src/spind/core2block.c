@@ -21,10 +21,10 @@
 
 #define MAXSTR 1024
 
-// #define SF_ADD			0
-// #define SF_REM			1
+// #define SF_ADD                       0
+// #define SF_REM                       1
 
-#define QUEUE_BLOCK	2
+#define QUEUE_BLOCK     2
 
 FILE *logfile;
 
@@ -35,6 +35,9 @@ setup_debug() {
     setbuf(logfile, NULL);
 }
 
+/*
+ * At startup cleaning up could cause errors
+ */
 static int ignore_system_errors;
 
 static void
@@ -46,9 +49,9 @@ iptab_system(char *s) {
     assert (ignore_system_errors || result == 0);
 }
 
-#define IDT_MAKE	0
-#define IDT_DEL		1
-#define IDT_FLUSH	2
+#define IDT_MAKE        0
+#define IDT_DEL         1
+#define IDT_FLUSH       2
 
 static void
 iptab_do_table(char *name, int delete) {
@@ -61,7 +64,7 @@ iptab_do_table(char *name, int delete) {
     iptab_system(str);
 }
 
-#define IAJ_ADD	0
+#define IAJ_ADD 0
 #define IAJ_INS 1
 #define IAJ_DEL 2
 
@@ -71,10 +74,10 @@ iptab_add_jump(char *table, int option, char *cond, char *dest) {
     static char *iaj_option[3] = { "-A", "-I", "-D" };
 
     sprintf(str, "iptables %s %s%s%s -j %s", iaj_option[option], table,
-    			cond ? " " : "", cond ? cond : "", dest);
+                        cond ? " " : "", cond ? cond : "", dest);
     iptab_system(str);
     sprintf(str, "ip6tables %s %s%s%s -j %s", iaj_option[option], table,
-    			cond ? " " : "", cond ? cond : "", dest);
+                        cond ? " " : "", cond ? cond : "", dest);
     iptab_system(str);
 }
 
@@ -144,8 +147,8 @@ c2b_do_rule(char *table, int ipv6, int addrem, char *ip_str, char *target) {
     cmd = iptables_command[ipv6];
     flag = addrem == SF_ADD ? "-I": "-D";
     for (i=0; i<2; i++) {
-	sprintf(str, "%s %s %s %s %s -j %s", cmd, flag, table, srcdst[i], ip_str, target);
-	iptab_system(str);
+        sprintf(str, "%s %s %s %s %s -j %s", cmd, flag, table, srcdst[i], ip_str, target);
+        iptab_system(str);
     }
 }
 
@@ -159,8 +162,9 @@ void c2b_changelist(void* arg, int iplist, int addrem, ip_t *ip_addr) {
 
 
     // IP v4 or 6, decode address
-    if (ip_addr->family != AF_INET)
-	ipv6 = 1;
+    if (ip_addr->family != AF_INET) {
+        ipv6 = 1;
+    }
     spin_ntop(ip_str, ip_addr, INET6_ADDRSTRLEN);
     spin_log(LOG_DEBUG, "Change list %d %d %d %s\n", iplist, addrem, ipv6, ip_str);
 
@@ -171,7 +175,8 @@ static int
 c2b_catch(void *arg, int af, int proto, char* data, int size, uint8_t *src_addr, uint8_t *dest_addr, unsigned src_port, unsigned dest_port) {
 
     spin_log(LOG_DEBUG, "c2b_catch %d %d %d %d (%x, %x, %x) %d\n", af, proto, src_port, dest_port, data[0], data[1], data[2], size);
-    return 0;		// DROP
+    report_block(af, proto, src_addr, dest_addr, src_port, dest_port, size);
+    return 0;           // DROP
 }
 
 static void
@@ -186,8 +191,8 @@ wf_core2block(void *arg, int data, int timeout) {
     char buf[1024];
 
     if (timeout) {
-	spin_log(LOG_DEBUG, "wf_core2block called\n");
-	// TODO Do something with kernel messages
+        spin_log(LOG_DEBUG, "wf_core2block called\n");
+        // TODO Do something with kernel messages
     }
 }
 

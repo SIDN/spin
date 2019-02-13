@@ -10,7 +10,7 @@
 
 #include "handle_command.h"
 
-#define MOSQUITTO_KEEPALIVE_TIME 60	/* Seconds */
+#define MOSQUITTO_KEEPALIVE_TIME 60     /* Seconds */
 
 #define MQTT_CHANNEL_TRAFFIC "SPIN/traffic"
 #define MQTT_CHANNEL_COMMANDS "SPIN/commands"
@@ -31,8 +31,8 @@ pubsub_publish(int payloadlen, const void* payload) {
      * There is a result from command, but for now ignored
      */
     mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC,
-    				payloadlen, payload,
-				0, false);
+                                payloadlen, payload,
+                                0, false);
 }
 
 void core2pubsub_publish(buffer_t *buf) {
@@ -94,10 +94,10 @@ json_parse_ip_arg(ip_t* dest,
     char ip_str[INET6_ADDRSTRLEN];
 
     if (!json_parse_string_arg(ip_str, INET6_ADDRSTRLEN,
-    			json_str, tokens, argument_token_i))
+                        json_str, tokens, argument_token_i))
         return 0;
     if(!spin_pton(dest, ip_str))
-	return 0;
+        return 0;
     return 1;
 }
 
@@ -116,18 +116,18 @@ json_parse_node_id_name_arg(int* node_id,
     if (token.type != JSMN_OBJECT || token.size != 2)
         return 0;
     for (i = 0; i < token.size; i++) {
-	// i*2 is name, i*2 + 1 is value
-	i_n = argument_token_i + i*2 + 1;
-	i_v = argument_token_i + i*2 + 2;
-	if (strncmp("name", json_str + tokens[i_n].start, tokens[i_n].end-tokens[i_n].start) == 0) {
-	    if(!json_parse_string_arg(name, name_size, json_str, tokens, i_v))
-		return 0;
-	    name_found = 1;
-	} else if (strncmp("node_id", json_str + tokens[i_n].start, tokens[i_n].end-tokens[i_n].start) == 0) {
-	    if(!json_parse_int_arg(node_id, json_str, tokens, i_v))
-		return 0;
-	    id_found = 1;
-	}
+        // i*2 is name, i*2 + 1 is value
+        i_n = argument_token_i + i*2 + 1;
+        i_v = argument_token_i + i*2 + 2;
+        if (strncmp("name", json_str + tokens[i_n].start, tokens[i_n].end-tokens[i_n].start) == 0) {
+            if(!json_parse_string_arg(name, name_size, json_str, tokens, i_v))
+                return 0;
+            name_found = 1;
+        } else if (strncmp("node_id", json_str + tokens[i_n].start, tokens[i_n].end-tokens[i_n].start) == 0) {
+            if(!json_parse_int_arg(node_id, json_str, tokens, i_v))
+                return 0;
+            id_found = 1;
+        }
     }
     return (name_found && id_found);
 }
@@ -137,43 +137,43 @@ json_parse_node_id_name_arg(int* node_id,
  */
 
 // Commands
-#define PSC_V_ADD		SF_ADD
-#define PSC_V_REM		SF_REM
-#define PSC_V_REM_IP		N_SF + 0
-#define PSC_V_RESET		N_SF + 1
-#define PSC_V_GET		N_SF + 2
+#define PSC_V_ADD               SF_ADD
+#define PSC_V_REM               SF_REM
+#define PSC_V_REM_IP            N_SF + 0
+#define PSC_V_RESET             N_SF + 1
+#define PSC_V_GET               N_SF + 2
 
 // Types
-#define PSC_O_BLOCK		IPLIST_BLOCK
-#define PSC_O_IGNORE		IPLIST_IGNORE
-#define PSC_O_ALLOW		IPLIST_ALLOW
-#define PSC_O_NAME		N_IPLIST + 0
+#define PSC_O_BLOCK             IPLIST_BLOCK
+#define PSC_O_IGNORE            IPLIST_IGNORE
+#define PSC_O_ALLOW             IPLIST_ALLOW
+#define PSC_O_NAME              N_IPLIST + 0
 
-#define STR_AND_LEN(s)	s, (sizeof(s)-1)
+#define STR_AND_LEN(s)  s, (sizeof(s)-1)
 
 static struct pubsub_commands {
-    char *	psc_commandstr;		// String of command
-    int		psc_commandlen;		// Length of command
-    int		psc_verb;		// Verb
-    int		psc_object;		// Object
+    char *      psc_commandstr;         // String of command
+    int         psc_commandlen;         // Length of command
+    int         psc_verb;               // Verb
+    int         psc_object;             // Object
 } pubsub_commands[] = {
-    { STR_AND_LEN("get_filters"),	PSC_V_GET,	PSC_O_IGNORE},
-    { STR_AND_LEN("get_blocks"),	PSC_V_GET,	PSC_O_BLOCK},
-    { STR_AND_LEN("get_alloweds"),	PSC_V_GET,	PSC_O_ALLOW},
-    { STR_AND_LEN("get_names"),		PSC_V_GET,	PSC_O_NAME },
-    { STR_AND_LEN("add_filter"),	PSC_V_ADD,	PSC_O_IGNORE}, // Backw
-    { STR_AND_LEN("add_filter_node"),	PSC_V_ADD,	PSC_O_IGNORE},
-    { STR_AND_LEN("add_name"),		PSC_V_ADD,	PSC_O_NAME},
-    { STR_AND_LEN("add_block_node"),	PSC_V_ADD,	PSC_O_BLOCK},
-    { STR_AND_LEN("add_allow_node"),	PSC_V_ADD,	PSC_O_ALLOW},
-    { STR_AND_LEN("remove_filter"),	PSC_V_REM_IP,	PSC_O_IGNORE}, // Backw
-    { STR_AND_LEN("remove_filter_node"),PSC_V_REM,	PSC_O_IGNORE},
-    { STR_AND_LEN("remove_filter_ip"),	PSC_V_REM_IP,	PSC_O_IGNORE},
-    { STR_AND_LEN("remove_block_node"),	PSC_V_REM,	PSC_O_BLOCK},
-    { STR_AND_LEN("remove_block_ip"),	PSC_V_REM_IP,	PSC_O_BLOCK},
-    { STR_AND_LEN("remove_allow_node"),	PSC_V_REM,	PSC_O_ALLOW},
-    { STR_AND_LEN("remove_allow_ip"),	PSC_V_REM_IP,	PSC_O_ALLOW},
-    { STR_AND_LEN("reset_filters"),	PSC_V_RESET,	PSC_O_IGNORE},
+    { STR_AND_LEN("get_filters"),       PSC_V_GET,      PSC_O_IGNORE},
+    { STR_AND_LEN("get_blocks"),        PSC_V_GET,      PSC_O_BLOCK},
+    { STR_AND_LEN("get_alloweds"),      PSC_V_GET,      PSC_O_ALLOW},
+    { STR_AND_LEN("get_names"),         PSC_V_GET,      PSC_O_NAME },
+    { STR_AND_LEN("add_filter"),        PSC_V_ADD,      PSC_O_IGNORE}, // Backw
+    { STR_AND_LEN("add_filter_node"),   PSC_V_ADD,      PSC_O_IGNORE},
+    { STR_AND_LEN("add_name"),          PSC_V_ADD,      PSC_O_NAME},
+    { STR_AND_LEN("add_block_node"),    PSC_V_ADD,      PSC_O_BLOCK},
+    { STR_AND_LEN("add_allow_node"),    PSC_V_ADD,      PSC_O_ALLOW},
+    { STR_AND_LEN("remove_filter"),     PSC_V_REM_IP,   PSC_O_IGNORE}, // Backw
+    { STR_AND_LEN("remove_filter_node"),PSC_V_REM,      PSC_O_IGNORE},
+    { STR_AND_LEN("remove_filter_ip"),  PSC_V_REM_IP,   PSC_O_IGNORE},
+    { STR_AND_LEN("remove_block_node"), PSC_V_REM,      PSC_O_BLOCK},
+    { STR_AND_LEN("remove_block_ip"),   PSC_V_REM_IP,   PSC_O_BLOCK},
+    { STR_AND_LEN("remove_allow_node"), PSC_V_REM,      PSC_O_ALLOW},
+    { STR_AND_LEN("remove_allow_ip"),   PSC_V_REM_IP,   PSC_O_ALLOW},
+    { STR_AND_LEN("reset_filters"),     PSC_V_RESET,    PSC_O_IGNORE},
     { 0, 0, 0, 0 }
 };
 
@@ -187,24 +187,24 @@ static int find_command(int name_len, const char *name_str, int *verb, int *obje
     struct pubsub_commands *p;
 
     for (p=pubsub_commands; p->psc_commandstr; p++) {
-	//
-	// We do a strncmp, potential issue with commands that are initial
-	// substring of other commands
-	// Solved by adding length of string with clever macro
-	// Should be done cleaner some day TODO
+        //
+        // We do a strncmp, potential issue with commands that are initial
+        // substring of other commands
+        // Solved by adding length of string with clever macro
+        // Should be done cleaner some day TODO
 
-	if (name_len == p->psc_commandlen &&
-			strncmp(name_str, p->psc_commandstr, name_len)==0) {
-	    // Match
-	    *verb = p->psc_verb;
-	    *object = p->psc_object;
-	    return 1;
-	}
+        if (name_len == p->psc_commandlen &&
+                        strncmp(name_str, p->psc_commandstr, name_len)==0) {
+            // Match
+            *verb = p->psc_verb;
+            *object = p->psc_object;
+            return 1;
+        }
     }
     return 0;
 }
 
-#define MAXNAMELEN	80	// Maximum identifier length; TODO */
+#define MAXNAMELEN      80      // Maximum identifier length; TODO */
 
 
 void handle_json_command_detail(int verb, int object,
@@ -224,22 +224,22 @@ void handle_json_command_detail(int verb, int object,
     switch(verb) {
     case PSC_V_ADD:
     case PSC_V_REM:
-	// Add names is different
-	if (object == PSC_O_NAME)
-	    break;
-	if (!json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
-	    spin_log(LOG_ERR, "Cannot parse node_id\n");
-	    return;
-	}
-	spin_log(LOG_DEBUG, "Spin verb %d, object %d, node-id %d\n", verb, object, node_id_arg);
-	break;
+        // Add names is different
+        if (object == PSC_O_NAME)
+            break;
+        if (!json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
+            spin_log(LOG_ERR, "Cannot parse node_id\n");
+            return;
+        }
+        spin_log(LOG_DEBUG, "Spin verb %d, object %d, node-id %d\n", verb, object, node_id_arg);
+        break;
     case PSC_V_REM_IP:
-	if (!json_parse_ip_arg(&ip_arg, json_str, tokens, argument_token_i)) {
-	    spin_log(LOG_ERR, "Cannot parse ip-addr\n");
-	    return;
-	}
-	spin_log(LOG_DEBUG, "Spin verb %d, object %d, ip XX\n", verb, object);
-	break;
+        if (!json_parse_ip_arg(&ip_arg, json_str, tokens, argument_token_i)) {
+            spin_log(LOG_ERR, "Cannot parse ip-addr\n");
+            return;
+        }
+        spin_log(LOG_DEBUG, "Spin verb %d, object %d, ip XX\n", verb, object);
+        break;
     }
 
     //
@@ -248,41 +248,41 @@ void handle_json_command_detail(int verb, int object,
 
     switch(object) {
     case PSC_O_NAME:
-	switch(verb) {
-	case PSC_V_GET:
-	    // TODO
-	    // handle_command_get_names();
-	    break;
-	case PSC_V_ADD:
-	    if (!json_parse_node_id_name_arg(&node_id_arg, str_arg, MAXNAMELEN, json_str, tokens, argument_token_i)) {
-		spin_log(LOG_ERR, "Cannot parse node_id\n");
-		return;
-	    }
-	    handle_command_add_name(node_id_arg, str_arg);
-	    break;
-	}
-	break;	//NAME
+        switch(verb) {
+        case PSC_V_GET:
+            // TODO
+            // handle_command_get_names();
+            break;
+        case PSC_V_ADD:
+            if (!json_parse_node_id_name_arg(&node_id_arg, str_arg, MAXNAMELEN, json_str, tokens, argument_token_i)) {
+                spin_log(LOG_ERR, "Cannot parse node_id\n");
+                return;
+            }
+            handle_command_add_name(node_id_arg, str_arg);
+            break;
+        }
+        break;  //NAME
 
     case PSC_O_BLOCK:
     case PSC_O_IGNORE:
     case PSC_O_ALLOW:
-	switch(verb) {
-	case PSC_V_GET:
-	    break;
-	case PSC_V_ADD:
-	case PSC_V_REM:
-	    handle_list_membership(object, verb, node_id_arg);
-	    break;
-	case PSC_V_REM_IP:
+        switch(verb) {
+        case PSC_V_GET:
+            break;
+        case PSC_V_ADD:
+        case PSC_V_REM:
+            handle_list_membership(object, verb, node_id_arg);
+            break;
+        case PSC_V_REM_IP:
             handle_command_remove_ip_from_list(object, &ip_arg);
             node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip_arg);
             if (node) {
                 node->is_onlist[object] = 0;
             }
-	    break;
-	}
-	handle_command_get_iplist(object, getnames[object]);
-	break;	//BLOCK IGNORE and ALLOW
+            break;
+        }
+        handle_command_get_iplist(object, getnames[object]);
+        break;  //BLOCK IGNORE and ALLOW
     }
 }
 
@@ -318,9 +318,9 @@ void handle_json_command(const char* data) {
         return;
     }
     if (find_command(tokens[2].end - tokens[2].start, data+tokens[2].start,
-    			&verb, &object)) {
-	handle_json_command_detail(verb, object, data, tokens, 4);
-	return;
+                        &verb, &object)) {
+        handle_json_command_detail(verb, object, data, tokens, 4);
+        return;
     }
     spin_log(LOG_ERR, "Error: json command not understood\n");
 }
@@ -363,11 +363,11 @@ void connect_mosquitto(const char* host, int port) {
 void wf_mosquitto(void* arg, int data, int timeout) {
 
     if (data) {
-	mosquitto_loop_read(mosq, 1);
+        mosquitto_loop_read(mosq, 1);
     }
     if (timeout) {
-	mosquitto_loop_write(mosq, 1);
-	mosquitto_loop_misc(mosq);
+        mosquitto_loop_write(mosq, 1);
+        mosquitto_loop_misc(mosq);
     }
 }
 
