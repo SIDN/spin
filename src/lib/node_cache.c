@@ -22,7 +22,7 @@ node_create(int id) {
     node->name = NULL;
     node->mac = NULL;
     for (i=0;i<N_IPLIST;i++) {
-	node->is_onlist[i] = 0;
+        node->is_onlist[i] = 0;
     }
     node->last_seen = 0;
     return node;
@@ -62,7 +62,7 @@ node_t* node_clone(node_t* node) {
         node_set_name(new, node->name);
     }
     for (i=0;i<N_IPLIST;i++) {
-	new->is_onlist[i] = node->is_onlist[i];
+        new->is_onlist[i] = node->is_onlist[i];
     }
     new->last_seen = node->last_seen;
     cur = tree_first(node->ips);
@@ -172,7 +172,7 @@ node_merge(node_t* dest, node_t* src) {
         dest->last_seen = src->last_seen;
     }
     for (i=0;i<N_IPLIST;i++) {
-	dest->is_onlist[i] |= src->is_onlist[i];
+        dest->is_onlist[i] |= src->is_onlist[i];
     }
 #ifdef notdef
     // When merging nodes, set blocked and allowed to 1 if either

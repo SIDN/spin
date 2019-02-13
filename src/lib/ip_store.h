@@ -5,14 +5,14 @@
 #include "pkt_info.h"
 
 typedef struct ip_store_el {
-	uint64_t k1;
-	uint64_t k2;
-	char* val;
-	struct ip_store_el* next;
+    uint64_t k1;
+    uint64_t k2;
+    char* val;
+    struct ip_store_el* next;
 } ip_store_el_t;
 
 typedef struct  {
-	ip_store_el_t* elements;
+    ip_store_el_t* elements;
 } ip_store_t;
 
 ip_store_t* ip_store_create(void);
