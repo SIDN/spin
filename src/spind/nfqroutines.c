@@ -210,7 +210,7 @@ nfq_cb_tcp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t
     unsigned src_port, dest_port;
     int hdrsize;
 
-    fprintf(stderr, "nfq_cb_tcp %x %d\n", payload, payloadsize);
+    //fprintf(stderr, "nfq_cb_tcp %x %d\n", payload, payloadsize);
 
     tcp_header = (struct tcphdr *) payload;
     src_port = ntohs(tcp_header->source);
@@ -227,7 +227,7 @@ nfq_cb_udp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t
     unsigned src_port, dest_port;
     int hdrsize;
 
-    fprintf(stderr, "nfq_cb_udp %x %d\n", payload, payloadsize);
+    //fprintf(stderr, "nfq_cb_udp %x %d\n", payload, payloadsize);
 
     udp_header = (struct udphdr *) payload;
     src_port = ntohs(udp_header->source);
@@ -253,7 +253,7 @@ nfq_cb_ipv4(int fr_n, char *payload, int payloadsize) {
     uint8_t src_addr[16], dest_addr[16];
     int hdrsize;
 
-    fprintf(stderr, "nfq_cb_ipv4 %x %d\n", payload, payloadsize);
+    //fprintf(stderr, "nfq_cb_ipv4 %x %d\n", payload, payloadsize);
     ip_header = (struct iphdr *) payload;
 
     memset(src_addr, 0, 12);
@@ -282,7 +282,7 @@ nfq_cb_ipv6(int fr_n, char *payload, int payloadsize) {
     uint8_t src_addr[16], dest_addr[16];
     int hdrsize;
 
-    fprintf(stderr, "nfq_cb_ipv6 %x %d\n", payload, payloadsize);
+    //fprintf(stderr, "nfq_cb_ipv6 %x %d\n", payload, payloadsize);
     ipv6_header = (struct ipv6hdr *) payload;
 
     memcpy(src_addr, &ipv6_header->saddr, 16);
@@ -314,7 +314,7 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
 	int fr_n;
 	int verdict;
 
-	printf("entering callback\n");
+	//printf("entering callback\n");
 	ph = nfq_get_msg_packet_hdr(nfa);	
 	id = ntohl(ph->packet_id);
 	proto = ntohs(ph->hw_protocol);

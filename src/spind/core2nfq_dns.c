@@ -15,6 +15,8 @@
 #include "node_cache.h"
 #include "core2nfq_dns.h"
 #include "spin_log.h"
+#include "spind.h"
+#include "nfqroutines.h"
 
 static struct nfq_handle* dns_qh = NULL;
 static struct nfq_q_handle* dns_q_qh = NULL;
@@ -65,7 +67,11 @@ handle_dns_query(const u_char *bp, u_int length, uint8_t* src_addr, int family, 
     memcpy(dns_pkt.dname, query_rdf->_data, query_rdf->_size);
 
     node_cache_add_dns_query_info(node_cache, &dns_pkt, timestamp);
-    send_command_dnsquery(&dns_pkt);
+    // only send a notification if this node is not ignored (we
+    // do cache it, should we not do that either?)
+    if (!addr_in_ignore_list(family, src_addr)) {
+        send_command_dnsquery(&dns_pkt);
+    }
 
 out:
     ldns_pkt_free(p);
@@ -183,7 +189,7 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
 
 
 static int nfq_dns_callback(void* arg, int family, int protocol,
-                            void* data, size_t size,
+                            char* data, int size,
                             uint8_t* src_addr, uint8_t* dest_addr,
                             unsigned int src_port, unsigned int dest_port) {
     // skip udp header (all packets are udp atm)

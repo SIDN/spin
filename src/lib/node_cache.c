@@ -572,8 +572,8 @@ pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf
     buffer_write(json_buf, ", \"protocol\": %d", pkt_info->protocol);
     buffer_write(json_buf, ", \"from_port\": %d", pkt_info->src_port);
     buffer_write(json_buf, ", \"to_port\": %d", pkt_info->dest_port);
-    buffer_write(json_buf, ", \"size\": %d", pkt_info->payload_size);
-    buffer_write(json_buf, ", \"count\": %d }", pkt_info->packet_count);
+    buffer_write(json_buf, ", \"size\": %llu", pkt_info->payload_size);
+    buffer_write(json_buf, ", \"count\": %llu }", pkt_info->packet_count);
     return s;
 }
 
@@ -709,7 +709,7 @@ create_traffic_command(node_cache_t* node_cache, flow_list_t* flow_list, buffer_
     s += flow_list2json(node_cache, flow_list, json_buf);
     buffer_write(json_buf, "], ");
     buffer_write(json_buf, " \"timestamp\": %u, ", timestamp);
-    buffer_write(json_buf, " \"total_size\": %u, ", flow_list->total_size);
-    buffer_write(json_buf, " \"total_count\": %u } }", flow_list->total_count);
+    buffer_write(json_buf, " \"total_size\": %llu, ", flow_list->total_size);
+    buffer_write(json_buf, " \"total_count\": %llu } }", flow_list->total_count);
     return s;
 }

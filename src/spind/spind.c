@@ -20,6 +20,8 @@
 #include "core2pubsub.h"
 #include "core2kernel.h"
 #include "core2block.h"
+#include "core2nfq_dns.h"
+#include "core2conntrack.h"
 
 #include "handle_command.h"
 #include "mainloop.h"
@@ -150,7 +152,7 @@ void maybe_sendflow(flow_list_t *flow_list, time_t now) {
  * The lists in the kernel module will not be read back, even while there is a
  * kernel module.
  */
-
+// TODO: move this out to the library, this feels like pretty commonly shared code
 struct list_info {
 	tree_t *	li_tree;				// Tree of IP addresses
 	char *		li_filename;			// Name of shadow file
@@ -229,6 +231,23 @@ void remove_ip_from_li(ip_t* ip, struct list_info *lip) {
 
 	tree_remove(lip->li_tree, sizeof(ip_t), ip);
 	lip->li_modified++;
+}
+
+int ip_in_li(ip_t* ip, struct list_info* lip) {
+    return tree_find(lip->li_tree, sizeof(ip_t), ip) != NULL;
+}
+
+int ip_in_ignore_list(ip_t* ip) {
+    return ip_in_li(ip, &ipl_list_ar[IPLIST_IGNORE]);
+}
+
+// hmz, we probably want to refactor ip_t/the tree list
+// into something that requires less data copying
+int addr_in_ignore_list(int family, uint8_t* addr) {
+    ip_t ip;
+    ip.family = family;
+    memcpy(ip.addr, addr, 16);
+    return ip_in_ignore_list(&ip);
 }
 
 #define MAXSR 3	/* More than this would be excessive */

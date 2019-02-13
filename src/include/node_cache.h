@@ -116,8 +116,8 @@ unsigned int pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffe
 unsigned int dns_query_pkt_info2json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info, buffer_t* json_buf);
 
 typedef struct {
-    int packet_count;
-    int payload_size;
+    uint64_t packet_count;
+    uint64_t payload_size;
 } flow_data_t;
 
 typedef struct {
@@ -125,8 +125,8 @@ typedef struct {
     // and the data is the flow_data from above
     tree_t* flows;
     uint32_t timestamp;
-    unsigned int total_size;
-    unsigned int total_count;
+    uint64_t total_size;
+    uint64_t total_count;
 } flow_list_t;
 
 flow_list_t* flow_list_create(uint32_t timestamp);

@@ -1,9 +1,12 @@
 #include <libmnl/libmnl.h>
 #include <libnetfilter_conntrack/libnetfilter_conntrack.h>
 #include <kernelmod/pkt_info.h>
+#include <time.h>
 
 #include "core2conntrack.h"
 #include "spin_log.h"
+#include "mainloop.h"
+#include "spind.h"
 
 // define a structure for the callback data
 typedef struct {
@@ -24,46 +27,44 @@ static inline u_int32_t get_u32_attr(struct nf_conntrack *ct, char ATTR) {
 }
 
 static inline u_int64_t get_u64_attr(struct nf_conntrack *ct, char ATTR) {
-  return nfct_get_attr_u64(ct, ATTR);
+  return be64toh(nfct_get_attr_u64(ct, ATTR));
 }
 
-int nfct_to_pkt_info(pkt_info_t* pkt_info_orig, pkt_info_t* pkt_info_reply, struct nf_conntrack *ct) {
+int nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
   unsigned int offset = 0;
   u_int32_t tmp;
 
-  pkt_info_orig->family = nfct_get_attr_u8(ct, ATTR_ORIG_L3PROTO);
-  switch (pkt_info_orig->family) {
+  pkt_info->family = nfct_get_attr_u8(ct, ATTR_ORIG_L3PROTO);
+  switch (pkt_info->family) {
   case AF_INET:
     tmp = nfct_get_attr_u32(ct, ATTR_IPV4_SRC);
-    memset(pkt_info_orig->src_addr, 0, 12);
-    memset(pkt_info_orig->dest_addr, 0, 12);
-    memcpy((pkt_info_orig->src_addr) + 12, &tmp, 4);
+    memset(pkt_info->src_addr, 0, 12);
+    memset(pkt_info->dest_addr, 0, 12);
+    memcpy((pkt_info->src_addr) + 12, &tmp, 4);
     tmp = nfct_get_attr_u32(ct, ATTR_IPV4_DST);
-    memcpy((pkt_info_orig->dest_addr) + 12, &tmp, 4);
-    pkt_info_orig->src_port = get_u16_attr(ct, ATTR_ORIG_PORT_SRC);
-    pkt_info_orig->dest_port = get_u16_attr(ct, ATTR_ORIG_PORT_DST);
-    pkt_info_orig->payload_size = get_u64_attr(ct, ATTR_ORIG_COUNTER_BYTES);
-    pkt_info_orig->packet_count = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS);
-    pkt_info_orig->payload_size += get_u64_attr(ct, ATTR_REPL_COUNTER_BYTES);
-    pkt_info_orig->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
-    pkt_info_orig->payload_offset = 0;
-    pkt_info_orig->protocol = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
-
-    pkt_info_reply->src_port = get_u16_attr(ct, ATTR_REPL_PORT_SRC);
-    pkt_info_reply->dest_port = get_u16_attr(ct, ATTR_REPL_PORT_DST);
+    memcpy((pkt_info->dest_addr) + 12, &tmp, 4);
+    pkt_info->src_port = get_u16_attr(ct, ATTR_ORIG_PORT_SRC);
+    pkt_info->dest_port = get_u16_attr(ct, ATTR_ORIG_PORT_DST);
+    pkt_info->payload_size = get_u64_attr(ct, ATTR_ORIG_COUNTER_BYTES);
+    // We count both the orig and the repl for size and packet numbers
+    pkt_info->payload_size = get_u64_attr(ct, ATTR_ORIG_COUNTER_BYTES);
+    pkt_info->payload_size += get_u64_attr(ct, ATTR_REPL_COUNTER_BYTES);
+    pkt_info->packet_count = get_u64_attr(ct, ATTR_ORIG_COUNTER_PACKETS);
+    pkt_info->packet_count += get_u64_attr(ct, ATTR_REPL_COUNTER_PACKETS);
+    pkt_info->payload_offset = 0;
+    pkt_info->protocol = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
 
     break;
   case AF_INET6:
-    memcpy((&pkt_info_orig->src_addr[0]), nfct_get_attr(ct, ATTR_IPV6_SRC), 16);
-    memcpy((&pkt_info_orig->dest_addr[0]), nfct_get_attr(ct, ATTR_IPV6_DST), 16);
-    pkt_info_orig->src_port = get_u16_attr(ct, ATTR_ORIG_PORT_SRC);
-    pkt_info_orig->dest_port = get_u16_attr(ct, ATTR_ORIG_PORT_DST);
-    pkt_info_orig->payload_size = get_u64_attr(ct, ATTR_ORIG_COUNTER_BYTES);
-    pkt_info_orig->packet_count = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS);
-    pkt_info_orig->payload_size += get_u64_attr(ct, ATTR_REPL_COUNTER_BYTES);
-    pkt_info_orig->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
-    pkt_info_orig->payload_offset = 0;
-    pkt_info_orig->protocol = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
+    memcpy((&pkt_info->src_addr[0]), nfct_get_attr(ct, ATTR_IPV6_SRC), 16);
+    memcpy((&pkt_info->dest_addr[0]), nfct_get_attr(ct, ATTR_IPV6_DST), 16);
+    pkt_info->packet_count = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS);
+    pkt_info->payload_size = get_u64_attr(ct, ATTR_ORIG_COUNTER_BYTES);
+    pkt_info->payload_size += get_u64_attr(ct, ATTR_REPL_COUNTER_BYTES);
+    pkt_info->packet_count = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS);
+    pkt_info->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
+    pkt_info->payload_offset = 0;
+    pkt_info->protocol = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
     break;
     // note: ipv6 is u128
   }
@@ -85,35 +86,46 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
 {
     struct nf_conntrack *ct;
     char buf[4096];
-    pkt_info_t orig, reply;
+    pkt_info_t pkt_info;
     char new_buf[4096];
     cb_data_t* cb_data = (cb_data_t*) data;
     //flow_list_t* flow_list = cb_data->flow_list;
     // TODO: remove time() calls, use the single one at caller
     uint32_t now = time(NULL);
+    ip_t ip;
 
     maybe_sendflow(cb_data->flow_list, now);
 
     ct = nfct_new();
-    if (ct == NULL)
-    return MNL_CB_OK;
+    if (ct == NULL) {
+      return MNL_CB_OK;
+    }
 
     nfct_nlmsg_parse(nlh, ct);
 
     // TODO: remove repl?
-    nfct_to_pkt_info(&orig, &reply, ct);
+    nfct_to_pkt_info(&pkt_info, ct);
 
-    if (orig.packet_count > 0 || orig.payload_size > 0) {
-        node_cache_add_pkt_info(cb_data->node_cache, &orig, now);
+    if (pkt_info.packet_count > 0 || pkt_info.payload_size > 0) {
+        node_cache_add_pkt_info(cb_data->node_cache, &pkt_info, now);
 
         // small experiment, try to ignore messages from and to
         // this device, unless local_mode is set
-        if (!cb_data->local_mode && check_ignore_local(&orig, cb_data->node_cache)) {
+        if (!cb_data->local_mode && check_ignore_local(&pkt_info, cb_data->node_cache)) {
             nfct_destroy(ct);
-            return;
+            return MNL_CB_OK;
+        }
+        // check for configured ignores as well
+        // do we need to cache it or should we do this check earlier?
+        // do we need to check both source and reply?
+        if (addr_in_ignore_list(pkt_info.family, pkt_info.src_addr) ||
+            addr_in_ignore_list(pkt_info.family, pkt_info.dest_addr)
+           ) {
+            nfct_destroy(ct);
+            return MNL_CB_OK;
         }
 
-        flow_list_add_pktinfo(cb_data->flow_list, &orig);
+        flow_list_add_pktinfo(cb_data->flow_list, &pkt_info);
     }
 
     nfct_destroy(ct);
