@@ -102,7 +102,6 @@ send_command(size_t cmdbuf_size, unsigned char* cmdbuf, FILE* output)
             break;
         } else if (cmd == SPIN_CMD_ERR) {
             //printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
-            pkt_info_t pkt;
             char err_str[MAX_NETLINK_PAYLOAD];
             strncpy(err_str, (char *)NLMSG_DATA(nlh) + 2, MAX_NETLINK_PAYLOAD);
             printf("Error message from kernel: %s\n", err_str);
@@ -156,6 +155,9 @@ execute_no_arg(cmd_types_t type, cmd_t cmd, FILE* output) {
         case CLEAR:
             cmdbuf[1] = SPIN_CMD_CLEAR_IGNORE;
             break;
+        default:
+            // Called with wrong argument
+            return -1;
         }
         break;
     case BLOCK:
@@ -166,6 +168,9 @@ execute_no_arg(cmd_types_t type, cmd_t cmd, FILE* output) {
         case CLEAR:
             cmdbuf[1] = SPIN_CMD_CLEAR_BLOCK;
             break;
+        default:
+            // Called with wrong argument
+            return -1;
         }
         break;
     case EXCEPT:
@@ -176,6 +181,9 @@ execute_no_arg(cmd_types_t type, cmd_t cmd, FILE* output) {
         case CLEAR:
             cmdbuf[1] = SPIN_CMD_CLEAR_EXCEPT;
             break;
+        default:
+            // Called with wrong argument
+            return -1;
         }
         break;
     }
@@ -197,6 +205,9 @@ execute_arg(cmd_types_t type, cmd_t cmd, const char* ip_str, FILE* output) {
         case REMOVE:
             cmdbuf[1] = SPIN_CMD_REMOVE_IGNORE;
             break;
+        default:
+            // Called with wrong argument
+            return -1;
         }
         break;
     case BLOCK:
@@ -207,6 +218,9 @@ execute_arg(cmd_types_t type, cmd_t cmd, const char* ip_str, FILE* output) {
         case REMOVE:
             cmdbuf[1] = SPIN_CMD_REMOVE_BLOCK;
             break;
+        default:
+            // Called with wrong argument
+            return -1;
         }
         break;
     case EXCEPT:
@@ -217,6 +231,9 @@ execute_arg(cmd_types_t type, cmd_t cmd, const char* ip_str, FILE* output) {
         case REMOVE:
             cmdbuf[1] = SPIN_CMD_REMOVE_EXCEPT;
             break;
+        default:
+            // Called with wrong argument
+            return -1;
         }
     }
 
@@ -362,6 +379,5 @@ int main(int argc, char** argv) {
         fclose(file);
     }
 
-    // check all given addresses
     return 0;
 }

@@ -76,7 +76,7 @@ static inline int instr(char c, const char* str) {
 }
 
 static inline size_t skip_token(char* in, const char* delimit, size_t max) {
-    size_t in_i = 0, out_i = 0;
+    size_t in_i = 0;
     // skip spaces
     while (instr(in[in_i], " \t")) { in_i++; };
     while (!instr(in[in_i], delimit)) {
@@ -233,7 +233,8 @@ int node_names_read_dhcpconfig(node_names_t* node_names, const char* filename) {
     return 0;
 }
 
-int node_names_read_dhcpleases(node_names_t* node_names, const char* filename) {
+int
+node_names_read_dhcpleases(node_names_t* node_names, const char* filename) {
     // states:
     // 0: looking for 'config' section
     // 1: in 'config host' section
@@ -293,6 +294,7 @@ int node_names_read_dhcpleases(node_names_t* node_names, const char* filename) {
         name[0] = '\0';
         mac[0] = '\0';
     }
+    return 0;
 }
 
 int node_names_read_userconfig(node_names_t* node_names, const char* filename) {

@@ -86,25 +86,27 @@ unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argum
 }
 
 void send_command_blocked(pkt_info_t* pkt_info) {
-    unsigned int response_size;
     buffer_t* response_json = buffer_create(2048);
     buffer_t* pkt_json = buffer_create(2048);
     unsigned int p_size;
 
     p_size = pkt_info2json(node_cache, pkt_info, pkt_json);
-    buffer_finish(pkt_json);
-    response_size = create_mqtt_command(response_json, "blocked", NULL, buffer_str(pkt_json));
-    if (buffer_finish(response_json)) {
-        core2pubsub_publish(response_json);
+    if (p_size > 0) {
+        buffer_finish(pkt_json);
+        create_mqtt_command(response_json, "blocked", NULL, buffer_str(pkt_json));
+        if (buffer_finish(response_json)) {
+            core2pubsub_publish(response_json);
+        } else {
+            spin_log(LOG_WARNING, "Error converting blocked pkt_info to JSON; partial packet: %s\n", buffer_str(response_json));
+        }
     } else {
-        spin_log(LOG_WARNING, "Error converting blocked pkt_info to JSON; partial packet: %s\n", buffer_str(response_json));
+        spin_log(LOG_DEBUG, "[XX] did not get an actual block command (size 0)\n");
     }
     buffer_destroy(response_json);
     buffer_destroy(pkt_json);
 }
 
 void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
-    unsigned int response_size;
     buffer_t* response_json = buffer_create(2048);
     buffer_t* pkt_json = buffer_create(2048);
     unsigned int p_size;
@@ -113,7 +115,7 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
     if (p_size > 0) {
         spin_log(LOG_DEBUG, "[XX] got an actual dns query command (size >0)\n");
         buffer_finish(pkt_json);
-        response_size = create_mqtt_command(response_json, "dnsquery", NULL, buffer_str(pkt_json));
+        create_mqtt_command(response_json, "dnsquery", NULL, buffer_str(pkt_json));
         if (buffer_finish(response_json)) {
             core2pubsub_publish(response_json);
         } else {
@@ -132,7 +134,6 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
 void maybe_sendflow(flow_list_t *flow_list, time_t now) {
     buffer_t* json_buf = buffer_create(4096);
     buffer_allow_resize(json_buf);
-    int mosq_result;
 
     if (flow_list_should_send(flow_list, now)) {
         if (!flow_list_empty(flow_list)) {
@@ -454,7 +455,6 @@ iptree2json(tree_t* tree, buffer_t* result) {
 void handle_command_get_iplist(int iplist, const char* json_command) {
     buffer_t* response_json = buffer_create(4096);
     buffer_t* result_json = buffer_create(4096);
-    unsigned int response_size;
 
     iptree2json(ipl_list_ar[iplist].li_tree, result_json);
     if (!buffer_ok(result_json)) {
@@ -466,7 +466,7 @@ void handle_command_get_iplist(int iplist, const char* json_command) {
 
     spin_log(LOG_DEBUG, "get_iplist result %s\n", buffer_str(result_json));
 
-    response_size = create_mqtt_command(response_json, json_command, NULL, buffer_str(result_json));
+    create_mqtt_command(response_json, json_command, NULL, buffer_str(result_json));
     if (!buffer_ok(response_json)) {
         buffer_destroy(result_json);
         buffer_destroy(response_json);
@@ -521,7 +521,6 @@ void cleanup_cache() {
 }
 
 int main(int argc, char** argv) {
-    int result;
     int c;
     int log_verbosity = 6;
     int use_syslog = 1;
@@ -586,7 +585,7 @@ int main(int argc, char** argv) {
 
     push_all_ipl();
 
-    result = init_netlink(local_mode, node_cache);
+    init_netlink(local_mode, node_cache);
 
     mainloop_run();
 

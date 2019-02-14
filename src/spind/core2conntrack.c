@@ -30,8 +30,7 @@ static inline u_int64_t get_u64_attr(struct nf_conntrack *ct, char ATTR) {
   return be64toh(nfct_get_attr_u64(ct, ATTR));
 }
 
-int nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
-  unsigned int offset = 0;
+void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
   u_int32_t tmp;
 
   pkt_info->family = nfct_get_attr_u8(ct, ATTR_ORIG_L3PROTO);
@@ -85,14 +84,11 @@ static int check_ignore_local(pkt_info_t* pkt, node_cache_t* node_cache) {
 static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
 {
     struct nf_conntrack *ct;
-    char buf[4096];
     pkt_info_t pkt_info;
-    char new_buf[4096];
     cb_data_t* cb_data = (cb_data_t*) data;
     //flow_list_t* flow_list = cb_data->flow_list;
     // TODO: remove time() calls, use the single one at caller
     uint32_t now = time(NULL);
-    ip_t ip;
 
     maybe_sendflow(cb_data->flow_list, now);
 
@@ -140,7 +136,6 @@ int do_read(cb_data_t* cb_data, int inet_family) {
     char buf[MNL_SOCKET_BUFFER_SIZE];
     unsigned int seq, portid;
     int ret;
-    int i = 0;
 
     nl = mnl_socket_open(NETLINK_NETFILTER);
     if (nl == NULL) {

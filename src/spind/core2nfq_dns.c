@@ -18,11 +18,8 @@
 #include "spind.h"
 #include "nfqroutines.h"
 
-static struct nfq_handle* dns_qh = NULL;
-static struct nfq_q_handle* dns_q_qh = NULL;
 static node_cache_t* node_cache;
 static dns_cache_t* dns_cache;
-static int dns_q_fd;
 
 // ip: source address of the query sender
 // bp: query packet data
@@ -37,8 +34,6 @@ handle_dns_query(const u_char *bp, u_int length, uint8_t* src_addr, int family, 
     ldns_rdf* query_rdf;
     dns_pkt_info_t dns_pkt;
     size_t count;
-    char *s;
-    size_t i;
 
     status = ldns_wire2pkt(&p, bp, length);
     if (status != LDNS_STATUS_OK) {
@@ -147,11 +142,8 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
         }
         ips[i] = s;
 
-        ip_t ip;
-
         ldns_rdf* query_rdf = ldns_rr_owner(ldns_rr_list_rr(ldns_pkt_question(p),
         0));
-
 
         dns_pkt_info_t dns_pkt;
         dns_pkt.family = protocol;

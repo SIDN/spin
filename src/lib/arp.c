@@ -48,6 +48,7 @@ void arp_table_read(arp_table_t* arp_table) {
     pclose(fp);
 }
 
+#ifdef notdef
 static
 void arp_table_print(arp_table_t* arp_table) {
     char ip_str[INET6_ADDRSTRLEN];
@@ -61,11 +62,14 @@ void arp_table_print(arp_table_t* arp_table) {
     }
     spin_log(LOG_DEBUG, "[end of arp table]\n");
 }
+#endif
 
+#ifdef notdef
 static
 int arp_table_size(arp_table_t* arp_table) {
     return tree_size(arp_table->entries);
 }
+#endif
 
 char* arp_table_find_by_ip(arp_table_t* arp_table, ip_t* ip) {
     tree_entry_t* entry = tree_find(arp_table->entries, sizeof(ip_t), ip);

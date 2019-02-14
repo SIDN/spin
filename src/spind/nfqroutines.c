@@ -35,6 +35,7 @@ fd_set_blocking(int fd, int blocking) {
     return fcntl(fd, F_SETFL, flags) != -1;
 }
 
+#ifdef notdef
 static void
 processPacketData (char *data, int ret) {
     int i;
@@ -46,7 +47,9 @@ processPacketData (char *data, int ret) {
         printf("%02x ", data[i]&0xFF);
     }
 }
+#endif
 
+#ifdef notdef
 static u_int32_t print_pkt (struct nfq_data *tb)
 {
     int id = 0;
@@ -107,6 +110,7 @@ static u_int32_t print_pkt (struct nfq_data *tb)
 
     return id;
 }
+#endif
 
 #define MAXNFR 5        /* More than this would be excessive */
 static
@@ -278,7 +282,6 @@ wf_nfq(void *arg, int data, int timeout) {
 // Register work function:  timeout in millisec
 void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
     struct nfq_q_handle *qh;
-    int i;
 
     spin_log(LOG_DEBUG, "Nfqroutine registered %s(..., %d)\n", name, queue);
     assert (n_nfr < MAXNFR) ;

@@ -123,8 +123,6 @@ void wf_netlink(void *arg, int data, int timeout) {
         //printf("C: %u RS: %u\n", c, rs);
         //printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
         pkt_info_t pkt;
-        dns_pkt_info_t dns_pkt;
-        char pkt_str[2048];
         type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
 #ifdef notdef
         if (type == SPIN_BLOCKED) {
@@ -183,10 +181,8 @@ void wf_netlink(void *arg, int data, int timeout) {
 int init_netlink(int local, node_cache_t* node_cache_a)
 {
     //ssize_t c = 0;
-    int rs;
-    message_type_t type;
     struct timeval tv;
-    uint32_t now, last_mosq_poll;
+    uint32_t now = time(NULL);
     static int all_lists[N_IPLIST] = { 1, 1, 1 };
 
     node_cache = node_cache_a;

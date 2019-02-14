@@ -36,8 +36,6 @@ pubsub_publish(int payloadlen, const void* payload) {
 }
 
 void core2pubsub_publish(buffer_t *buf) {
-    int mosq_result;
-
     pubsub_publish(buffer_size(buf), buffer_str(buf));
 }
 
@@ -47,7 +45,7 @@ void core2pubsub_publish(buffer_t *buf) {
 
 void send_command_restart() {
     buffer_t* response_json = buffer_create(4096);
-    unsigned int response_size = create_mqtt_command(response_json, "serverRestart", NULL, NULL);
+    create_mqtt_command(response_json, "serverRestart", NULL, NULL);
     buffer_finish(response_json);
     if (buffer_ok(response_json)) {
         core2pubsub_publish(response_json);
@@ -78,11 +76,9 @@ json_parse_string_arg(char* dest,
                           jsmntok_t* tokens,
                           int argument_token_i) {
     jsmntok_t token = tokens[argument_token_i];
-    size_t size;
-
     if (token.type != JSMN_STRING)
         return 0;
-    size = snprintf(dest, dest_size, "%.*s", token.end - token.start, json_str+token.start);
+    snprintf(dest, dest_size, "%.*s", token.end - token.start, json_str+token.start);
     return 1;
 }
 
@@ -289,8 +285,8 @@ void handle_json_command_detail(int verb, int object,
 void handle_json_command(const char* data) {
     jsmn_parser p;
     // todo: alloc these upon global init, realloc when necessary?
-    size_t tok_count = 10;
-    jsmntok_t tokens[10];
+    const size_t tok_count = 10;
+    jsmntok_t tokens[tok_count];
     int result;
     int verb, object;
 

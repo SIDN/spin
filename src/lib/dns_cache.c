@@ -45,7 +45,7 @@ dns_cache_create() {
 void dns_cache_add_dname_ip(dns_cache_t* cache, uint8_t family, uint32_t ttl, char* dname, const ip_t* ip, uint32_t timestamp) {
     dns_pkt_info_t* dns_pkt_info = (dns_pkt_info_t*)malloc(sizeof(dns_pkt_info_t));
     dns_pkt_info->family = family;
-    memcpy(dns_pkt_info->ip, ip, sizeof(ip));
+    memcpy(dns_pkt_info->ip, ip, sizeof(ip_t));
     strcpy(dns_pkt_info->dname, dname);
     dns_pkt_info->ttl = ttl;
 

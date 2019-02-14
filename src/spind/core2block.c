@@ -189,7 +189,6 @@ setup_catch() {
 
 static void
 wf_core2block(void *arg, int data, int timeout) {
-    char buf[1024];
 
     if (timeout) {
         spin_log(LOG_DEBUG, "wf_core2block called\n");
