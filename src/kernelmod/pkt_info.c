@@ -72,8 +72,8 @@ void pktinfo2str(char* dest, pkt_info_t* pkt_info, size_t max_len) {
              pkt_info->protocol,
              sa, pkt_info->src_port,
              da, pkt_info->dest_port,
-             pkt_info->packet_count,
-             pkt_info->payload_size);
+             (long long unsigned int)pkt_info->packet_count,
+             (long long unsigned int)pkt_info->payload_size);
 }
 
 void dns_dname2str(char* dname, char* src, size_t max_len) {

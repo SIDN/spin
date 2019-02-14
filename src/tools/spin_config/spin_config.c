@@ -282,7 +282,7 @@ int main(int argc, char** argv) {
     } else if (strncmp(argv[1], "-help", 6) == 0) {
         help(0);
     } else {
-        printf("unknown command type %s; must be one of 'ignore', 'block' or 'except'\n");
+        printf("unknown command type %s; must be one of 'ignore', 'block' or 'except'\n", argv[1]);
         return 1;
     }
 
@@ -303,7 +303,7 @@ int main(int argc, char** argv) {
     } else if (strncmp(argv[2], "-help", 6) == 0) {
         help(0);
     } else {
-        printf("unknown command type %s; must be one of 'ignore', 'block' or 'except'\n");
+        printf("unknown command type %s; must be one of 'ignore', 'block' or 'except'\n", argv[2]);
         return 1;
     }
 
