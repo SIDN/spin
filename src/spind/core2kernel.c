@@ -123,7 +123,7 @@ void wf_netlink(void *arg, int data, int timeout) {
         //printf("C: %u RS: %u\n", c, rs);
         //printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
         pkt_info_t pkt;
-        type = wire2pktinfo(&pkt, (unsigned char *)NLMSG_DATA(traffic_nlh));
+        type = wire2pktinfo(&pkt, (uint8_t*)NLMSG_DATA(traffic_nlh));
 #ifdef notdef
         if (type == SPIN_BLOCKED) {
             //pktinfo2str(pkt_str, &pkt, 2048);

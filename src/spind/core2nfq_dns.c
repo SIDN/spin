@@ -181,7 +181,7 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
 
 
 static int nfq_dns_callback(void* arg, int family, int protocol,
-                            char* data, int size,
+                            uint8_t* data, int size,
                             uint8_t* src_addr, uint8_t* dest_addr,
                             unsigned int src_port, unsigned int dest_port) {
     // skip udp header (all packets are udp atm)

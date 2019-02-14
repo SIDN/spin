@@ -109,7 +109,7 @@ send_command(size_t cmdbuf_size, unsigned char* cmdbuf, FILE* output)
             // TODO: check message size
             // first octet is ip version (AF_INET or AF_INET6)
             uint8_t ipv = ((uint8_t*)NLMSG_DATA(nlh))[2];
-            unsigned char ip_str[INET6_ADDRSTRLEN];
+            char ip_str[INET6_ADDRSTRLEN];
             inet_ntop(ipv, NLMSG_DATA(nlh) + 3, ip_str, INET6_ADDRSTRLEN);
             if (output != NULL) {
                 fprintf(output, "%s\n", ip_str);

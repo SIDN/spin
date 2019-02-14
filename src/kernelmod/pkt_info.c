@@ -181,19 +181,19 @@ static inline void write_int64(uint8_t* dest, uint64_t i) {
     memcpy(dest, &wi, 8);
 }
 
-static inline uint16_t read_int16(char* src) {
+static inline uint16_t read_int16(uint8_t* src) {
     uint16_t wi;
     memcpy(&wi, src, 2);
     return ntohs(wi);
 }
 
-static inline uint32_t read_int32(char* src) {
+static inline uint32_t read_int32(uint8_t* src) {
     uint32_t wi;
     memcpy(&wi, src, 4);
     return ntohl(wi);
 }
 
-static inline uint64_t read_int64(char* src) {
+static inline uint64_t read_int64(uint8_t* src) {
     uint64_t wi;
     memcpy(&wi, src, 8);
     if (htonl(123) != 123) {
@@ -249,7 +249,7 @@ void pktinfo_msg2wire(message_type_t type, uint8_t* dest, pkt_info_t* pkt_info) 
     pktinfo2wire(dest, pkt_info);
 }
 
-message_type_t wire2pktinfo(pkt_info_t* pkt_info, char* src) {
+message_type_t wire2pktinfo(pkt_info_t* pkt_info, uint8_t* src) {
     // todo: should we read message type and size earlier?
     message_type_t msg_type;
     uint16_t msg_size;
@@ -318,7 +318,7 @@ void dns_pktinfo_msg2wire(message_type_t type, uint8_t* dest, dns_pkt_info_t* dn
     dns_pktinfo2wire(dest, dns_pkt_info);
 }
 
-message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, char* src) {
+message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, uint8_t* src) {
     // todo: should we read message type and size earlier?
     message_type_t msg_type;
     uint16_t msg_size;
@@ -344,7 +344,7 @@ message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, char* src) {
         src += 4;
         dname_size = src[0];
         src += 1;
-        strncpy(dns_pkt_info->dname, src, dname_size);
+        strncpy(dns_pkt_info->dname, (char*)src, dname_size);
     }
     return msg_type;
 }

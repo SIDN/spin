@@ -37,7 +37,7 @@ fd_set_blocking(int fd, int blocking) {
 
 #ifdef notdef
 static void
-processPacketData (char *data, int ret) {
+processPacketData (uint8_t* data, int ret) {
     int i;
 
     for (i=0; i<ret;i++) {
@@ -57,7 +57,7 @@ static u_int32_t print_pkt (struct nfq_data *tb)
     struct nfqnl_msg_packet_hw *hwph;
     u_int32_t mark,ifi;
     int ret;
-    unsigned char *data;
+    uint8_t* data;
 
     ph = nfq_get_msg_packet_hdr(tb);
     if (ph) {
@@ -136,7 +136,7 @@ nfr_find_qh(struct nfq_q_handle *qh) {
 }
 
 static int
-nfq_cb_tcp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t *d) {
+nfq_cb_tcp(int fr_n, uint8_t* payload, int payloadsize, int af, uint8_t *s, uint8_t *d) {
     struct tcphdr *tcp_header;
     unsigned src_port, dest_port;
     int hdrsize;
@@ -151,7 +151,7 @@ nfq_cb_tcp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t
 }
 
 static int
-nfq_cb_udp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t *d) {
+nfq_cb_udp(int fr_n, uint8_t* payload, int payloadsize, int af, uint8_t *s, uint8_t *d) {
     struct udphdr *udp_header;
     unsigned src_port, dest_port;
     int hdrsize;
@@ -166,14 +166,14 @@ nfq_cb_udp(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t
 }
 
 static int
-nfq_cb_rest(int fr_n, char *payload, int payloadsize, int af, uint8_t *s, uint8_t *d) {
+nfq_cb_rest(int fr_n, uint8_t *payload, int payloadsize, int af, uint8_t *s, uint8_t *d) {
 
     return (*nfr[fr_n].nfr_wf)(nfr[fr_n].nfr_wfarg, af, 0,
                 payload, payloadsize, s, d, 0, 0);
 }
 
 static int
-nfq_cb_ipv4(int fr_n, char *payload, int payloadsize) {
+nfq_cb_ipv4(int fr_n, uint8_t* payload, int payloadsize) {
     struct iphdr *ip_header;
     uint8_t src_addr[16], dest_addr[16];
     int hdrsize;
@@ -200,7 +200,7 @@ nfq_cb_ipv4(int fr_n, char *payload, int payloadsize) {
 }
 
 static int
-nfq_cb_ipv6(int fr_n, char *payload, int payloadsize) {
+nfq_cb_ipv6(int fr_n, uint8_t* payload, int payloadsize) {
     struct ipv6hdr *ipv6_header;
     uint8_t src_addr[16], dest_addr[16];
     int hdrsize;
@@ -231,7 +231,7 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
         // u_int32_t id = print_pkt(nfa);
         u_int32_t id;
         int proto;
-        unsigned char *payload;
+        uint8_t* payload;
         int payloadsize;
         struct nfqnl_msg_packet_hdr *ph;
         int fr_n;
