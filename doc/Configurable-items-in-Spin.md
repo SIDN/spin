@@ -9,6 +9,8 @@ One way we could move is to isolate the configuration query mechanism into a sep
 
 Ubus itself looks to be a relatively simple RPC mechanism. It is one to one, and on the wire it uses simple TLV items. Normal interface is with a library that uses a Unix socket, although the documentation suggests it can be used over IP(not found yet). There are userspace programs to deal with Ubus too, and these all use JSON formatted data, converting to/from TLV if needed.
 
+Ubus datatypes are int's of various sizes, strings, and array/table structures. The latter seem vary simple.
+
 #Configurable items in Spin
 
 All configurable items found so far. They will be marked *Italic* if they are runtime modifyable.
@@ -46,3 +48,24 @@ Mosquitto host and port
 
 ###Various
 At various places more or less random timers are used. These could be configured.
+
+# Potential UCI structure
+
+Add section spin in uci:
+
+Add variables of type int32 and type string
+
+### Variables
+spin.iptable.debugfile	*value* "/tmp/blockcommands"
+spin.iptable.queuedns	*value* 1
+spin.iptable.queueblock	*value* 2
+
+spin.iptableplace.dns	*value* 0
+spin.iptableplace.block	*value* 0
+
+spin.pubsub.channel.command	*value* "SPIN/traffic"
+spin.subsub.channel.traffic	*value*	"SPIN/commands"
+spin.pubsub.timeout	*value*	60
+
+
+
