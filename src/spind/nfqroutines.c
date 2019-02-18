@@ -116,6 +116,7 @@ struct nfreg {
     void *              nfr_wfarg;      /* Call back argument */
     int                 nfr_queue;      /* Queue number */
     struct nfq_q_handle *nfr_qh;        /* Queue handle */
+    int                 nfr_packets;    /* Number of packets handled */
 } nfr[MAXNFR];
 static int n_nfr = 0;
 
@@ -250,6 +251,12 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
             spin_log(LOG_DEBUG, "Unknown protocol %x\n", proto);
             // Who knows? Let's pass it on just in case
             verdict = 1;
+        }
+        nfr[fr_n].nfr_packets++;
+        if (nfr[fr_n].nfr_packets % 100 == 0) {
+            spin_log(LOG_INFO, "Nfq module %s handled %d packets\n", 
+                nfr[fr_n].nfr_name,
+                nfr[fr_n].nfr_packets);
         }
         // TODO what is verdict here
         return nfq_set_verdict(qh, id, verdict ? NF_ACCEPT : NF_DROP, 0, NULL);
