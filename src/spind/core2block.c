@@ -93,6 +93,7 @@ static char Return[] = "RETURN";
 
 static void
 clean_old_tables() {
+    char nfq_queue_str[MAXSTR];
 
     iptab_do_table(SpinCheck, IDT_FLUSH);
     iptab_do_table(SpinLog, IDT_FLUSH);
@@ -101,6 +102,11 @@ clean_old_tables() {
     iptab_add_jump(table_input, IAJ_DEL, 0, SpinCheck);
     iptab_add_jump(table_output, IAJ_DEL, 0, SpinCheck);
     iptab_add_jump(table_forward, IAJ_DEL, 0, SpinCheck);
+
+    sprintf(nfq_queue_str, "NFQUEUE --queue-bypass --queue-num %d", CORE2NFQ_DNS_QUEUE_NUMBER);
+    iptab_add_jump(table_output, IAJ_DEL, "-p udp --sport 53", nfq_queue_str);
+    iptab_add_jump(table_input, IAJ_DEL, "-p udp --dport 53", nfq_queue_str);
+    iptab_add_jump(table_forward, IAJ_DEL, "-p udp --dport 53", nfq_queue_str);
 
     iptab_do_table(SpinCheck, IDT_DEL);
     iptab_do_table(SpinLog, IDT_DEL);
@@ -127,8 +133,9 @@ setup_tables() {
     // Note: only UDP for now, we'll need to reconstruct TCP packets
     // to support that
     sprintf(nfq_queue_str, "NFQUEUE --queue-bypass --queue-num %d", CORE2NFQ_DNS_QUEUE_NUMBER);
-    iptab_add_jump(SpinCheck, IAJ_ADD, "-p udp --sport 53", nfq_queue_str);
-    iptab_add_jump(SpinCheck, IAJ_ADD, "-p udp --dport 53", nfq_queue_str);
+    iptab_add_jump(table_output, IAJ_INS, "-p udp --sport 53", nfq_queue_str);
+    iptab_add_jump(table_input, IAJ_INS, "-p udp --dport 53", nfq_queue_str);
+    iptab_add_jump(table_forward, IAJ_INS, "-p udp --dport 53", nfq_queue_str);
 
     iptab_do_table(SpinBlock, IDT_MAKE);
     iptab_add_jump(SpinBlock, IAJ_ADD, 0, SpinLog);
