@@ -1,3 +1,4 @@
+#ifdef notdef
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <linux/netlink.h>
@@ -365,3 +366,6 @@ int main(int argc, char** argv) {
     // check all given addresses
     return 0;
 }
+#else
+int main() {}
+#endif

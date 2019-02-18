@@ -1,3 +1,4 @@
+#ifdef notdef
 #ifndef SPIN_NETLINK_COMMANDS_H
 #define SPIN_NETLINK_COMMANDS_H 1
 
@@ -31,3 +32,4 @@ netlink_command_result_t* send_netlink_command_iparg(config_command_t cmd, ip_t*
 
 
 #endif // SPIN_NETLINK_COMMANDS_H
+#endif

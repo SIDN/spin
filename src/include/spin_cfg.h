@@ -1,3 +1,4 @@
+#ifdef notdef
 
 #ifndef SPIN_CONFIG_H
 #define SPIN_CONFIG_H 1
@@ -23,5 +24,7 @@ typedef enum {
 } config_command_t;
 
 void config_test(void);
+
+#endif
 
 #endif

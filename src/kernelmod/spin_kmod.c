@@ -1,3 +1,4 @@
+#ifdef notdef
 //'Hello World' netfilter hooks example
 //For any packet, we drop it, and log fact to /var/log/messages
 
@@ -755,3 +756,4 @@ void cleanup_module()
 }
 
 MODULE_LICENSE("GPL");
+#endif

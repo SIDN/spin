@@ -1,6 +1,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
+#ifdef notdef
 #include <linux/netlink.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -15,10 +17,14 @@
 #include "node_cache.h"
 #include "dns_cache.h"
 #include "tree.h"
+#ifdef notdef
 #include "netlink_commands.h"
+#endif
 #include "spin_log.h"
 #include "core2pubsub.h"
+#ifdef notdef
 #include "core2kernel.h"
+#endif
 #include "core2block.h"
 #include "core2nfq_dns.h"
 #include "core2conntrack.h"
@@ -586,12 +592,16 @@ int main(int argc, char** argv) {
 
     push_all_ipl();
 
+#ifdef notdef
     result = init_netlink(local_mode, node_cache);
+#endif
 
     mainloop_run();
 
     cleanup_cache();
+#ifdef notdef
     cleanup_netlink();
+#endif
 
     cleanup_core2block();
 
