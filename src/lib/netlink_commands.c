@@ -1,3 +1,4 @@
+#ifdef notdef
 
 #include "netlink_commands.h"
 
@@ -198,3 +199,5 @@ netlink_command_result_t* send_netlink_command_iparg(config_command_t cmd, ip_t*
         return send_netlink_command_buf(19, cmd_buf);
     }
 }
+
+#endif

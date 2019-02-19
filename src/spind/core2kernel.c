@@ -1,3 +1,4 @@
+#ifdef notdef
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <linux/netlink.h>
@@ -230,3 +231,4 @@ void cleanup_netlink() {
     flow_list_destroy(flow_list);
     free(traffic_nlh);
 }
+#endif

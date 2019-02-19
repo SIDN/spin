@@ -1,6 +1,5 @@
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <linux/netlink.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -15,10 +14,8 @@
 #include "node_cache.h"
 #include "dns_cache.h"
 #include "tree.h"
-#include "netlink_commands.h"
 #include "spin_log.h"
 #include "core2pubsub.h"
-#include "core2kernel.h"
 #include "core2block.h"
 #include "core2nfq_dns.h"
 #include "core2conntrack.h"
@@ -585,13 +582,9 @@ int main(int argc, char** argv) {
 
     push_all_ipl();
 
-    init_netlink(local_mode, node_cache);
-
     mainloop_run();
 
     cleanup_cache();
-    cleanup_netlink();
-
     cleanup_core2block();
 
     finish_mosquitto();
