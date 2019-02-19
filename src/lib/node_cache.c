@@ -130,6 +130,17 @@ node_set_last_seen(node_t* node, uint32_t last_seen) {
     node->last_seen = last_seen;
 }
 
+static void ip_key2str(char* buf, size_t buf_len, const uint8_t* ip_key_data) {
+    int family = (int)ip_key_data[0];
+    size_t offset;
+    if (family == AF_INET) {
+        offset = 13;
+    } else {
+        offset = 1;
+    }
+    ntop(family, buf, (const uint8_t*)&ip_key_data[offset], buf_len);
+}
+
 static int
 node_shares_element(node_t* node, node_t* othernode) {
     tree_entry_t* cur_me;
@@ -138,6 +149,7 @@ node_shares_element(node_t* node, node_t* othernode) {
     //fflush(stdout);
     if (node->mac != NULL && othernode->mac != NULL) {
         if (strcmp(node->mac, othernode->mac) == 0) {
+            spin_log(LOG_DEBUG, "[MERGE] Nodes %d and %d share mac address %s\n", node->id, othernode->id, node->mac);
             return 1;
         }
     }
@@ -145,6 +157,9 @@ node_shares_element(node_t* node, node_t* othernode) {
     cur_me = tree_first(node->ips);
     while (cur_me != NULL) {
         if (tree_find(othernode->ips, cur_me->key_size, cur_me->key) != NULL) {
+            char ip_str[256];
+            ip_key2str(ip_str, 256, cur_me->key);
+            spin_log(LOG_DEBUG, "[MERGE] Nodes %d and %d share IP address %s\n", node->id, othernode->id, ip_str);
             return 1;
         }
         cur_me = tree_next(cur_me);
@@ -153,47 +168,13 @@ node_shares_element(node_t* node, node_t* othernode) {
     cur_me = tree_first(node->domains);
     while (cur_me != NULL) {
         if (tree_find(othernode->domains, cur_me->key_size, cur_me->key) != NULL) {
+            spin_log(LOG_DEBUG, "[MERGE3] Nodes %d and %d share domain name %s\n", node->id, othernode->id, cur_me->key);
             return 1;
         }
         cur_me = tree_next(cur_me);
     }
 
     return 0;
-}
-
-static void
-node_merge(node_t* dest, node_t* src) {
-    tree_entry_t* cur;
-    int i;
-
-    if (dest->name == NULL) {
-        node_set_name(dest, src->name);
-    }
-    if (dest->mac == NULL) {
-        node_set_mac(dest, src->mac);
-    }
-    if (dest->last_seen < src->last_seen) {
-        dest->last_seen = src->last_seen;
-    }
-    for (i=0;i<N_IPLIST;i++) {
-        dest->is_onlist[i] |= src->is_onlist[i];
-    }
-#ifdef notdef
-    // When merging nodes, set blocked and allowed to 1 if either
-    // of them were not 0
-    node_set_blocked(dest, src->is_blocked | dest->is_blocked);
-    node_set_allowed(dest, src->is_allowed | dest->is_allowed);
-#endif
-    cur = tree_first(src->ips);
-    while (cur != NULL) {
-        tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
-        cur = tree_next(cur);
-    }
-    cur = tree_first(src->domains);
-    while (cur != NULL) {
-        tree_add(dest->domains, cur->key_size, cur->key, cur->data_size, cur->data, 1);
-        cur = tree_next(cur);
-    }
 }
 
 static void
@@ -228,6 +209,46 @@ node_print(node_t* node) {
     cur = tree_first(node->domains);
     while (cur != NULL) {
         spin_log(LOG_DEBUG, "        %s\n", (unsigned char*)cur->key);
+        cur = tree_next(cur);
+    }
+}
+
+static void
+node_merge(node_t* dest, node_t* src) {
+    tree_entry_t* cur;
+    int i;
+
+    spin_log(LOG_DEBUG, "[MERGE] MERGING NODE:\n");
+    node_print(src);
+    spin_log(LOG_DEBUG, "[MERGE] INTO NODE:\n");
+    node_print(dest);
+
+    if (dest->name == NULL) {
+        node_set_name(dest, src->name);
+    }
+    if (dest->mac == NULL) {
+        node_set_mac(dest, src->mac);
+    }
+    if (dest->last_seen < src->last_seen) {
+        dest->last_seen = src->last_seen;
+    }
+    for (i=0;i<N_IPLIST;i++) {
+        dest->is_onlist[i] |= src->is_onlist[i];
+    }
+#ifdef notdef
+    // When merging nodes, set blocked and allowed to 1 if either
+    // of them were not 0
+    node_set_blocked(dest, src->is_blocked | dest->is_blocked);
+    node_set_allowed(dest, src->is_allowed | dest->is_allowed);
+#endif
+    cur = tree_first(src->ips);
+    while (cur != NULL) {
+        tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        cur = tree_next(cur);
+    }
+    cur = tree_first(src->domains);
+    while (cur != NULL) {
+        tree_add(dest->domains, cur->key_size, cur->key, cur->data_size, cur->data, 1);
         cur = tree_next(cur);
     }
 }
