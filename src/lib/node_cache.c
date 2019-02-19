@@ -177,6 +177,50 @@ node_shares_element(node_t* node, node_t* othernode) {
     return 0;
 }
 
+static int largest_tree = 0;
+
+static void
+node_merge(node_t* dest, node_t* src) {
+    tree_entry_t* cur;
+    int i;
+    int tsize;
+
+    if (dest->name == NULL) {
+        node_set_name(dest, src->name);
+    }
+    if (dest->mac == NULL) {
+        node_set_mac(dest, src->mac);
+    }
+    if (dest->last_seen < src->last_seen) {
+        dest->last_seen = src->last_seen;
+    }
+    // When merging nodes, set is_onlist[] entries to 1 if either
+    // of them were not 0
+    for (i=0;i<N_IPLIST;i++) {
+        dest->is_onlist[i] |= src->is_onlist[i];
+    }
+
+    cur = tree_first(src->ips);
+    while (cur != NULL) {
+        tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        tsize++;
+        cur = tree_next(cur);
+    }
+    // TODO: temporary hack for largest IP tree size
+    tsize = tree_size(dest->ips);
+    if (tsize > largest_tree) {
+        spin_log(LOG_INFO, "Largest IP tree is %d entries at node %d with name %s\n", tsize, dest->id, dest->name? dest->name : "<empty>");
+        largest_tree = tsize;
+    }
+    // end of temporary hack
+
+    cur = tree_first(src->domains);
+    while (cur != NULL) {
+        tree_add(dest->domains, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        cur = tree_next(cur);
+    }
+}
+
 static void
 node_print(node_t* node) {
     tree_entry_t* cur;
@@ -209,46 +253,6 @@ node_print(node_t* node) {
     cur = tree_first(node->domains);
     while (cur != NULL) {
         spin_log(LOG_DEBUG, "        %s\n", (unsigned char*)cur->key);
-        cur = tree_next(cur);
-    }
-}
-
-static void
-node_merge(node_t* dest, node_t* src) {
-    tree_entry_t* cur;
-    int i;
-
-    spin_log(LOG_DEBUG, "[MERGE] MERGING NODE:\n");
-    node_print(src);
-    spin_log(LOG_DEBUG, "[MERGE] INTO NODE:\n");
-    node_print(dest);
-
-    if (dest->name == NULL) {
-        node_set_name(dest, src->name);
-    }
-    if (dest->mac == NULL) {
-        node_set_mac(dest, src->mac);
-    }
-    if (dest->last_seen < src->last_seen) {
-        dest->last_seen = src->last_seen;
-    }
-    for (i=0;i<N_IPLIST;i++) {
-        dest->is_onlist[i] |= src->is_onlist[i];
-    }
-#ifdef notdef
-    // When merging nodes, set blocked and allowed to 1 if either
-    // of them were not 0
-    node_set_blocked(dest, src->is_blocked | dest->is_blocked);
-    node_set_allowed(dest, src->is_allowed | dest->is_allowed);
-#endif
-    cur = tree_first(src->ips);
-    while (cur != NULL) {
-        tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
-        cur = tree_next(cur);
-    }
-    cur = tree_first(src->domains);
-    while (cur != NULL) {
-        tree_add(dest->domains, cur->key_size, cur->key, cur->data_size, cur->data, 1);
         cur = tree_next(cur);
     }
 }
