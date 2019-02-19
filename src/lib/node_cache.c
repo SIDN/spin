@@ -177,13 +177,14 @@ node_shares_element(node_t* node, node_t* othernode) {
     return 0;
 }
 
+#ifdef notdef
 static int largest_tree = 0;
+#endif
 
 static void
 node_merge(node_t* dest, node_t* src) {
     tree_entry_t* cur;
     int i;
-    int tsize;
 
     if (dest->name == NULL) {
         node_set_name(dest, src->name);
@@ -203,16 +204,18 @@ node_merge(node_t* dest, node_t* src) {
     cur = tree_first(src->ips);
     while (cur != NULL) {
         tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
-        tsize++;
         cur = tree_next(cur);
     }
+#ifdef notdef
     // TODO: temporary hack for largest IP tree size
+    int tsize;
     tsize = tree_size(dest->ips);
     if (tsize > largest_tree) {
         spin_log(LOG_INFO, "Largest IP tree is %d entries at node %d with name %s\n", tsize, dest->id, dest->name? dest->name : "<empty>");
         largest_tree = tsize;
     }
     // end of temporary hack
+#endif
 
     cur = tree_first(src->domains);
     while (cur != NULL) {

@@ -19,6 +19,8 @@
 #include "mainloop.h"
 #include "nfqroutines.h"
 
+#define NFQPERIOD   1000
+
 static int
 fd_set_blocking(int fd, int blocking) {
     /* Save the current flags */
@@ -257,7 +259,7 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
             verdict = 1;
         }
         nfr[fr_n].nfr_packets++;
-        if (nfr[fr_n].nfr_packets % 100 == 0) {
+        if (NFQPERIOD != 0 && nfr[fr_n].nfr_packets % NFQPERIOD == 0) {
             spin_log(LOG_INFO, "Nfq module %s handled %d packets\n", 
                 nfr[fr_n].nfr_name,
                 nfr[fr_n].nfr_packets);

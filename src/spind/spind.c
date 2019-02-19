@@ -33,41 +33,7 @@ const char* mosq_host;
 int mosq_port;
 int stop_on_error;
 
-/*
-static inline void
-print_pktinfo_wirehex(pkt_info_t* pkt_info) {
-        uint8_t* wire = (char*)malloc(46);
-        memset(wire, 0, 46);
-        pktinfo2wire(wire, pkt_info);
-        // size is 49 (46 bytes of pkt info, 1 byte of type, 2 bytes of size)
-        int i;
-        // print version, msg_type, and size (which is irrelevant right now)
-        printf("{ 0x01, 0x01, 0x00, 0x00, ");
-        for (i = 0; i < 45; i++) {
-                printf("0x%02x, ", wire[i]);
-        }
-        printf("0x%02x }\n", wire[45]);
-
-        free(wire);
-}
-
-static inline void
-print_dnspktinfo_wirehex(dns_pkt_info_t* pkt_info) {
-        uint8_t* wire = (char*)malloc(277);
-        memset(wire, 0, 277);
-        dns_pktinfo2wire(wire, pkt_info);
-        // size is 49 (46 bytes of pkt info, 1 byte of type, 2 bytes of size)
-        int i;
-        // print version, msg_type, and size (which is irrelevant right now)
-        printf("{ 0x01, 0x02, 0x00, 0x00, ");
-        for (i = 0; i < 276; i++) {
-                printf("0x%02x, ", wire[i]);
-        }
-        printf("0x%02x }\n", wire[277]);
-
-        free(wire);
-}
-*/
+#define JSONBUFSIZ      4096
 
 unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argument, char* result) {
 
@@ -83,8 +49,9 @@ unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argum
 }
 
 void send_command_blocked(pkt_info_t* pkt_info) {
-    buffer_t* response_json = buffer_create(2048);
-    buffer_t* pkt_json = buffer_create(2048);
+    unsigned int response_size;
+    buffer_t* response_json = buffer_create(JSONBUFSIZ);
+    buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
     unsigned int p_size;
 
     p_size = pkt_info2json(node_cache, pkt_info, pkt_json);
@@ -104,8 +71,9 @@ void send_command_blocked(pkt_info_t* pkt_info) {
 }
 
 void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
-    buffer_t* response_json = buffer_create(2048);
-    buffer_t* pkt_json = buffer_create(2048);
+    unsigned int response_size;
+    buffer_t* response_json = buffer_create(JSONBUFSIZ);
+    buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
     unsigned int p_size;
 
     p_size = dns_query_pkt_info2json(node_cache, pkt_info, pkt_json);
@@ -129,7 +97,7 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
 // void connect_mosquitto(const char* host, int port);
 
 void maybe_sendflow(flow_list_t *flow_list, time_t now) {
-    buffer_t* json_buf = buffer_create(4096);
+    buffer_t* json_buf = buffer_create(JSONBUFSIZ);
     buffer_allow_resize(json_buf);
 
     if (flow_list_should_send(flow_list, now)) {
@@ -166,9 +134,7 @@ report_block(int af, int proto, uint8_t *src_addr, uint8_t *dest_addr, unsigned 
 /*
  * The three lists of IP addresses are now kept in memory in spind, with
  * a copy written to file.
- * BLOCK, FILTER, ALLOW
- * The lists in the kernel module will not be read back, even while there is a
- * kernel module.
+ * BLOCK, IGNORE, ALLOW
  */
 // TODO: move this out to the library, this feels like pretty commonly shared code
 struct list_info {
@@ -450,8 +416,9 @@ iptree2json(tree_t* tree, buffer_t* result) {
 }
 
 void handle_command_get_iplist(int iplist, const char* json_command) {
-    buffer_t* response_json = buffer_create(4096);
-    buffer_t* result_json = buffer_create(4096);
+    buffer_t* response_json = buffer_create(JSONBUFSIZ);
+    buffer_t* result_json = buffer_create(JSONBUFSIZ);
+    unsigned int response_size;
 
     iptree2json(ipl_list_ar[iplist].li_tree, result_json);
     if (!buffer_ok(result_json)) {

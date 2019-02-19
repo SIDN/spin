@@ -22,9 +22,6 @@
 
 #define MAXSTR 1024
 
-// #define SF_ADD                       0
-// #define SF_REM                       1
-
 #define QUEUE_BLOCK     2
 
 FILE *logfile;
