@@ -42,6 +42,7 @@ Mosquitto keepalive time
 ### spind.c
 
 Mosquitto host and port
+Logging settings
 
 ### spin_config.c
 *Lists of ip-addresses*
@@ -55,7 +56,7 @@ Add section spin in uci:
 
 Add variables of type int32 and type string
 
-### Variables
+### Variables(to be completed)
 spin.iptable.debugfile	*value* "/tmp/blockcommands"
 spin.iptable.queuedns	*value* 1
 spin.iptable.queueblock	*value* 2
@@ -63,9 +64,14 @@ spin.iptable.queueblock	*value* 2
 spin.iptableplace.dns	*value* 0
 spin.iptableplace.block	*value* 0
 
+spin.pubsub.host *value* "name/address"
+spin.pubsub.port *value* 1883
 spin.pubsub.channel.command	*value* "SPIN/traffic"
 spin.subsub.channel.traffic	*value*	"SPIN/commands"
 spin.pubsub.timeout	*value*	60
+
+spin.log.usesyslog	*value*	1
+spin.log.loglevel	*value*	6
 
 
 
