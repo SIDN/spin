@@ -133,11 +133,6 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
     i = 0;
     rr = ldns_rr_list_pop_rr(answers);
     while (rr && i < ips_len) {
-        // skip any non-address answers (such as cname)
-        if (ldns_rr_get_type(rr) != LDNS_RR_TYPE_A && ldns_rr_get_type(rr) != LDNS_RR_TYPE_AAAA) {
-            ldns_rr_free(rr);
-            continue;
-        }
         // XXX TTL ldns_rr_ttl
         rdf = ldns_rr_rdf(rr, 0);
         s = ldns_rdf2str(rdf);
@@ -151,12 +146,16 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
         0));
 
         dns_pkt_info_t dns_pkt;
-        dns_pkt.family = protocol;
-        if (protocol == AF_INET) {
+        if (ldns_rr_get_type(rr) == LDNS_RR_TYPE_A) {
+            dns_pkt.family = AF_INET;
             memset(dns_pkt.ip, 0, 12);
             memcpy(dns_pkt.ip+12, rdf->_data, rdf->_size);
-        } else {
+        } else if (ldns_rr_get_type(rr) == LDNS_RR_TYPE_AAAA) {
+            dns_pkt.family = AF_INET6;
             memcpy(dns_pkt.ip, rdf->_data, rdf->_size);
+        } else {
+            ips[i] = NULL;
+            goto next;
         }
         memcpy(dns_pkt.dname, query_rdf->_data, query_rdf->_size);
         // TODO
@@ -166,14 +165,16 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
         dns_cache_add(dns_cache, &dns_pkt, now);
         node_cache_add_dns_info(node_cache, &dns_pkt, now);
 
+        next:
         ++i;
         ldns_rr_free(rr);
         rr = ldns_rr_list_pop_rr(answers);
-
     }
 
     for (i = 0; i < ips_len; ++i) {
-        spin_log(LOG_DEBUG, "DNS ANSWER: %s %s\n", query, ips[i]);
+        if (ips[i] != NULL) {
+            spin_log(LOG_DEBUG, "DNS ANSWER: %s %s\n", query, ips[i]);
+        }
     }
 
  out:
