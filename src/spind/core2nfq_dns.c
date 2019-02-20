@@ -77,7 +77,7 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
 {
     ldns_status status;
     ldns_pkt *p = NULL;
-    ldns_rr_list *answers;
+    ldns_rr_list *answers = NULL;
     ldns_rr *rr;
     ldns_rdf *rdf;
     size_t count;
