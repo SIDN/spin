@@ -133,6 +133,11 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
     i = 0;
     rr = ldns_rr_list_pop_rr(answers);
     while (rr && i < ips_len) {
+        // skip any non-address answers (such as cname)
+        if (ldns_rr_get_type(rr) != LDNS_RR_TYPE_A && ldns_rr_get_type(rr) != LDNS_RR_TYPE_AAAA) {
+            ldns_rr_free(rr);
+            continue;
+        }
         // XXX TTL ldns_rr_ttl
         rdf = ldns_rr_rdf(rr, 0);
         s = ldns_rdf2str(rdf);
@@ -162,6 +167,7 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
         node_cache_add_dns_info(node_cache, &dns_pkt, now);
 
         ++i;
+        ldns_rr_free(rr);
         rr = ldns_rr_list_pop_rr(answers);
 
     }
@@ -176,6 +182,7 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
     }
     free(ips);
     free(query);
+    ldns_rr_list_deep_free(answers);
     ldns_pkt_free(p);
 }
 
