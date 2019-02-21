@@ -68,7 +68,8 @@ handle_dns(const u_char *bp, u_int length, long long timestamp)
 {
 	ldns_status status;
 	ldns_pkt *p = NULL;
-	ldns_rr_list *answers;
+	ldns_rr_list *answers = NULL;
+	ldns_rr_list *tmp_list;
 	ldns_rr *rr;
 	ldns_rdf *rdf;
 #if unused
@@ -98,10 +99,18 @@ handle_dns(const u_char *bp, u_int length, long long timestamp)
 	}
 
 	answers = ldns_rr_list_new();
-	ldns_rr_list_cat(answers, ldns_pkt_rr_list_by_type(p, LDNS_RR_TYPE_A,
-	    LDNS_SECTION_ANSWER));
-	ldns_rr_list_cat(answers, ldns_pkt_rr_list_by_type(p, LDNS_RR_TYPE_AAAA,
-	    LDNS_SECTION_ANSWER));
+	tmp_list = ldns_pkt_rr_list_by_type(p, LDNS_RR_TYPE_A,
+	    LDNS_SECTION_ANSWER);
+	if (tmp_list) {
+		ldns_rr_list_cat(answers, tmp_list);
+		ldns_rr_list_free(tmp_list);
+	}
+	tmp_list = ldns_pkt_rr_list_by_type(p, LDNS_RR_TYPE_AAAA,
+	    LDNS_SECTION_ANSWER);
+	if (tmp_list) {
+		ldns_rr_list_cat(answers, tmp_list);
+		ldns_rr_list_free(tmp_list);
+	}
 
 	ips_len = ldns_rr_list_rr_count(answers);
 
@@ -131,6 +140,7 @@ handle_dns(const u_char *bp, u_int length, long long timestamp)
 		// XXX TTL ldns_rr_ttl
 		rdf = ldns_rr_rdf(rr, 0);
 		s = ldns_rdf2str(rdf);
+		ldns_rr_free(rr);
 		if (!s) {
 			DPRINTF("DNS: ldns_rdf2str failure");
 			goto out;
@@ -144,6 +154,7 @@ handle_dns(const u_char *bp, u_int length, long long timestamp)
 	print_dnsquery(query, (const char **)ips, ips_len, timestamp);
 
  out:
+	ldns_rr_list_deep_free(answers);
 	for (i = 0; i < ips_len; ++i) {
 		free(ips[i]);
 	}
