@@ -5,15 +5,15 @@
 #include "jsmn.h"
 #include "util.h"
 #include "mainloop.h"
+#include "spinconfig.h"
 #include "spin_log.h"
 #include "spin_list.h"
 
 #include "handle_command.h"
 
-#define MOSQUITTO_KEEPALIVE_TIME 60     /* Seconds */
-
-#define MQTT_CHANNEL_TRAFFIC "SPIN/traffic"
-#define MQTT_CHANNEL_COMMANDS "SPIN/commands"
+static char *mqtt_channel_traffic;
+static char *mqtt_channel_commands;
+static int mosquitto_keepalive_time;
 
 struct mosquitto* mosq;
 extern node_cache_t* node_cache;
@@ -30,7 +30,7 @@ pubsub_publish(int payloadlen, const void* payload) {
     /*
      * There is a result from command, but for now ignored
      */
-    mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC,
+    mosquitto_publish(mosq, NULL, mqtt_channel_traffic,
                                 payloadlen, payload,
                                 0, false);
 }
@@ -325,7 +325,7 @@ void handle_json_command(const char* data) {
 // Hook from Mosquitto code called with incoming messages
 
 void do_mosq_message(struct mosquitto* mosq, void* user_data, const struct mosquitto_message* msg) {
-    if (strcmp(msg->topic, MQTT_CHANNEL_COMMANDS) == 0) {
+    if (strcmp(msg->topic, mqtt_channel_commands) == 0) {
         handle_json_command(msg->payload);
     }
 }
@@ -341,15 +341,15 @@ void connect_mosquitto(const char* host, int port) {
 
     mosq = mosquitto_new(client_name, 1, NULL);
     spin_log(LOG_INFO, "Connecting to mqtt server on %s:%d\n", host, port);
-    result = mosquitto_connect(mosq, host, port, MOSQUITTO_KEEPALIVE_TIME);
+    result = mosquitto_connect(mosq, host, port, mosquitto_keepalive_time);
     if (result != 0) {
         spin_log(LOG_ERR, "Error connecting to mqtt server on %s:%d, %s\n", host, port, mosquitto_strerror(result));
         exit(1);
     }
-    spin_log(LOG_INFO, "Connected to mqtt server on %s:%d with keepalive value %d\n", host, port, MOSQUITTO_KEEPALIVE_TIME);
-    result = mosquitto_subscribe(mosq, NULL, MQTT_CHANNEL_COMMANDS, 0);
+    spin_log(LOG_INFO, "Connected to mqtt server on %s:%d with keepalive value %d\n", host, port, mosquitto_keepalive_time);
+    result = mosquitto_subscribe(mosq, NULL, mqtt_channel_commands, 0);
     if (result != 0) {
-        spin_log(LOG_ERR, "Error subscribing to topic %s: %s\n", MQTT_CHANNEL_COMMANDS, mosquitto_strerror(result));
+        spin_log(LOG_ERR, "Error subscribing to topic %s: %s\n", mqtt_channel_commands, mosquitto_strerror(result));
     }
 
     mosquitto_message_callback_set(mosq, do_mosq_message);
@@ -370,9 +370,12 @@ void wf_mosquitto(void* arg, int data, int timeout) {
 void init_mosquitto(const char* host, int port) {
     mosquitto_lib_init();
 
+    mqtt_channel_traffic = spinconfig_pubsub_channel_traffic();
+    mqtt_channel_commands = spinconfig_pubsub_channel_commands();
+    mosquitto_keepalive_time = spinconfig_pubsub_timeout();
     connect_mosquitto(host, port);
 
-    mainloop_register("mosq", &wf_mosquitto, (void *) 0, mosquitto_socket(mosq), MOSQUITTO_KEEPALIVE_TIME*1000/2);
+    mainloop_register("mosq", &wf_mosquitto, (void *) 0, mosquitto_socket(mosq), mosquitto_keepalive_time*1000/2);
     mosquitto_socket(mosq);
     send_command_restart();
     handle_command_get_iplist(IPLIST_IGNORE, "filters");

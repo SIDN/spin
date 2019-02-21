@@ -8,6 +8,7 @@
 #include <time.h>
 #include <assert.h>
 
+#include "spinconfig.h"
 #include "pkt_info.h"
 #include "util.h"
 #include "spin_list.h"
@@ -486,11 +487,15 @@ void cleanup_cache() {
 
 int main(int argc, char** argv) {
     int c;
-    int log_verbosity = 6;
-    int use_syslog = 1;
+    int log_verbosity;
+    int use_syslog;
 
-    mosq_host = "127.0.0.1";
-    mosq_port = 1883;
+    init_config();
+    log_verbosity = spinconfig_log_loglevel();
+    use_syslog = spinconfig_log_usesyslog();
+
+    mosq_host = spinconfig_pubsub_host();
+    mosq_port = spinconfig_pubsub_port();
     stop_on_error = 0;
 
     while ((c = getopt (argc, argv, "dehlm:op:v")) != -1) {
@@ -531,6 +536,7 @@ int main(int argc, char** argv) {
             abort ();
         }
     }
+
 
     spin_log_init(use_syslog, log_verbosity, "spind");
     log_version();

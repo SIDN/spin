@@ -15,22 +15,25 @@
 
 #include "spin_list.h"
 #include "spind.h"
-
-// needed for the CORE2NFQ_DNS_QUEUE_NUMBER value
-// (we will probably make this configurable)
-#include "core2nfq_dns.h"
+#include "spinconfig.h"
 
 #define MAXSTR 1024
 
-#define QUEUE_BLOCK     2
-
-FILE *logfile;
+static int dolog;
+static FILE *logfile;
 
 static void
 setup_debug() {
+    char *fname;
 
-    logfile = fopen("/tmp/block_commands", "w");
+    fname = spinconfig_iptable_debug();
+    if (fname == 0 || *fname == 0)  {
+        return;
+    }
+
+    logfile = fopen(fname, "w");
     setbuf(logfile, NULL);
+    dolog = 1;
 }
 
 /*
@@ -42,7 +45,9 @@ static void
 iptab_system(char *s) {
     int result;
 
-    fprintf(logfile, "%s\n", s);
+    if (dolog) {
+        fprintf(logfile, "%s\n", s);
+    }
     result = system(s);
     assert (ignore_system_errors || result == 0);
 }
@@ -111,32 +116,36 @@ clean_old_tables() {
 }
 
 static void
-setup_tables() {
+setup_tables(int queue_dns, int queue_block, int place) {
     char str[MAXSTR];
     char nfq_queue_str[MAXSTR];
+    int block_iaj;
+
+    // Currently block and dns both in one list
+    block_iaj = place ? IAJ_ADD : IAJ_INS;
 
     ignore_system_errors = 1;
     clean_old_tables();
     ignore_system_errors = 0;
 
     iptab_do_table(SpinCheck, IDT_MAKE);
-    iptab_add_jump(table_input, IAJ_INS, 0, SpinCheck);
-    iptab_add_jump(table_output, IAJ_INS, 0, SpinCheck);
-    iptab_add_jump(table_forward, IAJ_INS, 0, SpinCheck);
+    iptab_add_jump(table_input, block_iaj, 0, SpinCheck);
+    iptab_add_jump(table_output, block_iaj, 0, SpinCheck);
+    iptab_add_jump(table_forward, block_iaj, 0, SpinCheck);
 
     iptab_do_table(SpinLog, IDT_MAKE);
     iptab_add_jump(SpinLog, IAJ_ADD, 0, "LOG --log-prefix \"Spin blocked: \"");
     // Forward all (udp) DNS queries to nfqueue (for core2nfq_dns)
     // Note: only UDP for now, we'll need to reconstruct TCP packets
     // to support that
-    sprintf(nfq_queue_str, "NFQUEUE --queue-bypass --queue-num %d", CORE2NFQ_DNS_QUEUE_NUMBER);
+    sprintf(nfq_queue_str, "NFQUEUE --queue-bypass --queue-num %d", queue_dns);
     iptab_add_jump(table_output, IAJ_INS, "-p udp --sport 53", nfq_queue_str);
     iptab_add_jump(table_input, IAJ_INS, "-p udp --dport 53", nfq_queue_str);
     iptab_add_jump(table_forward, IAJ_INS, "-p udp --dport 53", nfq_queue_str);
 
     iptab_do_table(SpinBlock, IDT_MAKE);
     iptab_add_jump(SpinBlock, IAJ_ADD, 0, SpinLog);
-    sprintf(str, "NFQUEUE --queue-num %d", QUEUE_BLOCK);
+    sprintf(str, "NFQUEUE --queue-num %d", queue_block);
     iptab_add_jump(SpinBlock, IAJ_ADD, 0, str);
 }
 
@@ -185,10 +194,10 @@ c2b_catch(void *arg, int af, int proto, uint8_t* data, int size, uint8_t *src_ad
 }
 
 static void
-setup_catch() {
+setup_catch(int queue) {
 
     // Here we set up the catching of kernel messages for LOGed packets
-    nfqroutine_register("core2block", c2b_catch, (void *) 0, QUEUE_BLOCK);
+    nfqroutine_register("core2block", c2b_catch, (void *) 0, queue);
 }
 
 static void
@@ -202,10 +211,19 @@ wf_core2block(void *arg, int data, int timeout) {
 
 void init_core2block() {
     static int all_lists[N_IPLIST] = { 1, 1, 1 };
+    int queue_dns, queue_block;
+    int place_dns, place_block;
 
-    setup_catch();
+    queue_dns = spinconfig_iptable_queue_dns();
+    queue_block = spinconfig_iptable_queue_block();
+    place_dns = spinconfig_iptable_place_dns();
+    place_block = spinconfig_iptable_place_block();
+
+    spin_log(LOG_DEBUG, "NFQ's %d and %d\n", queue_dns, queue_block);
+
+    setup_catch(queue_block);
     setup_debug();
-    setup_tables();
+    setup_tables(queue_dns, queue_block, place_block);
 
     mainloop_register("core2block", wf_core2block, (void *) 0, 0, 10000);
     spin_register("core2block", c2b_changelist, (void *) 0, all_lists);

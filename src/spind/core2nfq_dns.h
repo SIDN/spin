@@ -3,8 +3,6 @@
 #include "node_cache.h"
 #include "dns_cache.h"
 
-#define CORE2NFQ_DNS_QUEUE_NUMBER 1
-
 // Initialize the core2nfq_dns module
 // Arguments:
 // node_cache_t* the global spin node cache

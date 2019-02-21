@@ -23,7 +23,6 @@ libspin_a_SOURCES = ../kernelmod/pkt_info.c \
 					node_names.c \
 					jsmn.h \
 					jsmn.c \
-					netlink_commands.c \
 					version.c
 
 libspin_a_CFLAGS = -I$(top_srcdir)/kernelmod

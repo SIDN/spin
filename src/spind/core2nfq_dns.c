@@ -17,6 +17,7 @@
 #include "spin_log.h"
 #include "spind.h"
 #include "nfqroutines.h"
+#include "spinconfig.h"
 
 static node_cache_t* node_cache;
 static dns_cache_t* dns_cache;
@@ -216,8 +217,10 @@ static int nfq_dns_callback(void* arg, int family, int protocol,
 void init_core2nfq_dns(node_cache_t* node_cache_a, dns_cache_t* dns_cache_a) {
     node_cache = node_cache_a;
     dns_cache = dns_cache_a;
+    int queue_dns;
     
-    nfqroutine_register("core2nfq_dns", nfq_dns_callback, (void *) 0, CORE2NFQ_DNS_QUEUE_NUMBER);
+    queue_dns = spinconfig_iptable_queue_dns();
+    nfqroutine_register("core2nfq_dns", nfq_dns_callback, (void *) 0, queue_dns);
 }
 
 void cleanup_core2nfq_dns() {
