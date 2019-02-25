@@ -1,12 +1,12 @@
 #include <libmnl/libmnl.h>
 #include <libnetfilter_conntrack/libnetfilter_conntrack.h>
-#include <kernelmod/pkt_info.h>
 #include <time.h>
 
 #include "core2conntrack.h"
 #include "spin_log.h"
 #include "mainloop.h"
 #include "spind.h"
+#include "pkt_info.h"
 
 // define a structure for the callback data
 typedef struct {

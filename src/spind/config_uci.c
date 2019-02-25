@@ -7,7 +7,6 @@
 
 
 #if USE_UCI
-
 #include <uci.h>
 
 /*
