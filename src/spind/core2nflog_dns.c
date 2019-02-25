@@ -13,12 +13,12 @@
 #include "util.h"
 #include "dns_cache.h"
 #include "node_cache.h"
-#include "core2nfq_dns.h"
+#include "core2nflog_dns.h"
 #include "spin_log.h"
 #include "spind.h"
-#include "nfqroutines.h"
 #include "spinconfig.h"
 #include "statistics.h"
+#include "nflogroutines.h"
 
 static node_cache_t* node_cache;
 static dns_cache_t* dns_cache;
@@ -48,6 +48,7 @@ handle_dns_query(const u_char *bp, u_int length, uint8_t* src_addr, int family, 
         phexdump(bp, length);
         goto out;
     }
+    spin_log(LOG_DEBUG, "DNS query with qid: %u\n", ldns_pkt_id(p));
 
     count = ldns_rr_list_rr_count(ldns_pkt_question(p));
     if (count == 0) {
@@ -102,6 +103,7 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
         phexdump(bp, length);
         goto out;
     }
+    spin_log(LOG_DEBUG, "DNS answer with qid: %u\n", ldns_pkt_id(p));
 
     count = ldns_rr_list_rr_count(ldns_pkt_question(p));
     if (count == 0) {
@@ -203,7 +205,7 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
 }
 
 
-static int nfq_dns_callback(void* arg, int family, int protocol,
+static void nflog_dns_callback(void* arg, int family, int protocol,
                             uint8_t* data, int size,
                             uint8_t* src_addr, uint8_t* dest_addr,
                             unsigned int src_port, unsigned int dest_port) {
@@ -217,18 +219,16 @@ static int nfq_dns_callback(void* arg, int family, int protocol,
 
         handle_dns_query(data + header_size, size - header_size, src_addr, family, now);
     }
-
-    return 1;
 }
 
-void init_core2nfq_dns(node_cache_t* node_cache_a, dns_cache_t* dns_cache_a) {
+void init_core2nflog_dns(node_cache_t* node_cache_a, dns_cache_t* dns_cache_a) {
     node_cache = node_cache_a;
     dns_cache = dns_cache_a;
-    int queue_dns;
+    int nflog_dns_group;
     
-    queue_dns = spinconfig_iptable_queue_dns();
-    nfqroutine_register("core2nfq_dns", nfq_dns_callback, (void *) 0, queue_dns);
+    nflog_dns_group = spinconfig_iptable_nflog_dns_group();
+    nflogroutine_register("core2nflog_dns", nflog_dns_callback, (void *) 0, nflog_dns_group);
 }
 
-void cleanup_core2nfq_dns() {
+void cleanup_core2nflog_dns() {
 }

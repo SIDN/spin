@@ -1,5 +1,5 @@
-#ifndef CORE2NFQ_DNS
-#define CORE2NGQ_DNS 1
+#ifndef CORE2CONNTRACK
+#define CORE2CONNTRACK 1
 #include "node_cache.h"
 #include "dns_cache.h"
 

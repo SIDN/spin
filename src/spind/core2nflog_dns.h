@@ -1,15 +1,15 @@
-#ifndef CORE2NFQ_DNS
-#define CORE2NGQ_DNS 1
+#ifndef CORE2NFLOG_DNS
+#define CORE2NGLOG_DNS 1
 #include "node_cache.h"
 #include "dns_cache.h"
 
-// Initialize the core2nfq_dns module
+// Initialize the core2nflog_dns module
 // Arguments:
 // node_cache_t* the global spin node cache
 // node_cache_t* the global spin dns cache
 //
 // We may want to add some options here (such as a configurable queue number)
-void init_core2nfq_dns(node_cache_t*, dns_cache_t*);
-void cleanup_core2nfq_dns();
+void init_core2nflog_dns(node_cache_t*, dns_cache_t*);
+void cleanup_core2nflog_dns();
 
 #endif

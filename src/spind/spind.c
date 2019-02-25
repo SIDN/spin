@@ -18,7 +18,7 @@
 #include "spin_log.h"
 #include "core2pubsub.h"
 #include "core2block.h"
-#include "core2nfq_dns.h"
+#include "core2nflog_dns.h"
 #include "core2conntrack.h"
 
 #include "handle_command.h"
@@ -572,7 +572,7 @@ int main(int argc, char** argv) {
     init_cache();
 
     init_core2conntrack(node_cache, local_mode);
-    init_core2nfq_dns(node_cache, dns_cache);
+    init_core2nflog_dns(node_cache, dns_cache);
 
     init_core2block();
 

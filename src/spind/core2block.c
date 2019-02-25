@@ -19,6 +19,9 @@
 #include "spinconfig.h"
 
 #include "statistics.h"
+// needed for the CORE2NFLOG_DNS_GROUP_NUMBER value
+// (we will probably make this configurable)
+#include "core2nflog_dns.h"
 
 #define MAXSTR 1024
 
@@ -105,8 +108,9 @@ static char SpinBlock[] = "SpinBlock";
 static char SpinLog[] = "SpinLog";
 static char Return[] = "RETURN";
 
+// TODO: rename nflog_dns_group to nflog_dns_group
 static void
-clean_old_tables(int queue_dns) {
+clean_old_tables(int nflog_dns_group) {
     char nfq_queue_str[MAXSTR];
 
     iptab_do_table(SpinCheck, IDT_FLUSH);
@@ -117,7 +121,7 @@ clean_old_tables(int queue_dns) {
     iptab_add_jump(table_output, IAJ_DEL, 0, SpinCheck);
     iptab_add_jump(table_forward, IAJ_DEL, 0, SpinCheck);
 
-    sprintf(nfq_queue_str, "NFQUEUE --queue-bypass --queue-num %d", queue_dns);
+    sprintf(nfq_queue_str, "NFLOG --nflog-group %d", nflog_dns_group);
     iptab_add_jump(table_output, IAJ_DEL, "-p udp --sport 53", nfq_queue_str);
     iptab_add_jump(table_input, IAJ_DEL, "-p udp --dport 53", nfq_queue_str);
     iptab_add_jump(table_forward, IAJ_DEL, "-p udp --dport 53", nfq_queue_str);
@@ -128,7 +132,7 @@ clean_old_tables(int queue_dns) {
 }
 
 static void
-setup_tables(int queue_dns, int queue_block, int place) {
+setup_tables(int nflog_dns_group, int queue_block, int place) {
     char str[MAXSTR];
     char nfq_queue_str[MAXSTR];
     int block_iaj;
@@ -137,7 +141,7 @@ setup_tables(int queue_dns, int queue_block, int place) {
     block_iaj = place ? IAJ_ADD : IAJ_INS;
 
     ignore_system_errors = 1;
-    clean_old_tables(queue_dns);
+    clean_old_tables(nflog_dns_group);
     ignore_system_errors = 0;
 
     iptab_do_table(SpinCheck, IDT_MAKE);
@@ -150,7 +154,7 @@ setup_tables(int queue_dns, int queue_block, int place) {
     // Forward all (udp) DNS queries to nfqueue (for core2nfq_dns)
     // Note: only UDP for now, we'll need to reconstruct TCP packets
     // to support that
-    sprintf(nfq_queue_str, "NFQUEUE --queue-bypass --queue-num %d", queue_dns);
+    sprintf(nfq_queue_str, "NFLOG --nflog-group %d", nflog_dns_group);
     iptab_add_jump(table_output, IAJ_INS, "-p udp --sport 53", nfq_queue_str);
     iptab_add_jump(table_input, IAJ_INS, "-p udp --dport 53", nfq_queue_str);
     iptab_add_jump(table_forward, IAJ_INS, "-p udp --dport 53", nfq_queue_str);
@@ -228,10 +232,10 @@ wf_core2block(void *arg, int data, int timeout) {
 
 void init_core2block() {
     static int all_lists[N_IPLIST] = { 1, 1, 1 };
-    int queue_dns, queue_block;
+    int nflog_dns_group, queue_block;
     int place_dns, place_block;
 
-    queue_dns = spinconfig_iptable_queue_dns();
+    nflog_dns_group = spinconfig_iptable_nflog_dns_group();
     queue_block = spinconfig_iptable_queue_block();
     place_dns = spinconfig_iptable_place_dns();
     place_block = spinconfig_iptable_place_block();
@@ -240,11 +244,11 @@ void init_core2block() {
     // silence unused warning:
     (void)place_dns;
 
-    spin_log(LOG_DEBUG, "NFQ's %d and %d\n", queue_dns, queue_block);
+    spin_log(LOG_DEBUG, "NFQ's %d and %d\n", nflog_dns_group, queue_block);
 
     setup_catch(queue_block);
     setup_debug();
-    setup_tables(queue_dns, queue_block, place_block);
+    setup_tables(nflog_dns_group, queue_block, place_block);
 
 #ifdef notdef
     mainloop_register("core2block", wf_core2block, (void *) 0, 0, 10000);

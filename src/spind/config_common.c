@@ -148,7 +148,7 @@ int spinconfig_pubsub_timeout() {
     return(spi_int(PUBSUB_TIMEOUT));
 }
 
-int spinconfig_iptable_queue_dns() {
+int spinconfig_iptable_nflog_dns_group() {
 
     return(spi_int(IPTABLE_QUEUE_DNS));
 }
