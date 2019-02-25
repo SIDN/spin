@@ -94,7 +94,7 @@ static char SpinLog[] = "SpinLog";
 static char Return[] = "RETURN";
 
 static void
-clean_old_tables() {
+clean_old_tables(int queue_dns) {
     char nfq_queue_str[MAXSTR];
 
     iptab_do_table(SpinCheck, IDT_FLUSH);
@@ -105,7 +105,7 @@ clean_old_tables() {
     iptab_add_jump(table_output, IAJ_DEL, 0, SpinCheck);
     iptab_add_jump(table_forward, IAJ_DEL, 0, SpinCheck);
 
-    sprintf(nfq_queue_str, "NFQUEUE --queue-bypass --queue-num %d", CORE2NFQ_DNS_QUEUE_NUMBER);
+    sprintf(nfq_queue_str, "NFQUEUE --queue-bypass --queue-num %d", queue_dns);
     iptab_add_jump(table_output, IAJ_DEL, "-p udp --sport 53", nfq_queue_str);
     iptab_add_jump(table_input, IAJ_DEL, "-p udp --dport 53", nfq_queue_str);
     iptab_add_jump(table_forward, IAJ_DEL, "-p udp --dport 53", nfq_queue_str);
@@ -125,7 +125,7 @@ setup_tables(int queue_dns, int queue_block, int place) {
     block_iaj = place ? IAJ_ADD : IAJ_INS;
 
     ignore_system_errors = 1;
-    clean_old_tables();
+    clean_old_tables(queue_dns);
     ignore_system_errors = 0;
 
     iptab_do_table(SpinCheck, IDT_MAKE);
@@ -218,6 +218,10 @@ void init_core2block() {
     queue_block = spinconfig_iptable_queue_block();
     place_dns = spinconfig_iptable_place_dns();
     place_block = spinconfig_iptable_place_block();
+
+    // TODO: is place_dns necessary? unused at this moment
+    // silence unused warning:
+    (void)place_dns;
 
     spin_log(LOG_DEBUG, "NFQ's %d and %d\n", queue_dns, queue_block);
 

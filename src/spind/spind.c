@@ -50,7 +50,6 @@ unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argum
 }
 
 void send_command_blocked(pkt_info_t* pkt_info) {
-    unsigned int response_size;
     buffer_t* response_json = buffer_create(JSONBUFSIZ);
     buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
     unsigned int p_size;
@@ -72,7 +71,6 @@ void send_command_blocked(pkt_info_t* pkt_info) {
 }
 
 void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
-    unsigned int response_size;
     buffer_t* response_json = buffer_create(JSONBUFSIZ);
     buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
     unsigned int p_size;
@@ -419,7 +417,6 @@ iptree2json(tree_t* tree, buffer_t* result) {
 void handle_command_get_iplist(int iplist, const char* json_command) {
     buffer_t* response_json = buffer_create(JSONBUFSIZ);
     buffer_t* result_json = buffer_create(JSONBUFSIZ);
-    unsigned int response_size;
 
     iptree2json(ipl_list_ar[iplist].li_tree, result_json);
     if (!buffer_ok(result_json)) {

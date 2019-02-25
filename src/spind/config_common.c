@@ -48,10 +48,10 @@ config_set_option(char *name, char *value) {
 void
 init_config() {
     struct conf_item *p;
-    char *s;
     int get_config_entries();
 
 #ifdef notdef
+    char *s;
     char *get_config_entry();
     for (p=ci_list; p->ci_name != 0; p++) {
         s = get_config_entry(p->ci_name);

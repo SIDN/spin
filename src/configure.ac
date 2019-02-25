@@ -40,6 +40,27 @@ PKG_CHECK_MODULES([libnfnetlink], [libnfnetlink >= 1.0.1])
 
 AC_CHECK_LIB([mosquitto], [mosquitto_lib_version], [], [AC_MSG_ERROR([libmosquitto not found])])
 
+#AC_CHECK_LIB([netfilter-log], [XXXXXXXX], [], [AC_MSG_ERROR([libXXXXXXX not found])])
+AC_CHECK_LIB([mnl], [mnl_socket_open], [LDFLAGS="$LDFLAGS -lmnl"], [AC_MSG_ERROR([libmnl not found])])
+AC_CHECK_LIB([netfilter_log], [nflog_open], [LDFLAGS="$LDFLAGS -lnetfilter_log"], [AC_MSG_ERROR([libnetfilter-log not found])])
+AC_CHECK_LIB([netfilter_queue], [nfq_open], [LDFLAGS="$LDFLAGS -lnetfilter_queue"], [AC_MSG_ERROR([libnetfilter-queue not found])])
+AC_CHECK_LIB([netfilter_conntrack], [nfct_new], [LDFLAGS="$LDFLAGS -lnetfilter_conntrack"], [AC_MSG_ERROR([libnetfilter-conntrack not found])])
+
+AC_CHECK_LIB([ldns], [ldns_wire2pkt], [LDFLAGS="$LDFLAGS -lldns"], [AC_MSG_ERROR([ldns not found])])
+
+
+
+# In case of UCI, check if it is available, and use it if so
+# no problem if not (we'll use standard config
+AC_CHECK_LIB([uci], [uci_alloc_context],
+    [
+        AC_DEFINE([USE_UCI], [1], [Do not use UCI for configuration])
+        LDFLAGS="$LDFLAGS -luci"
+    ],
+    [
+        AC_DEFINE([USE_UCI], [0], [Do not use UCI for configuration])
+    ])
+
 AC_ARG_WITH(linux-headers,
     AC_HELP_STRING([--with-linux-headers=PATH], [specify path of linux headers]),
     [ AC_SUBST(KERNELPATH, "$withval") ]
@@ -55,6 +76,15 @@ AC_ARG_ENABLE(tests,
                 AC_CONFIG_FILES(tests/Makefile)
                 CFLAGS="-g -O0"
               ], [])
+
+AC_ARG_ENABLE(uci,
+              AC_HELP_STRING([--enable-uci], [use UCI for configuration]),
+              [
+                AC_DEFINE([USE_UCI], [1], [Use UCI for configuration])
+              ], [
+                AC_DEFINE([USE_UCI], [0], [Do not use UCI for configuration])
+              ])
+
 
 AC_CONFIG_FILES(
     Makefile

@@ -1,9 +1,7 @@
 // if USE_UCI is defined we use UCI with section spin.spind
 // if not we use a file /etc/spin/spind.conf
 
-#define USE_UCI
-
-#ifdef USE_UCI
+#if USE_UCI
 #define UCI_SECTION_NAME "spin.spind"
 #else
 #define CONFIG_FILE "/etc/spin/spind.conf"
