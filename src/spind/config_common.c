@@ -5,6 +5,11 @@
 #include "spin_log.h"
 #include "spinconfig.h"
 
+
+//
+//  TODO, cleanup conatsnts here
+//
+
 struct conf_item {
     char *ci_name;
     char *ci_default;
@@ -34,7 +39,6 @@ config_set_option(char *name, char *value) {
     for (p=ci_list; p->ci_name != 0; p++) {
         if (strcmp(p->ci_name, name)==0) {
             p->ci_value = value;
-            // fprintf(stderr, "Found option %s with value %s\n", name, value);
             return;
         }
     }
@@ -75,7 +79,7 @@ spi_int(int n) {
     int val;
 
     val = atoi(ci_list[n].ci_value);
-    printf("spi_int(%d) = %d(%s)\n", n, val, ci_list[n].ci_value);
+    // printf("spi_int(%d) = %d('%s')\n", n, val, ci_list[n].ci_value);
     return val;
 }
 
@@ -84,7 +88,7 @@ spi_str(int n) {
     char *val;
 
     val = ci_list[n].ci_value;
-    printf("spi_str(%d) = %s\n", n, val);
+    // printf("spi_str(%d) = '%s'\n", n, val);
     return val;
 }
 

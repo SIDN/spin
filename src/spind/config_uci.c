@@ -76,7 +76,6 @@ int get_config_entries() {
     conf_file = fopen(CONFIG_FILE, "r");
     if (conf_file == 0) {
         spin_log(LOG_INFO, "Could not open %s\n", CONFIG_FILE);
-        fprintf(stderr, "No init file\n");
         return 1;
     }
 
@@ -123,7 +122,6 @@ int get_config_entries() {
         }
 
         endofvalue[1] = 0;
-        printf("conf file key %s, value %s\n", beginofkeyw, beginofvalue);
         config_set_option(beginofkeyw, strdup(beginofvalue));
     }
     return 0;
