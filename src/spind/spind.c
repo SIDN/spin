@@ -70,6 +70,8 @@ void send_command_blocked(pkt_info_t* pkt_info) {
     buffer_destroy(pkt_json);
 }
 
+static int largest;
+
 void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
     buffer_t* response_json = buffer_create(JSONBUFSIZ);
     buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
@@ -78,6 +80,11 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
     p_size = dns_query_pkt_info2json(node_cache, pkt_info, pkt_json);
     if (p_size > 0) {
         spin_log(LOG_DEBUG, "[XX] got an actual dns query command (size >0)\n");
+        // Test code
+        if (p_size > largest) {
+            spin_log(LOG_INFO, "Largest DNS packet now %d\n", p_size);
+            largest = p_size;
+        }
         buffer_finish(pkt_json);
         create_mqtt_command(response_json, "dnsquery", NULL, buffer_str(pkt_json));
         if (buffer_finish(response_json)) {

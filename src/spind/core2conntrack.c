@@ -206,7 +206,7 @@ void init_core2conntrack(node_cache_t* node_cache, int local_mode) {
     // called every timeout
     mainloop_register("core2nfq_dns", core2conntrack_callback, (void *) 0, 0, 1000);
 
-    spin_log(LOG_INFO, "core2conntrack initialized\n");
+    spin_log(LOG_DEBUG, "core2conntrack initialized\n");
 }
 
 void cleanup_core2conntrack() {
