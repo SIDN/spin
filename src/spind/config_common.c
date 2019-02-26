@@ -48,7 +48,7 @@ struct conf_item {
     [IPTABLE_PLACE_BLOCK] =
             { "iptable_place_block",        "0",                0   },
     [IPTABLE_DEBUG] =
-            { "iptable_debug",              "",                 0   },
+            { "iptable_debug",              "/tmp/block_commands",                 0   },
  { 0, 0, 0 }
 };
 
