@@ -1,14 +1,18 @@
 #ifndef SPIN_LIST_H
-#define LIST_MAINLOOP_H
+#define SPIN_LIST_H
 
-#define IPLIST_BLOCK		0
-#define IPLIST_IGNORE		1
-#define IPLIST_ALLOW		2
-#define N_IPLIST		3
+enum iplist_index {
+    IPLIST_BLOCK,
+    IPLIST_IGNORE,
+    IPLIST_ALLOW,
+    N_IPLIST
+};
 
-#define SF_ADD			0
-#define SF_REM			1
-#define N_SF			2
+enum spinfunc_command {
+    SF_ADD,
+    SF_REM,
+    N_SF
+};
 
 typedef void (*spinfunc)(void*, int listid, int addrem, ip_t *ip_addr);
 

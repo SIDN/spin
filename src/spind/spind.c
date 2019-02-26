@@ -229,6 +229,7 @@ int ip_in_ignore_list(ip_t* ip) {
 // into something that requires less data copying
 int addr_in_ignore_list(int family, uint8_t* addr) {
     ip_t ip;
+
     ip.family = family;
     memcpy(ip.addr, addr, 16);
     return ip_in_ignore_list(&ip);
@@ -352,9 +353,13 @@ void handle_list_membership(int listid, int addrem, int node_id) {
 void handle_command_reset_ignores() {
 
     // clear the ignores; derive them from our own addresses again
-    // hmm, use a script for this?
-    //load_ips_from_file
+
+    // First remove all current ignores
+
+    // Now generate new list
     system("/usr/lib/spin/show_ips.lua -o /etc/spin/ignore.list -f");
+
+    // Load the ignores again
     system("spin_config ignore load /etc/spin/ignore.list");
 }
 
