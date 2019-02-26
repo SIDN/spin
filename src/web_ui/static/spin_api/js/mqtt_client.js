@@ -93,11 +93,11 @@ function onTrafficMessage(msg) {
                 //console.log("Got blocked command: " + msg);
                 handleDNSQueryMessage(result);
                 break;
-            case 'filters':
-                console.log("Got filters command: " + msg);
-                filterList = result;
-                filterList.sort();
-                updateFilterList();
+            case 'ignores':
+                console.log("Got ignores command: " + msg);
+                ignoreList = result;
+                ignoreList.sort();
+                updateIgnoreList();
                 break;
             case 'blocks':
                 console.log("Got blocks command: " + msg);
@@ -138,7 +138,7 @@ function onTrafficOpen(evt) {
     console.log("Connected");
     client.subscribe("SPIN/traffic");
 
-    sendCommand("get_filters", {})//, "")
+    sendCommand("get_ignores", {})//, "")
     sendCommand("get_blocks", {})//, "")
     sendCommand("get_alloweds", {})//, "")
     //show connected status somewhere

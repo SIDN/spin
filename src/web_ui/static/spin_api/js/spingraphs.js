@@ -14,8 +14,8 @@
 var traffic_dataset = new vis.DataSet([]);
 var graph2d_1;
 var selectedNodeId;
-// list of filters
-var filterList = [];
+// list of ignores
+var ignoreList = [];
 var blockList = [];
 var allowedList = [];
 // feed this data from websocket command
@@ -60,22 +60,22 @@ function updateZoomLock(newBool) {
 }
 
 // code to add filters
-function sendAddFilterCommand(nodeId) {
+function sendAddIgnoreCommand(nodeId) {
     var node = nodes.get(nodeId);
     if ("ips" in node) {
         for (var i = 0; i < node.ips.length; i++) {
-            filterList.push(node.ips[i]);
+            ignoreList.push(node.ips[i]);
         }
     }
 
-    sendCommand("add_filter", nodeId); // talk to websocket
+    sendCommand("add_ignore_node", nodeId); // talk to websocket
     deleteNodeAndConnectedNodes(node);
 }
 
-function updateFilterList() {
+function updateIgnoreList() {
     $("#filter-list").empty();
-    for (var i = 0; i < filterList.length; i++) {
-        var li = $("<li class='ui-widget-content'></li> ").text(filterList[i]);
+    for (var i = 0; i < ignoreList.length; i++) {
+        var li = $("<li class='ui-widget-content'></li> ").text(ignoreList[i]);
         $("#filter-list").append(li);
     }
 }
@@ -133,7 +133,7 @@ function initGraphs() {
             modal: true,
             buttons: {
                 "Ignore node": function() {
-                    sendAddFilterCommand(selectedNodeId);
+                    sendAddIgnoreCommand(selectedNodeId);
                     $(this).dialog("close");
                 },
                 Cancel: function() {
@@ -231,9 +231,9 @@ function initGraphs() {
                     var index = $("#filter-list li").index(this);
                 });
                 if (selected.length > 0) {
-                    $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("enable");
+                    $(".ui-dialog-buttonpane button:contains('Remove Ignores')").button("enable");
                 } else {
-                    $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
+                    $(".ui-dialog-buttonpane button:contains('Remove Ignores')").button("disable");
                 }
             }
         });
@@ -340,21 +340,21 @@ function initGraphs() {
                 of: "#mynetwork"
             },
             buttons: {
-                "Remove Filters": function() {
+                "Remove Ignores": function() {
                     $("#filter-list .ui-selected", this).each(function() {
                         // The inner text contains the name of the filter
                         //alertWithObject("[XX] selected:", this);
                         var address;
                         if (this.innerText) {
-                            sendCommand("remove_filter", this.innerText);
+                            sendCommand("remove_ignore_ip", this.innerText);
                         } else if (this.innerHTML) {
-                            sendCommand("remove_filter", this.innerHTML);
+                            sendCommand("remove_ignore_ip", this.innerHTML);
                         }
-                        $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
+                        $(".ui-dialog-buttonpane button:contains('Remove Ignores')").button("disable");
                     });
                 },
                 Reset: function() {
-                    sendCommand("reset_filters", "");
+                    sendCommand("reset_ignores", "");
                 },
                 Close: function() {
                     dialog.dialog("close");
@@ -363,7 +363,7 @@ function initGraphs() {
             close: function() {}
         });
 
-        $(".ui-dialog-buttonpane button:contains('Remove Filters')").button("disable");
+        $(".ui-dialog-buttonpane button:contains('Remove Ignores')").button("disable");
         $("#filter-list-button").button().on("click", function() {
             dialog.dialog("open");
         });
@@ -963,13 +963,13 @@ function addFlow(timestamp, from, to, count, size) {
     // TODO ignore for now, data structure of from and to changed
     for (var i = 0; i < to.ips.length; i++) {
       var ip = to.ips[i];
-      if (contains(filterList, ip)) {
+      if (contains(ignoreList, ip)) {
         return;
       }
     }
     for (var i = 0; i < from.ips.length; i++) {
       var ip = from.ips[i];
-      if (contains(filterList, ip)) {
+      if (contains(ignoreList, ip)) {
         return;
       }
     }
@@ -984,7 +984,7 @@ function addFlow(timestamp, from, to, count, size) {
 }
 
 function addBlocked(from, to) {
-    if (contains(filterList, from) || contains(filterList, to)) {
+    if (contains(ignoreList, from) || contains(ignoreList, to)) {
         return;
     }
 
@@ -1002,7 +1002,7 @@ function addBlocked(from, to) {
 }
 
 function addDNSQuery(from, dns) {
-    if (contains(filterList, from) || contains(filterList, dns)) {
+    if (contains(ignoreList, from) || contains(ignoreList, dns)) {
         return;
     }
 
