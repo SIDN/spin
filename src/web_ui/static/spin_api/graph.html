@@ -29,7 +29,7 @@
 <div id="buttonbarright" class="body-item">
  <span>
    <button id="autozoom-button"></button>
-   <button id="filter-list-button">Show filter list</button>
+   <button id="filter-list-button">Show ignore list</button>
    <button id="block-list-button">Show blocked list</button>
    <button id="allowed-list-button">Show allowed list</button>
    <span id="statustext" class="ui-button ui-corner-all">Not connected</span>
@@ -44,10 +44,10 @@
 
 <!-- dialogs -->
 
-<div id="new-filter-dialog" title="Filter out this node?" class="initiallyHidden">
+<div id="new-filter-dialog" title="Ignore this node?" class="initiallyHidden">
    <p>
      <span class="ui-icon ui-icon-alert" style="float:left; margin:12px 12px 20px 0;"></span>
-     If you filter out this node, new traffic from and to its IP address(es) will no longer be registered. You can remove filters in the Filter List window.
+     If you filter out this node, new traffic from and to its IP address(es) will no longer be registered. You can remove ignores in the Ignore List window.
   </p>
 </div>
 
@@ -84,7 +84,7 @@
     </div>
 </div>
 
-<div id="filter-list-dialog" title="Filter list" class="initiallyHidden ipList">
+<div id="filter-list-dialog" title="Ignore list" class="initiallyHidden ipList">
     <ul id="filter-list">
     </ul>
 </div>
