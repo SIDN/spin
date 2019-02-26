@@ -157,24 +157,16 @@ static struct pubsub_commands {
     { STR_AND_LEN("get_ignores"),       PSC_V_GET,      PSC_O_IGNORE},
     { STR_AND_LEN("get_alloweds"),      PSC_V_GET,      PSC_O_ALLOW},
     { STR_AND_LEN("get_names"),         PSC_V_GET,      PSC_O_NAME },
-    { STR_AND_LEN("get_filters"),       PSC_V_GET,      PSC_O_IGNORE},  // Backw
     { STR_AND_LEN("add_block_node"),    PSC_V_ADD,      PSC_O_BLOCK},
     { STR_AND_LEN("add_ignore_node"),   PSC_V_ADD,      PSC_O_IGNORE},
     { STR_AND_LEN("add_allow_node"),    PSC_V_ADD,      PSC_O_ALLOW},
     { STR_AND_LEN("add_name"),          PSC_V_ADD,      PSC_O_NAME},
-    { STR_AND_LEN("add_filter"),        PSC_V_ADD,      PSC_O_IGNORE}, // Backw
-    { STR_AND_LEN("add_ignore"),        PSC_V_ADD,      PSC_O_IGNORE}, // Backw
-    { STR_AND_LEN("add_filter_node"),   PSC_V_ADD,      PSC_O_IGNORE},  // Backw
     { STR_AND_LEN("remove_block_node"), PSC_V_REM,      PSC_O_BLOCK},
     { STR_AND_LEN("remove_ignore_node"),PSC_V_REM,      PSC_O_IGNORE},
     { STR_AND_LEN("remove_allow_node"), PSC_V_REM,      PSC_O_ALLOW},
-    { STR_AND_LEN("remove_filter"),     PSC_V_REM_IP,   PSC_O_IGNORE}, // Backw
-    { STR_AND_LEN("remove_filter_node"),PSC_V_REM,      PSC_O_IGNORE},  // Backw
-    { STR_AND_LEN("remove_filter_ip"),  PSC_V_REM_IP,   PSC_O_IGNORE},  // Backw
     { STR_AND_LEN("remove_block_ip"),   PSC_V_REM_IP,   PSC_O_BLOCK},
     { STR_AND_LEN("remove_ignore_ip"),  PSC_V_REM_IP,   PSC_O_IGNORE},
     { STR_AND_LEN("remove_allow_ip"),   PSC_V_REM_IP,   PSC_O_ALLOW},
-    { STR_AND_LEN("reset_filters"),     PSC_V_RESET,    PSC_O_IGNORE},  // Backw
     { STR_AND_LEN("reset_ignores"),     PSC_V_RESET,    PSC_O_IGNORE},
     { 0, 0, 0, 0 }
 };
