@@ -16,7 +16,11 @@
 #include "spind.h"
 #include "spinconfig.h"
 
+#include "statistics.h"
+
 #define MAXSTR 1024
+
+static const char stat_modname[]="core2block";
 
 static int dolog;
 static FILE *logfile;
@@ -45,7 +49,9 @@ static int ignore_system_errors;
 static void
 iptab_system(char *s) {
     int result;
+    static stat_t ctr = { stat_modname, "system", STAT_TOTAL };
 
+    stat_val(&ctr, 1);
     result = system(s);
     if (dolog) {
         char *resstr = result ? " -> ERROR" : " -> OK";

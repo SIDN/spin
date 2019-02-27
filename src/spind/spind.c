@@ -513,8 +513,10 @@ void init_cache() {
 }
 
 void cleanup_cache() {
+#ifdef notdef
     dns_cache_destroy(dns_cache);
     node_cache_destroy(node_cache);
+#endif
 }
 
 int main(int argc, char** argv) {

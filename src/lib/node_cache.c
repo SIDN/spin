@@ -111,20 +111,6 @@ node_set_name(node_t* node, char* name) {
     node->name = strndup(name, 128);
 }
 
-#ifdef notdef
-static void
-node_set_blocked(node_t* node, int blocked) {
-    node->is_blocked = blocked;
-}
-#endif
-
-#ifdef notdef
-static void
-node_set_allowed(node_t* node, int allowed) {
-    node->is_allowed = allowed;
-}
-#endif
-
 static void
 node_set_last_seen(node_t* node, uint32_t last_seen) {
     node->last_seen = last_seen;

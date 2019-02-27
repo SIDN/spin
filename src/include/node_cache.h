@@ -73,6 +73,7 @@ typedef struct {
     // this tree holds the actual memory structure, indexed by their id
     tree_t* nodes;
     // this is a non-memory tree, indexed by the ip addresses
+    // unused, TODO, HvS
     tree_t* ip_refs;
     // keep a counter for new ids
     int available_id;
