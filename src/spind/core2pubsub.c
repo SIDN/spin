@@ -24,19 +24,17 @@ extern node_cache_t* node_cache;
  * UI code(and others?) to do their work with
  */
 
-static void
-pubsub_publish(int payloadlen, const void* payload) {
+void
+pubsub_publish(char *channel, int payloadlen, const void* payload) {
 
     /*
      * There is a result from command, but for now ignored
      */
-    mosquitto_publish(mosq, NULL, mqtt_channel_traffic,
-                                payloadlen, payload,
-                                0, false);
+    mosquitto_publish(mosq, NULL, channel, payloadlen, payload, 0, false);
 }
 
 void core2pubsub_publish(buffer_t *buf) {
-    pubsub_publish(buffer_size(buf), buffer_str(buf));
+    pubsub_publish(mqtt_channel_traffic, buffer_size(buf), buffer_str(buf));
 }
 
 /* End push back code */
