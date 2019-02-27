@@ -8,13 +8,19 @@
 #include "node_cache.h"
 #include "netlink_commands.h"
 #include "spin_cfg.h"
+#include "statistics.h"
+
+static const char stat_modname[]="nodecache";
 
 static int node_cache_add_node(node_cache_t* node_cache, node_t* node);
+
+static stat_t nodes_stat = { stat_modname, "nodes", STAT_TOTAL };
 
 static node_t*
 node_create(int id) {
     int i;
 
+    stat_val(&nodes_stat, 1);
     node_t* node = (node_t*) malloc(sizeof(node_t));
     node->id = id;
     node->ips = tree_create(cmp_ips);
@@ -30,6 +36,8 @@ node_create(int id) {
 
 static void
 node_destroy(node_t* node) {
+
+    stat_val(&nodes_stat, -1);
     tree_destroy(node->ips);
     node->ips = NULL;
     tree_destroy(node->domains);
@@ -81,11 +89,17 @@ node_t* node_clone(node_t* node) {
 
 static void
 node_add_ip(node_t* node, ip_t* ip) {
+    static stat_t ctr = { stat_modname, "add-ip", STAT_TOTAL };
+
+    stat_val(&ctr, 1);
     tree_add(node->ips, sizeof(ip_t), ip, 0, NULL, 1);
 }
 
 static void
 node_add_domain(node_t* node, char* domain) {
+    static stat_t ctr = { stat_modname, "add-domain", STAT_TOTAL };
+
+    stat_val(&ctr, 1);
     tree_add(node->domains, strlen(domain) + 1, domain, 0, NULL, 1);
 }
 
@@ -356,14 +370,20 @@ node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* i
     // TODO: this is very inefficient; we should add a second tree for ip searching
     tree_entry_t* cur = tree_first(node_cache->nodes);
     node_t* node;
+    static stat_t ctr = { stat_modname, "find-by-ip", STAT_TOTAL };
+    int loopcnt=0;
+
     while (cur != NULL) {
+        loopcnt++;
         node = (node_t*)cur->data;
         // can we use a node_has_ip?
         if (tree_find(node->ips, sizeof(ip_t), ip) != NULL) {
+            stat_val(&ctr, loopcnt);
             return node;
         }
         cur = tree_next(cur);
     }
+    stat_val(&ctr, loopcnt);
     return NULL;
 }
 
