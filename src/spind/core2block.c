@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <assert.h>
 #include <stdio.h>
 
 #include <sys/types.h>
@@ -38,6 +37,8 @@ setup_debug() {
 
 /*
  * At startup cleaning up could cause errors
+ *
+ * Also sometimes more addresses are deleted, TODO
  */
 static int ignore_system_errors;
 
@@ -45,11 +46,11 @@ static void
 iptab_system(char *s) {
     int result;
 
-    if (dolog) {
-        fprintf(logfile, "%s\n", s);
-    }
     result = system(s);
-    assert (ignore_system_errors || result == 0);
+    if (dolog) {
+        char *resstr = result ? " -> ERROR" : " -> OK";
+        fprintf(logfile, "%s%s\n", s, ignore_system_errors ? "" : resstr);
+    }
 }
 
 #define IDT_MAKE        0
