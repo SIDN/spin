@@ -54,7 +54,7 @@ AC_CHECK_LIB([ldns], [ldns_wire2pkt], [LDFLAGS="$LDFLAGS -lldns"], [AC_MSG_ERROR
 # no problem if not (we'll use standard config
 AC_CHECK_LIB([uci], [uci_alloc_context],
     [
-        AC_DEFINE([USE_UCI], [1], [Do not use UCI for configuration])
+        AC_DEFINE([USE_UCI], [1], [Use UCI for configuration])
         LDFLAGS="$LDFLAGS -luci"
     ],
     [
@@ -76,14 +76,6 @@ AC_ARG_ENABLE(tests,
                 AC_CONFIG_FILES(tests/Makefile)
                 CFLAGS="-g -O0"
               ], [])
-
-AC_ARG_ENABLE(uci,
-              AC_HELP_STRING([--enable-uci], [use UCI for configuration]),
-              [
-                AC_DEFINE([USE_UCI], [1], [Use UCI for configuration])
-              ], [
-                AC_DEFINE([USE_UCI], [0], [Do not use UCI for configuration])
-              ])
 
 
 AC_CONFIG_FILES(
