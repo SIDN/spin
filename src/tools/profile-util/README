@@ -66,7 +66,7 @@ Collect info from MQTT, store in database:
   $ ./mqtt_nm.lua db.sqlite3 192.168.8.1
 
 Collect info from pcap file, store in database:
-  $ ../pcap-spin-json/pcap -r $PCAP | ./stdin_nm.lua db.sqlite3
+  $ ../pcap-reader/pcap -r $PCAP | ./stdin_nm.lua db.sqlite3
 
 generate-profile.lua:
   $ ./generate-profile.lua -d db.sqlite3 -a			# All devices
