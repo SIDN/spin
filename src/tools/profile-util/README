@@ -63,15 +63,15 @@ Note: Valibox 1.6-beta-201805281149 or later is recommended.
 ==> Usage
 
 Collect info from MQTT, store in database:
-  $ lua5.1 mqtt_nm.lua db.sqlite3 192.168.8.1
+  $ ./mqtt_nm.lua db.sqlite3 192.168.8.1
 
 Collect info from pcap file, store in database:
   $ ../pcap-spin-json/pcap -r $PCAP | ./stdin_nm.lua db.sqlite3
 
 generate-profile.lua:
-  $ lua5.1 generate-profile.lua -d db.sqlite3 -a		# All devices
-  $ lua5.1 generate-profile.lua -d db.sqlite3 -i 192.168.8.22
-  $ lua5.1 generate-profile.lua -d db.sqlite3 -m 9c:db:75:0e:62:2b
+  $ ./generate-profile.lua -d db.sqlite3 -a			# All devices
+  $ ./generate-profile.lua -d db.sqlite3 -i 192.168.8.22
+  $ ./generate-profile.lua -d db.sqlite3 -m 9c:db:75:0e:62:2b
 
 Enforce generated profile for device with MAC address 00:17:88:71:cd:4a:
   $ ./generate-fw.lua -i | ssh root@192.168.8.1 sh -x
