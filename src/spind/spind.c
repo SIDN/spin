@@ -390,6 +390,7 @@ void handle_command_reset_ignores() {
 
     // Load the ignores again
     init_ipl(&ipl_list_ar[IPLIST_IGNORE]);
+    push_ips_from_list_to_kernel(IPLIST_IGNORE);
 }
 
 void handle_command_add_name(int node_id, char* name) {
