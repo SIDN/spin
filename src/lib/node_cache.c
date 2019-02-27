@@ -606,7 +606,9 @@ pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf
     buffer_write(json_buf, ", \"to_port\": %d", pkt_info->dest_port);
     buffer_write(json_buf, ", \"size\": %llu", pkt_info->payload_size);
     buffer_write(json_buf, ", \"count\": %llu }", pkt_info->packet_count);
-    return s;
+    // temp fix; size is not actually tracked right now
+    return 1;
+    //return s;
 }
 
 unsigned int
