@@ -177,16 +177,21 @@ void wf_ipl(void *arg, int data, int timeout) {
     }
 }
 
+void init_ipl(struct list_info *lip) {
+    int cnt;
+
+    lip->li_tree = tree_create(cmp_ips);
+    cnt = read_ip_tree(lip->li_tree, lip->li_filename);
+    spin_log(LOG_DEBUG, "File %s, read %d entries\n", lip->li_filename, cnt);
+}
+
 void init_all_ipl() {
     int i;
     struct list_info *lip;
-    int cnt;
 
     for (i=0; i<N_IPLIST; i++) {
         lip = &ipl_list_ar[i];
-        lip->li_tree = tree_create(cmp_ips);
-        cnt = read_ip_tree(lip->li_tree, lip->li_filename);
-        spin_log(LOG_DEBUG, "File %s, read %d entries\n", lip->li_filename, cnt);
+        init_ipl(lip);
     }
 
     // Sync trees to files every 2.5 seconds for now
@@ -329,6 +334,18 @@ void handle_command_remove_ip_from_list(int iplist, ip_t* ip) {
     remove_ip_from_li(ip, &ipl_list_ar[iplist]);
 }
 
+void handle_command_remove_all_from_list(int iplist) {
+    tree_entry_t* ip_entry;
+
+    ip_entry = tree_first(ipl_list_ar[iplist].li_tree);
+    while (ip_entry != NULL) {
+        list_inout_do_ip(iplist, SF_REM, ip_entry->key);
+        ip_entry = tree_next(ip_entry);
+    }
+    // Remove whole tree, will be recreated
+    tree_destroy(ipl_list_ar[iplist].li_tree);
+}
+
 static node_t *
 find_node_id(int node_id) {
     node_t *node;
@@ -366,12 +383,13 @@ void handle_command_reset_ignores() {
     // clear the ignores; derive them from our own addresses again
 
     // First remove all current ignores
+    handle_command_remove_all_from_list(IPLIST_IGNORE);
 
     // Now generate new list
     system("/usr/lib/spin/show_ips.lua -o /etc/spin/ignore.list -f");
 
     // Load the ignores again
-    system("spin_config ignore load /etc/spin/ignore.list");
+    init_ipl(&ipl_list_ar[IPLIST_IGNORE]);
 }
 
 void handle_command_add_name(int node_id, char* name) {
