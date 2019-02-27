@@ -8,7 +8,7 @@ static stat_p stat_chain = &end;
 
 static char buf[512];
 
-void pubsub_publish(char *, char *, int);
+void pubsub_publish(char *, int, char *);
 
 void
 stat_val(stat_p sp, int val) {
@@ -32,5 +32,5 @@ stat_val(stat_p sp, int val) {
     sprintf(buf, "{ \"var\": \"%s.%s\", \"type\": %d, \"value\": %d, \"count\": %d }\n",
                 sp->stat_module, sp->stat_name,
                 sp->stat_type, sp->stat_value, sp->stat_count);
-    pubsub_publish("SPIN/stat", buf, strlen(buf));
+    pubsub_publish("SPIN/stat", strlen(buf), buf);
 }
