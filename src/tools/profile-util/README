@@ -18,10 +18,6 @@ This repository contains a number of Lua programs:
  * generate-fw.lua, which generates iptables firewall rules for the the profile
    provided on stdin (use generate-profile.lua with the -p flag to obtain output
    which can be fed into generate-fw.lua).
- * mqtt_fw.lua, which helps enforcing a profile. It listens to the SPIN/fw MQTT
-   channel. This channel is used to communicate which new holes must be punched
-   in the drop-by-default firewall. The mqtt_fw.lua script then actually
-   interacts with the firewall to allow certain traffic flows to occur.
 
 Caveats:
  * The mqtt_nm.lua program should have a better understanding of the concept of
@@ -33,10 +29,10 @@ Caveats:
 
 Install Lua libraries as necessary:
 
-(for generate-fw.lua, mqtt_nm.lua and mqtt_fw.lua)
+(for generate-fw.lua and mqtt_nm.lua)
 $ luarocks --local install luajson
 
-(for mqtt_nm.lua and mqtt_fw.lua)
+(for mqtt_nm.lua)
 # apt-get install libmosquitto-dev	# Or pkg_add mosquitto on OpenBSD
 $ luarocks --local install lua-mosquitto
 $ luarocks --local install luaposix
