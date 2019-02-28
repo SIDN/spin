@@ -1,9 +1,6 @@
 -- XXX "The AUTOINCREMENT keyword imposes extra CPU ... overhead"
 -- XXX     source: https://sqlite.org/autoinc.html
 
--- XXX perhaps add indices? pro: probably faster lookups of existing flows
--- XXX when running mqtt_nm.lua/stdin_nm.lua. con: increases size of database
-
 create table flows (
 	id integer primary key asc,
 	mac_from varchar(17),
@@ -20,12 +17,13 @@ create table flows (
 	last_timestamp int
 );
 
--- XXX maybe do not create an index on a string
---create index flows_ip_from on flows(ip_from);
---create index flows_ip_to on flows(ip_to);
-create index flows_ip_proto on flows(ip_proto);
-create index flows_port_from on flows(port_from);
-create index flows_port_to on flows(port_to);
+create index idx_flows_update on flows(
+	port_from,
+	port_to,
+	ip_proto,
+	ip_from,
+	ip_to
+);
 
 create table dns (
 	id integer primary key asc,
