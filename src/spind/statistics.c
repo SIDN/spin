@@ -4,7 +4,9 @@
 #include "mainloop.h"
 #include "statistics.h"
 
-static stat_t end = { 0 };
+#if DO_SPIN_STATS
+
+static spin_stat_t end = { 0 };
 static stat_p stat_chain = &end;
 
 static char buf[512];
@@ -32,7 +34,7 @@ firstuse() {
 }
 
 void
-stat_val(stat_p sp, int val) {
+spin_stat_val(stat_p sp, int val) {
     static int inited=0;
 
     if (sp->stat_next == 0) {
@@ -56,3 +58,5 @@ stat_val(stat_p sp, int val) {
         break;
     }
 }
+
+#endif // DO_SPIN_STATS

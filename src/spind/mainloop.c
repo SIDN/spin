@@ -1,11 +1,12 @@
-#include "mainloop.h"
-#include "spin_log.h"
-
 #include <sys/time.h>
 #include <stdlib.h>
 #include <string.h>
 #include <poll.h>
 #include <errno.h>
+
+#include "mainloop.h"
+#include "spin_log.h"
+#include "statistics.h"
 
 /*
  * Subsystems can register here for the mainloop
@@ -29,6 +30,8 @@ struct mnreg {
     struct timeval      mnr_nxttime;    /* Time of next end-of-period */
 } mnr[MAXMNR];
 static int n_mnr = 0;
+
+STAT_MODULE(mainloop)
 
 static void panic(char *s) {
 
@@ -137,6 +140,7 @@ void mainloop_run() {
     int oldmillitime = 0;
     int millitime;
     int argdata, argtmout;
+    STAT_COUNTER(ctr, polltime, STAT_TOTAL);
 
     mainloop_register("mainloop", wf_mainloop, (void *) 0, 0, 10000);
     init_mltime();
@@ -158,6 +162,7 @@ void mainloop_run() {
             spin_log(LOG_DEBUG, " Millitime = %d, polling", millitime);
         oldmillitime = millitime;
 
+        STAT_VALUE(ctr, millitime);
         // go poll and wait until something interesting is up
         rs = poll(fds, nfds, millitime);
 

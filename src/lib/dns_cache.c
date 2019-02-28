@@ -99,7 +99,6 @@ dns_cache_add(dns_cache_t* cache, dns_pkt_info_t* dns_pkt_info, uint32_t timesta
     }
 }
 
-#ifdef notdef
 // Unused ??
 void
 dns_cache_destroy(dns_cache_t* dns_cache) {
@@ -165,7 +164,6 @@ dns_cache_clean(dns_cache_t* dns_cache) {
         cur = nxt;
     }
 }
-#endif
 
 void
 dns_cache_print(dns_cache_t* dns_cache) {

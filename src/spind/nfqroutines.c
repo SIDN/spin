@@ -18,6 +18,9 @@
 //#include "pkt_info.h"
 #include "mainloop.h"
 #include "nfqroutines.h"
+#include "statistics.h"
+
+STAT_MODULE(nfq)
 
 #define NFQPERIOD   1000
 
@@ -239,6 +242,9 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
         struct nfqnl_msg_packet_hdr *ph;
         int fr_n;
         int verdict;
+        STAT_COUNTER(ctr4, "handled-ipv4", STAT_TOTAL);
+        STAT_COUNTER(ctr6, "handled-ipv6", STAT_TOTAL);
+        STAT_COUNTER(ctrv, "verdict", STAT_TOTAL);
 
         // printf("entering callback\n");
         ph = nfq_get_msg_packet_hdr(nfa);
@@ -248,9 +254,11 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
         fr_n = nfr_find_qh(qh);
         switch (proto) {
         case 0x800:
+            STAT_VALUE(ctr4, 1);
             verdict = nfq_cb_ipv4(fr_n, payload, payloadsize);
             break;
         case 0x86DD:
+            STAT_VALUE(ctr6, 1);
             verdict = nfq_cb_ipv6(fr_n, payload, payloadsize);
             break;
         default:
@@ -265,6 +273,7 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
                 nfr[fr_n].nfr_packets);
         }
         // TODO what is verdict here
+        STAT_VALUE(ctr4, verdict);
         return nfq_set_verdict(qh, id, verdict ? NF_ACCEPT : NF_DROP, 0, NULL);
 }
 

@@ -8,8 +8,8 @@
 #include "spinconfig.h"
 #include "spin_log.h"
 #include "spin_list.h"
-
 #include "handle_command.h"
+#include "statistics.h"
 
 static char *mqtt_channel_traffic;
 static char *mqtt_channel_commands;
@@ -18,6 +18,7 @@ static int mosquitto_keepalive_time;
 struct mosquitto* mosq;
 extern node_cache_t* node_cache;
 
+STAT_MODULE(pubsub)
 
 /*
  * Code that pushes gathered results back to Spin traffic channel for
@@ -26,7 +27,9 @@ extern node_cache_t* node_cache;
 
 void
 pubsub_publish(char *channel, int payloadlen, const void* payload) {
+    STAT_COUNTER(ctr, message-bytes-out, STAT_TOTAL);
 
+    STAT_VALUE(ctr, payloadlen);
     /*
      * There is a result from command, but for now ignored
      */
@@ -294,9 +297,13 @@ void handle_json_command(const char* data) {
     jsmntok_t tokens[tok_count];
     int result;
     int verb, object;
+    int datalen;
+    STAT_COUNTER(ctr, message-bytes-in, STAT_TOTAL);
 
+    datalen = strlen(data);
+    STAT_VALUE(ctr, datalen);
     jsmn_init(&p);
-    result = jsmn_parse(&p, data, strlen(data), tokens, 10);
+    result = jsmn_parse(&p, data, datalen, tokens, 10);
     if (result < 0) {
         spin_log(LOG_ERR, "Error: unable to parse json data: %d\n", result);
         return;
@@ -330,9 +337,12 @@ void handle_json_command(const char* data) {
 // Hook from Mosquitto code called with incoming messages
 
 void do_mosq_message(struct mosquitto* mosq, void* user_data, const struct mosquitto_message* msg) {
+
     if (strcmp(msg->topic, mqtt_channel_commands) == 0) {
         handle_json_command(msg->payload);
     }
+
+    // TODO, what if other channel?
 }
 
 void connect_mosquitto(const char* host, int port) {
@@ -362,11 +372,15 @@ void connect_mosquitto(const char* host, int port) {
 }
 
 void wf_mosquitto(void* arg, int data, int timeout) {
+    STAT_COUNTER(ctr_data, wf-data, STAT_TOTAL);
+    STAT_COUNTER(ctr_timeout, wf-timeout, STAT_TOTAL);
 
     if (data) {
+        STAT_VALUE(ctr_data, 1);
         mosquitto_loop_read(mosq, 1);
     }
     if (timeout) {
+        STAT_VALUE(ctr_timeout, 1);
         mosquitto_loop_write(mosq, 1);
         mosquitto_loop_misc(mosq);
     }

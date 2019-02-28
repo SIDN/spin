@@ -8,6 +8,10 @@
 #include "spind.h"
 #include "pkt_info.h"
 
+#include "statistics.h"
+
+STAT_MODULE(conntrack)
+
 // define a structure for the callback data
 typedef struct {
   flow_list_t* flow_list;
@@ -32,6 +36,8 @@ static inline u_int64_t get_u64_attr(struct nf_conntrack *ct, char ATTR) {
 
 void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
   u_int32_t tmp;
+  STAT_COUNTER(ctr4, "ipv4-to-pkt", STAT_TOTAL);
+  STAT_COUNTER(ctr6, "ipv6-to-pkt", STAT_TOTAL);
 
   pkt_info->family = nfct_get_attr_u8(ct, ATTR_ORIG_L3PROTO);
   switch (pkt_info->family) {
@@ -52,6 +58,7 @@ void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
     pkt_info->packet_count += get_u64_attr(ct, ATTR_REPL_COUNTER_PACKETS);
     pkt_info->payload_offset = 0;
     pkt_info->protocol = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
+    STAT_VALUE(ctr4, 1);
 
     break;
   case AF_INET6:
@@ -64,6 +71,7 @@ void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
     pkt_info->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
     pkt_info->payload_offset = 0;
     pkt_info->protocol = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
+    STAT_VALUE(ctr6, 1);
     break;
     // note: ipv6 is u128
   }
@@ -89,7 +97,9 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
     //flow_list_t* flow_list = cb_data->flow_list;
     // TODO: remove time() calls, use the single one at caller
     uint32_t now = time(NULL);
+    STAT_COUNTER(ctr, "callback", STAT_TOTAL);
 
+    STAT_VALUE(ctr, 1);
     maybe_sendflow(cb_data->flow_list, now);
 
     ct = nfct_new();

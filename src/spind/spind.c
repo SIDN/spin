@@ -23,6 +23,7 @@
 
 #include "handle_command.h"
 #include "mainloop.h"
+#include "statistics.h"
 #include "version.h"
 
 node_cache_t* node_cache;
@@ -33,6 +34,8 @@ static int local_mode;
 const char* mosq_host;
 int mosq_port;
 int stop_on_error;
+
+STAT_MODULE(spind)
 
 #define JSONBUFSIZ      4096
 
@@ -74,21 +77,14 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
     buffer_t* response_json = buffer_create(JSONBUFSIZ);
     buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
     unsigned int p_size;
+    STAT_COUNTER(ctr, dnsquerysize, STAT_MAX);
 
     p_size = dns_query_pkt_info2json(node_cache, pkt_info, pkt_json);
     if (p_size > 0) {
         spin_log(LOG_DEBUG, "[XX] got an actual dns query command (size >0)\n");
         buffer_finish(pkt_json);
 
-        // Test code
-        static int largest=0;
-
-        p_size = strlen(buffer_str(pkt_json));
-        if (p_size > largest) {
-            spin_log(LOG_INFO, "Largest DNS packet now %d\n", p_size);
-            largest = p_size;
-        }
-        // End of test code
+        STAT_VALUE(ctr, strlen(buffer_str(pkt_json)));
 
         create_mqtt_command(response_json, "dnsquery", NULL, buffer_str(pkt_json));
         if (buffer_finish(response_json)) {
@@ -513,10 +509,8 @@ void init_cache() {
 }
 
 void cleanup_cache() {
-#ifdef notdef
     dns_cache_destroy(dns_cache);
     node_cache_destroy(node_cache);
-#endif
 }
 
 int main(int argc, char** argv) {

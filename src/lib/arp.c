@@ -1,5 +1,8 @@
 #include "arp.h"
 #include "spin_log.h"
+#include "statistics.h"
+
+STAT_MODULE(arp)
 
 arp_table_t* arp_table_create(void) {
     arp_table_t* arp_table = (arp_table_t*) malloc(sizeof(arp_table_t));
