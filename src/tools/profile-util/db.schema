@@ -1,6 +1,3 @@
--- XXX "The AUTOINCREMENT keyword imposes extra CPU ... overhead"
--- XXX     source: https://sqlite.org/autoinc.html
-
 create table flows (
 	id integer primary key asc,
 	mac_from varchar(17),
@@ -115,10 +112,4 @@ group by ip_from, domain_from, port_from;
 --
 
 .mode csv
-
--- import all.csv packets
-
--- create index
-
--- .save db.sqlite3
 
