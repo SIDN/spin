@@ -177,7 +177,8 @@ void mainloop_run() {
                 argtmout = 1;
 
                 // Increase for next time
-                timeradd(&mnr[i].mnr_nxttime, &mnr[i].mnr_toval, &mnr[i].mnr_nxttime);
+                // timeradd(&mnr[i].mnr_nxttime, &mnr[i].mnr_toval, &mnr[i].mnr_nxttime);
+                timeradd(&time_now, &mnr[i].mnr_toval, &mnr[i].mnr_nxttime);
             }
             pollnum = mnr[i].mnr_pollnumber ;
             if ( pollnum >= 0) {
