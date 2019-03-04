@@ -137,7 +137,6 @@ void mainloop_run() {
     int i, pollnum;
     int rs;
     struct timeval time_now, time_interesting;
-    int oldmillitime = 0;
     int millitime;
     int argdata, argtmout;
     STAT_COUNTER(ctr, polltime, STAT_TOTAL);
@@ -157,10 +156,6 @@ void mainloop_run() {
 
     while (mainloop_running) {
         millitime = mainloop_findtime(&time_now, &time_interesting);
-
-        if (millitime != oldmillitime)
-            spin_log(LOG_DEBUG, " Millitime = %d, polling", millitime);
-        oldmillitime = millitime;
 
         STAT_VALUE(ctr, millitime);
         // go poll and wait until something interesting is up
