@@ -23,6 +23,7 @@
 
 #include "handle_command.h"
 #include "mainloop.h"
+#include "statistics.h"
 #include "version.h"
 
 node_cache_t* node_cache;
@@ -33,6 +34,8 @@ static int local_mode;
 const char* mosq_host;
 int mosq_port;
 int stop_on_error;
+
+STAT_MODULE(spind)
 
 #define JSONBUFSIZ      4096
 
@@ -74,11 +77,15 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
     buffer_t* response_json = buffer_create(JSONBUFSIZ);
     buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
     unsigned int p_size;
+    STAT_COUNTER(ctr, dnsquerysize, STAT_MAX);
 
     p_size = dns_query_pkt_info2json(node_cache, pkt_info, pkt_json);
     if (p_size > 0) {
         spin_log(LOG_DEBUG, "[XX] got an actual dns query command (size >0)\n");
         buffer_finish(pkt_json);
+
+        STAT_VALUE(ctr, strlen(buffer_str(pkt_json)));
+
         create_mqtt_command(response_json, "dnsquery", NULL, buffer_str(pkt_json));
         if (buffer_finish(response_json)) {
             core2pubsub_publish(response_json);
@@ -166,16 +173,21 @@ void wf_ipl(void *arg, int data, int timeout) {
     }
 }
 
+void init_ipl(struct list_info *lip) {
+    int cnt;
+
+    lip->li_tree = tree_create(cmp_ips);
+    cnt = read_ip_tree(lip->li_tree, lip->li_filename);
+    spin_log(LOG_DEBUG, "File %s, read %d entries\n", lip->li_filename, cnt);
+}
+
 void init_all_ipl() {
     int i;
     struct list_info *lip;
-    int cnt;
 
     for (i=0; i<N_IPLIST; i++) {
         lip = &ipl_list_ar[i];
-        lip->li_tree = tree_create(cmp_ips);
-        cnt = read_ip_tree(lip->li_tree, lip->li_filename);
-        spin_log(LOG_DEBUG, "File %s, read %d entries\n", lip->li_filename, cnt);
+        init_ipl(lip);
     }
 
     // Sync trees to files every 2.5 seconds for now
@@ -229,6 +241,7 @@ int ip_in_ignore_list(ip_t* ip) {
 // into something that requires less data copying
 int addr_in_ignore_list(int family, uint8_t* addr) {
     ip_t ip;
+
     ip.family = family;
     memcpy(ip.addr, addr, 16);
     return ip_in_ignore_list(&ip);
@@ -317,6 +330,18 @@ void handle_command_remove_ip_from_list(int iplist, ip_t* ip) {
     remove_ip_from_li(ip, &ipl_list_ar[iplist]);
 }
 
+void handle_command_remove_all_from_list(int iplist) {
+    tree_entry_t* ip_entry;
+
+    ip_entry = tree_first(ipl_list_ar[iplist].li_tree);
+    while (ip_entry != NULL) {
+        list_inout_do_ip(iplist, SF_REM, ip_entry->key);
+        ip_entry = tree_next(ip_entry);
+    }
+    // Remove whole tree, will be recreated
+    tree_destroy(ipl_list_ar[iplist].li_tree);
+}
+
 static node_t *
 find_node_id(int node_id) {
     node_t *node;
@@ -352,10 +377,16 @@ void handle_list_membership(int listid, int addrem, int node_id) {
 void handle_command_reset_ignores() {
 
     // clear the ignores; derive them from our own addresses again
-    // hmm, use a script for this?
-    //load_ips_from_file
+
+    // First remove all current ignores
+    handle_command_remove_all_from_list(IPLIST_IGNORE);
+
+    // Now generate new list
     system("/usr/lib/spin/show_ips.lua -o /etc/spin/ignore.list -f");
-    system("spin_config ignore load /etc/spin/ignore.list");
+
+    // Load the ignores again
+    init_ipl(&ipl_list_ar[IPLIST_IGNORE]);
+    push_ips_from_list_to_kernel(IPLIST_IGNORE);
 }
 
 void handle_command_add_name(int node_id, char* name) {

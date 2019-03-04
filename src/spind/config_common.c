@@ -5,37 +5,58 @@
 #include "spin_log.h"
 #include "spinconfig.h"
 
-
-//
-//  TODO, cleanup conatsnts here
-//
+enum configs {
+    LOG_USESYSLOG,
+    LOG_LOGLEVEL,
+    PUBSUB_HOST,
+    PUBSUB_PORT,
+    PUBSUB_CHANNEL_COMMANDS,
+    PUBSUB_CHANNEL_TRAFFIC,
+    PUBSUB_TIMEOUT,
+    IPTABLE_QUEUE_DNS,
+    IPTABLE_QUEUE_BLOCK,
+    IPTABLE_PLACE_DNS,
+    IPTABLE_PLACE_BLOCK,
+    IPTABLE_DEBUG
+};
 
 struct conf_item {
     char *ci_name;
     char *ci_default;
     char *ci_value;
 } ci_list[] = {
-
-/*  0 */    { "log_usesyslog",              "1",                0   },
-/*  1 */    { "log_loglevel",               "6",                0   },
-/*  2 */    { "pubsub_host",                "127.0.0.1",        0   },
-/*  3 */    { "pubsub_port",                "1883",             0   },
-/*  4 */    { "pubsub_channel_commands",    "SPIN/commands",    0   },
-/*  5 */    { "pubsub_channel_traffic",     "SPIN/traffic",     0   },
-/*  6 */    { "pubsub_timeout",             "60",               0   },
-/*  7 */    { "iptable_queue_dns",          "1",                0   },
-/*  8 */    { "iptable_queue_block",        "2",                0   },
-/*  9 */    { "iptable_place_dns",          "0",                0   },
-/* 10 */    { "iptable_place_block",        "0",                0   },
-/* 11 */    { "iptable_debug",              "",                 0   },
+    [LOG_USESYSLOG] =
+            { "log_usesyslog",              "1",                0   },
+    [LOG_LOGLEVEL] =
+            { "log_loglevel",               "6",                0   },
+    [PUBSUB_HOST] =
+            { "pubsub_host",                "127.0.0.1",        0   },
+    [PUBSUB_PORT] =
+            { "pubsub_port",                "1883",             0   },
+    [PUBSUB_CHANNEL_COMMANDS] =
+            { "pubsub_channel_commands",    "SPIN/commands",    0   },
+    [PUBSUB_CHANNEL_TRAFFIC] =
+            { "pubsub_channel_traffic",     "SPIN/traffic",     0   },
+    [PUBSUB_TIMEOUT] =
+            { "pubsub_timeout",             "60",               0   },
+    [IPTABLE_QUEUE_DNS] =
+            { "iptable_queue_dns",          "1",                0   },
+    [IPTABLE_QUEUE_BLOCK] =
+            { "iptable_queue_block",        "2",                0   },
+    [IPTABLE_PLACE_DNS] =
+            { "iptable_place_dns",          "0",                0   },
+    [IPTABLE_PLACE_BLOCK] =
+            { "iptable_place_block",        "0",                0   },
+    [IPTABLE_DEBUG] =
+            { "iptable_debug",              "/tmp/block_commands",                 0   },
  { 0, 0, 0 }
 };
-
 
 void
 config_set_option(char *name, char *value) {
     struct conf_item *p;
 
+    printf("Set option %s to value '%s'\n", name, value);
     for (p=ci_list; p->ci_name != 0; p++) {
         if (strcmp(p->ci_name, name)==0) {
             p->ci_value = value;
@@ -94,61 +115,60 @@ spi_str(int n) {
 
 int spinconfig_log_usesyslog() {
 
-    return (spi_int(0));
+    return (spi_int(LOG_USESYSLOG));
 }
 
 int spinconfig_log_loglevel() {
 
-    return (spi_int(1));
+    return (spi_int(LOG_LOGLEVEL));
 }
 
 char *spinconfig_pubsub_host() {
 
-    return(spi_str(2));
+    return(spi_str(PUBSUB_HOST));
 }
 
 int spinconfig_pubsub_port() {
 
-    return(spi_int(3));
+    return(spi_int(PUBSUB_PORT));
 }
 
 char *spinconfig_pubsub_channel_commands() {
 
-    return(spi_str(4));
+    return(spi_str(PUBSUB_CHANNEL_COMMANDS));
 }
 
 char *spinconfig_pubsub_channel_traffic() {
 
-    return(spi_str(5));
+    return(spi_str(PUBSUB_CHANNEL_TRAFFIC));
 }
 
 int spinconfig_pubsub_timeout() {
 
-    return(spi_int(6));
+    return(spi_int(PUBSUB_TIMEOUT));
 }
 
 int spinconfig_iptable_queue_dns() {
 
-    return(spi_int(7));
+    return(spi_int(IPTABLE_QUEUE_DNS));
 }
 
 int spinconfig_iptable_queue_block() {
 
-    return(spi_int(8));
+    return(spi_int(IPTABLE_QUEUE_BLOCK));
 }
 
 int spinconfig_iptable_place_dns() {
 
-    return(spi_int(9));
+    return(spi_int(IPTABLE_PLACE_DNS));
 }
 
 int spinconfig_iptable_place_block() {
 
-    return(spi_int(10));
+    return(spi_int(IPTABLE_PLACE_BLOCK));
 }
 
 char *spinconfig_iptable_debug() {
 
-    return(spi_str(11));
+    return(spi_str(IPTABLE_DEBUG));
 }
-

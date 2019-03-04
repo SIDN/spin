@@ -8,13 +8,22 @@
 #include "node_cache.h"
 #include "netlink_commands.h"
 #include "spin_cfg.h"
+#include "statistics.h"
+
+STAT_MODULE(node_cache)
+//static const char stat_modname[]="nodecache";
 
 static int node_cache_add_node(node_cache_t* node_cache, node_t* node);
+
+STAT_COUNTER(nodes, "nodes", STAT_TOTAL);
+//static stat_t nodes_stat = { stat_modname, "nodes", STAT_TOTAL };
 
 static node_t*
 node_create(int id) {
     int i;
 
+    STAT_VALUE(nodes, 1);
+    // stat_val(&nodes_stat, 1);
     node_t* node = (node_t*) malloc(sizeof(node_t));
     node->id = id;
     node->ips = tree_create(cmp_ips);
@@ -30,6 +39,9 @@ node_create(int id) {
 
 static void
 node_destroy(node_t* node) {
+
+    STAT_VALUE(nodes, -1);
+    //stat_val(&nodes_stat, -1);
     tree_destroy(node->ips);
     node->ips = NULL;
     tree_destroy(node->domains);
@@ -81,16 +93,29 @@ node_t* node_clone(node_t* node) {
 
 static void
 node_add_ip(node_t* node, ip_t* ip) {
+    STAT_COUNTER(ctr, add-ip, STAT_TOTAL);
+    //static stat_t ctr = { stat_modname, "add-ip", STAT_TOTAL };
+
+    STAT_VALUE(ctr, 1);
+    //stat_val(&ctr, 1);
     tree_add(node->ips, sizeof(ip_t), ip, 0, NULL, 1);
 }
 
 static void
 node_add_domain(node_t* node, char* domain) {
+    STAT_COUNTER(ctr, add-domain, STAT_TOTAL);
+    //static stat_t ctr = { stat_modname, "add-domain", STAT_TOTAL };
+
+    STAT_VALUE(ctr, 1);
+    //stat_val(&ctr, 1);
     tree_add(node->domains, strlen(domain) + 1, domain, 0, NULL, 1);
 }
 
 static void
 node_set_mac(node_t* node, char* mac) {
+    STAT_COUNTER(ctr, set-mac, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
     if (mac == NULL) {
         return;
     }
@@ -102,6 +127,9 @@ node_set_mac(node_t* node, char* mac) {
 
 void
 node_set_name(node_t* node, char* name) {
+    STAT_COUNTER(ctr, set-name, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
     if (name == NULL) {
         return;
     }
@@ -110,20 +138,6 @@ node_set_name(node_t* node, char* name) {
     }
     node->name = strndup(name, 128);
 }
-
-#ifdef notdef
-static void
-node_set_blocked(node_t* node, int blocked) {
-    node->is_blocked = blocked;
-}
-#endif
-
-#ifdef notdef
-static void
-node_set_allowed(node_t* node, int allowed) {
-    node->is_allowed = allowed;
-}
-#endif
 
 static void
 node_set_last_seen(node_t* node, uint32_t last_seen) {
@@ -177,14 +191,12 @@ node_shares_element(node_t* node, node_t* othernode) {
     return 0;
 }
 
-#ifdef notdef
-static int largest_tree = 0;
-#endif
-
 static void
 node_merge(node_t* dest, node_t* src) {
     tree_entry_t* cur;
     int i;
+    STAT_COUNTER(ip_size, ip-tree-size, STAT_MAX);
+    STAT_COUNTER(domain_size, domain-tree-size, STAT_MAX);
 
     if (dest->name == NULL) {
         node_set_name(dest, src->name);
@@ -206,22 +218,14 @@ node_merge(node_t* dest, node_t* src) {
         tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
         cur = tree_next(cur);
     }
-#ifdef notdef
-    // TODO: temporary hack for largest IP tree size
-    int tsize;
-    tsize = tree_size(dest->ips);
-    if (tsize > largest_tree) {
-        spin_log(LOG_INFO, "Largest IP tree is %d entries at node %d with name %s\n", tsize, dest->id, dest->name? dest->name : "<empty>");
-        largest_tree = tsize;
-    }
-    // end of temporary hack
-#endif
+    STAT_VALUE(ip_size, tree_size(dest->ips));
 
     cur = tree_first(src->domains);
     while (cur != NULL) {
         tree_add(dest->domains, cur->key_size, cur->key, cur->data_size, cur->data, 1);
         cur = tree_next(cur);
     }
+    STAT_VALUE(domain_size, tree_size(dest->domains));
 }
 
 static void
@@ -370,28 +374,40 @@ node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* i
     // TODO: this is very inefficient; we should add a second tree for ip searching
     tree_entry_t* cur = tree_first(node_cache->nodes);
     node_t* node;
+    STAT_COUNTER(ctr, find-by-ip, STAT_TOTAL);
+    int loopcnt=0;
+
     while (cur != NULL) {
+        loopcnt++;
         node = (node_t*)cur->data;
         // can we use a node_has_ip?
         if (tree_find(node->ips, sizeof(ip_t), ip) != NULL) {
+            STAT_VALUE(ctr, loopcnt);
             return node;
         }
         cur = tree_next(cur);
     }
+    STAT_VALUE(ctr, loopcnt);
     return NULL;
 }
 
 node_t* node_cache_find_by_domain(node_cache_t* node_cache, char* dname) {
     tree_entry_t* cur = tree_first(node_cache->nodes);
     node_t* node;
+    STAT_COUNTER(ctr, find-by-domain, STAT_TOTAL);
+    int loopcnt=0;
+
     while (cur != NULL) {
+        loopcnt++;
         node = (node_t*)cur->data;
         // can we use a node_has_domain?
         if (tree_find(node->domains, strlen(dname) + 1, dname) != NULL) {
+            STAT_VALUE(ctr, loopcnt);
             return node;
         }
         cur = tree_next(cur);
     }
+    STAT_VALUE(ctr, loopcnt);
     return NULL;
 }
 
@@ -444,11 +460,15 @@ node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
     // and update last_seen)
     node_t* node = node_create(0);
     char* name;
+    int new;
+    STAT_COUNTER(ctr, add-ip-info, STAT_TOTAL);
 
     node_set_last_seen(node, timestamp);
     add_mac_and_name(node_cache, node, ip);
     node_add_ip(node, ip);
-    if (node_cache_add_node(node_cache, node) == 1) {
+    new = node_cache_add_node(node_cache, node);
+    STAT_VALUE(ctr, new);
+    if (new == 1) {
         // It was new; reread the DHCP leases table, and set the name if it wasn't set yet
         node_names_read_dhcpleases(node_cache->names, "/var/dhcp.leases");
         if (node->mac && !node->name) {
@@ -606,7 +626,9 @@ pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf
     buffer_write(json_buf, ", \"to_port\": %d", pkt_info->dest_port);
     buffer_write(json_buf, ", \"size\": %llu", pkt_info->payload_size);
     buffer_write(json_buf, ", \"count\": %llu }", pkt_info->packet_count);
-    return s;
+    // temp fix; size is not actually tracked right now
+    return 1;
+    //return s;
 }
 
 unsigned int
@@ -662,6 +684,7 @@ dns_query_pkt_info2json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info, 
 }
 
 flow_list_t* flow_list_create(uint32_t timestamp) {
+
     flow_list_t* flow_list = (flow_list_t*)malloc(sizeof(flow_list_t));
     flow_list->flows = tree_create(cmp_pktinfos);
     flow_list->timestamp = timestamp;
@@ -671,6 +694,7 @@ flow_list_t* flow_list_create(uint32_t timestamp) {
 }
 
 void flow_list_destroy(flow_list_t* flow_list) {
+
     tree_destroy(flow_list->flows);
     free(flow_list);
 }
@@ -679,6 +703,7 @@ void flow_list_add_pktinfo(flow_list_t* flow_list, pkt_info_t* pkt_info) {
     flow_data_t fd;
     flow_data_t* efd;
     tree_entry_t* cur = tree_find(flow_list->flows, 38, pkt_info);
+
     if (cur != NULL) {
         efd = (flow_data_t*)cur->data;
         efd->payload_size += pkt_info->payload_size;
@@ -691,15 +716,18 @@ void flow_list_add_pktinfo(flow_list_t* flow_list, pkt_info_t* pkt_info) {
 }
 
 int flow_list_should_send(flow_list_t* flow_list, uint32_t timestamp) {
+
     return timestamp > flow_list->timestamp;
 }
 
 void flow_list_clear(flow_list_t* flow_list, uint32_t timestamp) {
+
     tree_clear(flow_list->flows);
     flow_list->timestamp = timestamp;
 }
 
 int flow_list_empty(flow_list_t* flow_list) {
+
     return tree_empty(flow_list->flows);
 }
 

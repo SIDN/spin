@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <assert.h>
 #include <stdio.h>
 
 #include <sys/types.h>
@@ -10,14 +9,21 @@
 #include "util.h"
 #include "handle_command.h"
 #include "spin_log.h"
+#ifdef notdef
 #include "mainloop.h"
+#endif
 #include "nfqroutines.h"
 
 #include "spin_list.h"
 #include "spind.h"
 #include "spinconfig.h"
 
+#include "statistics.h"
+
 #define MAXSTR 1024
+
+STAT_MODULE(core2block)
+// static const char stat_modname[]="core2block";
 
 static int dolog;
 static FILE *logfile;
@@ -38,18 +44,24 @@ setup_debug() {
 
 /*
  * At startup cleaning up could cause errors
+ *
+ * Also sometimes more addresses are deleted, TODO
  */
 static int ignore_system_errors;
 
 static void
 iptab_system(char *s) {
     int result;
+    STAT_COUNTER(ctr, system, STAT_TOTAL);
+    // static stat_t ctr = { stat_modname, "system", STAT_TOTAL };
 
-    if (dolog) {
-        fprintf(logfile, "%s\n", s);
-    }
+    STAT_VALUE(ctr, 1);
+    // stat_val(&ctr, 1);
     result = system(s);
-    assert (ignore_system_errors || result == 0);
+    if (dolog) {
+        char *resstr = result ? " -> ERROR" : " -> OK";
+        fprintf(logfile, "%s%s\n", s, ignore_system_errors ? "" : resstr);
+    }
 }
 
 #define IDT_MAKE        0
@@ -173,7 +185,7 @@ static char *tables[] = { SpinCheck, SpinLog, SpinBlock };
 void c2b_changelist(void* arg, int iplist, int addrem, ip_t *ip_addr) {
     int ipv6 = 0;
     char ip_str[INET6_ADDRSTRLEN];
-
+    STAT_COUNTER(ctr, changelist, STAT_TOTAL);
 
     // IP v4 or 6, decode address
     if (ip_addr->family != AF_INET) {
@@ -182,13 +194,16 @@ void c2b_changelist(void* arg, int iplist, int addrem, ip_t *ip_addr) {
     spin_ntop(ip_str, ip_addr, INET6_ADDRSTRLEN);
     spin_log(LOG_DEBUG, "Change list %d %d %d %s\n", iplist, addrem, ipv6, ip_str);
 
+    STAT_VALUE(ctr, 1);
     c2b_do_rule(tables[iplist], ipv6, addrem, ip_str, targets[iplist]);
 }
 
 static int
 c2b_catch(void *arg, int af, int proto, uint8_t* data, int size, uint8_t *src_addr, uint8_t *dest_addr, unsigned src_port, unsigned dest_port) {
+    STAT_COUNTER(ctr, catch-block, STAT_TOTAL);
 
     spin_log(LOG_DEBUG, "c2b_catch %d %d %d %d (%x, %x, %x) %d\n", af, proto, src_port, dest_port, data[0], data[1], data[2], size);
+    STAT_VALUE(ctr, 1);
     report_block(af, proto, src_addr, dest_addr, src_port, dest_port, size);
     return 0;           // DROP
 }
@@ -200,6 +215,7 @@ setup_catch(int queue) {
     nfqroutine_register("core2block", c2b_catch, (void *) 0, queue);
 }
 
+#ifdef notdef
 static void
 wf_core2block(void *arg, int data, int timeout) {
 
@@ -208,6 +224,7 @@ wf_core2block(void *arg, int data, int timeout) {
         // TODO Do something with kernel messages
     }
 }
+#endif
 
 void init_core2block() {
     static int all_lists[N_IPLIST] = { 1, 1, 1 };
@@ -229,9 +246,13 @@ void init_core2block() {
     setup_debug();
     setup_tables(queue_dns, queue_block, place_block);
 
+#ifdef notdef
     mainloop_register("core2block", wf_core2block, (void *) 0, 0, 10000);
+#endif
     spin_register("core2block", c2b_changelist, (void *) 0, all_lists);
 }
 
 void cleanup_core2block() {
+
+    // Add freeing of malloced memory for memory-leak detection
 }

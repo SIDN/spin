@@ -1,11 +1,12 @@
-#include "mainloop.h"
-#include "spin_log.h"
-
 #include <sys/time.h>
 #include <stdlib.h>
 #include <string.h>
 #include <poll.h>
 #include <errno.h>
+
+#include "mainloop.h"
+#include "spin_log.h"
+#include "statistics.h"
 
 /*
  * Subsystems can register here for the mainloop
@@ -29,6 +30,8 @@ struct mnreg {
     struct timeval      mnr_nxttime;    /* Time of next end-of-period */
 } mnr[MAXMNR];
 static int n_mnr = 0;
+
+STAT_MODULE(mainloop)
 
 static void panic(char *s) {
 
@@ -134,9 +137,9 @@ void mainloop_run() {
     int i, pollnum;
     int rs;
     struct timeval time_now, time_interesting;
-    int oldmillitime = 0;
     int millitime;
     int argdata, argtmout;
+    STAT_COUNTER(ctr, polltime, STAT_TOTAL);
 
     mainloop_register("mainloop", wf_mainloop, (void *) 0, 0, 10000);
     init_mltime();
@@ -154,10 +157,7 @@ void mainloop_run() {
     while (mainloop_running) {
         millitime = mainloop_findtime(&time_now, &time_interesting);
 
-        if (millitime != oldmillitime)
-            spin_log(LOG_DEBUG, " Millitime = %d, polling", millitime);
-        oldmillitime = millitime;
-
+        STAT_VALUE(ctr, millitime);
         // go poll and wait until something interesting is up
         rs = poll(fds, nfds, millitime);
 
@@ -177,7 +177,8 @@ void mainloop_run() {
                 argtmout = 1;
 
                 // Increase for next time
-                timeradd(&mnr[i].mnr_nxttime, &mnr[i].mnr_toval, &mnr[i].mnr_nxttime);
+                // timeradd(&mnr[i].mnr_nxttime, &mnr[i].mnr_toval, &mnr[i].mnr_nxttime);
+                timeradd(&time_now, &mnr[i].mnr_toval, &mnr[i].mnr_nxttime);
             }
             pollnum = mnr[i].mnr_pollnumber ;
             if ( pollnum >= 0) {

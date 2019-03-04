@@ -18,9 +18,12 @@
 #include "spind.h"
 #include "nfqroutines.h"
 #include "spinconfig.h"
+#include "statistics.h"
 
 static node_cache_t* node_cache;
 static dns_cache_t* dns_cache;
+
+STAT_MODULE(dns)
 
 // ip: source address of the query sender
 // bp: query packet data
@@ -35,7 +38,9 @@ handle_dns_query(const u_char *bp, u_int length, uint8_t* src_addr, int family, 
     ldns_rdf* query_rdf;
     dns_pkt_info_t dns_pkt;
     size_t count;
+    STAT_COUNTER(ctr, query, STAT_TOTAL);
 
+    STAT_VALUE(ctr, 1);
     status = ldns_wire2pkt(&p, bp, length);
     if (status != LDNS_STATUS_OK) {
         spin_log(LOG_WARNING, "DNS: could not parse packet: %s\n",
@@ -87,7 +92,9 @@ handle_dns_answer(const u_char *bp, u_int length, long long timestamp, int proto
     char **ips = NULL;
     size_t ips_len = 0;
     size_t i;
-    
+    STAT_COUNTER(ctr, answer, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
     status = ldns_wire2pkt(&p, bp, length);
     if (status != LDNS_STATUS_OK) {
         spin_log(LOG_WARNING, "DNS: could not parse packet: %s\n",

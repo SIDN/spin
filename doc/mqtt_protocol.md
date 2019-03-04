@@ -1,4 +1,4 @@
-The spin_mqtt.lua daemon will send traffic infromation to the topic
+The spin_mqtt.lua daemon will send traffic information to the topic
 SPIN/traffic. It will listen on the topic SPIN/commands for commands.
 
 All messages are of the format
@@ -18,7 +18,9 @@ On the SPIN/traffic topic, commands can be one of:
   been seen before). See below for the format.
 * "serverRestart": Tells the client that the server has restarted and
   it should drop its local cache of nodes. argument and result are empty.
-* "filters": result is a list of strings containing IP addresses that are
+* "allows" xx
+* "blocks" xx
+* "ignores": result is a list of strings containing IP addresses that are
   currently filtered (not shown) by the SPIN system.
 * "names": result is a map containing IP address -> domain name values;
   these are user-set names.
@@ -152,8 +154,8 @@ topic. These usually have no "result" value, but often do contain an
 
 The following commands can be issued:
 
-* "get_filters": Triggers a new "filters" message to be sent to SPIN/traffic
-* "add_filter": argument is a string containing an IP address, which will be added to the list of IP addresses to be filtered.
+* "get_ignores": Triggers a new "ignores" message to be sent to SPIN/traffic
+* "add_ignore_node": argument is a string containing an IP address, which will be added to the list of IP addresses to be ignored.
 * "remove_filter": argument is a string containing an IP address, which will be removed from the list of IP addresses to be filtered.
 * "reset_filters": All filters are removed, and replaced by the IP addresses of the system that SPIN is running on.
 * "get_names": Triggers a new "names" message to be sent to SPIN/traffic

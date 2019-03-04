@@ -8,8 +8,8 @@
 #include "spinconfig.h"
 #include "spin_log.h"
 #include "spin_list.h"
-
 #include "handle_command.h"
+#include "statistics.h"
 
 static char *mqtt_channel_traffic;
 static char *mqtt_channel_commands;
@@ -18,25 +18,26 @@ static int mosquitto_keepalive_time;
 struct mosquitto* mosq;
 extern node_cache_t* node_cache;
 
+STAT_MODULE(pubsub)
 
 /*
  * Code that pushes gathered results back to Spin traffic channel for
  * UI code(and others?) to do their work with
  */
 
-static void
-pubsub_publish(int payloadlen, const void* payload) {
+void
+pubsub_publish(char *channel, int payloadlen, const void* payload) {
+    STAT_COUNTER(ctr, message-bytes-out, STAT_TOTAL);
 
+    STAT_VALUE(ctr, payloadlen);
     /*
      * There is a result from command, but for now ignored
      */
-    mosquitto_publish(mosq, NULL, mqtt_channel_traffic,
-                                payloadlen, payload,
-                                0, false);
+    mosquitto_publish(mosq, NULL, channel, payloadlen, payload, 0, false);
 }
 
 void core2pubsub_publish(buffer_t *buf) {
-    pubsub_publish(buffer_size(buf), buffer_str(buf));
+    pubsub_publish(mqtt_channel_traffic, buffer_size(buf), buffer_str(buf));
 }
 
 /* End push back code */
@@ -153,29 +154,28 @@ static struct pubsub_commands {
     int         psc_verb;               // Verb
     int         psc_object;             // Object
 } pubsub_commands[] = {
-    { STR_AND_LEN("get_filters"),       PSC_V_GET,      PSC_O_IGNORE},
     { STR_AND_LEN("get_blocks"),        PSC_V_GET,      PSC_O_BLOCK},
+    { STR_AND_LEN("get_ignores"),       PSC_V_GET,      PSC_O_IGNORE},
     { STR_AND_LEN("get_alloweds"),      PSC_V_GET,      PSC_O_ALLOW},
     { STR_AND_LEN("get_names"),         PSC_V_GET,      PSC_O_NAME },
-    { STR_AND_LEN("add_filter"),        PSC_V_ADD,      PSC_O_IGNORE}, // Backw
-    { STR_AND_LEN("add_filter_node"),   PSC_V_ADD,      PSC_O_IGNORE},
-    { STR_AND_LEN("add_name"),          PSC_V_ADD,      PSC_O_NAME},
     { STR_AND_LEN("add_block_node"),    PSC_V_ADD,      PSC_O_BLOCK},
+    { STR_AND_LEN("add_ignore_node"),   PSC_V_ADD,      PSC_O_IGNORE},
     { STR_AND_LEN("add_allow_node"),    PSC_V_ADD,      PSC_O_ALLOW},
-    { STR_AND_LEN("remove_filter"),     PSC_V_REM_IP,   PSC_O_IGNORE}, // Backw
-    { STR_AND_LEN("remove_filter_node"),PSC_V_REM,      PSC_O_IGNORE},
-    { STR_AND_LEN("remove_filter_ip"),  PSC_V_REM_IP,   PSC_O_IGNORE},
+    { STR_AND_LEN("add_name"),          PSC_V_ADD,      PSC_O_NAME},
     { STR_AND_LEN("remove_block_node"), PSC_V_REM,      PSC_O_BLOCK},
-    { STR_AND_LEN("remove_block_ip"),   PSC_V_REM_IP,   PSC_O_BLOCK},
+    { STR_AND_LEN("remove_ignore_node"),PSC_V_REM,      PSC_O_IGNORE},
     { STR_AND_LEN("remove_allow_node"), PSC_V_REM,      PSC_O_ALLOW},
+    { STR_AND_LEN("remove_block_ip"),   PSC_V_REM_IP,   PSC_O_BLOCK},
+    { STR_AND_LEN("remove_ignore_ip"),  PSC_V_REM_IP,   PSC_O_IGNORE},
     { STR_AND_LEN("remove_allow_ip"),   PSC_V_REM_IP,   PSC_O_ALLOW},
-    { STR_AND_LEN("reset_filters"),     PSC_V_RESET,    PSC_O_IGNORE},
+    { STR_AND_LEN("reset_ignores"),     PSC_V_RESET,    PSC_O_IGNORE},
     { 0, 0, 0, 0 }
 };
 
 static char *getnames[N_IPLIST] = {
     "blocks",
-    "filters",
+    //"filters",    // Backw
+    "ignores",
     "alloweds"
 };
 
@@ -199,6 +199,7 @@ static int find_command(int name_len, const char *name_str, int *verb, int *obje
     }
     return 0;
 }
+
 
 #define MAXNAMELEN      80      // Maximum identifier length; TODO */
 
@@ -236,6 +237,13 @@ void handle_json_command_detail(int verb, int object,
         }
         spin_log(LOG_DEBUG, "Spin verb %d, object %d, ip XX\n", verb, object);
         break;
+    case PSC_V_RESET:
+        if (object != PSC_O_IGNORE) {
+            spin_log(LOG_ERR, "Reset of non-ignore\n");
+            return;
+        }
+        handle_command_reset_ignores();
+        return;
     }
 
     //
@@ -289,9 +297,13 @@ void handle_json_command(const char* data) {
     jsmntok_t tokens[tok_count];
     int result;
     int verb, object;
+    int datalen;
+    STAT_COUNTER(ctr, message-bytes-in, STAT_TOTAL);
 
+    datalen = strlen(data);
+    STAT_VALUE(ctr, datalen);
     jsmn_init(&p);
-    result = jsmn_parse(&p, data, strlen(data), tokens, 10);
+    result = jsmn_parse(&p, data, datalen, tokens, 10);
     if (result < 0) {
         spin_log(LOG_ERR, "Error: unable to parse json data: %d\n", result);
         return;
@@ -302,7 +314,7 @@ void handle_json_command(const char* data) {
         return;
     }
     // token 1 should be "command",
-    // token 2 should be the command name (e.g. "get_filters")
+    // token 2 should be the command name (e.g. "get_ignores")
     // token 3 should be "arguments",
     // token 4 should be an object with the arguments (possibly empty)
     if (tokens[1].type != JSMN_STRING || strncmp(data+tokens[1].start, "command", 7) != 0) {
@@ -325,9 +337,12 @@ void handle_json_command(const char* data) {
 // Hook from Mosquitto code called with incoming messages
 
 void do_mosq_message(struct mosquitto* mosq, void* user_data, const struct mosquitto_message* msg) {
+
     if (strcmp(msg->topic, mqtt_channel_commands) == 0) {
         handle_json_command(msg->payload);
     }
+
+    // TODO, what if other channel?
 }
 
 void connect_mosquitto(const char* host, int port) {
@@ -357,11 +372,15 @@ void connect_mosquitto(const char* host, int port) {
 }
 
 void wf_mosquitto(void* arg, int data, int timeout) {
+    STAT_COUNTER(ctr_data, wf-data, STAT_TOTAL);
+    STAT_COUNTER(ctr_timeout, wf-timeout, STAT_TOTAL);
 
     if (data) {
+        STAT_VALUE(ctr_data, 1);
         mosquitto_loop_read(mosq, 1);
     }
     if (timeout) {
+        STAT_VALUE(ctr_timeout, 1);
         mosquitto_loop_write(mosq, 1);
         mosquitto_loop_misc(mosq);
     }
@@ -375,11 +394,13 @@ void init_mosquitto(const char* host, int port) {
     mosquitto_keepalive_time = spinconfig_pubsub_timeout();
     connect_mosquitto(host, port);
 
-    mainloop_register("mosq", &wf_mosquitto, (void *) 0, mosquitto_socket(mosq), mosquitto_keepalive_time*1000/2);
+    mainloop_register("mosq", &wf_mosquitto, (void *) 0,
+            mosquitto_socket(mosq), mosquitto_keepalive_time*1000/2);
     mosquitto_socket(mosq);
     send_command_restart();
-    handle_command_get_iplist(IPLIST_IGNORE, "filters");
+    // handle_command_get_iplist(IPLIST_IGNORE, "filters"); // Backw
     handle_command_get_iplist(IPLIST_BLOCK, "blocks");
+    handle_command_get_iplist(IPLIST_IGNORE, "ignores");
     handle_command_get_iplist(IPLIST_ALLOW, "alloweds");
 }
 
