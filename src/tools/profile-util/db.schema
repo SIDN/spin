@@ -1,0 +1,115 @@
+create table flows (
+	id integer primary key asc,
+	mac_from varchar(17),
+	mac_to varchar(17),
+	ip_from varchar(46), -- INET6_ADDRSTRLEN
+	ip_to varchar(46), -- INET6_ADDRSTRLEN
+	ip_proto int,
+	tcp_initiated int,
+	port_from int,
+	port_to int,
+	packets int,
+	bytes int,
+	first_timestamp int,
+	last_timestamp int
+);
+
+create index idx_flows_update on flows(
+	port_from,
+	port_to,
+	ip_proto,
+	ip_from,
+	ip_to
+);
+
+create table dns (
+	id integer primary key asc,
+	domain text,
+	ip text,
+	timestamp int
+);
+
+create view annotated_flows
+as
+select
+	flows.id,
+	flows.mac_from,
+	flows.ip_from,
+	dns_from.domain as domain_from,
+	flows.port_from,
+	flows.mac_to,
+	flows.ip_to,
+	dns_to.domain as domain_to,
+	flows.port_to,
+	flows.ip_proto,
+	flows.tcp_initiated,
+	flows.packets,
+	flows.bytes,
+	flows.first_timestamp,
+	flows.last_timestamp,
+--	dns_from.timestamp,
+--	dns_to.timestamp,
+	(flows.first_timestamp - dns_from.timestamp) as diff_from,
+	(flows.first_timestamp - dns_to.timestamp) as diff_to,
+	(flows.last_timestamp - flows.first_timestamp) as conv_seconds
+from flows
+left join
+	dns dns_from on dns_from.ip = flows.ip_from
+	and dns_from.id = (
+		select max(dns_from2.id)
+		from dns dns_from2
+		where
+			dns_from2.ip = flows.ip_from
+			and dns_from2.timestamp <= flows.first_timestamp
+	)
+left join
+	dns dns_to on dns_to.ip = flows.ip_to
+	and dns_to.id = (
+		select max(dns_to2.id)
+		from dns dns_to2
+		where
+			dns_to2.ip = flows.ip_to
+			and dns_to2.timestamp <= flows.first_timestamp
+	)
+;
+
+create view annotated_flows_no_ntp_no_dns
+as
+select * from annotated_flows
+where
+	not ((port_from == 123 or port_to == 123) and ip_proto == 17)
+	and not (port_from == 53 or port_to == 53);
+
+-- More like "flows" actually
+create view connections_out
+as
+select *
+from annotated_flows
+where
+	ip_proto != 6
+	or (ip_proto == 6 and tcp_initiated == 1)
+group by ip_to, domain_to, port_to;
+
+create view connections_out_tcp_initiated
+as
+select *
+from annotated_flows
+where
+	ip_proto = 6
+	and tcp_initiated = 1
+group by ip_to, domain_to, port_to;
+
+-- Probably not very useful
+create view connections_in
+as
+select *
+from annotated_flows
+group by ip_from, domain_from, port_from;
+
+--
+-- No connections_in_tcp_initiated view as that is bogus; tcp_initiated will be
+-- 1 when the SYN is sent to the "to" host, not to the "from" host.
+--
+
+.mode csv
+
