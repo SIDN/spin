@@ -13,29 +13,29 @@ Per counter a struct:
 	
 	
 The fields value and count together can be used for averages in UI.
-In code this would just look like
+In code this just looks like
 
-	static stat_t ctr = { stat_modname, "Interesting thing", STAT_TOTAL };
+	#include "statistics.h"
+	STAT_MODULE(module-name)
 	
-with stat_modname a string constant at the top of the file. This struct declaration could even be included inside a function code
-	
+at the top of the module, and for each counter a definition(inside or outside a function)
+
+	STAT_COUNTER(ctr1, counter1-name, STAT_TOTAL);
+	STAT_COUNTER(ctr2, counter2-name, STAT_MAX);
+
 calls while running
 
-	stat_val(&ctr, val);
+	STAT_VALUE(ctr1, value);
 	
-Statistics package will do something intelligent
+Statistics package keeps track of number of times counter was accessed, and either the TOTAL or MAX of the values.
 
-	counter -> just add 1
-	total -> just add value
-	max -> increase max if
-	
-At regular intervals the statistics package will report JSON data containing all values like:
+All names, module and counter, can be typed without quotes. The statistics.h file takes care of all that.
 
-	Results: array of ( package, array of (name, type, value, count))
 	
-but then properly JSONified. Simpler is multiple reports of the form:
+At regular intervals the statistics package reports JSON data containing all values with multiple reports of the form:
 
 	package, name, type, value, count
 
-These reports will be published on the SPIN/statistics channel, and it is left to external commands to make sense of them.
+These reports are published on the SPIN/stat channel, and it is left to external programs to make sense of them.
 
+All counters and all code will disappear from compiled code at the unsetting of one preprocessor variable.
