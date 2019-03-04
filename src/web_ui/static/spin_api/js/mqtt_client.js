@@ -111,6 +111,10 @@ function onTrafficMessage(msg) {
                 allowedList.sort();
                 updateAllowedList();
                 break;
+			case 'peakinfo':
+				//console.log("Got peak information: " + msg);
+				handlePeakInformation(result);
+				break;
             case 'nodeUpdate':
                 console.log("Got node update command: " + msg);
                 // just addNode?

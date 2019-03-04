@@ -13,6 +13,8 @@
 
 var traffic_dataset = new vis.DataSet([]);
 var graph2d_1;
+var graph_peak_packets;
+var graph_peak_bytes;
 var selectedNodeId;
 // list of filters
 var filterList = [];
@@ -118,7 +120,8 @@ function initGraphs() {
             my: "left top",
             at: "left top",
             of: "#mynetwork"
-        }
+        },
+        close: nodeInfoClosed,
     });
 
     // create the ignore node dialog
@@ -496,6 +499,9 @@ function initGraphs() {
 
     // clean up every X seconds
     setInterval(cleanNetwork, 5000);
+    
+    // Refresh peak information every 30 seconds
+    setInterval(getPeakInformation, 30000);
 }
 
 //
@@ -612,11 +618,36 @@ function showNetwork() {
 
 function updateNodeInfo(nodeId) {
     var node = nodes.get(nodeId);
-    writeToScreen("trafficcount", "Connections seen: " + node.count);
-    writeToScreen("trafficsize", "Traffic size: " + node.size);
+	var sizeblabel = 'B';
+	var sizeb = 0;
+	if (node.size > 0) {
+		sizeblabel = ['B','KiB', 'MiB', 'GiB', 'TiB'][Math.floor(Math.log2(node.size)/10)]
+		sizeb = Math.floor(node.size / ([1,1024, 1024**2, 1024**3, 1024**4][Math.floor(Math.log2(node.size)/10)]))
+	} 
+
+    writeToScreen("trafficcount", "<b>Packets seen</b>: " + node.count);
+    writeToScreen("trafficsize", "<b>Traffic size</b>: " + sizeb + " " + sizeblabel);
     writeToScreen("ipaddress", "");
-    writeToScreen("lastseen", "Last seen: " + node.lastseen + " (" + new Date(node.lastseen * 1000) + ")");
-    // TODO: mark that this is hw not ip
+	var d = new Date(node.lastseen * 1000);
+    writeToScreen("lastseen", "<b>Last seen</b>: " + d.toLocaleDateString() + " " + d.toLocaleTimeString() + " (" + node.lastseen + ")");
+
+    writeToScreen("nodeid", "<b>Node</b>: " + nodeId);
+    //sendCommand("arp2ip", node.address); // talk to Websocket
+    if (node.mac) {
+        writeToScreen("mac", "<b>HW Addr</b>: " + node.mac);
+    } else {
+        writeToScreen("mac", "");
+    }
+    if (node.ips) {
+        writeToScreen("ipaddress", "<b>IP</b>: " + node.ips.join("</br>"));
+    } else {
+        writeToScreen("ipaddress", "<b>IP</b>: ");
+    }
+    if (node.domains) {
+        writeToScreen("reversedns", "<b>DNS</b>: " + node.domains.join("</br>"));
+    } else {
+        writeToScreen("reversedns", "<b>DNS</b>: ");
+    }
 
     return node;
 }
@@ -626,26 +657,30 @@ function nodeSelected(event) {
     if (typeof(nodeId) == 'number' && selectedNodeId != nodeId) {
         var node = updateNodeInfo(nodeId);
         selectedNodeId = nodeId;
-        writeToScreen("nodeid", "Node: " + nodeId);
-        //sendCommand("arp2ip", node.address); // talk to Websocket
-        if (node.mac) {
-            writeToScreen("mac", "HW Addr: " + node.mac);
-        } else {
-            writeToScreen("mac", "");
-        }
-        if (node.ips) {
-            writeToScreen("ipaddress", "IP: " + node.ips.join());
-        } else {
-            writeToScreen("ipaddress", "IP: ");
-        }
-        if (node.domains) {
-            writeToScreen("reversedns", "DNS: " + node.domains.join());
-        } else {
-            writeToScreen("reversedns", "DNS: ");
-        }
 
         updateBlockedButton();
         updateAllowedButton();
+
+		/* Arrange peak detection graph */
+        if (graph_peak_packets != null){
+            graph_peak_packets.destroy();
+            graph_peak_packets = null;
+        }
+        if (graph_peak_bytes != null){
+            graph_peak_bytes.destroy();
+            graph_peak_bytes = null;
+        }
+        
+		if (node.mac) {
+            // Obtain peak information from server.
+            // Uses variable selectedNodeId as set above.
+            getPeakInformation();
+            $("#nodeinfo-peakdet").show();
+            $("#nodeinfo-peakdetvis").html("Loading...")
+            $("#nodeinfo-peakdetvis2").html("Loading...")
+		} else {
+			$("#nodeinfo-peakdet").hide();
+		}
 
         //sendCommand("ip2hostname", node.address);
         //writeToScreen("netowner", "Network owner: &lt;searching&gt;");
@@ -718,45 +753,6 @@ function updateAllowedButton() {
 
 */
 
-function updateNode(node) {
-    if (!node) { return; }
-    var enode = nodes.get(node.id);
-    if (!enode) { return; }
-
-    var label = node.id;
-    // should only change color if it was recent and is no longer so
-    // but that is for a separate loop (unless it's internal device
-    // and we just discovered that, in which case we set it to _src)
-    //var colour = node.blocked ? colour_blocked : colour_recent;
-    var ips = node.ips ? node.ips : [];
-    var domains = node.domains ? node.domains : [];
-    if (node.name) {
-        label = node.name;
-    } else if (node.mac) {
-        label = node.mac;
-    } else if (domains.length > 0) {
-        label = node.domains[0];
-    } else if (ips.length > 0) {
-        label = node.ips[0];
-    }
-
-    if (node.mac) {
-        node.color = colour_src;
-    } else {
-        node.color = colour_recent;
-    }
-
-    enode.label = label;
-    enode.ips = ips;
-    enode.domains = domains;
-
-    nodes.update(enode);
-
-    if (node.id == selectedNodeId) {
-        updateNodeInfo(node.id);
-    }
-}
-
 // Used in AddFlow()
 function addNode(timestamp, node, scale, count, size, lwith, type) {
     // why does this happen
@@ -825,6 +821,8 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
         enode.lastseen = timestamp;
         enode.is_blocked = node.is_blocked;
         enode.is_excepted = node.is_excepted;
+		enode.size += size;
+		enode.count += count;
         nodes.update(enode);
     } else {
         // it's new
@@ -850,6 +848,10 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
                 }
             }
         });
+    }
+	// If node is selected, update labels
+    if (node.id == selectedNodeId) {
+        updateNodeInfo(node.id);
     }
 }
 
@@ -1101,4 +1103,164 @@ function cleanNetwork() {
 
 
     }
+}
+
+
+/* 
+ On close of NodeInfo window
+ */
+function nodeInfoClosed(event, ui) {
+    selectedNodeId = 0;
+    $("#nodeinfo-peakdet").hide(); // Hide just to be sure.
+    if (graph_peak_packets != null){
+        graph_peak_packets.destroy();
+        graph_peak_packets = null;
+    }
+    if (graph_peak_bytes != null){
+        graph_peak_bytes.destroy();
+        graph_peak_bytes = null;
+    }
+}
+
+/* 
+ * Request peak information for a particular nodeId.
+ * Uses MQTT to query any running peak detection.
+ */
+function getPeakInformation() {
+    if (selectedNodeId > 0) {
+        sendCommand("get_peak_info", selectedNodeId);
+    }
+}
+
+/* Handle peak information.
+ * Only when information window for a local node is open.
+ * If closed, stop streaming of information
+ */
+function handlePeakInformation(result) {
+	var container = document.getElementById('nodeinfo-peakdetvis');
+    //
+
+    /*
+     * If there is no graph yet, make one.
+     * Otherwise, change only the inner dataset.
+     */
+	var options = {
+        start: "2019-01-01 00:00",
+        end: "2019-01-01 00:59",
+		graphHeight: '100px',
+		showMajorLabels: false,
+		showMinorLabels: false,
+        zoomable: false,
+        moveable: false,
+        legend: false,
+		dataAxis: {
+			visible: false,
+			left: { range: { min: 0 }}
+		},
+		drawPoints: { enabled: false }
+	};
+
+    if (graph_peak_bytes == null) {
+        // Remove loading text
+        $("#nodeinfo-peakdetvis").html("");
+
+        graph_peak_bytes = new vis.Graph2d(container, new vis.DataSet(), options);
+        var groups = new vis.DataSet();
+        groups.add({
+            id: 0,
+            content: "Bytes",
+            style:   "stroke: blue"
+        });
+        groups.add({
+            id: 1,
+            style:   "stroke: red",
+            options: {
+                excludeFromLegend: "true"
+            }
+        });
+        graph_peak_bytes.setGroups(groups);
+    }
+
+    if (graph_peak_packets == null) {
+        graph_peak_packets = new vis.Graph2d(container, new vis.DataSet(), options);
+        var groups = new vis.DataSet();
+        groups.add({
+            id: 0,
+            content: "Packets",
+            style:   "stroke: black"
+        });
+        groups.add({
+            id: 1,
+            style:   "stroke: red",
+            options: {
+                excludeFromLegend: true
+            }
+        });
+        graph_peak_packets.setGroups(groups);
+    }
+    
+    // Clear dataset, re-add changed values.
+    graph_peak_bytes.itemsData.clear();
+    graph_peak_packets.itemsData.clear();
+
+    Object.keys(result["items"]).forEach(function (element){
+        var elemi = parseInt(element);
+        if (elemi < -59 || elemi > 0) {
+            // We accept only -59 <= x <= 0
+            return;
+        }
+        var m = 59 + elemi; // Compute: -1 goes to 58 seconds, Basically inverse all values.
+        graph_peak_bytes.itemsData.add({
+            x: "2019-01-01 00:" + String(m).padStart(2,'0'),
+            y: result["items"][element]["bytes"],
+            group: 0
+        });
+
+        graph_peak_packets.itemsData.add({
+            x: "2019-01-01 00:" + String(m).padStart(2,'0'),
+            y: result["items"][element]["packets"],
+            group: 0
+        });
+    });
+    graph_peak_bytes.redraw();
+
+    // Now add limits
+    if (result["maxbytes"] > 0) {
+        graph_peak_bytes.itemsData.add({
+            x: "2019-01-01 00:00",
+            y: result["maxbytes"],
+            group: 1
+        });
+        graph_peak_bytes.itemsData.add({
+            x: "2019-01-01 00:59",
+            y: result["maxbytes"],
+            group: 1
+        });
+    }
+
+    if (result["maxpackets"] > 0) {
+        graph_peak_packets.itemsData.add({
+            x: "2019-01-01 00:00",
+            y: result["maxpackets"],
+            group: 1
+        });
+        graph_peak_packets.itemsData.add({
+            x: "2019-01-01 00:59",
+            y: result["maxpackets"],
+            group: 1
+        });
+    }
+    
+    if (result["maxbytes"] == 0 || result["maxpackets"] == 0) {
+        $("#nodeinfo-notenoughdata:hidden").show();
+    } else {
+        $("#nodeinfo-notenoughdata:visible").hide();
+    }
+    
+    if (!result["enforcing"]) {
+        $("#nodeinfo-training:hidden").show();
+    } else {
+        $("#nodeinfo-training:visible").hide();
+    }
+
 }
