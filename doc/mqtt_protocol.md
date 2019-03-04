@@ -1,4 +1,4 @@
-The spin_mqtt.lua daemon will send traffic information to the topic
+The Spindaemon will send traffic information to the topic
 SPIN/traffic. It will listen on the topic SPIN/commands for commands.
 
 All messages are of the format
@@ -12,18 +12,19 @@ All messages are of the format
 On the SPIN/traffic topic, commands can be one of:
 
 * "traffic": Traffic flow information, see next section
-* "nodeUpdate": Updates information about nodes that were seen earlier
-  (such as an additional domain name that resolved to the same IP
-  address, or a new IP address that is matched to an ARP address that has
-  been seen before). See below for the format.
+
 * "serverRestart": Tells the client that the server has restarted and
   it should drop its local cache of nodes. argument and result are empty.
-* "allows" xx
-* "blocks" xx
+
+* "blocks" result is a list of IP addresses that are blocked
+
+* "allows" result is a list of IP addresses that are immune to having their traffic blocked
+
 * "ignores": result is a list of strings containing IP addresses that are
   currently filtered (not shown) by the SPIN system.
-* "names": result is a map containing IP address -> domain name values;
-  these are user-set names.
+  
+* "names": result is a map containing IP address -> name values;
+  these are user-set names. **Currently not implemented.**
 
 
 
@@ -128,6 +129,8 @@ A node update contains the same information as a node element from the
 previous section; it contains (additional) information about a node
 that has been seen earlier.
 
+**This is currently not implemented. There are plans to reuse this, so still in document.**
+
 ### Node update example
 
     {
@@ -148,20 +151,29 @@ that has been seen earlier.
 
 ### Configuration commands
 
-The client can send commands to the SPIN daemon on the 'SPIN/commands'
-topic. These usually have no "result" value, but often do contain an
-"argument" section.
+The client can send commands to the SPIN daemon on the 'SPIN/commands' topic. These usually have no "result" value, but often do contain an "argument" section.
 
 The following commands can be issued:
 
-* "get_ignores": Triggers a new "ignores" message to be sent to SPIN/traffic
-* "add_ignore_node": argument is a string containing an IP address, which will be added to the list of IP addresses to be ignored.
-* "remove_filter": argument is a string containing an IP address, which will be removed from the list of IP addresses to be filtered.
-* "reset_filters": All filters are removed, and replaced by the IP addresses of the system that SPIN is running on.
-* "get_names": Triggers a new "names" message to be sent to SPIN/traffic
-* "add_name": Sets a user-set name to a node. The argument is a map containing "node_id" (int) with the ID of the node, and "name" (string) with the name to be set.
-* "blockdata": Tells the SPIN system to block all traffic from and to a node; argument is the node id (int)
-* "stopblockdata": Tells the SPIN system to stop blocking traffic to and from a node; argument is the node id (int)
-* "allowdata": Tells the SPIN system to accept all traffic from and to a node, even though this traffic would be blocked otherwise (for instance, if the traffic is from a node that was blocked); argument is the node id (int)
-* "stopallowdata": Tells the SPIN system to no longer accept all traffic from and to a node, even though this traffic would be blocked otherwise (for instance, if the traffic is from a node that was blocked); argument is the node id (int)
+
+	
+	"get_blocks": Triggers a new "blocks" message to be sent to SPIN/traffic
+	"get_ignores": Triggers a new "ignores" message to be sent to SPIN/traffic
+	"get_alloweds": Triggers a new "alloweds" message to be sent to SPIN/traffic
+
+	"add_block_node": argument is an integer containing a node number, which will be added to the list of IP addresses to be blocked.
+	"add_ignore_node": argument is an integer containing a node number, which will be added to the list of IP addresses to be ignored.
+	"add_allow_node": argument is an integer containing a node number, which will be added to the list of IP addresses to be allowed.
+	
+	"add_name": Sets a user-set name to a node. The argument is a map containing "node_id" (int) with the ID of the node, and "name" (string) with the name to be set.	
+	
+	"remove_block_node": argument is an integer containing a node number, which will be removed from the list of IP addresses to be blocked.
+	"remove_ignore_node": argument is an integer containing a node number, which will be removed from the list of IP addresses to be ignored.
+	"remove_allow_node": argument is an integer containing a node number, which will be removed from the list of IP addresses to be allowed.
+
+	"remove_block_ip": argument is a string containing an IP address, which will be removed from the list of IP addresses to be blocked.
+	"remove_ignore_ip": argument is a string containing an IP address, which will be removed from the list of IP addresses to be ignored.	
+	"remove_allow_ip": argument is a string containing an IP address, which will be removed from the list of IP addresses to be allowed.	
+	
+	"reset_ignores": All ignores are removed, and replaced by the IP addresses of the system that SPIN is running on.
 

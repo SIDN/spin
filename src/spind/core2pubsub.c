@@ -174,7 +174,6 @@ static struct pubsub_commands {
 
 static char *getnames[N_IPLIST] = {
     "blocks",
-    //"filters",    // Backw
     "ignores",
     "alloweds"
 };
@@ -398,10 +397,12 @@ void init_mosquitto(const char* host, int port) {
             mosquitto_socket(mosq), mosquitto_keepalive_time*1000/2);
     mosquitto_socket(mosq);
     send_command_restart();
-    // handle_command_get_iplist(IPLIST_IGNORE, "filters"); // Backw
-    handle_command_get_iplist(IPLIST_BLOCK, "blocks");
-    handle_command_get_iplist(IPLIST_IGNORE, "ignores");
-    handle_command_get_iplist(IPLIST_ALLOW, "alloweds");
+    for (object = 0; object < N_IPLIST; object++) {
+        handle_command_get_iplist(object, getnames[object]);
+    }
+    //handle_command_get_iplist(IPLIST_BLOCK, "blocks");
+    //handle_command_get_iplist(IPLIST_IGNORE, "ignores");
+    //handle_command_get_iplist(IPLIST_ALLOW, "alloweds");
 }
 
 void finish_mosquitto() {
