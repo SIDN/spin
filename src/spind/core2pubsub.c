@@ -386,6 +386,8 @@ void wf_mosquitto(void* arg, int data, int timeout) {
 }
 
 void init_mosquitto(const char* host, int port) {
+    int object;
+
     mosquitto_lib_init();
 
     mqtt_channel_traffic = spinconfig_pubsub_channel_traffic();
@@ -396,10 +398,12 @@ void init_mosquitto(const char* host, int port) {
     mainloop_register("mosq", &wf_mosquitto, (void *) 0,
             mosquitto_socket(mosq), mosquitto_keepalive_time*1000/2);
     mosquitto_socket(mosq);
+
     send_command_restart();
     for (object = 0; object < N_IPLIST; object++) {
         handle_command_get_iplist(object, getnames[object]);
     }
+
     //handle_command_get_iplist(IPLIST_BLOCK, "blocks");
     //handle_command_get_iplist(IPLIST_IGNORE, "ignores");
     //handle_command_get_iplist(IPLIST_ALLOW, "alloweds");
