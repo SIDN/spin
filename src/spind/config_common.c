@@ -56,7 +56,7 @@ void
 config_set_option(char *name, char *value) {
     struct conf_item *p;
 
-    printf("Set option %s to value '%s'\n", name, value);
+    // printf("Set option %s to value '%s'\n", name, value);
     for (p=ci_list; p->ci_name != 0; p++) {
         if (strcmp(p->ci_name, name)==0) {
             p->ci_value = value;
