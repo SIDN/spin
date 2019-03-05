@@ -393,6 +393,8 @@ void init_mosquitto(const char* host, int port) {
     mqtt_channel_traffic = spinconfig_pubsub_channel_traffic();
     mqtt_channel_commands = spinconfig_pubsub_channel_commands();
     mosquitto_keepalive_time = spinconfig_pubsub_timeout();
+    spin_log(LOG_DEBUG, "Mosquitto traffic on %s, commands on %s, timeout %d\n", mqtt_channel_traffic, mqtt_channel_commands, mosquitto_keepalive_time);
+
     connect_mosquitto(host, port);
 
     mainloop_register("mosq", &wf_mosquitto, (void *) 0,
