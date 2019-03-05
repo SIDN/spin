@@ -42,7 +42,7 @@ void arp_table_read(arp_table_t* arp_table) {
     fp = popen("ip neigh", "r");
     STAT_VALUE(ctr, fp != NULL);
     if (fp == NULL) {
-        spin_log(LOG_ERR, "error running ip neigh: %s\n", sys_errlist[errno]);
+        spin_log(LOG_ERR, "error running ip neigh\n");
         return;
     }
     /* Read the output a line at a time - output it. */
