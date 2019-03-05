@@ -48,6 +48,7 @@ void arp_table_read(arp_table_t* arp_table) {
 
         spin_log(LOG_ERR, "error running ip neigh: %s\n", sys_errlist[errno]);
 
+#ifdef notdef
         // test if fork still works
 
         pid = fork();
@@ -62,6 +63,8 @@ void arp_table_read(arp_table_t* arp_table) {
                 wait(&pid);
             }
         }
+
+#endif
         return;
     }
     /* Read the output a line at a time - output it. */
