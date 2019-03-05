@@ -27,9 +27,7 @@ STAT_MODULE(pubsub)
 
 void
 pubsub_publish(char *channel, int payloadlen, const void* payload) {
-    STAT_COUNTER(ctr, message-bytes-out, STAT_TOTAL);
 
-    STAT_VALUE(ctr, payloadlen);
     /*
      * There is a result from command, but for now ignored
      */
@@ -37,6 +35,9 @@ pubsub_publish(char *channel, int payloadlen, const void* payload) {
 }
 
 void core2pubsub_publish(buffer_t *buf) {
+    STAT_COUNTER(ctr, traffic-publish, STAT_TOTAL);
+
+    STAT_VALUE(ctr, buffer_size(buf));
     pubsub_publish(mqtt_channel_traffic, buffer_size(buf), buffer_str(buf));
 }
 

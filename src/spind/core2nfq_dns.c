@@ -39,6 +39,7 @@ handle_dns_query(const u_char *bp, u_int length, uint8_t* src_addr, int family, 
     dns_pkt_info_t dns_pkt;
     size_t count;
     STAT_COUNTER(ctr, query, STAT_TOTAL);
+    STAT_COUNTER(send, send-dns, STAT_TOTAL);
 
     STAT_VALUE(ctr, 1);
     status = ldns_wire2pkt(&p, bp, length);
@@ -71,6 +72,7 @@ handle_dns_query(const u_char *bp, u_int length, uint8_t* src_addr, int family, 
     // only send a notification if this node is not ignored (we
     // do cache it, should we not do that either?)
     if (!addr_in_ignore_list(family, src_addr)) {
+        STAT_VALUE(send, 1);
         send_command_dnsquery(&dns_pkt);
     }
 
