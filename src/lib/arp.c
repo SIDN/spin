@@ -1,3 +1,6 @@
+#include <string.h>
+#include <errno.h>
+
 #include "arp.h"
 #include "spin_log.h"
 #include "statistics.h"
@@ -37,7 +40,7 @@ void arp_table_read(arp_table_t* arp_table) {
 
     fp = popen("ip neigh", "r");
     if (fp == NULL) {
-        spin_log(LOG_ERR, "error running ip neigh\n");
+        spin_log(LOG_ERR, "error running ip neigh: %s\n", strerror(errno));
         return;
     }
     /* Read the output a line at a time - output it. */

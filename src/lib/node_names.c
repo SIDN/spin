@@ -294,6 +294,7 @@ node_names_read_dhcpleases(node_names_t* node_names, const char* filename) {
         name[0] = '\0';
         mac[0] = '\0';
     }
+    fclose(in);
     return 0;
 }
 
