@@ -11,19 +11,16 @@
 #include "statistics.h"
 
 STAT_MODULE(node_cache)
-//static const char stat_modname[]="nodecache";
 
 static int node_cache_add_node(node_cache_t* node_cache, node_t* node);
 
 STAT_COUNTER(nodes, "nodes", STAT_TOTAL);
-//static stat_t nodes_stat = { stat_modname, "nodes", STAT_TOTAL };
 
 static node_t*
 node_create(int id) {
     int i;
 
     STAT_VALUE(nodes, 1);
-    // stat_val(&nodes_stat, 1);
     node_t* node = (node_t*) malloc(sizeof(node_t));
     node->id = id;
     node->ips = tree_create(cmp_ips);
@@ -41,7 +38,6 @@ static void
 node_destroy(node_t* node) {
 
     STAT_VALUE(nodes, -1);
-    //stat_val(&nodes_stat, -1);
     tree_destroy(node->ips);
     node->ips = NULL;
     tree_destroy(node->domains);
@@ -94,20 +90,16 @@ node_t* node_clone(node_t* node) {
 static void
 node_add_ip(node_t* node, ip_t* ip) {
     STAT_COUNTER(ctr, add-ip, STAT_TOTAL);
-    //static stat_t ctr = { stat_modname, "add-ip", STAT_TOTAL };
 
     STAT_VALUE(ctr, 1);
-    //stat_val(&ctr, 1);
     tree_add(node->ips, sizeof(ip_t), ip, 0, NULL, 1);
 }
 
 static void
 node_add_domain(node_t* node, char* domain) {
     STAT_COUNTER(ctr, add-domain, STAT_TOTAL);
-    //static stat_t ctr = { stat_modname, "add-domain", STAT_TOTAL };
 
     STAT_VALUE(ctr, 1);
-    //stat_val(&ctr, 1);
     tree_add(node->domains, strlen(domain) + 1, domain, 0, NULL, 1);
 }
 

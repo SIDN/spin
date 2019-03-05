@@ -34,8 +34,10 @@ void arp_table_read(arp_table_t* arp_table) {
     char ignore[40];
     int result = 4;
     char line[1024];
+    STAT_COUNTER(ctr, arp-table-read, STAT_TOTAL);
 
     fp = popen("ip neigh", "r");
+    STAT_VALUE(ctr, fp != NULL);
     if (fp == NULL) {
         spin_log(LOG_ERR, "error running ip neigh\n");
         return;
