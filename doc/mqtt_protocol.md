@@ -1,3 +1,5 @@
+# mqtt protocol of Spind
+
 The Spindaemon will send traffic information to the topic
 SPIN/traffic. It will listen on the topic SPIN/commands for commands.
 
