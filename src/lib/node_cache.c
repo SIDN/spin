@@ -537,6 +537,7 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     node_t* tree_node;
     int node_found = 0;
     tree_entry_t* nxt;
+    STAT_COUNTER(ctr, node-sharing, STAT_TOTAL);
 
     while (cur != NULL) {
         tree_node = (node_t*) cur->data;
@@ -567,6 +568,7 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
             cur = tree_next(cur);
         }
     }
+    STAT_VALUE(ctr, node_found);
     if (node_found) {
         return 0;
     }
