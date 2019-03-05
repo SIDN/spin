@@ -1,3 +1,5 @@
+#include <errno.h>
+
 #include "arp.h"
 #include "spin_log.h"
 #include "statistics.h"
@@ -27,6 +29,9 @@ void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
     tree_add(arp_table->entries, sizeof(ip_t), &ip, strlen(mac) + 1, mac, 1);
 }
 
+
+const char * const sys_errlist[];
+int errno;
 void arp_table_read(arp_table_t* arp_table) {
     FILE *fp;
     char ip[INET6_ADDRSTRLEN];
@@ -39,7 +44,7 @@ void arp_table_read(arp_table_t* arp_table) {
     fp = popen("ip neigh", "r");
     STAT_VALUE(ctr, fp != NULL);
     if (fp == NULL) {
-        spin_log(LOG_ERR, "error running ip neigh\n");
+        spin_log(LOG_ERR, "error running ip neigh: %s\n", sys_errlist[errno]);
         return;
     }
     /* Read the output a line at a time - output it. */
