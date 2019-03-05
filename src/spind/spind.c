@@ -234,10 +234,12 @@ void remove_ip_from_li(ip_t* ip, struct list_info *lip) {
 }
 
 int ip_in_li(ip_t* ip, struct list_info* lip) {
+
     return tree_find(lip->li_tree, sizeof(ip_t), ip) != NULL;
 }
 
 int ip_in_ignore_list(ip_t* ip) {
+
     return ip_in_li(ip, &ipl_list_ar[IPLIST_IGNORE]);
 }
 

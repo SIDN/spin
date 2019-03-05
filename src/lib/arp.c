@@ -30,8 +30,6 @@ void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
 }
 
 
-const char * const sys_errlist[];
-int errno;
 void arp_table_read(arp_table_t* arp_table) {
     FILE *fp;
     char ip[INET6_ADDRSTRLEN];
@@ -44,27 +42,7 @@ void arp_table_read(arp_table_t* arp_table) {
     fp = popen("ip neigh", "r");
     STAT_VALUE(ctr, fp != NULL);
     if (fp == NULL) {
-        int pid;
-
         spin_log(LOG_ERR, "error running ip neigh: %s\n", sys_errlist[errno]);
-
-#ifdef notdef
-        // test if fork still works
-
-        pid = fork();
-        if (pid == 0) {
-            // Child
-            exit(0);
-        } else {
-            // Parent or fail
-            if (pid < 0) {
-                spin_log(LOG_ERR, "Fork failed %d\n", errno);
-            } else {
-                wait(&pid);
-            }
-        }
-
-#endif
         return;
     }
     /* Read the output a line at a time - output it. */

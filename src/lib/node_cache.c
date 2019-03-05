@@ -421,6 +421,8 @@ node_cache_get_new_id(node_cache_t* node_cache) {
     // just incremental for now
     nextid = node_cache->available_id++;
     STAT_VALUE(nnodes, node_cache->available_id);
+
+    return nextid;
 }
 
 static void
