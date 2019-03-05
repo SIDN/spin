@@ -4,6 +4,8 @@
 #include <poll.h>
 #include <errno.h>
 
+#include <unistd.h>
+
 #include "mainloop.h"
 #include "spin_log.h"
 #include "statistics.h"
@@ -139,7 +141,9 @@ void mainloop_run() {
     struct timeval time_now, time_interesting;
     int millitime;
     int argdata, argtmout;
-    STAT_COUNTER(ctr, polltime, STAT_TOTAL);
+    void *memboundary;
+    STAT_COUNTER(polltime, polltime, STAT_TOTAL);
+    STAT_COUNTER(mem, memextra, STAT_MAX);
 
     mainloop_register("mainloop", wf_mainloop, (void *) 0, 0, 10000);
     init_mltime();
@@ -154,10 +158,13 @@ void mainloop_run() {
         }
     }
 
+    memboundary = sbrk(0);
+
     while (mainloop_running) {
+        STAT_VALUE(mem, sbrk(0)-memboundary);
         millitime = mainloop_findtime(&time_now, &time_interesting);
 
-        STAT_VALUE(ctr, millitime);
+        STAT_VALUE(polltime, millitime);
         // go poll and wait until something interesting is up
         rs = poll(fds, nfds, millitime);
 

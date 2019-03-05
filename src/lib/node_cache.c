@@ -423,8 +423,12 @@ node_t* node_cache_find_by_id(node_cache_t* node_cache, int node_id) {
 
 static int
 node_cache_get_new_id(node_cache_t* node_cache) {
+    int nextid;
+    STAT_COUNTER(nnodes, number-nodes, STAT_MAX);
+
     // just incremental for now
-    return node_cache->available_id++;
+    nextid = node_cache->available_id++;
+    STAT_VALUE(nnodes, node_cache->available_id);
 }
 
 static void
