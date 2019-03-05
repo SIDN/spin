@@ -490,6 +490,9 @@ void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, 
     // should first see if we have a node with this ip or domain already
     char dname_str[512];
     ip_t ip;
+    STAT_COUNTER(ctr, add-dns-info, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
     ip.family = dns_pkt->family;
     memcpy(ip.addr, dns_pkt->ip, 16);
     dns_dname2str(dname_str, dns_pkt->dname, 512);
@@ -506,6 +509,8 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     // first see if we have a node with this ip or domain already
     char dname_str[512];
     ip_t ip;
+    STAT_COUNTER(ctr, add-dns-query, STAT_TOTAL);
+
     ip.family = dns_pkt->family;
     memcpy(ip.addr, dns_pkt->ip, 16);
     dns_dname2str(dname_str, dns_pkt->dname, 512);
@@ -520,6 +525,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     // in this case, the dns_pkt's ip address is a separate node!
     // add it too if it does not exist
     node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    STAT_VALUE(ctr, node == NULL);
     if (node == NULL) {
         node = node_create(0);
         node_set_last_seen(node, timestamp);
