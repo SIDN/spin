@@ -49,30 +49,30 @@ D. Valibox with SPIN current dev (nflog for DNS)
 
 3. Test website: nos.nl
 
-|  | CPU load | SPIN CPU % | SPIN memory % | Load time (avg) |
-|-|-|-|-|-| -| -| -|
-| Valibox with SPIN disabled | 0.04 | N/A | N/A | 1.64 |
-| Valibox with SPIN-beta (kernel) | 1.80 | 12% | 5% | 1.68 |
-| Valibox with SPIN-dev (userspace) | 0.61 | 6% | 6% | 1.87 |
-| Valibox with SPIN-dev (dns nflog) | 0.84 | 5% | 7% | 1.76 |
+|  | CPU load | SPIN CPU % | SPIN memory % | Load time (avg)
+|-|-|-|-|-|
+| Valibox with SPIN disabled | 0.04 | N/A | N/A | 1.64
+| Valibox with SPIN-beta (kernel) | 1.80 | 12% | 5% | 1.68
+| Valibox with SPIN-dev (userspace) | 0.61 | 6% | 6% | 1.87
+| Valibox with SPIN-dev (dns nflog) | 0.84 | 5% | 7% | 1.76
 
 4. Test website: youtube.com
 
-|  | CPU load | SPIN CPU % | SPIN memory % | Load time (avg) |
-|-|-|-|-|-| -| -| -|
-| Valibox with SPIN disabled | 0.04 | N/A | N/A | 3.26 |
-| Valibox with SPIN-beta (kernel) | 2.32 | 26% | 5% | 3.14 |
-| Valibox with SPIN-dev (userspace) | 0.30 | 15% | 6% |  3.56 |
-| Valibox with SPIN-dev (dns nflog) | 0.83 | 11% | 7% | 3.30 |
+|  | CPU load | SPIN CPU % | SPIN memory % | Load time (avg)
+|-|-|-|-|-|
+| Valibox with SPIN disabled | 0.04 | N/A | N/A | 3.26
+| Valibox with SPIN-beta (kernel) | 2.32 | 26% | 5% | 3.14
+| Valibox with SPIN-dev (userspace) | 0.30 | 15% | 6% |  3.56
+| Valibox with SPIN-dev (dns nflog) | 0.83 | 11% | 7% | 3.30
 
 5. dnsperf (5000)
 
-|  | CPU load | SPIN CPU % | SPIN memory % | Queries completed | Run time (s) |
-|-|-|-|-|-| -| -| -|
-| Valibox with SPIN disabled | 0.87 | N/A | N/A | 4946 (98.92%) |
+|  | CPU load | SPIN CPU % | SPIN memory % | Queries completed | Run time (s)
+|-|-|-|-|-|-|
+| Valibox with SPIN disabled | 0.87 | N/A | N/A | 4946 (98.92%)
 | Valibox with SPIN-beta (kernel) | 2.86 | 28% | 8% | 1425 (28.50%) | 201.408382
-| Valibox with SPIN-dev (userspace) | 
-| Valibox with SPIN-dev (dns nflog) | 1.59 | 6% 7% | 4899 (97.98%) | 33.253010
+| Valibox with SPIN-dev (userspace)
+| Valibox with SPIN-dev (dns nflog) | 1.59 | 6% | 7% | 4899 (97.98%) | 33.253010
 
 
 
