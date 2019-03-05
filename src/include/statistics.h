@@ -2,7 +2,7 @@
  * Statistics module include
  */
 
-#define DO_SPIN_STATS   1
+#define DO_SPIN_STATS   0
 
 #if DO_SPIN_STATS
 typedef enum {
