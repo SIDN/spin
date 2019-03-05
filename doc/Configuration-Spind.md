@@ -34,7 +34,8 @@ Package *spin*, initialized from the file */etc/config/spin*.
 
 ### Variables(as they are now)
 config spind 'spind'
->option iptable_debug '/tmp/blockcommands'
+
+	option iptable_debug '/tmp/blockcommands'
 	option iptable_queue_dns '1'
 	option iptable_queue_block '2'
 	option iptable_place_dns '0'
@@ -53,11 +54,11 @@ The values shown are the default in the current code.
 ### The file method
 Make file */etc/spin/spind.conf*, with exactly the same names and values, so for example
 
- #
- # Config of Spind
- #
-
-pubsub_port=1883
+	#
+	# Config of Spind
+	#
+	
+	pubsub_port=1883
 
 ### Configuration code in spind
 
