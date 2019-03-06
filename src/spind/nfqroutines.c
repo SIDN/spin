@@ -273,7 +273,7 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
                 nfr[fr_n].nfr_packets);
         }
         // TODO what is verdict here
-        STAT_VALUE(ctr4, verdict);
+        STAT_VALUE(ctrv, verdict);
         return nfq_set_verdict(qh, id, verdict ? NF_ACCEPT : NF_DROP, 0, NULL);
 }
 

@@ -59,6 +59,9 @@ spin_stat_val(stat_p sp, int val) {
             sp->stat_value = val;
         }
         break;
+    case N_STAT:
+        // should not happen.
+        break;
     }
 }
 
