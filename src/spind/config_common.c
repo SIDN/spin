@@ -17,7 +17,8 @@ enum configs {
     IPTABLE_QUEUE_BLOCK,
     IPTABLE_PLACE_DNS,
     IPTABLE_PLACE_BLOCK,
-    IPTABLE_DEBUG
+    IPTABLE_DEBUG,
+    NODE_CACHE_RETAIN_TIME
 };
 
 struct conf_item {
@@ -49,6 +50,8 @@ struct conf_item {
             { "iptable_place_block",        "0",                0   },
     [IPTABLE_DEBUG] =
             { "iptable_debug",              "/tmp/block_commands",                 0   },
+    [NODE_CACHE_RETAIN_TIME] =
+            { "node_cache_retain_time",     "1800",              0   },
  { 0, 0, 0 }
 };
 
@@ -171,4 +174,8 @@ int spinconfig_iptable_place_block() {
 char *spinconfig_iptable_debug() {
 
     return(spi_str(IPTABLE_DEBUG));
+}
+
+int spinconfig_node_cache_retain_time() {
+    return(spi_int(NODE_CACHE_RETAIN_TIME));
 }

@@ -22,3 +22,7 @@ int spinconfig_iptable_queue_block();
 int spinconfig_iptable_place_dns();
 int spinconfig_iptable_place_block();
 char *spinconfig_iptable_debug();
+// The time (in seconds) that node_cache entries
+// are kept after they have last been seen
+int spinconfig_node_cache_retain_time();
+

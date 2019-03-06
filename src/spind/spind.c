@@ -512,8 +512,8 @@ void print_help() {
 // Worker function to cleanup cache, gets called regularly
 void node_cache_clean_wf() {
     // should we make this configurable?
-    const uint32_t CLEAN_NODE_AFTER = 60;
-    uint32_t older_than = time(NULL) - CLEAN_NODE_AFTER;
+    const uint32_t node_cache_retain_seconds = spinconfig_node_cache_retain_time();
+    uint32_t older_than = time(NULL) - node_cache_retain_seconds;
     node_cache_clean(node_cache, older_than);
 }
 
