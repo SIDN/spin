@@ -336,5 +336,6 @@ void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
     nfr[n_nfr].nfr_wf = wf;
     nfr[n_nfr].nfr_wfarg = arg;
     nfr[n_nfr].nfr_qh = qh;
+    nfr[n_nfr].nfr_packets = 0;
     n_nfr++;
 }
