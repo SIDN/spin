@@ -509,9 +509,18 @@ void print_help() {
     printf("-v\t\t\tprint the version of spind and exit\n");
 }
 
+// Worker function to cleanup cache, gets called regularly
+void node_cache_clean_wf() {
+    // should we make this configurable?
+    const uint32_t CLEAN_NODE_AFTER = 60;
+    uint32_t older_than = time(NULL) - CLEAN_NODE_AFTER;
+    node_cache_clean(node_cache, older_than);
+}
+
 void init_cache() {
     dns_cache = dns_cache_create();
     node_cache = node_cache_create();
+    mainloop_register("node_cache_clean", node_cache_clean_wf, (void *) 0, 0, 60000);
 }
 
 void cleanup_cache() {

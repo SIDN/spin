@@ -413,6 +413,27 @@ node_t* node_cache_find_by_id(node_cache_t* node_cache, int node_id) {
     }
 }
 
+void node_cache_clean(node_cache_t* node_cache, uint32_t older_than) {
+    tree_entry_t* cur = tree_first(node_cache->nodes);
+    tree_entry_t* next;
+    node_t* node;
+    size_t deleted = 0;
+    spin_log(LOG_DEBUG, "[cache] clean up cache, timestamp %u\n", older_than);
+    while (cur != NULL) {
+        node = (node_t*)cur->data;
+        next = tree_next(cur);
+        if (node->last_seen < older_than) {
+            node_destroy(node);
+            cur->data = NULL;
+            tree_remove_entry(node_cache->nodes, cur);
+            deleted++;
+        }
+        cur = next;
+    }
+    spin_log(LOG_DEBUG, "[node_cache] Removed %u entries older than %u, size now %u\n", deleted, older_than, tree_size(node_cache->nodes));
+}
+
+
 static int
 node_cache_get_new_id(node_cache_t* node_cache) {
     int nextid;
