@@ -107,7 +107,7 @@ static void
 node_set_mac(node_t* node, char* mac) {
     STAT_COUNTER(ctr, set-mac, STAT_TOTAL);
 
-    STAT_VALUE(ctr, 1);
+    STAT_VALUE(ctr, mac != NULL);
     if (mac == NULL) {
         return;
     }
@@ -427,12 +427,16 @@ node_cache_get_new_id(node_cache_t* node_cache) {
 
 static void
 add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
-    char* mac = arp_table_find_by_ip(node_cache->arp_table, ip);
+    char* mac;
     char* name;
+    STAT_COUNTER(macctr, mac-found-by-read, STAT_TOTAL);
+
+    mac = arp_table_find_by_ip(node_cache->arp_table, ip);
     if (!mac) {
         // todo: incorporate this in standard lookup?
         arp_table_read(node_cache->arp_table);
         mac = arp_table_find_by_ip(node_cache->arp_table, ip);
+        STAT_VALUE(macctr, mac != NULL);
     }
     if (mac) {
         // spin_log(LOG_DEBUG, "[XX] mac found: %s\n", mac);
@@ -481,6 +485,7 @@ node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
 
 void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp) {
     ip_t ip;
+
     ip.family = pkt_info->family;
     memcpy(ip.addr, pkt_info->src_addr, 16);
     node_cache_add_ip_info(node_cache, &ip, timestamp);
@@ -637,15 +642,17 @@ pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf
     //return s;
 }
 
+#define DNAME_SIZE  512
 unsigned int
 dns_query_pkt_info2json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info, buffer_t* json_buf) {
     unsigned int s = 0;
     node_t* src_node;
     // the 'node' that was queried; this could be a node that we already know
     node_t* dns_node;
-    char dname_str[512];
-    dns_dname2str(dname_str, dns_pkt_info->dname, 512);
+    char dname_str[DNAME_SIZE];
     ip_t ip;
+
+    dns_dname2str(dname_str, dns_pkt_info->dname, DNAME_SIZE);
 
     ip.family = dns_pkt_info->family;
     memcpy(ip.addr, dns_pkt_info->ip, 16);
