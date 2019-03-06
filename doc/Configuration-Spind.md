@@ -1,4 +1,4 @@
-#Configuration of Spind
+# Configuration of Spind
 
 The spind program in the collection of Spin programs is the central part doing all the communication. It needs to know various things in order to start up that can be different on different platforms. To be able to consistently configure this we made it so that it can be configured using the method appropriate on each platform.
 
@@ -11,7 +11,7 @@ The structure of the code makes it possible to use dynamic configuration at a la
 
 The code contains a default value for each option, which is used if the configuration method does not set the option.
 
-##Configurable items in Spind
+## Configurable items in Spind
 
 Currently these are:
 
@@ -23,18 +23,19 @@ Currently these are:
 
 Others will undoubtedly be added.
 
-##General structure
+## General structure
 
 All Spin configuration is divided in sections, one for each program. Currently only Spind uses this but others will probably be added.
 For the UCI interface(see below) the package will be *spin* and the section *spind*. For the file interface the directory will be */etc/spin* and the file named *spind.conf*.
 
-##UCI structure
+## UCI structure
 
 Package *spin*, initialized from the file */etc/config/spin*.
 
-###Variables(as they are now)
+### Variables(as they are now)
 config spind 'spind'
->option iptable_debug '/tmp/blockcommands'
+
+	option iptable_debug '/tmp/blockcommands'
 	option iptable_queue_dns '1'
 	option iptable_queue_block '2'
 	option iptable_place_dns '0'
@@ -50,16 +51,16 @@ config spind 'spind'
 The values shown are the default in the current code.
 
 
-###The file method
+### The file method
 Make file */etc/spin/spind.conf*, with exactly the same names and values, so for example
 
- #
- # Config of Spind
- #
+	#
+	# Config of Spind
+	#
+	
+	pubsub_port=1883
 
-pubsub_port=1883
-
-###Configuration code in spind
+### Configuration code in spind
 
 In the code there is a source file config_common.c containing the generic option handling, including a table with all options and the defaults for each option. For each option there is an entry point to get the value, something like:
 

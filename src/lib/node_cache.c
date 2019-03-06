@@ -11,19 +11,16 @@
 #include "statistics.h"
 
 STAT_MODULE(node_cache)
-//static const char stat_modname[]="nodecache";
 
 static int node_cache_add_node(node_cache_t* node_cache, node_t* node);
 
 STAT_COUNTER(nodes, "nodes", STAT_TOTAL);
-//static stat_t nodes_stat = { stat_modname, "nodes", STAT_TOTAL };
 
 static node_t*
 node_create(int id) {
     int i;
 
     STAT_VALUE(nodes, 1);
-    // stat_val(&nodes_stat, 1);
     node_t* node = (node_t*) malloc(sizeof(node_t));
     node->id = id;
     node->ips = tree_create(cmp_ips);
@@ -41,7 +38,6 @@ static void
 node_destroy(node_t* node) {
 
     STAT_VALUE(nodes, -1);
-    //stat_val(&nodes_stat, -1);
     tree_destroy(node->ips);
     node->ips = NULL;
     tree_destroy(node->domains);
@@ -94,20 +90,16 @@ node_t* node_clone(node_t* node) {
 static void
 node_add_ip(node_t* node, ip_t* ip) {
     STAT_COUNTER(ctr, add-ip, STAT_TOTAL);
-    //static stat_t ctr = { stat_modname, "add-ip", STAT_TOTAL };
 
     STAT_VALUE(ctr, 1);
-    //stat_val(&ctr, 1);
     tree_add(node->ips, sizeof(ip_t), ip, 0, NULL, 1);
 }
 
 static void
 node_add_domain(node_t* node, char* domain) {
     STAT_COUNTER(ctr, add-domain, STAT_TOTAL);
-    //static stat_t ctr = { stat_modname, "add-domain", STAT_TOTAL };
 
     STAT_VALUE(ctr, 1);
-    //stat_val(&ctr, 1);
     tree_add(node->domains, strlen(domain) + 1, domain, 0, NULL, 1);
 }
 
@@ -115,7 +107,7 @@ static void
 node_set_mac(node_t* node, char* mac) {
     STAT_COUNTER(ctr, set-mac, STAT_TOTAL);
 
-    STAT_VALUE(ctr, 1);
+    STAT_VALUE(ctr, mac != NULL);
     if (mac == NULL) {
         return;
     }
@@ -423,18 +415,28 @@ node_t* node_cache_find_by_id(node_cache_t* node_cache, int node_id) {
 
 static int
 node_cache_get_new_id(node_cache_t* node_cache) {
+    int nextid;
+    STAT_COUNTER(nnodes, number-nodes, STAT_MAX);
+
     // just incremental for now
-    return node_cache->available_id++;
+    nextid = node_cache->available_id++;
+    STAT_VALUE(nnodes, node_cache->available_id);
+
+    return nextid;
 }
 
 static void
 add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
-    char* mac = arp_table_find_by_ip(node_cache->arp_table, ip);
+    char* mac;
     char* name;
+    STAT_COUNTER(macctr, mac-found-by-read, STAT_TOTAL);
+
+    mac = arp_table_find_by_ip(node_cache->arp_table, ip);
     if (!mac) {
         // todo: incorporate this in standard lookup?
         arp_table_read(node_cache->arp_table);
         mac = arp_table_find_by_ip(node_cache->arp_table, ip);
+        STAT_VALUE(macctr, mac != NULL);
     }
     if (mac) {
         // spin_log(LOG_DEBUG, "[XX] mac found: %s\n", mac);
@@ -483,6 +485,7 @@ node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
 
 void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp) {
     ip_t ip;
+
     ip.family = pkt_info->family;
     memcpy(ip.addr, pkt_info->src_addr, 16);
     node_cache_add_ip_info(node_cache, &ip, timestamp);
@@ -494,6 +497,9 @@ void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, 
     // should first see if we have a node with this ip or domain already
     char dname_str[512];
     ip_t ip;
+    STAT_COUNTER(ctr, add-dns-info, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
     ip.family = dns_pkt->family;
     memcpy(ip.addr, dns_pkt->ip, 16);
     dns_dname2str(dname_str, dns_pkt->dname, 512);
@@ -510,6 +516,8 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     // first see if we have a node with this ip or domain already
     char dname_str[512];
     ip_t ip;
+    STAT_COUNTER(ctr, add-dns-query, STAT_TOTAL);
+
     ip.family = dns_pkt->family;
     memcpy(ip.addr, dns_pkt->ip, 16);
     dns_dname2str(dname_str, dns_pkt->dname, 512);
@@ -524,6 +532,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     // in this case, the dns_pkt's ip address is a separate node!
     // add it too if it does not exist
     node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    STAT_VALUE(ctr, node == NULL);
     if (node == NULL) {
         node = node_create(0);
         node_set_last_seen(node, timestamp);
@@ -541,6 +550,7 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     node_t* tree_node;
     int node_found = 0;
     tree_entry_t* nxt;
+    STAT_COUNTER(ctr, node-sharing, STAT_TOTAL);
 
     while (cur != NULL) {
         tree_node = (node_t*) cur->data;
@@ -571,6 +581,7 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
             cur = tree_next(cur);
         }
     }
+    STAT_VALUE(ctr, node_found);
     if (node_found) {
         return 0;
     }
@@ -631,15 +642,17 @@ pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf
     //return s;
 }
 
+#define DNAME_SIZE  512
 unsigned int
 dns_query_pkt_info2json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info, buffer_t* json_buf) {
     unsigned int s = 0;
     node_t* src_node;
     // the 'node' that was queried; this could be a node that we already know
     node_t* dns_node;
-    char dname_str[512];
-    dns_dname2str(dname_str, dns_pkt_info->dname, 512);
+    char dname_str[DNAME_SIZE];
     ip_t ip;
+
+    dns_dname2str(dname_str, dns_pkt_info->dname, DNAME_SIZE);
 
     ip.family = dns_pkt_info->family;
     memcpy(ip.addr, dns_pkt_info->ip, 16);

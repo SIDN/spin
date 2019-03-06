@@ -39,6 +39,9 @@ spin_stat_val(stat_p sp, int val) {
 
     if (sp->stat_next == 0) {
         // First time use
+
+        // Prepend to list, currently in reverse chronological order
+        // Perhaps TODO, although UI should solve this
         sp->stat_next = stat_chain;
         stat_chain = sp;
         if (!inited) {

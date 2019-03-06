@@ -42,7 +42,7 @@ int get_config_entries() {
     struct uci_element *e;
     char buf[100];
 
-    fprintf(stderr, "Reading configuration from UCI section %s\n", UCI_SECTION_NAME);
+    // fprintf(stderr, "Reading configuration from UCI section %s\n", UCI_SECTION_NAME);
 
     c = uci_alloc_context();
 

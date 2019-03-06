@@ -242,9 +242,9 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
         struct nfqnl_msg_packet_hdr *ph;
         int fr_n;
         int verdict;
-        STAT_COUNTER(ctr4, "handled-ipv4", STAT_TOTAL);
-        STAT_COUNTER(ctr6, "handled-ipv6", STAT_TOTAL);
-        STAT_COUNTER(ctrv, "verdict", STAT_TOTAL);
+        STAT_COUNTER(ctr4, handled-ipv4, STAT_TOTAL);
+        STAT_COUNTER(ctr6, handled-ipv6, STAT_TOTAL);
+        STAT_COUNTER(ctrv, verdict, STAT_TOTAL);
 
         // printf("entering callback\n");
         ph = nfq_get_msg_packet_hdr(nfa);
@@ -336,5 +336,6 @@ void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
     nfr[n_nfr].nfr_wf = wf;
     nfr[n_nfr].nfr_wfarg = arg;
     nfr[n_nfr].nfr_qh = qh;
+    nfr[n_nfr].nfr_packets = 0;
     n_nfr++;
 }

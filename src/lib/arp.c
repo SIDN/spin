@@ -1,4 +1,3 @@
-#include <string.h>
 #include <errno.h>
 
 #include "arp.h"
@@ -30,6 +29,7 @@ void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
     tree_add(arp_table->entries, sizeof(ip_t), &ip, strlen(mac) + 1, mac, 1);
 }
 
+
 void arp_table_read(arp_table_t* arp_table) {
     FILE *fp;
     char ip[INET6_ADDRSTRLEN];
@@ -37,8 +37,10 @@ void arp_table_read(arp_table_t* arp_table) {
     char ignore[40];
     int result = 4;
     char line[1024];
+    STAT_COUNTER(ctr, arp-table-read, STAT_TOTAL);
 
     fp = popen("ip neigh", "r");
+    STAT_VALUE(ctr, fp != NULL);
     if (fp == NULL) {
         spin_log(LOG_ERR, "error running ip neigh: %s\n", strerror(errno));
         return;

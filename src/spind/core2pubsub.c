@@ -27,9 +27,7 @@ STAT_MODULE(pubsub)
 
 void
 pubsub_publish(char *channel, int payloadlen, const void* payload) {
-    STAT_COUNTER(ctr, message-bytes-out, STAT_TOTAL);
 
-    STAT_VALUE(ctr, payloadlen);
     /*
      * There is a result from command, but for now ignored
      */
@@ -37,6 +35,9 @@ pubsub_publish(char *channel, int payloadlen, const void* payload) {
 }
 
 void core2pubsub_publish(buffer_t *buf) {
+    STAT_COUNTER(ctr, traffic-publish, STAT_TOTAL);
+
+    STAT_VALUE(ctr, buffer_size(buf));
     pubsub_publish(mqtt_channel_traffic, buffer_size(buf), buffer_str(buf));
 }
 
@@ -174,7 +175,6 @@ static struct pubsub_commands {
 
 static char *getnames[N_IPLIST] = {
     "blocks",
-    //"filters",    // Backw
     "ignores",
     "alloweds"
 };
@@ -387,21 +387,29 @@ void wf_mosquitto(void* arg, int data, int timeout) {
 }
 
 void init_mosquitto(const char* host, int port) {
+    int object;
+
     mosquitto_lib_init();
 
     mqtt_channel_traffic = spinconfig_pubsub_channel_traffic();
     mqtt_channel_commands = spinconfig_pubsub_channel_commands();
     mosquitto_keepalive_time = spinconfig_pubsub_timeout();
+    spin_log(LOG_DEBUG, "Mosquitto traffic on %s, commands on %s, timeout %d\n", mqtt_channel_traffic, mqtt_channel_commands, mosquitto_keepalive_time);
+
     connect_mosquitto(host, port);
 
     mainloop_register("mosq", &wf_mosquitto, (void *) 0,
             mosquitto_socket(mosq), mosquitto_keepalive_time*1000/2);
     mosquitto_socket(mosq);
+
     send_command_restart();
-    // handle_command_get_iplist(IPLIST_IGNORE, "filters"); // Backw
-    handle_command_get_iplist(IPLIST_BLOCK, "blocks");
-    handle_command_get_iplist(IPLIST_IGNORE, "ignores");
-    handle_command_get_iplist(IPLIST_ALLOW, "alloweds");
+    for (object = 0; object < N_IPLIST; object++) {
+        handle_command_get_iplist(object, getnames[object]);
+    }
+
+    //handle_command_get_iplist(IPLIST_BLOCK, "blocks");
+    //handle_command_get_iplist(IPLIST_IGNORE, "ignores");
+    //handle_command_get_iplist(IPLIST_ALLOW, "alloweds");
 }
 
 void finish_mosquitto() {
