@@ -1,0 +1,9 @@
+Compiling for the valibox on MIPS:
+
+GOOS=linux GOARCH=mips GOMIPS=softfloat go build -ldflags="-s -w"
+
+GOOS=linux        => linux als OS
+GOARCH=mips       => mips als instrutieset.
+GOMIPS=softfloat  => chipsets hebben geen FPU, dus compileer met software-fpu  
+-ldflags="-s -w"  => kleinere binaries, strip debugging information
+
