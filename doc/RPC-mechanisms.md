@@ -12,7 +12,7 @@ The web_ui uses a REST API to send commands with parameters partly encoded in th
 ### Ubus
 
 OpenWRT would like us to use ubus as an RPC mechanism. Ubus is a mechanism using serialized data structures, like JSON, but more compact and binary.
-Ubus rendez-vous is through a local ubusd program, so not networked. There is however a mechanism to connect through the uhttpd process somehow, which should make it available over the network.
+Ubus rendez-vous is through a local ubusd program, so not networked. There is however a mechanism to connect through the uhttpd process somehow, which should make it available over the network. The uhttpd plugin uses JSON_RPC 2.0.
 Ubus contains a sort of broadcast mechanism to all listeners.
 
 The ubus system has a set of shell commands to talk to ubusd where all the calls are encoded in JSON. Easy for testing and interfacing to scripts.
