@@ -37,3 +37,4 @@ On SPIN/traffic/flow the flows seen recently. There will be no node information 
 
 On SPIN/traffic/dns the DNS requests (and replies??). Again information about nodes will only be their number.
 
+For the statistics, assuming we keep them on Mosquitto, we could use something like: SPIN/stat/module/counter channels making it easy for someone just to query one counter. Making all counters retainable will get you the latest value with one call.
