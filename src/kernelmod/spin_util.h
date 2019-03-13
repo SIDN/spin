@@ -5,10 +5,10 @@
 #ifndef SPIN_UTIL_H
 #define SPIN_UTIL_H 1
 
-#include <linux/cache.h>
-#include <linux/kernel.h>
-#include <linux/slab.h>
-#include <linux/module.h>
+//#include <linux/cache.h>
+//#include <linux/kernel.h>
+//#include <linux/slab.h>
+//#include <linux/module.h>
 
 #include "pkt_info.h"
 

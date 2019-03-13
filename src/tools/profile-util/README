@@ -1,0 +1,76 @@
+
+	SPIN profile utilities (prototype): collect information on network
+	behavior and use it to generate and enforce a profile.
+
+==> Introduction
+
+This repository contains a number of Lua programs:
+ * mqtt_nm.lua, which implements a prototype of the SPIN Network Measurement
+   Service. The Lua script subscribes to the SPIN/traffic MQTT channel.
+   The information published on the channel will be parsed and somehow stored
+   in the SQLite database.
+ * stdin_nm.lua, which is similar to mqtt_nm.lua except that it does not read
+   the SPIN messages from MQTT but from stdin.
+ * generate-profile.lua, which uses the SQLite database created by mqtt_nm.lua
+   to create a profile of the network activity of a device. The information
+   embedded in a profile will be similar to, but not equal to, the information
+   embedded in a MUD profile.
+ * generate-fw.lua, which generates iptables firewall rules for the the profile
+   provided on stdin (use generate-profile.lua with the -p flag to obtain output
+   which can be fed into generate-fw.lua).
+
+Caveats:
+ * The mqtt_nm.lua program should have a better understanding of the concept of
+   nodes in SPIN. Currently, mqtt_nm.lua does not assign SPIN node IDs to
+   devices on the network so the "bolletjes app" will not work.
+
+
+==> Preparing a Unix workstation to use the scripts
+
+Install Lua libraries as necessary:
+
+(for generate-fw.lua and mqtt_nm.lua)
+$ luarocks --local install luajson
+
+(for mqtt_nm.lua)
+# apt-get install libmosquitto-dev	# Or pkg_add mosquitto on OpenBSD
+$ luarocks --local install lua-mosquitto
+$ luarocks --local install luaposix
+
+(for generate-profile.lua and mqtt_nm.lua)
+$ luarocks --local install lsqlite3
+
+
+==> Preparing the Valibox to use the scripts
+
+Note: Valibox 1.6-beta-201805281149 or later is recommended.
+
+1. Upload *.lua and db.schema to a directory (e.g. /root/caspar-lua/) on the
+   Valibox device by hand or invoke ./rsync-valibox.sh to do this automatically
+   (assumes the device is reachable on 192.168.8.1).
+     pc# ./rsync-valibox.sh
+2. Copy some libraries from /usr/lib/spin to the directory:
+     valibox# cat /usr/lib/spin/json.lua >/root/caspar-lua/json.lua
+3. Install the LuaSQLite3 library:
+     valibox# opkg update
+     valibox# opkg install lsqlite3
+
+
+==> Usage
+
+Collect info from MQTT, store in database:
+  $ ./mqtt_nm.lua db.sqlite3 192.168.8.1
+
+Collect info from pcap file, store in database:
+  $ ../pcap-reader/pcap -r $PCAP | ./stdin_nm.lua db.sqlite3
+
+generate-profile.lua:
+  $ ./generate-profile.lua -d db.sqlite3 -a			# All devices
+  $ ./generate-profile.lua -d db.sqlite3 -i 192.168.8.22
+  $ ./generate-profile.lua -d db.sqlite3 -m 9c:db:75:0e:62:2b
+
+Enforce generated profile for device with MAC address 00:17:88:71:cd:4a:
+  $ ./generate-fw.lua -i | ssh root@192.168.8.1 sh -x
+  $ ./generate-profile.lua -m 00:17:88:71:cd:4a -j | \
+       ssh root@192.168.8.1 'cd /root/caspar-fw && ./generate-fw.lua -e | sh -x'
+

@@ -126,21 +126,23 @@ int tree_add(tree_t* tree, size_t key_size, void* key, size_t data_size, void* d
 }
 
 tree_entry_t* tree_find(tree_t* tree, size_t key_size, const void* key) {
-    tree_entry_t* cur = tree->root;
+    tree_entry_t* current;
     int c;
-    while (cur != NULL) {
-        c = tree->cmp_func(key_size, key, cur->key_size, cur->key);
+
+    current = tree->root;
+    while (current != NULL) {
+        c = tree->cmp_func(key_size, key, current->key_size, current->key);
         if (c == 0) {
-            return cur;
+            return current;
         } else if (c < 0) {
-            if (cur->left) {
-                cur = cur->left;
+            if (current->left) {
+                current = current->left;
             } else {
                 return NULL;
             }
         } else {
-            if (cur->right) {
-                cur = cur->right;
+            if (current->right) {
+                current = current->right;
             } else {
                 return NULL;
             }
@@ -151,6 +153,7 @@ tree_entry_t* tree_find(tree_t* tree, size_t key_size, const void* key) {
 
 static inline void
 elv(tree_entry_t* e) {
+
     if (e == NULL) {
         spin_log(LOG_DEBUG, "<0>");
     } else {
@@ -296,6 +299,7 @@ void tree_remove(tree_t* tree, size_t key_size, void* key) {
 
 tree_entry_t* tree_first(tree_t* tree) {
     tree_entry_t* current;
+
     if (tree->root == NULL) {
         return NULL;
     }
@@ -307,6 +311,7 @@ tree_entry_t* tree_first(tree_t* tree) {
 }
 
 tree_entry_t* tree_entry_first(tree_entry_t* current) {
+
     while (current->left != NULL) {
         current = current->left;
     }
@@ -314,6 +319,7 @@ tree_entry_t* tree_entry_first(tree_entry_t* current) {
 }
 
 tree_entry_t* tree_entry_last(tree_entry_t* current) {
+
     while (current->right != NULL) {
         current = current->right;
     }
@@ -352,6 +358,7 @@ tree_entry_t* tree_next(tree_entry_t* current) {
 int tree_entry_depth(tree_entry_t* current) {
     int left = 0;
     int right = 0;
+
     if (current == NULL) {
         return 0;
     }

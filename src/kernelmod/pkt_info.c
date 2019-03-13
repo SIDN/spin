@@ -1,6 +1,13 @@
 
 #include "pkt_info.h"
 
+#ifdef __KERNEL__
+# include <linux/types.h>
+# define be64toh(x) be64_to_cpu(x)
+# define htobe64(x) cpu_to_be64(x)
+#else
+# include <endian.h>
+#endif
 #include <stdarg.h>
 
 size_t pktinfo_msg_size() {
@@ -60,13 +67,13 @@ void pktinfo2str(char* dest, pkt_info_t* pkt_info, size_t max_len) {
     }
 
     snprintf(dest, max_len,
-             "ipv%d protocol %d %s:%u -> %s:%u %u packets %u bytes",
+             "ipv%d protocol %d %s:%u -> %s:%u %llu packets %llu bytes",
              pkt_info->family == AF_INET ? 4 : 6,
              pkt_info->protocol,
              sa, pkt_info->src_port,
              da, pkt_info->dest_port,
-             pkt_info->packet_count,
-             pkt_info->payload_size);
+             (long long unsigned int)pkt_info->packet_count,
+             (long long unsigned int)pkt_info->payload_size);
 }
 
 void dns_dname2str(char* dname, char* src, size_t max_len) {
@@ -166,16 +173,34 @@ static inline void write_int32(uint8_t* dest, uint32_t i) {
     memcpy(dest, &wi, 4);
 }
 
-static inline uint16_t read_int16(char* src) {
+static inline void write_int64(uint8_t* dest, uint64_t i) {
+    uint64_t wi;
+    if (htonl(123) != 123) {
+        wi = htobe64(i);
+    }
+    memcpy(dest, &wi, 8);
+}
+
+static inline uint16_t read_int16(uint8_t* src) {
     uint16_t wi;
     memcpy(&wi, src, 2);
     return ntohs(wi);
 }
 
-static inline uint32_t read_int32(char* src) {
+static inline uint32_t read_int32(uint8_t* src) {
     uint32_t wi;
     memcpy(&wi, src, 4);
     return ntohl(wi);
+}
+
+static inline uint64_t read_int64(uint8_t* src) {
+    uint64_t wi;
+    memcpy(&wi, src, 8);
+    if (htonl(123) != 123) {
+        return be64toh(wi);
+    } else {
+        return wi;
+    }
 }
 
 
@@ -194,10 +219,10 @@ void pktinfo2wire(uint8_t* dest, pkt_info_t* pkt_info) {
     write_int16(dest, pkt_info->dest_port);
     dest += 2;
 
-    write_int16(dest, pkt_info->packet_count);
+    write_int64(dest, pkt_info->packet_count);
     dest += 2;
 
-    write_int32(dest, pkt_info->payload_size);
+    write_int64(dest, pkt_info->payload_size);
     dest += 4;
 
     write_int16(dest, pkt_info->payload_offset);
@@ -224,7 +249,7 @@ void pktinfo_msg2wire(message_type_t type, uint8_t* dest, pkt_info_t* pkt_info) 
     pktinfo2wire(dest, pkt_info);
 }
 
-message_type_t wire2pktinfo(pkt_info_t* pkt_info, char* src) {
+message_type_t wire2pktinfo(pkt_info_t* pkt_info, uint8_t* src) {
     // todo: should we read message type and size earlier?
     message_type_t msg_type;
     uint16_t msg_size;
@@ -254,9 +279,9 @@ message_type_t wire2pktinfo(pkt_info_t* pkt_info, char* src) {
         src += 2;
         pkt_info->dest_port = read_int16(src);
         src += 2;
-        pkt_info->packet_count = read_int16(src);
+        pkt_info->packet_count = read_int64(src);
         src += 2;
-        pkt_info->payload_size = read_int32(src);
+        pkt_info->payload_size = read_int64(src);
         src += 4;
         pkt_info->payload_offset = read_int16(src);
         src += 2;
@@ -293,7 +318,7 @@ void dns_pktinfo_msg2wire(message_type_t type, uint8_t* dest, dns_pkt_info_t* dn
     dns_pktinfo2wire(dest, dns_pkt_info);
 }
 
-message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, char* src) {
+message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, uint8_t* src) {
     // todo: should we read message type and size earlier?
     message_type_t msg_type;
     uint16_t msg_size;
@@ -319,7 +344,7 @@ message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, char* src) {
         src += 4;
         dname_size = src[0];
         src += 1;
-        strncpy(dns_pkt_info->dname, src, dname_size);
+        strncpy(dns_pkt_info->dname, (char*)src, dname_size);
     }
     return msg_type;
 }

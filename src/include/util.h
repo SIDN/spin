@@ -34,6 +34,8 @@ typedef struct {
     int allow_resize;
 } buffer_t;
 
+void phexdump(const uint8_t* data, unsigned int size);
+
 buffer_t* buffer_create(size_t size);
 void buffer_destroy(buffer_t* buffer);
 

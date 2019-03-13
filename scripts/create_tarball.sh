@@ -3,6 +3,11 @@ PACKAGE=spin
 VERSION=`cat VERSION`
 
 OUTDIR="/tmp/spin_release_file/"
+# remove it if it exists, hardcoded for protecting a bit against, say OUTDIR="/"
+if [ -d "/tmp/spin_release_file/" ]; then
+    rm -rf /tmp/spin_release_file/
+fi
+
 BNAME="${PACKAGE}-${VERSION}"
 
 CHECK=1
