@@ -258,7 +258,7 @@ int read_ip_tree(tree_t* dest, const char* filename) {
     line = malloc(LINE_MAX);
     rline = fgets(line, LINE_MAX, in);
     while (rline != NULL) {
-        if (index(rline, '\n') >= 0) {
+        if (index(rline, '\n') != NULL) {
             *index(rline, '\n') = '\0';
             if (spin_pton(&ip, line)) {
                 tree_add(dest, sizeof(ip), &ip, 0, NULL, 1);

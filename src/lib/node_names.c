@@ -23,7 +23,7 @@ void node_names_destroy(node_names_t* node_names) {
 // 0 on eof
 // >0 on something read (even if just \n)
 static inline int readline(char* dest, FILE* in, size_t max) {
-    int read = 0;
+    size_t read = 0;
     while (1) {
         int c = getc(in);
         switch (c) {
@@ -103,7 +103,7 @@ static inline size_t get_token(char* dest, char* in, const char* delimit, size_t
 }
 
 static inline size_t unquote_token(char* token) {
-    int i;
+    size_t i;
     char quote;
     if (token[0] == '"') {
         quote = '"';

@@ -25,7 +25,7 @@ libspin_a_SOURCES = pkt_info.c \
 					jsmn.c \
 					version.c
 
-libspin_a_CFLAGS =
+#libspin_a_CFLAGS =
 #libspin_a_LIBADD =
 
 version.c:

@@ -7,7 +7,7 @@ SUBDIRS = @TESTDIR@
 bin_PROGRAMS = spind
 
 spind_SOURCES = spind.c core2block.c core2kernel.c core2pubsub.c handle_command.h mainloop.h mainloop.c nfqroutines.c core2nflog_dns.c core2conntrack.c config_common.c config_uci.c statistics.c nflogroutines.c
-spind_CFLAGS =
+#spind_CFLAGS =
 spind_LDADD = $(top_builddir)/lib/libspin.a
 
 version.c:
