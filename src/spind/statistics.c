@@ -9,20 +9,22 @@
 static spin_stat_t end = { 0 };
 static stat_p stat_chain = &end;
 
-static char buf[512];
-
 void pubsub_publish(char *, int, char *);
 
 void wf_stat(void * arg, int data, int timeout) {
     stat_p sp;
+    char tpbuf[100];
+    char jsbuf[512];
+
 
     if (timeout) {
         // What else
         for (sp = stat_chain; sp->stat_module; sp = sp->stat_next) {
-            sprintf(buf, "{ \"module\": \"%s\", \"name\": \"%s\", \"type\": %d, \"value\": %d, \"count\": %d }",
+            sprintf(jsbuf, "{ \"module\": \"%s\", \"name\": \"%s\", \"type\": %d, \"value\": %d, \"count\": %d }",
                 sp->stat_module, sp->stat_name,
                 sp->stat_type, sp->stat_value, sp->stat_count);
-            pubsub_publish("SPIN/stat", strlen(buf), buf);
+            sprintf(tpbuf, "SPIN/stat/%s/%s", sp->stat_module, sp->stat_name);
+            pubsub_publish(tpbuf, strlen(jsbuf), jsbuf);
         }
     }
 }
