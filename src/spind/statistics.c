@@ -9,7 +9,7 @@
 static spin_stat_t end = { 0 };
 static stat_p stat_chain = &end;
 
-void pubsub_publish(char *, int, char *);
+void pubsub_publish(char *, int, char *, int);
 
 void wf_stat(void * arg, int data, int timeout) {
     stat_p sp;
@@ -24,7 +24,7 @@ void wf_stat(void * arg, int data, int timeout) {
                 sp->stat_module, sp->stat_name,
                 sp->stat_type, sp->stat_value, sp->stat_count);
             sprintf(tpbuf, "SPIN/stat/%s/%s", sp->stat_module, sp->stat_name);
-            pubsub_publish(tpbuf, strlen(jsbuf), jsbuf);
+            pubsub_publish(tpbuf, strlen(jsbuf), jsbuf, 1);
         }
     }
 }

@@ -26,19 +26,19 @@ STAT_MODULE(pubsub)
  */
 
 void
-pubsub_publish(char *channel, int payloadlen, const void* payload) {
+pubsub_publish(char *channel, int payloadlen, const void* payload, int retain) {
 
     /*
      * There is a result from command, but for now ignored
      */
-    mosquitto_publish(mosq, NULL, channel, payloadlen, payload, 0, false);
+    mosquitto_publish(mosq, NULL, channel, payloadlen, payload, 0, retain);
 }
 
 void core2pubsub_publish(buffer_t *buf) {
     STAT_COUNTER(ctr, traffic-publish, STAT_TOTAL);
 
     STAT_VALUE(ctr, buffer_size(buf));
-    pubsub_publish(mqtt_channel_traffic, buffer_size(buf), buffer_str(buf));
+    pubsub_publish(mqtt_channel_traffic, buffer_size(buf), buffer_str(buf), 0);
 }
 
 /* End push back code */
