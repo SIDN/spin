@@ -92,7 +92,10 @@ Here is an example of a full traffic message:
 
                    ],
                    "lastseen":1497622511
-                }
+                },
+                "protocol": 6,
+                "from_port": 53025,
+                "to_port": 443
              },
              {
                 "size":101,
@@ -116,7 +119,10 @@ Here is an example of a full traffic message:
                    "domains":[
 
                    ]
-                }
+                },
+                "protocol": 6,
+                "from_port": 4242,
+                "to_port": 80
              }
           ],
           "timestamp":1497622538,
@@ -136,13 +142,19 @@ After the proposed changes:
                 "size":16,
                 "count":1,
                 "to": 10,
-                "from": 9
+                "from": 9,
+                "protocol": 6,
+                "from_port": 53025,
+                "to_port": 443
              },
              {
                 "size":101,
                 "count":1,
                 "to": 12,
-                "from":11
+                "from":11,
+                "protocol": 6,
+                "from_port": 4242,
+                "to_port": 80
              }
           ],
           "timestamp":1497622538,
