@@ -28,7 +28,7 @@ On the SPIN/traffic topic, commands can be one of:
 * "names": result is a map containing IP address -> name values;
   these are user-set names. **Currently not implemented.**
 
-
+** Proposed changes are documented here **
 
 ### Traffic information
 
@@ -125,13 +125,38 @@ Here is an example of a full traffic message:
        }
     }
 
+After the proposed changes:
+
+    {
+       "command":"traffic",
+       "argument":"",
+       "result":{
+          "flows":[
+             {
+                "size":16,
+                "count":1,
+                "to": 10,
+                "from": 9
+             },
+             {
+                "size":101,
+                "count":1,
+                "to": 12,
+                "from":11
+             }
+          ],
+          "timestamp":1497622538,
+          "total_size":117,
+          "total_count":2
+       }
+    }
 ### Node update
 
 A node update contains the same information as a node element from the
 previous section; it contains (additional) information about a node
 that has been seen earlier.
 
-**This is currently not implemented. There are plans to reuse this, so still in document.**
+** Proposed change is to re-add this, perhaps with different name. nodeDescr iso nodeUpdate?? **
 
 ### Node update example
 
