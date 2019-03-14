@@ -2,8 +2,6 @@
 AM_CPPFLAGS = -I$(top_srcdir)/include
 AM_CFLAGS = ${regular_CFLAGS} -g -Wall -Werror
 
-SUBDIRS = @TESTDIR@
-
 bin_PROGRAMS = spin_config
 spin_config_SOURCES = spin_config.c
 spin_config_CFLAGS =

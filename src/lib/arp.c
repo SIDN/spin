@@ -56,8 +56,6 @@ void arp_table_read(arp_table_t* arp_table) {
     pclose(fp);
 }
 
-#ifdef notdef
-static
 void arp_table_print(arp_table_t* arp_table) {
     char ip_str[INET6_ADDRSTRLEN];
     tree_entry_t* cur = tree_first(arp_table->entries);
@@ -70,14 +68,10 @@ void arp_table_print(arp_table_t* arp_table) {
     }
     spin_log(LOG_DEBUG, "[end of arp table]\n");
 }
-#endif
 
-#ifdef notdef
-static
 int arp_table_size(arp_table_t* arp_table) {
     return tree_size(arp_table->entries);
 }
-#endif
 
 char* arp_table_find_by_ip(arp_table_t* arp_table, ip_t* ip) {
     tree_entry_t* entry = tree_find(arp_table->entries, sizeof(ip_t), ip);
@@ -88,8 +82,6 @@ char* arp_table_find_by_ip(arp_table_t* arp_table, ip_t* ip) {
     }
 }
 
-#ifdef notdef
-static
 char* arp_table_find_by_str(arp_table_t* arp_table, char* ip_str) {
     ip_t ip;
     if (spin_pton(&ip, ip_str)) {
@@ -98,4 +90,3 @@ char* arp_table_find_by_str(arp_table_t* arp_table, char* ip_str) {
         return NULL;
     }
 }
-#endif

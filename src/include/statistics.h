@@ -1,6 +1,8 @@
 /*
  * Statistics module include
  */
+#ifndef SPIN_STATISTICS_H
+#define SPIN_STATISTICS_H 1
 
 #define DO_SPIN_STATS   1
 
@@ -39,3 +41,5 @@ void spin_stat_val(stat_p, int);
 #define STAT_VALUE(x, y)
 
 #endif // DO_SPIN_STATS
+
+#endif // SPIN_STATISTICS_H

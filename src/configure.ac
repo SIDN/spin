@@ -71,9 +71,9 @@ MAKEFILES="Makefile src/Makefile"
 AC_ARG_ENABLE(tests,
               AC_HELP_STRING([--enable-tests], [enable unit tests and code coverage]),
               [
-                MAKEFILES="$MAKEFILES tests/Makefile";
+                MAKEFILES="$MAKEFILES lib/tests/Makefile";
                 AC_SUBST(TESTDIR, "tests")
-                AC_CONFIG_FILES(tests/Makefile)
+                AC_CONFIG_FILES(lib/tests/Makefile)
                 CFLAGS="-g -O0"
               ], [])
 

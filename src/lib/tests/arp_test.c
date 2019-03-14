@@ -1,5 +1,9 @@
 
+#include "disable_statistics.h"
+
 #include "arp.h"
+
+#include "arp.c"
 
 #include <assert.h>
 

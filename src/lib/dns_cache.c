@@ -119,7 +119,7 @@ dns_cache_destroy(dns_cache_t* dns_cache) {
 }
 
 void
-dns_cache_clean(dns_cache_t* dns_cache) {
+dns_cache_clean(dns_cache_t* dns_cache, int clean_early) {
     uint32_t* expiry;
     dns_cache_entry_t* cur_dns;
     tree_entry_t* cur = tree_first(dns_cache->entries);
@@ -135,7 +135,7 @@ dns_cache_clean(dns_cache_t* dns_cache) {
         while (cur_domain != NULL) {
             nxt_domain = tree_next(cur_domain);
             expiry = (uint32_t*) cur_domain->data;
-            if (now > *expiry) {
+            if (now > *expiry - clean_early) {
                 //spin_log(LOG_DEBUG, "[XX] DOMAIN EXPIRED! DELETE FROM CACHE");
                 tree_remove_entry(cur_dns->domains, cur_domain);
             }

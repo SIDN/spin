@@ -65,15 +65,15 @@ check_ip_domain_ttl(dns_cache_t* dns_cache, const char* ip_str, const char* doma
 void
 sample_dns_pkt_info_1(dns_pkt_info_t* dns_pkt_info) {
     message_type_t mt;
-    char wire[] = { 0x01, 0x02, 0x00, 0x00, // header, dns packet
-                    0x02, // ipv4
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0xc0, 0x00, 0x02, 0x01, // 192.0.2.1
-                    0x00, 0x00, 0x0e, 0x10, 0x0d, // TTL (3600)
-                    0x03, 0x77, 0x77, 0x77, 0x04, 0x74, 0x65,
-                    0x73, 0x74, 0x02, 0x6e, 0x6c, 0x00  // www.test.nl
-                  };
+    uint8_t wire[] = { 0x01, 0x02, 0x00, 0x00, // header, dns packet
+                       0x02, // ipv4
+                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                       0xc0, 0x00, 0x02, 0x01, // 192.0.2.1
+                       0x00, 0x00, 0x0e, 0x10, 0x0d, // TTL (3600)
+                       0x03, 0x77, 0x77, 0x77, 0x04, 0x74, 0x65,
+                       0x73, 0x74, 0x02, 0x6e, 0x6c, 0x00  // www.test.nl
+                     };
     mt = wire2dns_pktinfo(dns_pkt_info, wire);
     printf("[XX] message type: %d\n", mt);
 }
@@ -81,16 +81,16 @@ sample_dns_pkt_info_1(dns_pkt_info_t* dns_pkt_info) {
 void
 sample_dns_pkt_info_2(dns_pkt_info_t* dns_pkt_info) {
     message_type_t mt;
-    char wire[] = { 0x01, 0x02, 0x00, 0x00, // header, dns packet
-                    0x02, // ipv4
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0xc0, 0x00, 0x02, 0x02, // 192.0.2.2
-                    0x00, 0x00, 0x0e, 0x10, // TTL (3600)
-                    0x0d, // 13 octets
-                    0x03, 0x77, 0x77, 0x77, 0x04, 0x74, 0x65,
-                    0x73, 0x74, 0x02, 0x6e, 0x6c, 0x00  // www.test.nl
-                  };
+    uint8_t wire[] = { 0x01, 0x02, 0x00, 0x00, // header, dns packet
+                       0x02, // ipv4
+                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                       0xc0, 0x00, 0x02, 0x02, // 192.0.2.2
+                       0x00, 0x00, 0x0e, 0x10, // TTL (3600)
+                       0x0d, // 13 octets
+                       0x03, 0x77, 0x77, 0x77, 0x04, 0x74, 0x65,
+                       0x73, 0x74, 0x02, 0x6e, 0x6c, 0x00  // www.test.nl
+                     };
     mt = wire2dns_pktinfo(dns_pkt_info, wire);
     printf("[XX] message type: %d\n", mt);
 }
@@ -98,16 +98,16 @@ sample_dns_pkt_info_2(dns_pkt_info_t* dns_pkt_info) {
 void
 sample_dns_pkt_info_3(dns_pkt_info_t* dns_pkt_info) {
     message_type_t mt;
-    char wire[] = { 0x01, 0x02, 0x00, 0x00, // header, dns packet
-                    0x02, // ipv4
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0xc0, 0x00, 0x02, 0x01, // 192.0.2.2
-                    0x00, 0x00, 0x0e, 0x10, // TTL (3600)
-                    0x0e, // 14 octets
-                    0x03, 0x77, 0x77, 0x77, 0x05, 0x74, 0x65,
-                    0x73, 0x74, 0x32, 0x02, 0x6e, 0x6c, 0x00  // www.test2.nl
-                  };
+    uint8_t wire[] = { 0x01, 0x02, 0x00, 0x00, // header, dns packet
+                       0x02, // ipv4
+                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                       0xc0, 0x00, 0x02, 0x01, // 192.0.2.2
+                       0x00, 0x00, 0x0e, 0x10, // TTL (3600)
+                       0x0e, // 14 octets
+                       0x03, 0x77, 0x77, 0x77, 0x05, 0x74, 0x65,
+                       0x73, 0x74, 0x32, 0x02, 0x6e, 0x6c, 0x00  // www.test2.nl
+                     };
     mt = wire2dns_pktinfo(dns_pkt_info, wire);
     printf("[XX] message type: %d\n", mt);
 }
@@ -178,23 +178,23 @@ test_dns_cache_clean() {
     sample_dns_pkt_info_1(&dns_pkt_info1);
     sample_dns_pkt_info_2(&dns_pkt_info2);
 
-    dns_cache_add(dns_cache, &dns_pkt_info1, 10000);
-    dns_cache_add(dns_cache, &dns_pkt_info2, 20000);
+    dns_cache_add(dns_cache, &dns_pkt_info1, -10000);
+    dns_cache_add(dns_cache, &dns_pkt_info2, -20000);
     assert(tree_size(dns_cache->entries) == 2);
 
     // this should keep both
-    dns_cache_clean(dns_cache, 100);
+    dns_cache_clean(dns_cache, 0);
     assert(tree_size(dns_cache->entries) == 2);
 
     // this should remove both
-    dns_cache_clean(dns_cache, 25000);
+    dns_cache_clean(dns_cache, -25000);
     assert(tree_size(dns_cache->entries) == 0);
 
     // add again and now remove just one
-    dns_cache_add(dns_cache, &dns_pkt_info1, 10000);
-    dns_cache_add(dns_cache, &dns_pkt_info2, 20000);
+    dns_cache_add(dns_cache, &dns_pkt_info1, -10000);
+    dns_cache_add(dns_cache, &dns_pkt_info2, -20000);
     assert(tree_size(dns_cache->entries) == 2);
-    dns_cache_clean(dns_cache, 15000);
+    dns_cache_clean(dns_cache, -15000);
     assert(tree_size(dns_cache->entries) == 1);
 
     dns_cache_destroy(dns_cache);
