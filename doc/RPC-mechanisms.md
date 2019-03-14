@@ -23,7 +23,7 @@ A generic type of RPC mechanism called JSON-RPC is used in various projects. JSO
 
 There is even a document explaining how to use JSON-RPC on top of Mosquitto making it look like the bubble-app to spind mechanism.
 
-JSON-RPC contains a notify mechanism, which is an RPC without reult.
+JSON-RPC contains a notify mechanism, which is an RPC without result.
 
 JSON-RPC can be accessed using the standard *curl* program. Easy for testing and interfacing to scripts.
 
