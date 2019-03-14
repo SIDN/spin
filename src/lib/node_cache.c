@@ -14,7 +14,7 @@ STAT_MODULE(node_cache)
 
 static int node_cache_add_node(node_cache_t* node_cache, node_t* node);
 
-STAT_COUNTER(nodes, "nodes", STAT_TOTAL);
+STAT_COUNTER(nodes, nodes, STAT_TOTAL);
 
 static node_t*
 node_create(int id) {

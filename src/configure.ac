@@ -66,7 +66,7 @@ AC_ARG_WITH(linux-headers,
     [ AC_SUBST(KERNELPATH, "$withval") ]
 )
 
-MAKEFILES="Makefile src/Makefile kernelmod/Makefile"
+MAKEFILES="Makefile src/Makefile"
 
 AC_ARG_ENABLE(tests,
               AC_HELP_STRING([--enable-tests], [enable unit tests and code coverage]),
@@ -82,7 +82,6 @@ AC_CONFIG_FILES(
     Makefile
     lib/Makefile
     spind/Makefile
-    kernelmod/Makefile
     tools/spin_print/Makefile
     tools/spin_config/Makefile
 )
