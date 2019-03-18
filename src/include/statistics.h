@@ -2,9 +2,18 @@
  * Statistics module include
  */
 
+#ifndef DO_SPIN_STATS
 #define DO_SPIN_STATS   1
+#endif
 
-#if DO_SPIN_STATS
+#if DO_SPIN_STATS == 1
+
+#define SPIN_STAT_START()   spin_stat_start();
+#define SPIN_STAT_FINISH()   spin_stat_finish();
+
+void spin_stat_start();
+void spin_stat_finish();
+
 typedef enum {
     STAT_TOTAL,
     STAT_MAX,
@@ -33,6 +42,9 @@ void spin_stat_val(stat_p, int);
 #define STAT_VALUE(ctr, val) spin_stat_val(&STAT_CONCAT(STAT_PREF, ctr), val)
 
 #else // DO_SPIN_STATS
+
+#define SPIN_STAT_START()
+#define SPIN_STAT_FINISH()
 
 #define STAT_MODULE(x)  ;
 #define STAT_COUNTER(x, y, z)

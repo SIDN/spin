@@ -584,6 +584,8 @@ int main(int argc, char** argv) {
     spin_log_init(use_syslog, log_verbosity, "spind");
     log_version();
 
+    SPIN_STAT_START();
+
     init_cache();
 
     init_core2conntrack(node_cache, local_mode);
@@ -604,6 +606,8 @@ int main(int argc, char** argv) {
     cleanup_core2block();
 
     finish_mosquitto();
+
+    SPIN_STAT_FINISH();
 
     return 0;
 }

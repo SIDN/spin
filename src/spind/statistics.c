@@ -29,15 +29,19 @@ void wf_stat(void * arg, int data, int timeout) {
     }
 }
 
-static void
-firstuse() {
+void
+spin_stat_start() {
 
     mainloop_register("Statistics", wf_stat, (void *) 0, 0, 30000);
 }
 
 void
+spin_stat_finish() {
+
+}
+
+void
 spin_stat_val(stat_p sp, int val) {
-    static int inited=0;
 
     if (sp->stat_next == 0) {
         // First time use
@@ -46,10 +50,6 @@ spin_stat_val(stat_p sp, int val) {
         // Perhaps TODO, although UI should solve this
         sp->stat_next = stat_chain;
         stat_chain = sp;
-        if (!inited) {
-            firstuse();
-            inited = 1;
-        }
     }
     sp->stat_count++;
     switch (sp->stat_type) {
