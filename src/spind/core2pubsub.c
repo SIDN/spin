@@ -372,17 +372,31 @@ void connect_mosquitto(const char* host, int port) {
 }
 
 void wf_mosquitto(void* arg, int data, int timeout) {
+    int result;
+
     STAT_COUNTER(ctr_data, wf-data, STAT_TOTAL);
     STAT_COUNTER(ctr_timeout, wf-timeout, STAT_TOTAL);
 
     if (data) {
         STAT_VALUE(ctr_data, 1);
-        mosquitto_loop_read(mosq, 1);
+        result = mosquitto_loop_read(mosq, 1);
+        if (result != 0) {
+            spin_log(LOG_ERR, "Error calling mosquitto_loop_read(): %s\n", mosquitto_strerror(result));
+            exit(1);
+        }
     }
     if (timeout) {
         STAT_VALUE(ctr_timeout, 1);
-        mosquitto_loop_write(mosq, 1);
-        mosquitto_loop_misc(mosq);
+        result = mosquitto_loop_write(mosq, 1);
+        if (result != 0) {
+            spin_log(LOG_ERR, "Error calling mosquitto_loop_write(): %s\n", mosquitto_strerror(result));
+            exit(1);
+        }
+        result = mosquitto_loop_misc(mosq);
+        if (result != 0) {
+            spin_log(LOG_ERR, "Error calling mosquitto_loop_misc(): %s\n", mosquitto_strerror(result));
+            exit(1);
+        }
     }
 }
 
