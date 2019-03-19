@@ -31,6 +31,7 @@ node_create(int id) {
         node->is_onlist[i] = 0;
     }
     node->last_seen = 0;
+    node->last_mod = 0;
     return node;
 }
 
@@ -73,6 +74,7 @@ node_t* node_clone(node_t* node) {
         new->is_onlist[i] = node->is_onlist[i];
     }
     new->last_seen = node->last_seen;
+    new->last_mod = node->last_mod;
     cur = tree_first(node->ips);
     while (cur != NULL) {
         tree_add(new->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
@@ -136,6 +138,12 @@ node_set_last_seen(node_t* node, uint32_t last_seen) {
     node->last_seen = last_seen;
 }
 
+static void
+node_set_last_mod(node_t* node, uint32_t last_mod) {
+    node->last_mod = last_mod;
+    node->last_seen = last_mod;
+}
+
 static void ip_key2str(char* buf, size_t buf_len, const uint8_t* ip_key_data) {
     int family = (int)ip_key_data[0];
     size_t offset;
@@ -187,8 +195,10 @@ static void
 node_merge(node_t* dest, node_t* src) {
     tree_entry_t* cur;
     int i;
+    int m, modified = 0;
     STAT_COUNTER(ip_size, ip-tree-size, STAT_MAX);
     STAT_COUNTER(domain_size, domain-tree-size, STAT_MAX);
+    STAT_COUNTER(modded, node-modified, STAT_TOTAL);
 
     if (dest->name == NULL) {
         node_set_name(dest, src->name);
@@ -207,17 +217,29 @@ node_merge(node_t* dest, node_t* src) {
 
     cur = tree_first(src->ips);
     while (cur != NULL) {
-        tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        m = tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        if (m) {
+            modified = 1;
+        }
         cur = tree_next(cur);
     }
     STAT_VALUE(ip_size, tree_size(dest->ips));
 
     cur = tree_first(src->domains);
     while (cur != NULL) {
-        tree_add(dest->domains, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        m = tree_add(dest->domains, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        if (m) {
+            modified = 1;
+        }
         cur = tree_next(cur);
     }
     STAT_VALUE(domain_size, tree_size(dest->domains));
+    STAT_VALUE(modded, modified);
+    if (modified) {
+        if (dest->last_mod < src->last_mod) {
+            dest->last_mod = src->last_mod;
+        }
+    }
 }
 
 static void
@@ -256,7 +278,7 @@ node_print(node_t* node) {
     }
 }
 
-static unsigned int
+unsigned int
 node2json(node_t* node, buffer_t* json_buf) {
     unsigned int s = 0;
     tree_entry_t* cur;
@@ -306,11 +328,28 @@ node2json(node_t* node, buffer_t* json_buf) {
     return s;
 }
 
+void node_publish_new(node_cache_t* node_cache, uint32_t timestamp) {
+    tree_entry_t* cur = tree_first(node_cache->nodes);
+    node_t* node;
+    static uint32_t last_time = 0;
+    int nfound;
+    STAT_COUNTER(ctr, publish-new, STAT_TOTAL);
+
+    nfound = 0;
+    while (cur != NULL) {
+        node = (node_t*)cur->data;
+        if (node->last_mod >= last_time) {
+            send_command_node_info(node);
+        }
+        cur = tree_next(cur);
+    }
+    last_time = timestamp;
+    STAT_VALUE(ctr, nfound);
+}
+
 /*
  * Create and destroy node_cache
- * As far as I can see only done once in current node, only one node cache in use
  *
- * Perhaps TODO
  */
 
 node_cache_t*
@@ -526,7 +565,7 @@ void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, 
     dns_dname2str(dname_str, dns_pkt->dname, 512);
 
     node_t* node = node_create(0);
-    node_set_last_seen(node, timestamp);
+    node_set_last_mod(node, timestamp);
     node_add_ip(node, &ip);
     node_add_domain(node, dname_str);
     add_mac_and_name(node_cache, node, &ip);
@@ -546,7 +585,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     // add the node with the domain name; if it is not known
     // this will result in a 'node' with only the domain name
     node_t* node = node_create(0);
-    node_set_last_seen(node, timestamp);
+    node_set_last_mod(node, timestamp);
     node_add_domain(node, dname_str);
     node_cache_add_node(node_cache, node);
 
@@ -556,7 +595,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     STAT_VALUE(ctr, node == NULL);
     if (node == NULL) {
         node = node_create(0);
-        node_set_last_seen(node, timestamp);
+        node_set_last_mod(node, timestamp);
         node_add_ip(node, &ip);
         node_cache_add_node(node_cache, node);
     }

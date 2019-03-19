@@ -52,10 +52,44 @@ unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argum
     return buf->pos;
 }
 
+void send_command_node_info(node_t* node) {
+    buffer_t* response_json = buffer_create(JSONBUFSIZ);
+    buffer_t* node_json = buffer_create(JSONBUFSIZ);
+    unsigned int p_size;
+
+    p_size = node2json(node, node_json);;
+    if (p_size > 0) {
+        buffer_finish(node_json);
+        create_mqtt_command(response_json, "nodeInfo", NULL, buffer_str(node_json));
+        if (buffer_finish(response_json)) {
+            // Subdivide channel
+            pubsub_publish("SPIN/traffic/node",
+                    buffer_size(response_json), buffer_str(response_json), 1);
+        } else {
+            spin_log(LOG_WARNING, "Error converting node to JSON; partial packet: %s\n", buffer_str(response_json));
+        }
+    } else {
+        spin_log(LOG_DEBUG, "[XX] node2json failed(size 0)\n");
+    }
+    buffer_destroy(response_json);
+    buffer_destroy(node_json);
+}
+
+static void
+publish_nodes() {
+    uint32_t now;
+
+    now = time(NULL);
+    node_publish_new(node_cache, now);
+}
+
 void send_command_blocked(pkt_info_t* pkt_info) {
     buffer_t* response_json = buffer_create(JSONBUFSIZ);
     buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
     unsigned int p_size;
+
+    // Publish recently changed nodes
+    publish_nodes();
 
     p_size = pkt_info2json(node_cache, pkt_info, pkt_json);
     if (p_size > 0) {
@@ -78,6 +112,9 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
     buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
     unsigned int p_size;
     STAT_COUNTER(ctr, dnsquerysize, STAT_MAX);
+
+    // Publish recently changed nodes
+    publish_nodes();
 
     p_size = dns_query_pkt_info2json(node_cache, pkt_info, pkt_json);
     if (p_size > 0) {
@@ -103,26 +140,30 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
 // void connect_mosquitto(const char* host, int port);
 
 void maybe_sendflow(flow_list_t *flow_list, time_t now) {
-    buffer_t* json_buf = buffer_create(JSONBUFSIZ);
-    buffer_allow_resize(json_buf);
     STAT_COUNTER(ctr1, send-flow, STAT_TOTAL);
     STAT_COUNTER(ctr2, create-traffic, STAT_TOTAL);
 
     if (flow_list_should_send(flow_list, now)) {
         STAT_VALUE(ctr1, 1);
         if (!flow_list_empty(flow_list)) {
+            buffer_t* json_buf = buffer_create(JSONBUFSIZ);
+
+            buffer_allow_resize(json_buf);
+
+            // Publish recently changed nodes
+            publish_nodes();
+
             // create json, send it
-            buffer_reset(json_buf);
             STAT_VALUE(ctr2, 1);
             create_traffic_command(node_cache, flow_list, json_buf, now);
             if (buffer_finish(json_buf)) {
                 core2pubsub_publish(json_buf);
                 // mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
             }
+            buffer_destroy(json_buf);
         }
         flow_list_clear(flow_list, now);
     }
-    buffer_destroy(json_buf);
 }
 
 void

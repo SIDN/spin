@@ -30,6 +30,8 @@ typedef struct {
     // at some point we may want to clean up stuff, so keep track of
     // when we last saw it
     uint32_t last_seen;
+    // and for publication purposes also when it last changed
+    uint32_t last_mod;
 } node_t;
 
 #define is_blocked is_onlist[IPLIST_BLOCK]
@@ -64,8 +66,8 @@ int node_shares_element(node_t* node, node_t* othernode);
 void node_merge(node_t* dest, node_t* src);
 
 void node_print(node_t* node);
-unsigned int node2json(node_t* node, buffer_t* json_buf);
  */
+unsigned int node2json(node_t* node, buffer_t* json_buf);
 
 #define MAX_NODES 2048
 
@@ -85,6 +87,7 @@ typedef struct {
 
 node_cache_t* node_cache_create(void);
 void node_cache_destroy(node_cache_t* node_cache);
+void node_publish_new(node_cache_t*, uint32_t);
 
 /*
 void node_cache_print(node_cache_t* node_cache);

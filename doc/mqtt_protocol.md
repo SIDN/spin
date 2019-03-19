@@ -168,12 +168,12 @@ A node update contains the same information as a node element from the
 previous section; it contains (additional) information about a node
 that has been seen earlier.
 
-** Proposed change is to re-add this, perhaps with different name. nodeDescr iso nodeUpdate?? **
+** Proposed change is to re-add this, with different name. nodeInfo**
 
 ### Node update example
 
     {
-       "command":"nodeUpdate",
+       "command":"nodeInfo",
        "argument":"",
        "result":{
           "id":11,

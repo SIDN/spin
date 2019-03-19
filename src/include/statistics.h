@@ -2,11 +2,19 @@
  * Statistics module include
  */
 
+/*
+ * DO_SPIN_STATS
+ * 
+ * 0: no statistics
+ * 1: statistics runtime in kernel
+ * 2: statistics at end for unit test
+ */
+
 #ifndef DO_SPIN_STATS
 #define DO_SPIN_STATS   1
 #endif
 
-#if DO_SPIN_STATS == 1
+#if DO_SPIN_STATS != 0
 
 #define SPIN_STAT_START()   spin_stat_start();
 #define SPIN_STAT_FINISH()   spin_stat_finish();
@@ -29,6 +37,9 @@ typedef struct spin_stat {
     int                 stat_count;
     stat_p              stat_next;
 } spin_stat_t;
+
+spin_stat_t spin_stat_end;
+stat_p spin_stat_chain;
 
 void spin_stat_val(stat_p, int);
 
