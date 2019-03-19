@@ -55,6 +55,7 @@ unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argum
 void send_command_node_info(node_t* node) {
     buffer_t* response_json = buffer_create(JSONBUFSIZ);
     buffer_t* node_json = buffer_create(JSONBUFSIZ);
+    char mosqchan[100];
     unsigned int p_size;
 
     p_size = node2json(node, node_json);;
@@ -63,7 +64,8 @@ void send_command_node_info(node_t* node) {
         create_mqtt_command(response_json, "nodeInfo", NULL, buffer_str(node_json));
         if (buffer_finish(response_json)) {
             // Subdivide channel
-            pubsub_publish("SPIN/traffic/node",
+            sprintf(mosqchan, "SPIN/traffic/node/%d", node->id);
+            pubsub_publish(mosqchan,
                     buffer_size(response_json), buffer_str(response_json), 1);
         } else {
             spin_log(LOG_WARNING, "Error converting node to JSON; partial packet: %s\n", buffer_str(response_json));
@@ -77,10 +79,8 @@ void send_command_node_info(node_t* node) {
 
 static void
 publish_nodes() {
-    uint32_t now;
 
-    now = time(NULL);
-    node_publish_new(node_cache, now);
+    node_publish_new(node_cache);
 }
 
 void send_command_blocked(pkt_info_t* pkt_info) {

@@ -30,8 +30,8 @@ typedef struct {
     // at some point we may want to clean up stuff, so keep track of
     // when we last saw it
     uint32_t last_seen;
-    // and for publication purposes also when it last changed
-    uint32_t last_mod;
+    // and for publication purposes also if it changed
+    uint32_t modified;
 } node_t;
 
 #define is_blocked is_onlist[IPLIST_BLOCK]
@@ -87,7 +87,7 @@ typedef struct {
 
 node_cache_t* node_cache_create(void);
 void node_cache_destroy(node_cache_t* node_cache);
-void node_publish_new(node_cache_t*, uint32_t);
+void node_publish_new(node_cache_t*);
 
 /*
 void node_cache_print(node_cache_t* node_cache);

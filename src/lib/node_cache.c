@@ -31,7 +31,7 @@ node_create(int id) {
         node->is_onlist[i] = 0;
     }
     node->last_seen = 0;
-    node->last_mod = 0;
+    node->modified = 0;
     return node;
 }
 
@@ -74,7 +74,7 @@ node_t* node_clone(node_t* node) {
         new->is_onlist[i] = node->is_onlist[i];
     }
     new->last_seen = node->last_seen;
-    new->last_mod = node->last_mod;
+    new->modified = node->modified;
     cur = tree_first(node->ips);
     while (cur != NULL) {
         tree_add(new->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
@@ -139,9 +139,9 @@ node_set_last_seen(node_t* node, uint32_t last_seen) {
 }
 
 static void
-node_set_last_mod(node_t* node, uint32_t last_mod) {
-    node->last_mod = last_mod;
-    node->last_seen = last_mod;
+node_set_modified(node_t* node, uint32_t last_seen) {
+    node->modified = 1;
+    node->last_seen = last_seen;
 }
 
 static void ip_key2str(char* buf, size_t buf_len, const uint8_t* ip_key_data) {
@@ -236,9 +236,7 @@ node_merge(node_t* dest, node_t* src) {
     STAT_VALUE(domain_size, tree_size(dest->domains));
     STAT_VALUE(modded, modified);
     if (modified) {
-        if (dest->last_mod < src->last_mod) {
-            dest->last_mod = src->last_mod;
-        }
+        dest->modified = 1;
     }
 }
 
@@ -329,23 +327,22 @@ node2json(node_t* node, buffer_t* json_buf) {
     return 1;
 }
 
-void node_publish_new(node_cache_t* node_cache, uint32_t timestamp) {
+void node_publish_new(node_cache_t* node_cache) {
     tree_entry_t* cur = tree_first(node_cache->nodes);
     node_t* node;
-    static uint32_t last_time = 0;
     int nfound;
     STAT_COUNTER(ctr, publish-new, STAT_TOTAL);
 
     nfound = 0;
     while (cur != NULL) {
         node = (node_t*)cur->data;
-        if (node->last_mod >= last_time) {
+        if (node->modified) {
             send_command_node_info(node);
             nfound++;
+            node->modified = 0;
         }
         cur = tree_next(cur);
     }
-    last_time = timestamp;
     STAT_VALUE(ctr, nfound);
 }
 
@@ -567,7 +564,7 @@ void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, 
     dns_dname2str(dname_str, dns_pkt->dname, 512);
 
     node_t* node = node_create(0);
-    node_set_last_mod(node, timestamp);
+    node_set_modified(node, timestamp);
     node_add_ip(node, &ip);
     node_add_domain(node, dname_str);
     add_mac_and_name(node_cache, node, &ip);
@@ -587,7 +584,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     // add the node with the domain name; if it is not known
     // this will result in a 'node' with only the domain name
     node_t* node = node_create(0);
-    node_set_last_mod(node, timestamp);
+    node_set_modified(node, timestamp);
     node_add_domain(node, dname_str);
     node_cache_add_node(node_cache, node);
 
@@ -597,7 +594,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     STAT_VALUE(ctr, node == NULL);
     if (node == NULL) {
         node = node_create(0);
-        node_set_last_mod(node, timestamp);
+        node_set_modified(node, timestamp);
         node_add_ip(node, &ip);
         node_cache_add_node(node_cache, node);
     }
