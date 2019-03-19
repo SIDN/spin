@@ -114,6 +114,7 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
     unsigned int p_size;
     STAT_COUNTER(ctr, dnsquerysize, STAT_MAX);
 
+    spin_log(LOG_DEBUG, "Doing DNS Query\n");
     // Publish recently changed nodes
     publish_nodes();
 
