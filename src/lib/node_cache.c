@@ -340,6 +340,7 @@ void node_publish_new(node_cache_t* node_cache, uint32_t timestamp) {
         node = (node_t*)cur->data;
         if (node->last_mod >= last_time) {
             send_command_node_info(node);
+            nfound++;
         }
         cur = tree_next(cur);
     }

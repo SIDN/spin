@@ -80,6 +80,7 @@ publish_nodes() {
     uint32_t now;
 
     now = time(NULL);
+    spin_log(LOG_DEBUG, "Publish nodes at time %d\n", now);
     node_publish_new(node_cache, now);
 }
 
