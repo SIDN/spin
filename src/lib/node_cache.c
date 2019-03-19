@@ -325,7 +325,8 @@ node2json(node_t* node, buffer_t* json_buf) {
     }
     buffer_write(json_buf, " ] }");
 
-    return s;
+    // Temp
+    return 1;
 }
 
 void node_publish_new(node_cache_t* node_cache, uint32_t timestamp) {
