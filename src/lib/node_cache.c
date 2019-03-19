@@ -1,4 +1,3 @@
-
 #include "spin_log.h"
 
 #include <assert.h>
@@ -9,6 +8,8 @@
 #include "netlink_commands.h"
 #include "spin_cfg.h"
 #include "statistics.h"
+
+extern int omitnode;
 
 STAT_MODULE(node_cache)
 
@@ -688,9 +689,17 @@ pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf
     assert(dest_node != NULL);
 
     buffer_write(json_buf, "{ \"from\": ");
-    s += node2json(src_node, json_buf);
+    if (omitnode) {
+        buffer_write(json_buf, "%d", src_node->id);
+    } else {
+        s += node2json(src_node, json_buf);
+    }
     buffer_write(json_buf, ", \"to\": ");
-    s += node2json(dest_node, json_buf);
+    if (omitnode) {
+        buffer_write(json_buf, "%d", dest_node->id);
+    } else {
+        s += node2json(dest_node, json_buf);
+    }
     buffer_write(json_buf, ", \"protocol\": %d", pkt_info->protocol);
     buffer_write(json_buf, ", \"from_port\": %d", pkt_info->src_port);
     buffer_write(json_buf, ", \"to_port\": %d", pkt_info->dest_port);
@@ -743,9 +752,17 @@ dns_query_pkt_info2json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info, 
     }
 
     buffer_write(json_buf, "{ \"from\": ");
-    s += node2json(src_node, json_buf);
+    if (omitnode) {
+        buffer_write(json_buf, "%d", src_node->id);
+    } else {
+        s += node2json(src_node, json_buf);
+    }
     s += buffer_write(json_buf, ", \"queriednode\": ");
-    s += node2json(dns_node, json_buf);
+    if (omitnode) {
+        buffer_write(json_buf, "%d", dns_node->id);
+    } else {
+        s += node2json(dns_node, json_buf);
+    }
     s += buffer_write(json_buf, ", \"query\": \"%s\"", dname_str);
     s += buffer_write(json_buf, " }");
 

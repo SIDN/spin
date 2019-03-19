@@ -35,6 +35,8 @@ const char* mosq_host;
 int mosq_port;
 int stop_on_error;
 
+int omitnode;
+
 STAT_MODULE(spind)
 
 #define JSONBUFSIZ      4096
@@ -640,6 +642,8 @@ int main(int argc, char** argv) {
     signal(SIGINT, int_handler);
 
     push_all_ipl();
+
+    omitnode = spinconfig_pubsub_omitnode();
 
     mainloop_run();
 

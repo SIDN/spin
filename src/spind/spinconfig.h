@@ -17,6 +17,7 @@ int spinconfig_pubsub_port();
 char *spinconfig_pubsub_channel_commands();
 char *spinconfig_pubsub_channel_traffic();
 int spinconfig_pubsub_timeout();
+int spinconfig_pubsub_omitnode();
 int spinconfig_iptable_nflog_dns_group();
 int spinconfig_iptable_queue_block();
 int spinconfig_iptable_place_dns();
