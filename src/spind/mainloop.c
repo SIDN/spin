@@ -189,6 +189,13 @@ void mainloop_run() {
             }
             pollnum = mnr[i].mnr_pollnumber ;
             if ( pollnum >= 0) {
+                if (fds[pollnum].revents & (POLLERR|POLLNVAL)) {
+                    spin_log(LOG_ERR, "Error on fd %d from %s\n", mnr[i].mnr_fd, mnr[i].mnr_name);
+                    // Now what ??
+                    // Negate FD to prevent further errors
+                    // Who knows what is right
+                    fds[pollnum].fd *= -1;
+                }
                 if (fds[pollnum].revents & POLLIN) {
                     argdata = 1;
                 }
