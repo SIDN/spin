@@ -11,7 +11,7 @@
 #include <time.h>
 
 // Since most functions are now defined static, we include the source itself
-#include "node_cache.c"
+#include "../node_cache.c"
 
 node_t*
 sample_node_1() {

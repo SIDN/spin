@@ -2,6 +2,8 @@
 #include "node_names.h"
 
 #include <stdio.h>
+#include <errno.h>
+#include <string.h>
 
 node_names_t* node_names_create(void) {
     node_names_t* node_names = (node_names_t*) malloc(sizeof(node_names_t));
@@ -309,6 +311,7 @@ int node_names_read_userconfig(node_names_t* node_names, const char* filename) {
 
     FILE* in = fopen(filename, "r");
     if (in == NULL) {
+        fprintf(stderr, "Error: unable to read %s: %s\n", filename, strerror(errno));
         return -1;
     }
     line = (char*)malloc(LINE_MAX);

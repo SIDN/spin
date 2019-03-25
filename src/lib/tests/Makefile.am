@@ -1,5 +1,5 @@
-AM_CPPFLAGS = -I$(top_srcdir)/include -Wall -Werror
-AM_CFLAGS = ${regular_CFLAGS} -g
+AM_CPPFLAGS = -I$(top_srcdir)/include -Wall -Werror -DTESTDATA_PATH='"$(abs_srcdir)/testdata"'
+AM_CFLAGS = ${regular_CFLAGS} -g 
 
 CLEANFILES = *.gcda *.gcno *.gcov
 
@@ -31,4 +31,4 @@ util_test_CFLAGS = -I../ -fprofile-arcs -ftest-coverage
 util_test_LDFLAGS = -L../
 
 all-local:
-	./run_tests.sh
+	$(srcdir)/run_tests.sh

@@ -3,7 +3,7 @@
 
 #include "arp.h"
 
-#include "arp.c"
+#include "../arp.c"
 
 #include <assert.h>
 
