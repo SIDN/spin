@@ -48,7 +48,7 @@ static inline int readline(char* dest, FILE* in, size_t max) {
     }
 }
 
-#define LINE_MAX 256
+#define NODE_NAMES_LINE_MAX 256
 #define TOKEN_MAX 64
 
 static inline char* find_name(const char* str) {
@@ -148,12 +148,12 @@ int node_names_read_dhcpconfig(node_names_t* node_names, const char* filename) {
     if (in == NULL) {
         return -1;
     }
-    line = (char*)malloc(LINE_MAX);
-    token = (char*)malloc(LINE_MAX);
-    token2 = (char*)malloc(LINE_MAX);
+    line = (char*)malloc(NODE_NAMES_LINE_MAX);
+    token = (char*)malloc(NODE_NAMES_LINE_MAX);
+    token2 = (char*)malloc(NODE_NAMES_LINE_MAX);
 
     while (!done) {
-        line_size = readline(line, in, LINE_MAX);
+        line_size = readline(line, in, NODE_NAMES_LINE_MAX);
         if (line_size == 0) {
             done = 1;
             break;
@@ -187,14 +187,14 @@ int node_names_read_dhcpconfig(node_names_t* node_names, const char* filename) {
                 }
             }
             line_cur = line;
-            token_len = get_token(token, line_cur, " \t", LINE_MAX);
+            token_len = get_token(token, line_cur, " \t", NODE_NAMES_LINE_MAX);
             if (strncmp(token, "option", 6) != 0) {
                 break;
             }
             line_cur += token_len;
-            token_len = get_token(token, line_cur, " \t", LINE_MAX);
+            token_len = get_token(token, line_cur, " \t", NODE_NAMES_LINE_MAX);
             line_cur += token_len;
-            get_token(token2, line_cur, "\r\n", LINE_MAX);
+            get_token(token2, line_cur, "\r\n", NODE_NAMES_LINE_MAX);
             unquote_token(token2);
             if (strcmp(token, "name") == 0) {
                 if (name != NULL) {
@@ -254,10 +254,10 @@ node_names_read_dhcpleases(node_names_t* node_names, const char* filename) {
     if (in == NULL) {
         return -1;
     }
-    line = (char*)malloc(LINE_MAX);
+    line = (char*)malloc(NODE_NAMES_LINE_MAX);
 
     while (!done) {
-        line_size = readline(line, in, LINE_MAX);
+        line_size = readline(line, in, NODE_NAMES_LINE_MAX);
         if (line_size == 0) {
             done = 1;
             break;
@@ -266,7 +266,7 @@ node_names_read_dhcpleases(node_names_t* node_names, const char* filename) {
 
         // Assuming the simplified lease format for now:
         // timestamp mac ip name [other]
-        token_len = skip_token(line_cur, " \t", LINE_MAX);
+        token_len = skip_token(line_cur, " \t", NODE_NAMES_LINE_MAX);
         if (token_len <= 0) {
             done = 1;
             break;
@@ -278,7 +278,7 @@ node_names_read_dhcpleases(node_names_t* node_names, const char* filename) {
             break;
         }
         line_cur += token_len;
-        token_len = skip_token(line_cur, " \t", LINE_MAX);
+        token_len = skip_token(line_cur, " \t", NODE_NAMES_LINE_MAX);
         if (token_len <= 0) {
             done = 1;
             break;
@@ -314,16 +314,16 @@ int node_names_read_userconfig(node_names_t* node_names, const char* filename) {
         fprintf(stderr, "Error: unable to read %s: %s\n", filename, strerror(errno));
         return -1;
     }
-    line = (char*)malloc(LINE_MAX);
-    token2 = (char*)malloc(LINE_MAX);
+    line = (char*)malloc(NODE_NAMES_LINE_MAX);
+    token2 = (char*)malloc(NODE_NAMES_LINE_MAX);
     while (1) {
-        line_size = readline(line, in, LINE_MAX);
+        line_size = readline(line, in, NODE_NAMES_LINE_MAX);
         if (line_size == 0) {
             break;
         }
         if (strncmp(line, "name: ", 6) == 0) {
             token1_len = get_token(token1, line + 6, " \t", INET6_ADDRSTRLEN);
-            token2_len = get_token(token2, line + 6 + token1_len, "\r\n", LINE_MAX);
+            token2_len = get_token(token2, line + 6 + token1_len, "\r\n", NODE_NAMES_LINE_MAX);
             if (token1_len == 0 || token2_len == 0) {
                 continue;
             }
