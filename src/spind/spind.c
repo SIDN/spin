@@ -645,6 +645,8 @@ int main(int argc, char** argv) {
 
     omitnode = spinconfig_pubsub_omitnode();
 
+    ubus_main();
+
     mainloop_run();
 
     cleanup_cache();
