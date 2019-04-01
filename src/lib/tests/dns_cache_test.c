@@ -86,7 +86,7 @@ sample_dns_pkt_info_2(dns_pkt_info_t* dns_pkt_info) {
                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                        0xc0, 0x00, 0x02, 0x02, // 192.0.2.2
-                       0x00, 0x00, 0x0e, 0x10, // TTL (3600)
+                       0x00, 0x00, 0x1c, 0x20, // TTL (7200)
                        0x0d, // 13 octets
                        0x03, 0x77, 0x77, 0x77, 0x04, 0x74, 0x65,
                        0x73, 0x74, 0x02, 0x6e, 0x6c, 0x00  // www.test.nl
@@ -174,12 +174,14 @@ test_dns_cache_clean() {
     dns_pkt_info_t dns_pkt_info2;
 
     dns_cache_t* dns_cache = dns_cache_create();
+    time_t now;
+    time(&now);
 
     sample_dns_pkt_info_1(&dns_pkt_info1);
     sample_dns_pkt_info_2(&dns_pkt_info2);
 
-    dns_cache_add(dns_cache, &dns_pkt_info1, -10000);
-    dns_cache_add(dns_cache, &dns_pkt_info2, -20000);
+    dns_cache_add(dns_cache, &dns_pkt_info1, now);
+    dns_cache_add(dns_cache, &dns_pkt_info2, now);
     assert(tree_size(dns_cache->entries) == 2);
 
     // this should keep both
@@ -187,14 +189,14 @@ test_dns_cache_clean() {
     assert(tree_size(dns_cache->entries) == 2);
 
     // this should remove both
-    dns_cache_clean(dns_cache, -25000);
+    dns_cache_clean(dns_cache, 25000);
     assert(tree_size(dns_cache->entries) == 0);
 
     // add again and now remove just one
-    dns_cache_add(dns_cache, &dns_pkt_info1, -10000);
-    dns_cache_add(dns_cache, &dns_pkt_info2, -20000);
+    dns_cache_add(dns_cache, &dns_pkt_info1, now);
+    dns_cache_add(dns_cache, &dns_pkt_info2, now);
     assert(tree_size(dns_cache->entries) == 2);
-    dns_cache_clean(dns_cache, -15000);
+    dns_cache_clean(dns_cache, 5000); // > 3600 (pkt1) and < 7200 (pk2)
     assert(tree_size(dns_cache->entries) == 1);
 
     dns_cache_destroy(dns_cache);
