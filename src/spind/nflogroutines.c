@@ -116,9 +116,11 @@ nflog_cb_ipv4(int fr_n, uint8_t* payload, int payloadsize) {
     case 6:
         // tcp
         nflog_cb_tcp(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET, src_addr, dest_addr);
+        break;
     case 17:
         // udp
         nflog_cb_udp(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET, src_addr, dest_addr);
+        break;
     }
     nflog_cb_rest(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET, src_addr, dest_addr);
 }
@@ -141,9 +143,11 @@ nflog_cb_ipv6(int fr_n, uint8_t* payload, int payloadsize) {
     case 6:
         // tcp
         nflog_cb_tcp(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET6, src_addr, dest_addr);
+        break;
     case 17:
         // udp
         nflog_cb_udp(fr_n, payload + hdrsize, payloadsize - hdrsize, AF_INET6, src_addr, dest_addr);
+        break;
     }
 }
 
