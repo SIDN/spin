@@ -82,7 +82,7 @@ void send_command_node_info(node_t* node) {
 static void
 publish_nodes() {
 
-    node_publish_new(node_cache);
+    node_callback_new(node_cache, send_command_node_info);
 }
 
 void send_command_blocked(pkt_info_t* pkt_info) {
@@ -570,6 +570,8 @@ void cleanup_cache() {
     dns_cache_destroy(dns_cache);
     node_cache_destroy(node_cache);
 }
+
+void ubus_main();
 
 int main(int argc, char** argv) {
     int c;

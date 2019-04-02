@@ -55,44 +55,6 @@ node_destroy(node_t* node) {
     free(node);
 }
 
-<<<<<<< HEAD
-#ifdef notdef
-
-/*
- * Seems unused, HVS
- */
-node_t* node_clone(node_t* node) {
-    int i;
-
-    node_t* new = node_create(node->id);
-    tree_entry_t *cur;
-    if (node->mac) {
-        node_set_mac(new, node->mac);
-    }
-    if (node->name) {
-        node_set_name(new, node->name);
-    }
-    for (i=0;i<N_IPLIST;i++) {
-        new->is_onlist[i] = node->is_onlist[i];
-    }
-    new->last_seen = node->last_seen;
-    new->modified = node->modified;
-    cur = tree_first(node->ips);
-    while (cur != NULL) {
-        tree_add(new->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
-        cur = tree_next(cur);
-    }
-    cur = tree_first(node->domains);
-    while (cur != NULL) {
-        tree_add(new->domains, cur->key_size, cur->key, cur->data_size, cur->data, 1);
-        cur = tree_next(cur);
-    }
-    return new;
-}
-#endif
-
-=======
->>>>>>> dev
 static void
 node_add_ip(node_t* node, ip_t* ip) {
     STAT_COUNTER(ctr, add-ip, STAT_TOTAL);
@@ -310,7 +272,7 @@ node_print(node_t* node) {
 
 unsigned int
 node2json(node_t* node, buffer_t* json_buf) {
-    unsigned int s = 0;
+    // unsigned int s = 0;
     tree_entry_t* cur;
     char ip_str[INET6_ADDRSTRLEN];
 
@@ -359,7 +321,7 @@ node2json(node_t* node, buffer_t* json_buf) {
     return 1;
 }
 
-void node_publish_new(node_cache_t* node_cache) {
+void node_callback_new(node_cache_t* node_cache, modfunc mf) {
     tree_entry_t* cur = tree_first(node_cache->nodes);
     node_t* node;
     int nfound;
@@ -369,7 +331,7 @@ void node_publish_new(node_cache_t* node_cache) {
     while (cur != NULL) {
         node = (node_t*)cur->data;
         if (node->modified) {
-            send_command_node_info(node);
+            (*mf)(node);
             nfound++;
             node->modified = 0;
         }

@@ -37,6 +37,8 @@ typedef struct {
 #define is_blocked is_onlist[IPLIST_BLOCK]
 #define is_allowed is_onlist[IPLIST_ALLOW]
 
+typedef void (*modfunc)(node_t *);
+
 /*
 node_t* node_create(int id);
 void node_destroy(node_t* node);
@@ -87,7 +89,7 @@ typedef struct {
 
 node_cache_t* node_cache_create(void);
 void node_cache_destroy(node_cache_t* node_cache);
-void node_publish_new(node_cache_t*);
+void node_callback_new(node_cache_t*, modfunc);
 
 /*
 void node_cache_print(node_cache_t* node_cache);

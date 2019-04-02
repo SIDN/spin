@@ -261,10 +261,9 @@ static void server_main(void)
 	uloop_run();
 }
 
-int ubus_main() {
+int ubus_main()
 {
 	const char *ubus_socket = NULL;
-	int ch;
 
 	uloop_init();
 	signal(SIGPIPE, SIG_IGN);
