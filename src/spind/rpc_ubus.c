@@ -261,23 +261,10 @@ static void server_main(void)
 	uloop_run();
 }
 
-int ubus_main(int argc, char **argv)
+int ubus_main() {
 {
 	const char *ubus_socket = NULL;
 	int ch;
-
-	while ((ch = getopt(argc, argv, "cs:")) != -1) {
-		switch (ch) {
-		case 's':
-			ubus_socket = optarg;
-			break;
-		default:
-			break;
-		}
-	}
-
-	argc -= optind;
-	argv += optind;
 
 	uloop_init();
 	signal(SIGPIPE, SIG_IGN);
