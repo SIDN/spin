@@ -37,8 +37,11 @@ test_read_userconfig() {
     assert(tree_size(node_names->user_names_by_ip) == 0);
     assert(tree_size(node_names->user_names_by_mac) == 0);
 
-    node_names_read_userconfig(node_names, "testdata/node_names_spin_userdata.conf");
+    const char* fpath = TESTDATA_PATH "/node_names_spin_userdata.conf";
+    printf("[XX] TESTDATA PATH: %s\n", fpath);
+    node_names_read_userconfig(node_names, TESTDATA_PATH "/node_names_spin_userdata.conf");
 
+    printf("[XX] TREE SIZE: %d\n", tree_size(node_names->user_names_by_ip));
     assert(tree_size(node_names->user_names_by_ip) == 6);
     assert(tree_size(node_names->user_names_by_mac) == 2);
 
@@ -65,7 +68,7 @@ test_read_dhcpconfig() {
     assert(tree_size(node_names->dhcp_names_by_ip) == 0);
     assert(tree_size(node_names->dhcp_names_by_mac) == 0);
 
-    node_names_read_dhcpconfig(node_names, "testdata/node_names_dhcp.conf");
+    node_names_read_dhcpconfig(node_names, TESTDATA_PATH "/node_names_dhcp.conf");
 
     check_ip(node_names, "192.0.2.1", "some host");
     check_ip(node_names, "192.0.2.155", "Foo");
@@ -96,11 +99,11 @@ test_read_both() {
 
     check_ip(node_names, "192.0.2.1", NULL);
 
-    node_names_read_dhcpconfig(node_names, "testdata/node_names_dhcp.conf");
+    node_names_read_dhcpconfig(node_names, TESTDATA_PATH "/node_names_dhcp.conf");
 
     check_ip(node_names, "192.0.2.1", "some host");
 
-    node_names_read_userconfig(node_names, "testdata/node_names_spin_userdata.conf");
+    node_names_read_userconfig(node_names, TESTDATA_PATH "/node_names_spin_userdata.conf");
 
     check_ip(node_names, "192.0.2.1", "some_other_host");
 
@@ -116,7 +119,7 @@ test_aaaa() {
 
     check_ip(node_names, "192.0.2.1", NULL);
 
-    node_names_read_dhcpconfig(node_names, "testdata/full_dhcp");
+    node_names_read_dhcpconfig(node_names, TESTDATA_PATH "/full_dhcp");
 
     node_names_destroy(node_names);
 }
@@ -185,7 +188,7 @@ test_write_userconfig() {
 
     // read DHCP file, and write the userconfig; this should result
     // in an empty file (as only user-set values are stored)
-    node_names_read_dhcpconfig(node_names, "testdata/node_names_dhcp.conf");
+    node_names_read_dhcpconfig(node_names, TESTDATA_PATH "/node_names_dhcp.conf");
     assert(tree_size(node_names->user_names_by_ip) == 0);
     assert(tree_size(node_names->user_names_by_mac) == 0);
     assert(tree_size(node_names->dhcp_names_by_ip) == 5);

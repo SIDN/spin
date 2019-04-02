@@ -6,7 +6,7 @@ SUBDIRS = @TESTDIR@
 
 noinst_LIBRARIES = libspin.a
 
-libspin_a_SOURCES = ../kernelmod/pkt_info.c \
+libspin_a_SOURCES = pkt_info.c \
 					spin_log.h \
 					spin_log.c \
 					dns_cache.h \
@@ -26,8 +26,8 @@ libspin_a_SOURCES = ../kernelmod/pkt_info.c \
                                         statistics.c \
 					version.c
 
-libspin_a_CFLAGS = -I$(top_srcdir)/kernelmod
-#libspin_a_LIBADD = -L../kernelmod
+#libspin_a_CFLAGS =
+#libspin_a_LIBADD =
 
 version.c:
 	$(top_srcdir)/../scripts/create_version_c.sh $(top_srcdir)/../VERSION

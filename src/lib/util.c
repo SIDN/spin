@@ -244,7 +244,7 @@ int store_ip_tree(tree_t* tree, const char* filename) {
     return 1;
 }
 
-#define LINE_MAX 1024
+#define SPIN_UTIL_LINE_MAX 1024
 int read_ip_tree(tree_t* dest, const char* filename) {
     int count = 0;
     char* line;
@@ -255,17 +255,17 @@ int read_ip_tree(tree_t* dest, const char* filename) {
     if (in == NULL) {
         return -1;
     }
-    line = malloc(LINE_MAX);
-    rline = fgets(line, LINE_MAX, in);
+    line = malloc(SPIN_UTIL_LINE_MAX);
+    rline = fgets(line, SPIN_UTIL_LINE_MAX, in);
     while (rline != NULL) {
-        if (index(rline, '\n') >= 0) {
+        if (index(rline, '\n') != NULL) {
             *index(rline, '\n') = '\0';
             if (spin_pton(&ip, line)) {
                 tree_add(dest, sizeof(ip), &ip, 0, NULL, 1);
                 count++;
             }
         }
-        rline = fgets(line, LINE_MAX, in);
+        rline = fgets(line, SPIN_UTIL_LINE_MAX, in);
     }
     free(line);
     fclose(in);

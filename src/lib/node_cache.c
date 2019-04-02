@@ -15,7 +15,7 @@ STAT_MODULE(node_cache)
 
 static int node_cache_add_node(node_cache_t* node_cache, node_t* node);
 
-STAT_COUNTER(nodes, "nodes", STAT_TOTAL);
+STAT_COUNTER(nodes, nodes, STAT_TOTAL);
 
 static node_t*
 node_create(int id) {
@@ -55,6 +55,7 @@ node_destroy(node_t* node) {
     free(node);
 }
 
+<<<<<<< HEAD
 #ifdef notdef
 
 /*
@@ -90,6 +91,8 @@ node_t* node_clone(node_t* node) {
 }
 #endif
 
+=======
+>>>>>>> dev
 static void
 node_add_ip(node_t* node, ip_t* ip) {
     STAT_COUNTER(ctr, add-ip, STAT_TOTAL);
@@ -239,6 +242,34 @@ node_merge(node_t* dest, node_t* src) {
     if (modified) {
         dest->modified = 1;
     }
+}
+
+node_t* node_clone(node_t* node) {
+    int i;
+
+    node_t* new = node_create(node->id);
+    tree_entry_t *cur;
+    if (node->mac) {
+        node_set_mac(new, node->mac);
+    }
+    if (node->name) {
+        node_set_name(new, node->name);
+    }
+    for (i=0;i<N_IPLIST;i++) {
+        new->is_onlist[i] = node->is_onlist[i];
+    }
+    new->last_seen = node->last_seen;
+    cur = tree_first(node->ips);
+    while (cur != NULL) {
+        tree_add(new->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        cur = tree_next(cur);
+    }
+    cur = tree_first(node->domains);
+    while (cur != NULL) {
+        tree_add(new->domains, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        cur = tree_next(cur);
+    }
+    return new;
 }
 
 static void

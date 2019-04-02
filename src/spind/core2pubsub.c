@@ -355,6 +355,10 @@ void connect_mosquitto(const char* host, int port) {
     }
 
     mosq = mosquitto_new(client_name, 1, NULL);
+    if (mosq == NULL) {
+        spin_log(LOG_ERR, "Error creating mqtt client instance: %s\n", strerror(errno));
+        exit(1);
+    }
     spin_log(LOG_INFO, "Connecting to mqtt server on %s:%d\n", host, port);
     result = mosquitto_connect(mosq, host, port, mosquitto_keepalive_time);
     if (result != 0) {
@@ -365,6 +369,7 @@ void connect_mosquitto(const char* host, int port) {
     result = mosquitto_subscribe(mosq, NULL, mqtt_channel_commands, 0);
     if (result != 0) {
         spin_log(LOG_ERR, "Error subscribing to topic %s: %s\n", mqtt_channel_commands, mosquitto_strerror(result));
+        exit(1);
     }
 
     mosquitto_message_callback_set(mosq, do_mosq_message);

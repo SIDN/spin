@@ -40,7 +40,8 @@ void dns_cache_destroy(dns_cache_t* dns_cache);
 // note: this copies the data
 void dns_cache_add_dname_ip(dns_cache_t* cache, uint8_t family, uint32_t ttl, char* dname, const ip_t* ip, uint32_t timestamp);
 void dns_cache_add(dns_cache_t* cache, dns_pkt_info_t* dns_pkt_info, uint32_t timestamp);
-void dns_cache_clean(dns_cache_t* dns_cache);
+
+void dns_cache_clean(dns_cache_t* dns_cache, size_t clean_early);
 void dns_cache_print(dns_cache_t* dns_cache);
 
 dns_cache_entry_t* dns_cache_find(dns_cache_t* dns_cache, ip_t* ip);

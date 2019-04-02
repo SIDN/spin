@@ -1,6 +1,8 @@
 /*
  * Statistics module include
  */
+#ifndef SPIN_STATISTICS_H
+#define SPIN_STATISTICS_H 1
 
 /*
  * DO_SPIN_STATS
@@ -48,7 +50,7 @@ void spin_stat_val(stat_p, int);
 
 #define STAT_MODULE(modulename) static const char STAT_CONCAT(STAT_PREF, modname)[] = #modulename ;
 
-#define STAT_COUNTER(ctr, descr, type) static spin_stat_t STAT_CONCAT(STAT_PREF, ctr) = { STAT_CONCAT(STAT_PREF, modname), #descr, type }
+#define STAT_COUNTER(ctr, descr, type) static spin_stat_t STAT_CONCAT(STAT_PREF, ctr) = { STAT_CONCAT(STAT_PREF, modname), #descr, type, 0, 0, NULL }
 
 #define STAT_VALUE(ctr, val) spin_stat_val(&STAT_CONCAT(STAT_PREF, ctr), val)
 
@@ -62,3 +64,5 @@ void spin_stat_val(stat_p, int);
 #define STAT_VALUE(x, y)
 
 #endif // DO_SPIN_STATS
+
+#endif // SPIN_STATISTICS_H
