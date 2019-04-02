@@ -11,6 +11,9 @@
  * GNU General Public License for more details.
  */
 
+#include "mainloop.h"
+#include "spin_log.h"
+
 #include <unistd.h>
 #include <signal.h>
 
@@ -20,6 +23,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+#include <fcntl.h>
 
 char *count_to_number(uint32_t num)
 {
@@ -74,6 +79,9 @@ struct hello_request {
 	char data[];
 };
 
+#undef WIERD
+
+#ifdef WIERD
 static void test_hello_fd_reply(struct uloop_timeout *t)
 {
 	struct hello_request *req = container_of(t, struct hello_request, timeout);
@@ -110,6 +118,7 @@ static void test_hello_reply(struct uloop_timeout *t)
 	req->timeout.cb = test_hello_fd_reply;
 	test_hello_fd_reply(t);
 }
+#endif
 
 static int test_hello(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct ubus_request_data *req, const char *method,
@@ -128,17 +137,75 @@ static int test_hello(struct ubus_context *ctx, struct ubus_object *obj,
 	if (tb[HELLO_MSG])
 		msgstr = blobmsg_data(tb[HELLO_MSG]);
 
+        fprintf(stderr, "Hello(%d, %s) called\n", num, msgstr);
 	hreq = calloc(1, sizeof(*hreq) + strlen(format) + strlen(obj->name) + 20 + strlen(msgstr) + 1);
 	if (!hreq)
 		return UBUS_STATUS_UNKNOWN_ERROR;
 
 	sprintf(hreq->data, format, obj->name, num, msgstr);
+
+#ifdef WIERD
 	ubus_defer_request(ctx, req, &hreq->req);
 	hreq->timeout.cb = test_hello_reply;
 	uloop_timeout_set(&hreq->timeout, 1000);
-
+#else
+	blob_buf_init(&b, 0);
+	blobmsg_add_string(&b, "message", hreq->data);
+	ubus_send_reply(ctx, req, b.head);
+#endif
 	return 0;
 }
+
+enum {
+	SPINDLIST_LIST,
+	SPINDLIST_ADDREM,
+	SPINDLIST_NODE,
+	__SPINDLIST_MAX
+};
+
+static const struct blobmsg_policy spindlist_policy[] = {
+	[SPINDLIST_LIST] = { .name = "list", .type = BLOBMSG_TYPE_INT32 },
+	[SPINDLIST_ADDREM] = { .name = "addrem", .type = BLOBMSG_TYPE_INT32 },
+	[SPINDLIST_NODE] = { .name = "node", .type = BLOBMSG_TYPE_INT32 },
+};
+
+struct spindlist_request {
+	struct ubus_request_data req;
+	struct uloop_timeout timeout;
+	int fd;
+	int idx;
+	char data[];
+};
+
+static int test_spindlist(struct ubus_context *ctx, struct ubus_object *obj,
+		      struct ubus_request_data *req, const char *method,
+		      struct blob_attr *msg)
+{
+	struct blob_attr *tb[__SPINDLIST_MAX];
+        int list, addrem, node;
+        void handle_list_membership(int, int, int);
+
+	blobmsg_parse(spindlist_policy, ARRAY_SIZE(spindlist_policy), tb, blob_data(msg), blob_len(msg));
+
+        list = 0; addrem = 0; node = 0;
+	if (tb[SPINDLIST_LIST])
+		list = blobmsg_get_u32(tb[SPINDLIST_LIST]);
+	if (tb[SPINDLIST_ADDREM])
+		addrem = blobmsg_get_u32(tb[SPINDLIST_ADDREM]);
+	if (tb[SPINDLIST_NODE])
+		node = blobmsg_get_u32(tb[SPINDLIST_NODE]);
+
+        fprintf(stderr, "spindlist(%d, %d, %d) called\n", list, addrem, node);
+
+        handle_list_membership(list, addrem, node);
+
+	blob_buf_init(&b, 0);
+	blobmsg_add_string(&b, "fake-return", "ok");
+	ubus_send_reply(ctx, req, b.head);
+	return 0;
+}
+
+#ifdef notdef
 
 enum {
 	WATCH_ID,
@@ -230,10 +297,16 @@ static int test_count(struct ubus_context *ctx, struct ubus_object *obj,
 	return 0;
 }
 
+#endif
+
+
 static const struct ubus_method test_methods[] = {
 	UBUS_METHOD("hello", test_hello, hello_policy),
+	UBUS_METHOD("spindlist", test_spindlist, spindlist_policy),
+#ifdef notdef
 	UBUS_METHOD("watch", test_watch, watch_policy),
 	UBUS_METHOD("count", test_count, count_policy),
+#endif
 };
 
 static struct ubus_object_type test_object_type =
@@ -245,6 +318,31 @@ static struct ubus_object test_object = {
 	.methods = test_methods,
 	.n_methods = ARRAY_SIZE(test_methods),
 };
+
+static int
+fd_set_blocking(int fd, int blocking) {
+    /* Save the current flags */
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) {
+        return 0;
+    }
+
+    if (blocking) {
+        flags &= ~O_NONBLOCK;
+    } else {
+        flags |= O_NONBLOCK;
+    }
+    return fcntl(fd, F_SETFL, flags) != -1;
+}
+
+void wf_ubus(void *arg, int data, int timeout) {
+
+    spin_log(LOG_DEBUG, "wf_ubus called\n");
+
+    if (data) {
+        ctx->sock.cb(&ctx->sock, ULOOP_READ);
+    }
+}
 
 static void server_main(void)
 {
@@ -258,28 +356,40 @@ static void server_main(void)
 	if (ret)
 		fprintf(stderr, "Failed to add watch handler: %s\n", ubus_strerror(ret));
 
+#ifdef notdef
 	uloop_run();
+#endif
 }
 
 int ubus_main()
 {
 	const char *ubus_socket = NULL;
 
+#ifdef notdef
 	uloop_init();
 	signal(SIGPIPE, SIG_IGN);
+#endif
 
 	ctx = ubus_connect(ubus_socket);
 	if (!ctx) {
 		fprintf(stderr, "Failed to connect to ubus\n");
 		return -1;
-	}
+	} else {
+            spin_log(LOG_DEBUG, "Connected to ubus\n");
+        }
 
+#ifdef notdef
 	ubus_add_uloop(ctx);
+#endif
+        fd_set_blocking(ctx->sock.fd, 0);
+        mainloop_register("ubus", wf_ubus, NULL, ctx->sock.fd, 0);
 
 	server_main();
 
+#ifdef notdef
 	ubus_free(ctx);
 	uloop_done();
+#endif
 
 	return 0;
 }

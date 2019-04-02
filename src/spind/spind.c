@@ -647,7 +647,9 @@ int main(int argc, char** argv) {
 
     omitnode = spinconfig_pubsub_omitnode();
 
+    spin_log(LOG_DEBUG, "Before ubus_main\n");
     ubus_main();
+    spin_log(LOG_DEBUG, "After ubus_main\n");
 
     mainloop_run();
 
