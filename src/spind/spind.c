@@ -46,6 +46,162 @@ STAT_MODULE(spind)
  *
  */
 
+#include "jsmn.h"
+#define NTOKENS 50
+
+// Do longest keywords here first, to prevent initial substring matching
+enum nkw {
+    NKW_IS_EXCEPTED,
+    NKW_IS_BLOCKED,
+    NKW_LASTSEEN,
+    NKW_DOMAINS,
+    NKW_NAME,
+    NKW_MAC,
+    NKW_IPS,
+    NKW_ID,
+    N_NKW
+};
+
+char *nodekeyw[] = {
+[NKW_IS_EXCEPTED] = "is_excepted",
+[NKW_IS_BLOCKED] = "is_blocked",
+[NKW_LASTSEEN] = "lastseen",
+[NKW_DOMAINS] = "domains",
+[NKW_NAME] = "name",
+[NKW_MAC] = "mac",
+[NKW_IPS] = "ips",
+[NKW_ID] = "id",
+};
+
+static enum nkw
+find_nkw(char *begin, int len) {
+    int i;
+    const char * kw;
+    int klen;
+
+    for (i=0; i<N_NKW; i++) {
+        kw = nodekeyw[i];
+        klen = strlen(kw);
+        if (strncmp(kw, begin, klen) == 0) {
+            return i;
+        }
+    }
+    return i;
+}
+
+static char *
+find_str(char *s, char *e) {
+
+    *e = 0; /* Should be safe */
+    return s;
+}
+
+static int
+find_num(char *s, char *e) {
+
+    return atoi(find_str(s,e));
+}
+
+#define CHECK_TYPE(n, t) if (tokens[n].type != t) { spin_log(LOG_ERR, "Token %d bad type\n", n); return; }
+#define CHECK_TRUTH(tr) if (!(tr)) { spin_log(LOG_ERR, "Unknown error in parse\n"); }
+
+static void
+decode_node_info(char *data) {
+    jsmn_parser p;
+    jsmntok_t tokens[NTOKENS];
+    int result;
+    int datalen;
+    int i, aix;
+    int nexttok;
+    node_t *newnode;
+    char *mac, *name;
+    int old_id;
+
+    datalen = strlen(data);
+    fprintf(stderr, "To parse: %s\n", data);
+    jsmn_init(&p);
+    result = jsmn_parse(&p, data, datalen, tokens, NTOKENS);
+    if (result < 0) {
+        spin_log(LOG_ERR, "Unable to parse node data\n");
+        return;
+    }
+    CHECK_TYPE(0, JSMN_OBJECT);
+
+    newnode = node_create(0);
+    nexttok = 1;
+    for (i=0; i<tokens[0].size; i++) {
+        int key, val;
+        enum nkw kw;
+
+        key = nexttok;
+        CHECK_TYPE(key, JSMN_STRING);
+        kw = find_nkw(data+tokens[key].start, tokens[key].end - tokens[key].start);
+        CHECK_TRUTH(kw!=N_NKW);
+        nexttok++;
+        val = nexttok;
+        switch(kw) {
+        case NKW_ID:
+            // Setup mapping between old and new numbers
+            CHECK_TYPE(val, JSMN_PRIMITIVE);
+            old_id = find_num(data+tokens[val].start, data+tokens[val].end);
+            fprintf(stderr, "Id= %d\n", old_id);
+            break;
+        case N_NKW:
+            // Cannot happen, but compiler wants it
+        case NKW_IS_EXCEPTED:
+        case NKW_IS_BLOCKED:
+        case NKW_LASTSEEN:
+            // These will be set again by other software
+            break;
+        case NKW_MAC:
+            // Store mac Address
+            CHECK_TYPE(val, JSMN_STRING);
+            mac = find_str(data+tokens[val].start, data+tokens[val].end);
+            node_set_mac(newnode, mac);
+            fprintf(stderr, "Mac=%s\n", mac);
+            break;
+        case NKW_NAME:
+            // Store name
+            CHECK_TYPE(val, JSMN_STRING);
+            name = find_str(data+tokens[val].start, data+tokens[val].end);
+            node_set_name(newnode, name);
+            fprintf(stderr, "Name=%s\n", name);
+            break;
+        case NKW_IPS:
+            // Store IP addresses
+            CHECK_TYPE(val, JSMN_ARRAY);
+            for (aix=1; aix <= tokens[val].size; aix++) {
+                char *ipaddr;
+                ip_t ipval;
+                int retval;
+
+                CHECK_TYPE(val+aix, JSMN_STRING);
+                ipaddr = find_str(data+tokens[val+aix].start, data+tokens[val+aix].end);
+                retval = spin_pton(&ipval, ipaddr);
+                CHECK_TRUTH(retval);
+                fprintf(stderr, "Ipaddr=%s\n", ipaddr);
+                node_add_ip(newnode, &ipval);
+            }
+            nexttok = val+aix-1;
+            break;
+        case NKW_DOMAINS:
+            // Store IP addresses
+            CHECK_TYPE(val, JSMN_ARRAY);
+            for (aix=1; aix <= tokens[val].size; aix++) {
+                char *domainname;
+
+                CHECK_TYPE(val+aix, JSMN_STRING);
+                domainname = find_str(data+tokens[val+aix].start, data+tokens[val+aix].end);
+                fprintf(stderr, "Domain=%s\n", domainname);
+                node_add_domain(newnode, domainname);
+            }
+            nexttok = val+aix-1;
+            break;
+        }
+        nexttok++;
+    }
+}
+
 #define NODE_FILENAME_DIR "/etc/spin/nodestore"
 
 static void
@@ -58,6 +214,7 @@ store_node_info(int nodenum, buffer_t *node_json) {
     nodefile = fopen(filename, "w");
     fprintf(nodefile, "%s\n", buffer_str(node_json));
     fclose(nodefile);
+    decode_node_info(buffer_str(node_json));
 }
 
 /*

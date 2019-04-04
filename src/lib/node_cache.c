@@ -17,7 +17,7 @@ static int node_cache_add_node(node_cache_t* node_cache, node_t* node);
 
 STAT_COUNTER(nodes, nodes, STAT_TOTAL);
 
-static node_t*
+node_t*
 node_create(int id) {
     int i;
 
@@ -37,7 +37,7 @@ node_create(int id) {
     return node;
 }
 
-static void
+void
 node_destroy(node_t* node) {
 
     STAT_VALUE(nodes, -1);
@@ -56,7 +56,7 @@ node_destroy(node_t* node) {
     free(node);
 }
 
-static void
+void
 node_add_ip(node_t* node, ip_t* ip) {
     STAT_COUNTER(ctr, add-ip, STAT_TOTAL);
 
@@ -64,7 +64,7 @@ node_add_ip(node_t* node, ip_t* ip) {
     tree_add(node->ips, sizeof(ip_t), ip, 0, NULL, 1);
 }
 
-static void
+void
 node_add_domain(node_t* node, char* domain) {
     STAT_COUNTER(ctr, add-domain, STAT_TOTAL);
 
@@ -72,7 +72,7 @@ node_add_domain(node_t* node, char* domain) {
     tree_add(node->domains, strlen(domain) + 1, domain, 0, NULL, 1);
 }
 
-static void
+void
 node_set_mac(node_t* node, char* mac) {
     STAT_COUNTER(ctr, set-mac, STAT_TOTAL);
 
