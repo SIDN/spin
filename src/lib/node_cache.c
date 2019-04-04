@@ -33,6 +33,7 @@ node_create(int id) {
     }
     node->last_seen = 0;
     node->modified = 0;
+    node->persistent = 0;
     return node;
 }
 

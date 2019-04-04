@@ -31,7 +31,9 @@ typedef struct {
     // when we last saw it
     uint32_t last_seen;
     // and for publication purposes also if it changed
-    uint32_t modified;
+    uint8_t modified;
+    // and for storage if persistent
+    uint8_t persistent;
 } node_t;
 
 #define is_blocked is_onlist[IPLIST_BLOCK]

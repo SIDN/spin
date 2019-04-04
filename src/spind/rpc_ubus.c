@@ -340,7 +340,8 @@ void wf_ubus(void *arg, int data, int timeout) {
     spin_log(LOG_DEBUG, "wf_ubus called\n");
 
     if (data) {
-        ctx->sock.cb(&ctx->sock, ULOOP_READ);
+        ubus_handle_event(ctx);
+        // ctx->sock.cb(&ctx->sock, ULOOP_READ);
     }
 }
 

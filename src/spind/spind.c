@@ -1,4 +1,5 @@
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +40,30 @@ int omitnode;
 
 STAT_MODULE(spind)
 
+/*
+ *
+ * Code to store and retrieve node info from files for persistency
+ *
+ */
+
+#define NODE_FILENAME_DIR "/etc/spin/nodestore"
+
+static void
+store_node_info(int nodenum, buffer_t *node_json) {
+    char filename[100];
+    FILE *nodefile;
+
+    mkdir(NODE_FILENAME_DIR, 0777);
+    sprintf(filename, "%s/%d", NODE_FILENAME_DIR, nodenum);
+    nodefile = fopen(filename, "w");
+    fprintf(nodefile, "%s\n", buffer_str(node_json));
+    fclose(nodefile);
+}
+
+/*
+ * End of node info store code
+ */
+
 #define JSONBUFSIZ      4096
 
 unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argument, char* result) {
@@ -54,35 +79,46 @@ unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argum
     return buf->pos;
 }
 
-void send_command_node_info(node_t* node) {
+static void
+send_command_node_info(int nodenum, buffer_t *node_json) {
     buffer_t* response_json = buffer_create(JSONBUFSIZ);
-    buffer_t* node_json = buffer_create(JSONBUFSIZ);
     char mosqchan[100];
+
+    create_mqtt_command(response_json, "nodeInfo", NULL, buffer_str(node_json));
+    if (buffer_finish(response_json)) {
+        // Subdivide channel
+        sprintf(mosqchan, "SPIN/traffic/node/%d", nodenum);
+        pubsub_publish(mosqchan,
+                buffer_size(response_json), buffer_str(response_json), 1);
+    } else {
+        spin_log(LOG_WARNING, "Error converting nodeInfo to JSON; partial packet: %s\n", buffer_str(response_json));
+    }
+    buffer_destroy(response_json);
+}
+
+static void
+node_is_updated(node_t *node) {
+    buffer_t* node_json = buffer_create(JSONBUFSIZ);
     unsigned int p_size;
 
-    p_size = node2json(node, node_json);;
+    p_size = node2json(node, node_json);
     if (p_size > 0) {
         buffer_finish(node_json);
-        create_mqtt_command(response_json, "nodeInfo", NULL, buffer_str(node_json));
-        if (buffer_finish(response_json)) {
-            // Subdivide channel
-            sprintf(mosqchan, "SPIN/traffic/node/%d", node->id);
-            pubsub_publish(mosqchan,
-                    buffer_size(response_json), buffer_str(response_json), 1);
-        } else {
-            spin_log(LOG_WARNING, "Error converting node to JSON; partial packet: %s\n", buffer_str(response_json));
+        // work
+        send_command_node_info(node->id, node_json);
+        if (1) /* Persistent? */ {
+            store_node_info(node->id, node_json);
         }
     } else {
         spin_log(LOG_DEBUG, "[XX] node2json failed(size 0)\n");
     }
-    buffer_destroy(response_json);
     buffer_destroy(node_json);
 }
 
 static void
 publish_nodes() {
 
-    node_callback_new(node_cache, send_command_node_info);
+    node_callback_new(node_cache, node_is_updated);
 }
 
 void send_command_blocked(pkt_info_t* pkt_info) {
@@ -193,7 +229,7 @@ report_block(int af, int proto, uint8_t *src_addr, uint8_t *dest_addr, unsigned 
 struct list_info {
     tree_t *        li_tree;                 // Tree of IP addresses
     char *          li_filename;             // Name of shadow file
-    int                     li_modified;     // File should be written
+    int             li_modified;     // File should be written
 } ipl_list_ar[N_IPLIST] = {
     { 0, "/etc/spin/block.list",   0 },
     { 0, "/etc/spin/ignore.list",  0 },
