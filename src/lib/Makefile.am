@@ -9,6 +9,8 @@ noinst_LIBRARIES = libspin.a
 libspin_a_SOURCES = pkt_info.c \
 					spin_log.h \
 					spin_log.c \
+					dns.c \
+					dns.h \
 					dns_cache.h \
 					dns_cache.c \
 					tree.h \
