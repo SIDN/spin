@@ -57,7 +57,7 @@ out:
 	return s;
 }
 static struct ubus_context *ctx;
-static struct ubus_subscriber test_event;
+static struct ubus_subscriber spin_event;
 static struct blob_buf b;
 
 enum {
@@ -82,7 +82,7 @@ struct hello_request {
 #undef WIERD
 
 #ifdef WIERD
-static void test_hello_fd_reply(struct uloop_timeout *t)
+static void spin_hello_fd_reply(struct uloop_timeout *t)
 {
 	struct hello_request *req = container_of(t, struct hello_request, timeout);
 	char *data;
@@ -98,7 +98,7 @@ static void test_hello_fd_reply(struct uloop_timeout *t)
 	uloop_timeout_set(&req->timeout, 1000);
 }
 
-static void test_hello_reply(struct uloop_timeout *t)
+static void spin_hello_reply(struct uloop_timeout *t)
 {
 	struct hello_request *req = container_of(t, struct hello_request, timeout);
 	int fds[2];
@@ -115,12 +115,12 @@ static void test_hello_reply(struct uloop_timeout *t)
 	ubus_complete_deferred_request(ctx, &req->req, 0);
 	req->fd = fds[1];
 
-	req->timeout.cb = test_hello_fd_reply;
-	test_hello_fd_reply(t);
+	req->timeout.cb = spin_hello_fd_reply;
+	spin_hello_fd_reply(t);
 }
 #endif
 
-static int test_hello(struct ubus_context *ctx, struct ubus_object *obj,
+static int spin_hello(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct ubus_request_data *req, const char *method,
 		      struct blob_attr *msg)
 {
@@ -146,7 +146,7 @@ static int test_hello(struct ubus_context *ctx, struct ubus_object *obj,
 
 #ifdef WIERD
 	ubus_defer_request(ctx, req, &hreq->req);
-	hreq->timeout.cb = test_hello_reply;
+	hreq->timeout.cb = spin_hello_reply;
 	uloop_timeout_set(&hreq->timeout, 1000);
 #else
 	blob_buf_init(&b, 0);
@@ -177,7 +177,7 @@ struct spindlist_request {
 	char data[];
 };
 
-static int test_spindlist(struct ubus_context *ctx, struct ubus_object *obj,
+static int spin_spindlist(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct ubus_request_data *req, const char *method,
 		      struct blob_attr *msg)
 {
@@ -224,13 +224,14 @@ struct spinblockflow_request {
 	char data[];
 };
 
-static int test_spinblockflow(struct ubus_context *ctx, struct ubus_object *obj,
+static int spin_spinblockflow(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct ubus_request_data *req, const char *method,
 		      struct blob_attr *msg)
 {
 	struct blob_attr *tb[__SPINBLOCKFLOW_MAX];
         int node1, node2;
         void c2b_flowblock_start(int, int);
+        void c2b_node_persistent_start(int);
 
 	blobmsg_parse(spinblockflow_policy, ARRAY_SIZE(spinblockflow_policy), tb, blob_data(msg), blob_len(msg));
 
@@ -242,6 +243,8 @@ static int test_spinblockflow(struct ubus_context *ctx, struct ubus_object *obj,
 
         fprintf(stderr, "spinblockflow(%d, %d) called\n", node1, node2);
 
+        c2b_node_persistent_start(node1);
+        c2b_node_persistent_start(node2);
         if (node1 < node2) {
             c2b_flowblock_start(node1, node2);
         } else {
@@ -255,20 +258,20 @@ static int test_spinblockflow(struct ubus_context *ctx, struct ubus_object *obj,
 }
 
 
-static const struct ubus_method test_methods[] = {
-	UBUS_METHOD("hello", test_hello, hello_policy),
-	UBUS_METHOD("spindlist", test_spindlist, spindlist_policy),
-	UBUS_METHOD("spinblockflow", test_spinblockflow, spinblockflow_policy),
+static const struct ubus_method spin_methods[] = {
+	UBUS_METHOD("hello", spin_hello, hello_policy),
+	UBUS_METHOD("spindlist", spin_spindlist, spindlist_policy),
+	UBUS_METHOD("spinblockflow", spin_spinblockflow, spinblockflow_policy),
 };
 
-static struct ubus_object_type test_object_type =
-	UBUS_OBJECT_TYPE("test", test_methods);
+static struct ubus_object_type spin_object_type =
+	UBUS_OBJECT_TYPE("spin", spin_methods);
 
-static struct ubus_object test_object = {
-	.name = "test",
-	.type = &test_object_type,
-	.methods = test_methods,
-	.n_methods = ARRAY_SIZE(test_methods),
+static struct ubus_object spin_object = {
+	.name = "spin",
+	.type = &spin_object_type,
+	.methods = spin_methods,
+	.n_methods = ARRAY_SIZE(spin_methods),
 };
 
 static int
@@ -301,11 +304,11 @@ static void server_main(void)
 {
 	int ret;
 
-	ret = ubus_add_object(ctx, &test_object);
+	ret = ubus_add_object(ctx, &spin_object);
 	if (ret)
 		fprintf(stderr, "Failed to add object: %s\n", ubus_strerror(ret));
 
-	ret = ubus_register_subscriber(ctx, &test_event);
+	ret = ubus_register_subscriber(ctx, &spin_event);
 	if (ret)
 		fprintf(stderr, "Failed to add watch handler: %s\n", ubus_strerror(ret));
 

@@ -139,6 +139,7 @@ static char *ipset_name(int nodenum, int v6) {
     static int which;
 
     // Be prepared for two "simultaneous" calls
+    // Hack...
     which = (which+1)%2;
     sprintf(namebuf[which], "N%dV%d", nodenum, v6 ? 6 : 4);
     return namebuf[which];
@@ -147,25 +148,31 @@ static char *ipset_name(int nodenum, int v6) {
 static void
 ipset_create(int nodenum, int v6) {
     char str[MAXSTR];
+    STAT_COUNTER(ctr, set-create, STAT_TOTAL);
 
     sprintf(str, "ipset create %s hash:ip family %s", ipset_name(nodenum, v6), v6? "inet6" : "inet");
     iptab_system(str);
+    STAT_VALUE(ctr, 1);
 }
 
 static void
 ipset_destroy(int nodenum, int v6) {
     char str[MAXSTR];
+    STAT_COUNTER(ctr, set-destroy, STAT_TOTAL);
 
     sprintf(str, "ipset destroy %s", ipset_name(nodenum, v6));
     iptab_system(str);
+    STAT_VALUE(ctr, 1);
 }
 
 static void
 ipset_add_addr(int nodenum, int v6, char *addr) {
     char str[MAXSTR];
+    STAT_COUNTER(ctr, set-add-addr, STAT_TOTAL);
 
     sprintf(str, "ipset add -exist %s %s", ipset_name(nodenum, v6), addr);
     iptab_system(str);
+    STAT_VALUE(ctr, 1);
 }
 
 static void
@@ -173,17 +180,20 @@ ipset_blockflow(int v6, int option, int nodenum1, int nodenum2) {
     char str[MAXSTR];
     int i;
     static char *sd[] = { "src", "dst", "src" };
+    static char matchset[] = "-m set --match-set";
+    STAT_COUNTER(ctr, set-block-flow, STAT_TOTAL);
 
     for (i=0; i<2; i++) {
         // Both directions
-        sprintf(str, "%s %s %s -m set --match-set %s %s -m --match-set %s %s -j %s",
+        sprintf(str, "%s %s %s %s %s %s %s %s %s -j %s",
             iptables_command[v6],
             iaj_option[option], SpinCheck, 
-            ipset_name(nodenum1, v6), sd[i],
-            ipset_name(nodenum2, v6), sd[i+1],
+            matchset, ipset_name(nodenum1, v6), sd[i],
+            matchset, ipset_name(nodenum2, v6), sd[i+1],
             SpinBlock);
         iptab_system(str);
     }
+    STAT_VALUE(ctr, 1);
 }
 
 static void
