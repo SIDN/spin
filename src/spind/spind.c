@@ -214,7 +214,8 @@ store_node_info(int nodenum, buffer_t *node_json) {
     nodefile = fopen(filename, "w");
     fprintf(nodefile, "%s\n", buffer_str(node_json));
     fclose(nodefile);
-    decode_node_info(buffer_str(node_json));
+    if ((nodenum % 42 ) == 0)
+        decode_node_info(buffer_str(node_json));
 }
 
 /*
@@ -263,8 +264,11 @@ node_is_updated(node_t *node) {
         buffer_finish(node_json);
         // work
         send_command_node_info(node->id, node_json);
-        if (1) /* Persistent? */ {
+        if (node->persistent) /* Persistent? */ {
+            // Store modified node in file
             store_node_info(node->id, node_json);
+
+            // Call core2block for ipset creation/modification
         }
     } else {
         spin_log(LOG_DEBUG, "[XX] node2json failed(size 0)\n");
@@ -274,6 +278,11 @@ node_is_updated(node_t *node) {
 
 static void
 publish_nodes() {
+
+    // Currently called just before traffic messages
+    // Maybe also with timer?
+    //
+    // If so, how often?
 
     node_callback_new(node_cache, node_is_updated);
 }

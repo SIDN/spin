@@ -205,108 +205,60 @@ static int test_spindlist(struct ubus_context *ctx, struct ubus_object *obj,
 	return 0;
 }
 
-#ifdef notdef
-
 enum {
-	WATCH_ID,
-	WATCH_COUNTER,
-	__WATCH_MAX
+	SPINBLOCKFLOW_NODE1,
+	SPINBLOCKFLOW_NODE2,
+	__SPINBLOCKFLOW_MAX
 };
 
-static const struct blobmsg_policy watch_policy[__WATCH_MAX] = {
-	[WATCH_ID] = { .name = "id", .type = BLOBMSG_TYPE_INT32 },
-	[WATCH_COUNTER] = { .name = "counter", .type = BLOBMSG_TYPE_INT32 },
+static const struct blobmsg_policy spinblockflow_policy[] = {
+	[SPINBLOCKFLOW_NODE1] = { .name = "node1", .type = BLOBMSG_TYPE_INT32 },
+	[SPINBLOCKFLOW_NODE2] = { .name = "node2", .type = BLOBMSG_TYPE_INT32 },
 };
 
-static void
-test_handle_remove(struct ubus_context *ctx, struct ubus_subscriber *s,
-                   uint32_t id)
-{
-	fprintf(stderr, "Object %08x went away\n", id);
-}
+struct spinblockflow_request {
+	struct ubus_request_data req;
+	struct uloop_timeout timeout;
+	int fd;
+	int idx;
+	char data[];
+};
 
-static int
-test_notify(struct ubus_context *ctx, struct ubus_object *obj,
-	    struct ubus_request_data *req, const char *method,
-	    struct blob_attr *msg)
-{
-#if 0
-	char *str;
-
-	str = blobmsg_format_json(msg, true);
-	fprintf(stderr, "Received notification '%s': %s\n", method, str);
-	free(str);
-#endif
-
-	return 0;
-}
-
-static int test_watch(struct ubus_context *ctx, struct ubus_object *obj,
+static int test_spinblockflow(struct ubus_context *ctx, struct ubus_object *obj,
 		      struct ubus_request_data *req, const char *method,
 		      struct blob_attr *msg)
 {
-	struct blob_attr *tb[__WATCH_MAX];
-	int ret;
+	struct blob_attr *tb[__SPINBLOCKFLOW_MAX];
+        int node1, node2;
+        void c2b_flowblock_start(int, int);
 
-	blobmsg_parse(watch_policy, __WATCH_MAX, tb, blob_data(msg), blob_len(msg));
-	if (!tb[WATCH_ID])
-		return UBUS_STATUS_INVALID_ARGUMENT;
+	blobmsg_parse(spinblockflow_policy, ARRAY_SIZE(spinblockflow_policy), tb, blob_data(msg), blob_len(msg));
 
-	test_event.remove_cb = test_handle_remove;
-	test_event.cb = test_notify;
-	ret = ubus_subscribe(ctx, &test_event, blobmsg_get_u32(tb[WATCH_ID]));
-	fprintf(stderr, "Watching object %08x: %s\n", blobmsg_get_u32(tb[WATCH_ID]), ubus_strerror(ret));
-	return ret;
-}
+        node1 = 0; node2 = 0;
+	if (tb[SPINBLOCKFLOW_NODE1])
+		node1 = blobmsg_get_u32(tb[SPINBLOCKFLOW_NODE1]);
+	if (tb[SPINBLOCKFLOW_NODE2])
+		node2 = blobmsg_get_u32(tb[SPINBLOCKFLOW_NODE2]);
 
-enum {
-    COUNT_TO,
-    COUNT_STRING,
-    __COUNT_MAX
-};
+        fprintf(stderr, "spinblockflow(%d, %d) called\n", node1, node2);
 
-static const struct blobmsg_policy count_policy[__COUNT_MAX] = {
-    [COUNT_TO] = { .name = "to", .type = BLOBMSG_TYPE_INT32 },
-    [COUNT_STRING] = { .name = "string", .type = BLOBMSG_TYPE_STRING },
-};
+        if (node1 < node2) {
+            c2b_flowblock_start(node1, node2);
+        } else {
+            c2b_flowblock_start(node2, node1);
+        }
 
-static int test_count(struct ubus_context *ctx, struct ubus_object *obj,
-		      struct ubus_request_data *req, const char *method,
-		      struct blob_attr *msg)
-{
-	struct blob_attr *tb[__COUNT_MAX];
-	char *s1, *s2;
-	uint32_t num;
-
-	blobmsg_parse(count_policy, __COUNT_MAX, tb, blob_data(msg), blob_len(msg));
-	if (!tb[COUNT_TO] || !tb[COUNT_STRING])
-		return UBUS_STATUS_INVALID_ARGUMENT;
-
-	num = blobmsg_get_u32(tb[COUNT_TO]);
-	s1 = blobmsg_get_string(tb[COUNT_STRING]);
-	s2 = count_to_number(num);
-	if (!s1 || !s2) {
-		free(s2);
-		return UBUS_STATUS_UNKNOWN_ERROR;
-	}
 	blob_buf_init(&b, 0);
-	blobmsg_add_u32(&b, "rc", strcmp(s1, s2));
+	blobmsg_add_string(&b, "fake-return", "ok");
 	ubus_send_reply(ctx, req, b.head);
-	free(s2);
-
 	return 0;
 }
-
-#endif
 
 
 static const struct ubus_method test_methods[] = {
 	UBUS_METHOD("hello", test_hello, hello_policy),
 	UBUS_METHOD("spindlist", test_spindlist, spindlist_policy),
-#ifdef notdef
-	UBUS_METHOD("watch", test_watch, watch_policy),
-	UBUS_METHOD("count", test_count, count_policy),
-#endif
+	UBUS_METHOD("spinblockflow", test_spinblockflow, spinblockflow_policy),
 };
 
 static struct ubus_object_type test_object_type =

@@ -23,17 +23,14 @@ typedef struct {
     char* mac;
     // some additional info about this node
     int is_onlist[N_IPLIST];
-#ifdef notdef
-    uint8_t is_blocked;
-    uint8_t is_allowed;
-#endif
+
     // at some point we may want to clean up stuff, so keep track of
     // when we last saw it
     uint32_t last_seen;
     // and for publication purposes also if it changed
     uint8_t modified;
     // and for storage if persistent
-    uint8_t persistent;
+    uint32_t persistent;
 } node_t;
 
 #define is_blocked is_onlist[IPLIST_BLOCK]

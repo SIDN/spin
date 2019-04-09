@@ -85,11 +85,11 @@ iptab_do_table(char *name, int delete) {
 #define IAJ_ADD 0
 #define IAJ_INS 1
 #define IAJ_DEL 2
+static char *iaj_option[3] = { "-A", "-I", "-D" };
 
 static void
 iptab_add_jump(char *table, int option, char *cond, char *dest) {
     char str[MAXSTR];
-    static char *iaj_option[3] = { "-A", "-I", "-D" };
 
     sprintf(str, "iptables %s %s%s%s -j %s", iaj_option[option], table,
                         cond ? " " : "", cond ? cond : "", dest);
@@ -107,6 +107,9 @@ static char SpinCheck[] = "SpinCheck";
 static char SpinBlock[] = "SpinBlock";
 static char SpinLog[] = "SpinLog";
 static char Return[] = "RETURN";
+
+static char *iptables_command[2] = { "iptables", "ip6tables" };
+static char *srcdst[2] = { "-s", "-d" };
 
 // TODO: rename nflog_dns_group to nflog_dns_group
 static void
@@ -129,6 +132,56 @@ clean_old_tables(int nflog_dns_group) {
     iptab_do_table(SpinCheck, IDT_DEL);
     iptab_do_table(SpinLog, IDT_DEL);
     iptab_do_table(SpinBlock, IDT_DEL);
+}
+
+static char *ipset_name(int nodenum, int v6) {
+    static char namebuf[2][100];
+    static int which;
+
+    // Be prepared for two "simultaneous" calls
+    which = (which+1)%2;
+    sprintf(namebuf[which], "N%dV%d", nodenum, v6 ? 6 : 4);
+    return namebuf[which];
+}
+
+static void
+ipset_create(int nodenum, int v6) {
+    char str[MAXSTR];
+
+    sprintf(str, "ipset create %s hash:ip family %s", ipset_name(nodenum, v6), v6? "inet6" : "inet");
+    iptab_system(str);
+}
+
+static void
+ipset_destroy(int nodenum, int v6) {
+    char str[MAXSTR];
+
+    sprintf(str, "ipset destroy %s", ipset_name(nodenum, v6));
+    iptab_system(str);
+}
+
+static void
+ipset_add_addr(int nodenum, int v6, char *addr) {
+    char str[MAXSTR];
+
+    sprintf(str, "ipset add -exist %s %s", ipset_name(nodenum, v6), addr);
+}
+
+static void
+ipset_blockflow(int v6, int option, int nodenum1, int nodenum2) {
+    char str[MAXSTR];
+    int i;
+    static char *sd[] = { "src", "dst", "src" };
+
+    for (i=0; i<2; i++) {
+        // Both directions
+        sprintf(str, "%s %s %s -m set --match-set %s %s -m --match-set %s %s -j %s",
+            iptables_command[v6],
+            iaj_option[option], SpinCheck, 
+            ipset_name(nodenum1, v6), sd[i],
+            ipset_name(nodenum2, v6), sd[i+1],
+            SpinBlock);
+    }
 }
 
 static void
@@ -165,9 +218,6 @@ setup_tables(int nflog_dns_group, int queue_block, int place) {
     iptab_add_jump(SpinBlock, IAJ_ADD, 0, str);
 }
 
-static char *iptables_command[2] = { "iptables", "ip6tables" };
-static char *srcdst[2] = { "-s", "-d" };
-
 static void
 c2b_do_rule(char *table, int ipv6, int addrem, char *ip_str, char *target) {
     char *cmd, *flag;
@@ -200,6 +250,50 @@ void c2b_changelist(void* arg, int iplist, int addrem, ip_t *ip_addr) {
 
     STAT_VALUE(ctr, 1);
     c2b_do_rule(tables[iplist], ipv6, addrem, ip_str, targets[iplist]);
+}
+
+void c2b_node_persistent_start(int nodenum) {
+
+    // Make the Ipv4 and Ipv6 ipsets for this node
+    ipset_create(nodenum, 0);
+    ipset_create(nodenum, 1);
+}
+
+void c2b_node_persistent_end(int nodenum) {
+
+    // Remove the ipsets
+    ipset_destroy(nodenum, 0);
+    ipset_destroy(nodenum, 1);
+}
+
+void c2b_node_ipaddress(int nodenum, ip_t *ip_addr) {
+    int ipv6 = 0;
+    char ip_str[INET6_ADDRSTRLEN];
+
+    // Add or re-add ip-addr to nodenum's set
+
+    // IP v4 or 6, decode address
+    if (ip_addr->family != AF_INET) {
+        ipv6 = 1;
+    }
+    spin_ntop(ip_str, ip_addr, INET6_ADDRSTRLEN);
+    spin_log(LOG_DEBUG, "c2b_node_ipaddress %d %d %s\n", nodenum, ipv6, ip_str);
+
+    ipset_add_addr(nodenum, ipv6, ip_str);
+}
+
+void c2b_flowblock_start(int nodenum1, int nodenum2) {
+
+    // Block this flow
+    ipset_blockflow(0, IAJ_INS, nodenum1, nodenum2);
+    ipset_blockflow(1, IAJ_INS, nodenum1, nodenum2);
+}
+
+void c2b_flowblock_end(int nodenum1, int nodenum2) {
+
+    // Unblock this flow
+    ipset_blockflow(0, IAJ_DEL, nodenum1, nodenum2);
+    ipset_blockflow(1, IAJ_DEL, nodenum1, nodenum2);
 }
 
 static int
