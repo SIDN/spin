@@ -12,6 +12,7 @@
 #include "pkt_info.h"
 #include "util.h"
 #include "dns_cache.h"
+#include "ipl.h"
 #include "node_cache.h"
 #include "core2nflog_dns.h"
 #include "spin_log.h"

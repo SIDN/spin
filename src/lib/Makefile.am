@@ -19,6 +19,8 @@ libspin_a_SOURCES = pkt_info.c \
 					util.c \
 					arp.h \
 					arp.c \
+					ipl.c \
+					ipl.h \
 					node_names.h \
 					node_names.c \
 					jsmn.h \
