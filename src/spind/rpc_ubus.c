@@ -13,6 +13,7 @@
 
 #include "mainloop.h"
 #include "spin_log.h"
+#include "spind.h"
 
 #include <unistd.h>
 #include <signal.h>
@@ -230,8 +231,7 @@ static int spin_spinblockflow(struct ubus_context *ctx, struct ubus_object *obj,
 {
 	struct blob_attr *tb[__SPINBLOCKFLOW_MAX];
         int node1, node2;
-        void c2b_flowblock_start(int, int);
-        void c2b_node_persistent_start(int);
+        int result;
 
 	blobmsg_parse(spinblockflow_policy, ARRAY_SIZE(spinblockflow_policy), tb, blob_data(msg), blob_len(msg));
 
@@ -243,16 +243,10 @@ static int spin_spinblockflow(struct ubus_context *ctx, struct ubus_object *obj,
 
         fprintf(stderr, "spinblockflow(%d, %d) called\n", node1, node2);
 
-        c2b_node_persistent_start(node1);
-        c2b_node_persistent_start(node2);
-        if (node1 < node2) {
-            c2b_flowblock_start(node1, node2);
-        } else {
-            c2b_flowblock_start(node2, node1);
-        }
+        result = spinrpc_flowblock(node1, node2);
 
 	blob_buf_init(&b, 0);
-	blobmsg_add_string(&b, "fake-return", "ok");
+	blobmsg_add_u32(&b, "return", result);
 	ubus_send_reply(ctx, req, b.head);
 	return 0;
 }

@@ -287,6 +287,50 @@ publish_nodes() {
     node_callback_new(node_cache, node_is_updated);
 }
 
+/*
+ * RPC implementing code
+ *
+ * This should probably be moved to separate file
+ *
+ */
+
+static int
+inc_node_persistency(int nodenum) {
+    node_t *node;
+
+    node = node_cache_find_by_id(node_cache, nodenum);
+    if (node != NULL) {
+        if (node->persistent == 0) {
+            c2b_node_persistent_start(nodenum);
+        }
+        node->persistent++;
+        return 0;
+    }
+    return 1;
+}
+
+int
+spinrpc_flowblock(int node1, int node2) {
+    int result;
+
+    result = 0;
+    result += inc_node_persistency(node1);
+    result += inc_node_persistency(node2);
+    if (result) {
+        return result;
+    }
+    if (node1 < node2) {
+        c2b_flowblock_start(node1, node2);
+    } else {
+        c2b_flowblock_start(node2, node1);
+    }
+    return 0;
+}
+
+/*
+ * End of RPC code
+ */
+
 void send_command_blocked(pkt_info_t* pkt_info) {
     buffer_t* response_json = buffer_create(JSONBUFSIZ);
     buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
