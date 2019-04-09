@@ -330,7 +330,8 @@ void handle_json_command(const char* data) {
         handle_json_command_detail(verb, object, data, tokens, 4);
         return;
     }
-    spin_log(LOG_ERR, "Error: json command not understood\n");
+    spin_log(LOG_ERR, "Error: json command %.*s not understood\n",
+        tokens[2].end-tokens[2].start, data+tokens[2].start);
 }
 
 

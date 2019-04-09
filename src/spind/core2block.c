@@ -165,6 +165,7 @@ ipset_add_addr(int nodenum, int v6, char *addr) {
     char str[MAXSTR];
 
     sprintf(str, "ipset add -exist %s %s", ipset_name(nodenum, v6), addr);
+    iptab_system(str);
 }
 
 static void
@@ -181,6 +182,7 @@ ipset_blockflow(int v6, int option, int nodenum1, int nodenum2) {
             ipset_name(nodenum1, v6), sd[i],
             ipset_name(nodenum2, v6), sd[i+1],
             SpinBlock);
+        iptab_system(str);
     }
 }
 
