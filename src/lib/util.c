@@ -38,6 +38,25 @@ int cmp_ints(size_t size_a, const void* key_a, size_t size_b, const void* key_b)
     }
 }
 
+int cmp_2ints(size_t size_a, const void* key_a, size_t size_b, const void* key_b) {
+    int *a, *b;
+    assert(size_a == 2*sizeof(*a));
+    assert(size_b == 2*sizeof(*b));
+    a = (int*) key_a;
+    b = (int*) key_b;
+    if (a[0] > b[0]) {
+        return 1;
+    } else if (a[0] < b[0]) {
+        return -1;
+    } else if (a[1] > b[1]) {
+        return 1;
+    } else if (a[1] < b[1]) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
 int cmp_strs(size_t size_a, const void* key_a, size_t size_b, const void* key_b) {
     size_t size = size_a;
     int result;
@@ -238,6 +257,24 @@ int store_ip_tree(tree_t* tree, const char* filename) {
     while (cur != NULL) {
         spin_ntop(ip_str, cur->key, cur->key_size);
         fprintf(out, "%s\n", ip_str);
+        cur = tree_next(cur);
+    }
+    fclose(out);
+    return 1;
+}
+
+int store_nodepair_tree(tree_t* tree, const char* filename) {
+    tree_entry_t* cur;
+    int *np;
+
+    FILE* out = fopen(filename, "w");
+    if (out == NULL) {
+        return 0;
+    }
+    cur = tree_first(tree);
+    while (cur != NULL) {
+        np = (int *) cur->key;
+        fprintf(out, "%d %d\n", np[0], np[1]);
         cur = tree_next(cur);
     }
     fclose(out);

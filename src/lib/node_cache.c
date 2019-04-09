@@ -105,7 +105,7 @@ node_set_last_seen(node_t* node, uint32_t last_seen) {
     node->last_seen = last_seen;
 }
 
-static void
+void
 node_set_modified(node_t* node, uint32_t last_seen) {
     node->modified = 1;
     node->last_seen = last_seen;

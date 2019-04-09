@@ -255,6 +255,17 @@ send_command_node_info(int nodenum, buffer_t *node_json) {
 }
 
 static void
+update_node_ips(int nodenum, tree_t *tree) {
+    tree_entry_t* ip_entry;
+
+    ip_entry = tree_first(tree);
+    while (ip_entry != NULL) {
+        c2b_node_ipaddress(nodenum, ip_entry->key);
+        ip_entry = tree_next(ip_entry);
+    }
+}
+
+static void
 node_is_updated(node_t *node) {
     buffer_t* node_json = buffer_create(JSONBUFSIZ);
     unsigned int p_size;
@@ -268,7 +279,8 @@ node_is_updated(node_t *node) {
             // Store modified node in file
             store_node_info(node->id, node_json);
 
-            // Call core2block for ipset creation/modification
+            // Update IP addresses in c2b
+            update_node_ips(node->id, node->ips);
         }
     } else {
         spin_log(LOG_DEBUG, "[XX] node2json failed(size 0)\n");
@@ -293,14 +305,24 @@ publish_nodes() {
  * This should probably be moved to separate file
  *
  */
+tree_t *nodepair_tree;
+
+static void
+init_spinrpc() {
+
+    nodepair_tree = tree_create(cmp_2ints);
+}
 
 static int
 inc_node_persistency(int nodenum) {
     node_t *node;
+    time_t now;
 
     node = node_cache_find_by_id(node_cache, nodenum);
     if (node != NULL) {
         if (node->persistent == 0) {
+            now = time(NULL);
+            node_set_modified(node, now);
             c2b_node_persistent_start(nodenum);
         }
         node->persistent++;
@@ -309,9 +331,23 @@ inc_node_persistency(int nodenum) {
     return 1;
 }
 
+static void
+spinrpc_flowblock_start(int node1, int node2) {
+    int node_ar[2];
+
+    node_ar[0] = node1;
+    node_ar[1] = node2;
+
+    // Copy flag is 1, key must be copied
+    tree_add(nodepair_tree, sizeof(node_ar), (void *) node_ar, 0, NULL, 1);
+    store_nodepair_tree(nodepair_tree, "/etc/spin/nodepair.list");
+    c2b_flowblock_start(node1, node2);
+}
+
 int
 spinrpc_flowblock(int node1, int node2) {
     int result;
+    STAT_COUNTER(ctr, rpc-flowblock, STAT_TOTAL);
 
     result = 0;
     result += inc_node_persistency(node1);
@@ -320,10 +356,11 @@ spinrpc_flowblock(int node1, int node2) {
         return result;
     }
     if (node1 < node2) {
-        c2b_flowblock_start(node1, node2);
+        spinrpc_flowblock_start(node1, node2);
     } else {
-        c2b_flowblock_start(node2, node1);
+        spinrpc_flowblock_start(node2, node1);
     }
+    STAT_VALUE(ctr, 1);
     return 0;
 }
 
@@ -886,6 +923,8 @@ int main(int argc, char** argv) {
 
     init_all_ipl();
 
+    init_spinrpc();
+
     init_mosquitto(mosq_host, mosq_port);
     signal(SIGINT, int_handler);
 
@@ -893,9 +932,7 @@ int main(int argc, char** argv) {
 
     omitnode = spinconfig_pubsub_omitnode();
 
-    spin_log(LOG_DEBUG, "Before ubus_main\n");
     ubus_main();
-    spin_log(LOG_DEBUG, "After ubus_main\n");
 
     mainloop_run();
 

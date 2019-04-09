@@ -54,6 +54,7 @@ void node_set_last_seen(node_t* node, uint32_t lastg_seen);
 
 int node_shares_element(node_t* node, node_t* othernode);
 */
+void node_set_modified(node_t* node, uint32_t lastg_seen);
 /*
  * Merge two nodes;
  * Add all IP addresses and domain names that are in src to dest
