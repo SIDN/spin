@@ -314,54 +314,110 @@ init_spinrpc() {
 }
 
 static int
-inc_node_persistency(int nodenum) {
+change_node_persistency(int nodenum, int val) {
     node_t *node;
     time_t now;
 
     node = node_cache_find_by_id(node_cache, nodenum);
     if (node != NULL) {
         if (node->persistent == 0) {
+            // Is becoming persistent
             now = time(NULL);
             node_set_modified(node, now);
             c2b_node_persistent_start(nodenum);
         }
-        node->persistent++;
+        node->persistent += val;
+        if (node->persistent == 0) {
+            // Stops being persistent
+            now = time(NULL);
+            node_set_modified(node, now);
+            c2b_node_persistent_end(nodenum);
+        }
         return 0;
     }
     return 1;
 }
 
 static void
-spinrpc_flowblock_start(int node1, int node2) {
+store_nodepairs() {
+
+    store_nodepair_tree(nodepair_tree, "/etc/spin/nodepair.list");
+}
+
+static int
+spinrpc_blockflow_start(int node1, int node2) {
+    int result;
     int node_ar[2];
+    tree_entry_t *leaf;
 
     node_ar[0] = node1;
     node_ar[1] = node2;
-
-    // Copy flag is 1, key must be copied
-    tree_add(nodepair_tree, sizeof(node_ar), (void *) node_ar, 0, NULL, 1);
-    store_nodepair_tree(nodepair_tree, "/etc/spin/nodepair.list");
-    c2b_flowblock_start(node1, node2);
-}
-
-int
-spinrpc_flowblock(int node1, int node2) {
-    int result;
-    STAT_COUNTER(ctr, rpc-flowblock, STAT_TOTAL);
+    leaf = tree_find(nodepair_tree, sizeof(node_ar), (void *) node_ar);
+    if (leaf != NULL) {
+        // This flow was already blocked
+        return 0;
+    }
 
     result = 0;
-    result += inc_node_persistency(node1);
-    result += inc_node_persistency(node2);
+    result += change_node_persistency(node1, 1);
+    result += change_node_persistency(node2, 1);
     if (result) {
         return result;
     }
+
+    // Copy flag is 1, key must be copied
+    tree_add(nodepair_tree, sizeof(node_ar), (void *) node_ar, 0, NULL, 1);
+    // new pair to block
+    store_nodepairs();
+    c2b_flowblock_start(node1, node2);
+    return 0;
+}
+
+static int
+spinrpc_blockflow_stop(int node1, int node2) {
+    int result;
+    int node_ar[2];
+    tree_entry_t *leaf;
+
+    node_ar[0] = node1;
+    node_ar[1] = node2;
+    leaf = tree_find(nodepair_tree, sizeof(node_ar), (void *) node_ar);
+    if (leaf == NULL) {
+        // This flow was not blocked
+        return 1;
+    }
+    // Remove from tree
+    tree_remove_entry(nodepair_tree, leaf);
+    store_nodepairs();
+    c2b_flowblock_end(node1, node2);
+
+    result = 0;
+    result += change_node_persistency(node1, -1);
+    result += change_node_persistency(node2, -1);
+    return result;
+}
+
+int
+spinrpc_blockflow(int node1, int node2, int block) {
+    int result;
+    int sn1, sn2;
+    STAT_COUNTER(ctr, rpc-flowblock, STAT_TOTAL);
+
+    if (node1 == node2) {
+        return 1;
+    }
     if (node1 < node2) {
-        spinrpc_flowblock_start(node1, node2);
+        sn1 = node1; sn2 = node2;
     } else {
-        spinrpc_flowblock_start(node2, node1);
+        sn1 = node2; sn2 = node1;
+    }
+    if (block) {
+        result = spinrpc_blockflow_start(sn1, sn2);
+    } else {
+        result = spinrpc_blockflow_stop(sn1, sn2);
     }
     STAT_VALUE(ctr, 1);
-    return 0;
+    return result;
 }
 
 /*

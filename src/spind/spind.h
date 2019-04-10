@@ -17,6 +17,6 @@ int addr_in_ignore_list(int family, uint8_t* addr);
 void send_command_dnsquery(dns_pkt_info_t* pkt_info);
 
 // RPC section
-int spinrpc_flowblock(int node1, int node2);
+int spinrpc_blockflow(int node1, int node2, int block);
 
 #endif
