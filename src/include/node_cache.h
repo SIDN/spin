@@ -101,8 +101,8 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
 /**
  * this takes ownership of the given node pointer, do not use or free after!
  * Returns 1 if the added node is new, 0 if not
-int node_cache_add_node(node_cache_t* node_cache, node_t* node);
  */
+int node_cache_add_node(node_cache_t* node_cache, node_t* node);
 
 node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* ip);
 /**

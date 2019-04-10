@@ -1,6 +1,8 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <sys/types.h>
+#include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -47,7 +49,7 @@ STAT_MODULE(spind)
  */
 
 #include "jsmn.h"
-#define NTOKENS 50
+#define NTOKENS 200
 
 // Do longest keywords here first, to prevent initial substring matching
 enum nkw {
@@ -102,28 +104,26 @@ find_num(char *s, char *e) {
     return atoi(find_str(s,e));
 }
 
-#define CHECK_TYPE(n, t) if (tokens[n].type != t) { spin_log(LOG_ERR, "Token %d bad type\n", n); return; }
-#define CHECK_TRUTH(tr) if (!(tr)) { spin_log(LOG_ERR, "Unknown error in parse\n"); }
+#define CHECK_TYPE(n, t) if (tokens[n].type != t) { spin_log(LOG_ERR, "Token %d bad type\n", n); return 0; }
+#define CHECK_TRUTH(tr) if (!(tr)) { spin_log(LOG_ERR, "Unknown error in parse\n"); return 0; }
 
-static void
-decode_node_info(char *data) {
+static node_t*
+decode_node_info(char *data, int datalen) {
     jsmn_parser p;
     jsmntok_t tokens[NTOKENS];
     int result;
-    int datalen;
     int i, aix;
     int nexttok;
     node_t *newnode;
     char *mac, *name;
     int old_id;
 
-    datalen = strlen(data);
     fprintf(stderr, "To parse: %s\n", data);
     jsmn_init(&p);
     result = jsmn_parse(&p, data, datalen, tokens, NTOKENS);
     if (result < 0) {
         spin_log(LOG_ERR, "Unable to parse node data\n");
-        return;
+        return 0;
     }
     CHECK_TYPE(0, JSMN_OBJECT);
 
@@ -200,22 +200,34 @@ decode_node_info(char *data) {
         }
         nexttok++;
     }
+    return newnode;
 }
 
 #define NODE_FILENAME_DIR "/etc/spin/nodestore"
 
+static char node_filename[100];
+static char *
+node_filename_int(int nodenum) {
+
+    sprintf(node_filename, "%s/%d", NODE_FILENAME_DIR, nodenum);
+    return node_filename;
+}
+
+static char *
+node_filename_str(char *nodenum) {
+
+    sprintf(node_filename, "%s/%s", NODE_FILENAME_DIR, nodenum);
+    return node_filename;
+}
+
 static void
 store_node_info(int nodenum, buffer_t *node_json) {
-    char filename[100];
     FILE *nodefile;
 
     mkdir(NODE_FILENAME_DIR, 0777);
-    sprintf(filename, "%s/%d", NODE_FILENAME_DIR, nodenum);
-    nodefile = fopen(filename, "w");
+    nodefile = fopen(node_filename_int(nodenum), "w");
     fprintf(nodefile, "%s\n", buffer_str(node_json));
     fclose(nodefile);
-    if ((nodenum % 42 ) == 0)
-        decode_node_info(buffer_str(node_json));
 }
 
 /*
@@ -308,9 +320,82 @@ publish_nodes() {
 tree_t *nodepair_tree;
 
 static void
+debug_node(node_t *node) {
+    buffer_t* node_json = buffer_create(JSONBUFSIZ);
+    unsigned int p_size;
+
+    p_size = node2json(node, node_json);
+    if (p_size > 0) {
+        buffer_finish(node_json);
+        fprintf(stderr, "Created: %s\n", buffer_str(node_json));
+    } else {
+        spin_log(LOG_DEBUG, "[XX] node2json failed(size 0)\n");
+    }
+    buffer_destroy(node_json);
+}
+
+static void
+handle_node_info(char *buf, int size) {
+    node_t *newnode;
+    int oldid, newid;
+    int wasnew;
+
+    newnode = decode_node_info(buf, size);
+
+    if (newnode) {
+        oldid = newnode->id;
+        newnode->id = 0;
+        debug_node(newnode);
+        wasnew = node_cache_add_node(node_cache, newnode);
+        // What if it was merged??
+        assert(wasnew);
+        newid = newnode->id;
+        fprintf(stderr, "Id mapping from %d to %d\n", oldid, newid);
+    }
+}
+
+#define NODE_READ_SIZE (JSONBUFSIZ+1000)
+
+static void
+retrieve_node_info() {
+    DIR *nodedir;
+    struct dirent *fentry;
+    char data[NODE_READ_SIZE];
+    int fildes;
+    int numbytes;
+
+    nodedir = opendir(NODE_FILENAME_DIR);
+    if (nodedir == NULL) {
+        spin_log(LOG_ERR, "Could not open directory %s\n", NODE_FILENAME_DIR);
+        return;
+    }
+    while ((fentry = readdir(nodedir))!=NULL) {
+        fprintf(stderr, "Found filename %s\n", node_filename_str(fentry->d_name));
+        if (fentry->d_name[0] == '.') {
+            continue;
+        }
+        fildes = open(node_filename_str(fentry->d_name), 0);
+        if (fildes >= 0) {
+            // do something with file
+            // read it, decode it, remove it
+            numbytes = read(fildes, data, NODE_READ_SIZE);
+            // If it totally fills buffer it is too large
+            if (numbytes < NODE_READ_SIZE) {
+                // zero terminate, just in case
+                data[numbytes] = 0;
+                handle_node_info(data, numbytes);
+            }
+            close(fildes);
+        }
+    }
+    closedir(nodedir);
+}
+
+static void
 init_spinrpc() {
 
     nodepair_tree = tree_create(cmp_2ints);
+    retrieve_node_info();
 }
 
 static int

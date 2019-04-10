@@ -38,4 +38,11 @@ c2b_flowblock_end(nodenum1, nodenum2)
 Start and ends the blocking of a flow(someone should sort the numbers)
 
 
-### 
+### Reread info at reboot/restart
+
+Currently the info saved is a file containing the pairs of nodenumbers that have their flows blocked, and the JSON description of the nodes contained in these pairs.  
+Later perhaps more nodes could be saved, when they are declared persistent for other reasons.
+
+When reading in the node descriptions the nodes will have to be allocated and get a different number. At least temporary there will need to be a mapping from old numbers to new numbers, using the tree code.
+
+Then read the nodepair.list file and using the mapping just built make new blocked flows

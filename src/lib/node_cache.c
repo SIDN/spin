@@ -13,8 +13,6 @@ extern int omitnode;
 
 STAT_MODULE(node_cache)
 
-static int node_cache_add_node(node_cache_t* node_cache, node_t* node);
-
 STAT_COUNTER(nodes, nodes, STAT_TOTAL);
 
 node_t*
@@ -597,7 +595,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
 
 // return 0 if it existed/was merged
 // return 1 if it was new
-static int
+int
 node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     int new_id, *new_id_mem;
     tree_entry_t* cur = tree_first(node_cache->nodes);
