@@ -118,7 +118,6 @@ decode_node_info(char *data, int datalen) {
     char *mac, *name;
     int old_id;
 
-    fprintf(stderr, "To parse: %s\n", data);
     jsmn_init(&p);
     result = jsmn_parse(&p, data, datalen, tokens, NTOKENS);
     if (result < 0) {
@@ -144,7 +143,6 @@ decode_node_info(char *data, int datalen) {
             // Setup mapping between old and new numbers
             CHECK_TYPE(val, JSMN_PRIMITIVE);
             old_id = find_num(data+tokens[val].start, data+tokens[val].end);
-            fprintf(stderr, "Id= %d\n", old_id);
             newnode->id = old_id;
             break;
         case N_NKW:
@@ -159,14 +157,12 @@ decode_node_info(char *data, int datalen) {
             CHECK_TYPE(val, JSMN_STRING);
             mac = find_str(data+tokens[val].start, data+tokens[val].end);
             node_set_mac(newnode, mac);
-            fprintf(stderr, "Mac=%s\n", mac);
             break;
         case NKW_NAME:
             // Store name
             CHECK_TYPE(val, JSMN_STRING);
             name = find_str(data+tokens[val].start, data+tokens[val].end);
             node_set_name(newnode, name);
-            fprintf(stderr, "Name=%s\n", name);
             break;
         case NKW_IPS:
             // Store IP addresses
@@ -180,7 +176,6 @@ decode_node_info(char *data, int datalen) {
                 ipaddr = find_str(data+tokens[val+aix].start, data+tokens[val+aix].end);
                 retval = spin_pton(&ipval, ipaddr);
                 CHECK_TRUTH(retval);
-                fprintf(stderr, "Ipaddr=%s\n", ipaddr);
                 node_add_ip(newnode, &ipval);
             }
             nexttok = val+aix-1;
@@ -193,7 +188,6 @@ decode_node_info(char *data, int datalen) {
 
                 CHECK_TYPE(val+aix, JSMN_STRING);
                 domainname = find_str(data+tokens[val+aix].start, data+tokens[val+aix].end);
-                fprintf(stderr, "Domain=%s\n", domainname);
                 node_add_domain(newnode, domainname);
             }
             nexttok = val+aix-1;
@@ -205,6 +199,7 @@ decode_node_info(char *data, int datalen) {
 }
 
 #define NODE_FILENAME_DIR "/etc/spin/nodestore"
+#define NODEPAIRFILE "/etc/spin/nodepair.list"
 
 static char node_filename[100];
 static char *
@@ -322,21 +317,6 @@ tree_t *nodepair_tree;
 tree_t *nodemap_tree;
 
 static void
-debug_node(node_t *node) {
-    buffer_t* node_json = buffer_create(JSONBUFSIZ);
-    unsigned int p_size;
-
-    p_size = node2json(node, node_json);
-    if (p_size > 0) {
-        buffer_finish(node_json);
-        fprintf(stderr, "Created: %s\n", buffer_str(node_json));
-    } else {
-        spin_log(LOG_DEBUG, "[XX] node2json failed(size 0)\n");
-    }
-    buffer_destroy(node_json);
-}
-
-static void
 handle_node_info(char *buf, int size) {
     node_t *newnode;
     int oldid, newid;
@@ -347,12 +327,10 @@ handle_node_info(char *buf, int size) {
     if (newnode) {
         oldid = newnode->id;
         newnode->id = 0;
-        debug_node(newnode);
         wasnew = node_cache_add_node(node_cache, newnode);
         // What if it was merged??
         assert(wasnew);
         newid = newnode->id;
-        fprintf(stderr, "Id mapping from %d to %d\n", oldid, newid);
         tree_add(nodemap_tree,
             sizeof(oldid), (void *) &oldid,
             sizeof(newid), (void *) &newid,
@@ -369,6 +347,7 @@ retrieve_node_info() {
     char data[NODE_READ_SIZE];
     int fildes;
     int numbytes;
+    char *filename;
 
     nodedir = opendir(NODE_FILENAME_DIR);
     if (nodedir == NULL) {
@@ -376,11 +355,11 @@ retrieve_node_info() {
         return;
     }
     while ((fentry = readdir(nodedir))!=NULL) {
-        fprintf(stderr, "Found filename %s\n", node_filename_str(fentry->d_name));
         if (fentry->d_name[0] == '.') {
             continue;
         }
-        fildes = open(node_filename_str(fentry->d_name), 0);
+        filename = node_filename_str(fentry->d_name);
+        fildes = open(filename, 0);
         if (fildes >= 0) {
             // do something with file
             // read it, decode it, remove it
@@ -393,21 +372,49 @@ retrieve_node_info() {
             }
             close(fildes);
         }
+        unlink(filename);
     }
     closedir(nodedir);
 }
 
-void debug_map() {
-    tree_entry_t* cur;
-    int old, new;
+static int map_node(int nodenum) {
+    tree_entry_t *leaf;
+    int newnodenum;
 
-    cur = tree_first(nodemap_tree);
-    while(cur != NULL) {
-        old = * ( (int *) cur->key);
-        new = * ( (int *) cur->data);
-        fprintf(stderr, "Old->New is %d to %d\n", old, new);
-        cur = tree_next(cur);
+    leaf = tree_find(nodemap_tree, sizeof(nodenum), (void *) &nodenum);
+    if (leaf == NULL) {
+        spin_log(LOG_ERR, "COuld not find mapping for node %d\n", nodenum);
+        return 0;
     }
+    newnodenum = *((int *) leaf->data);
+    return newnodenum;
+}
+
+int read_nodepair_tree(const char *filename) {
+    int count = 0;
+    char line[100];
+    char* rline;
+    int id[2];
+    int node1, node2;
+    int spinrpc_blockflow(int node1, int node2, int block);
+
+    FILE* in = fopen(filename, "r");
+    if (in == NULL) {
+        return -1;
+    }
+    unlink(filename); // to prevent overwriting TODO
+    while ((rline = fgets(line, sizeof(line), in)) != NULL) {
+        if (sscanf(rline, "%d %d", &id[0], &id[1]) == 2) {
+            node1 = map_node(id[0]);
+            node2 = map_node(id[1]);
+            spinrpc_blockflow(node1, node2, 1);
+            // Do mapping and actual blocking
+            // tree_add(nodepair_tree, sizeof(id), (void *) id, 0, NULL, 1);
+            count++;
+        }
+    }
+    fclose(in);
+    return count;
 }
 
 static void
@@ -418,7 +425,8 @@ init_spinrpc() {
     // Make mapping tree while doing init
     nodemap_tree = tree_create(cmp_ints);
     retrieve_node_info();
-    debug_map();
+
+    read_nodepair_tree(NODEPAIRFILE);
 
     tree_destroy(nodemap_tree);
 }
@@ -451,7 +459,7 @@ change_node_persistency(int nodenum, int val) {
 static void
 store_nodepairs() {
 
-    store_nodepair_tree(nodepair_tree, "/etc/spin/nodepair.list");
+    store_nodepair_tree(nodepair_tree, NODEPAIRFILE);
 }
 
 static int
@@ -479,7 +487,7 @@ spinrpc_blockflow_start(int node1, int node2) {
     tree_add(nodepair_tree, sizeof(node_ar), (void *) node_ar, 0, NULL, 1);
     // new pair to block
     store_nodepairs();
-    c2b_flowblock_start(node1, node2);
+    c2b_blockflow_start(node1, node2);
     return 0;
 }
 
@@ -499,7 +507,7 @@ spinrpc_blockflow_stop(int node1, int node2) {
     // Remove from tree
     tree_remove_entry(nodepair_tree, leaf);
     store_nodepairs();
-    c2b_flowblock_end(node1, node2);
+    c2b_blockflow_end(node1, node2);
 
     result = 0;
     result += change_node_persistency(node1, -1);
@@ -511,7 +519,7 @@ int
 spinrpc_blockflow(int node1, int node2, int block) {
     int result;
     int sn1, sn2;
-    STAT_COUNTER(ctr, rpc-flowblock, STAT_TOTAL);
+    STAT_COUNTER(ctr, rpc-blockflow, STAT_TOTAL);
 
     if (node1 == node2) {
         return 1;

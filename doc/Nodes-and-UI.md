@@ -13,17 +13,22 @@ What to do with nodes disappearing for one of two reasons?
 - Nodes being timed out??
 
 Nodes can become persistent if they need to be remembered over reboots. Currently only because they are in blocked flows.  
-But nodes are numbered sequentially in spind, so a persistent node will get a new number at reboot, holding the same info.
-Persistent nodes will be stored in a file, rewritten at each change, removed when becoming non persistent, and read back in at reboot.
+But nodes are numbered sequentially in spind, so a persistent node  gets a new number at reboot, holding the same info.
+Persistent nodes are stored in a file in JSON format, rewritten at each change, removed when becoming non persistent, and read back in at reboot.
 
+Also when nodes change their list of IP addresses can have grown, so lower layers(core2block) are informed of that.
 
-### Interfaces in spind
+### TODO
+Define and implement what happens to merged nodes and timed out nodes.
 
-Higher layers -> node
+## Software Interfaces in spind
+
+### Higher layers -> node  
+
+All nodes have a persistence level, which is zero when they come to life. When something happens that makes them more or less worthy of remembering routines must be called:  
 
 node_persistence_increase(nodenum)
 node_persistence_decrease(nodenum)  
-
 
 Nodes -> core2block
 Node becomes persistent:

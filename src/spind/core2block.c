@@ -228,6 +228,7 @@ setup_tables(int nflog_dns_group, int queue_block, int place) {
     iptab_add_jump(SpinBlock, IAJ_ADD, 0, SpinLog);
     sprintf(str, "NFQUEUE --queue-num %d", queue_block);
     iptab_add_jump(SpinBlock, IAJ_ADD, 0, str);
+    iptab_system("ipset destroy");
 }
 
 static void
@@ -294,14 +295,14 @@ void c2b_node_ipaddress(int nodenum, ip_t *ip_addr) {
     ipset_add_addr(nodenum, ipv6, ip_str);
 }
 
-void c2b_flowblock_start(int nodenum1, int nodenum2) {
+void c2b_blockflow_start(int nodenum1, int nodenum2) {
 
     // Block this flow
     ipset_blockflow(0, IAJ_INS, nodenum1, nodenum2);
     ipset_blockflow(1, IAJ_INS, nodenum1, nodenum2);
 }
 
-void c2b_flowblock_end(int nodenum1, int nodenum2) {
+void c2b_blockflow_end(int nodenum1, int nodenum2) {
 
     // Unblock this flow
     ipset_blockflow(0, IAJ_DEL, nodenum1, nodenum2);
