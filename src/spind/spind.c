@@ -145,6 +145,7 @@ decode_node_info(char *data, int datalen) {
             CHECK_TYPE(val, JSMN_PRIMITIVE);
             old_id = find_num(data+tokens[val].start, data+tokens[val].end);
             fprintf(stderr, "Id= %d\n", old_id);
+            newnode->id = old_id;
             break;
         case N_NKW:
             // Cannot happen, but compiler wants it
@@ -318,6 +319,7 @@ publish_nodes() {
  *
  */
 tree_t *nodepair_tree;
+tree_t *nodemap_tree;
 
 static void
 debug_node(node_t *node) {
@@ -351,6 +353,10 @@ handle_node_info(char *buf, int size) {
         assert(wasnew);
         newid = newnode->id;
         fprintf(stderr, "Id mapping from %d to %d\n", oldid, newid);
+        tree_add(nodemap_tree,
+            sizeof(oldid), (void *) &oldid,
+            sizeof(newid), (void *) &newid,
+            1);
     }
 }
 
@@ -391,11 +397,30 @@ retrieve_node_info() {
     closedir(nodedir);
 }
 
+void debug_map() {
+    tree_entry_t* cur;
+    int old, new;
+
+    cur = tree_first(nodemap_tree);
+    while(cur != NULL) {
+        old = * ( (int *) cur->key);
+        new = * ( (int *) cur->data);
+        fprintf(stderr, "Old->New is %d to %d\n", old, new);
+        cur = tree_next(cur);
+    }
+}
+
 static void
 init_spinrpc() {
 
     nodepair_tree = tree_create(cmp_2ints);
+
+    // Make mapping tree while doing init
+    nodemap_tree = tree_create(cmp_ints);
     retrieve_node_info();
+    debug_map();
+
+    tree_destroy(nodemap_tree);
 }
 
 static int
