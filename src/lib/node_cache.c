@@ -454,6 +454,7 @@ void node_cache_clean(node_cache_t* node_cache, uint32_t older_than) {
         node = (node_t*)cur->data;
         next = tree_next(cur);
         if (node->last_seen < older_than) {
+            // TODO: signal disappearance to listeners
             node_destroy(node);
             cur->data = NULL;
             tree_remove_entry(node_cache->nodes, cur);
@@ -618,12 +619,11 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
                 // note: we don't need to restart the loop since we know we have not found
                 // any mergable items so far
 
-                // TODO: this need to signal that existing nodes have been merged
-                // or will we ignore that and let time fix it?
                 node_merge(node, tree_node);
 
                 // clean up the tree
                 nxt = tree_next(cur);
+                // TODO: signal merge to listeners
                 node_destroy(tree_node);
                 cur->data = NULL;
                 tree_remove_entry(node_cache->nodes, cur);

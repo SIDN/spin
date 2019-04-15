@@ -538,6 +538,49 @@ spinrpc_blockflow(int node1, int node2, int block) {
     return result;
 }
 
+static void
+nodepairtree2json(tree_t* tree, buffer_t* result) {
+    tree_entry_t* cur;
+    char *prefix;
+    int *nodenump;
+
+    cur = tree_first(tree);
+
+    if (cur == NULL) {
+        // empty tree
+        buffer_write(result, " [ ] ");
+        return;
+    }
+
+    // Prefix is [ at first, after that ,
+    prefix = " [ ";
+
+    while (cur != NULL) {
+        nodenump = (int *) cur->key;
+        buffer_write(result, prefix);
+        buffer_write(result, "{ \"node1\": %d, \"node2\": %d}", nodenump[0], nodenump[1]);
+        prefix = " , ";
+        cur = tree_next(cur);
+    }
+    buffer_write(result, " ] ");
+}
+
+char *
+spinrpc_get_blockflow() {
+    buffer_t* response_json = buffer_create(JSONBUFSIZ);
+    char *retval;
+
+    buffer_write(response_json, "{\"result\": ");
+    nodepairtree2json(nodepair_tree, response_json);
+    buffer_write(response_json, "}");
+    if (buffer_finish(response_json)) {
+        retval = strdup(buffer_str(response_json));
+    } else {
+        retval = "{ -1 }";
+    }
+    return strdup(retval);
+}
+
 /*
  * End of RPC code
  */

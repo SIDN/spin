@@ -113,10 +113,37 @@ static int spin_blockflow(struct ubus_context *ctx, struct ubus_object *obj,
 	return 0;
 }
 
+enum {
+	__GET_BLOCKFLOW_MAX
+};
+
+static const struct blobmsg_policy get_blockflow_policy[] = {
+};
+
+static int spin_get_blockflow(struct ubus_context *ctx, struct ubus_object *obj,
+		      struct ubus_request_data *req, const char *method,
+		      struct blob_attr *msg)
+{
+	struct blob_attr *tb[__GET_BLOCKFLOW_MAX];
+        char *result;
+
+	blobmsg_parse(get_blockflow_policy, ARRAY_SIZE(get_blockflow_policy), tb, blob_data(msg), blob_len(msg));
+
+        fprintf(stderr, "get_blockflow() called\n");
+
+        result = spinrpc_get_blockflow();
+
+	blob_buf_init(&b, 0);
+        blobmsg_add_json_from_string(&b, result);
+        free(result);   // This was malloced
+	ubus_send_reply(ctx, req, b.head);
+	return 0;
+}
 
 static const struct ubus_method spin_methods[] = {
 	UBUS_METHOD("spindlist", spin_spindlist, spindlist_policy),
 	UBUS_METHOD("blockflow", spin_blockflow, blockflow_policy),
+	UBUS_METHOD("get_blockflow", spin_get_blockflow, get_blockflow_policy),
 };
 
 static struct ubus_object_type spin_object_type =

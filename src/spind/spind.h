@@ -18,5 +18,6 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info);
 
 // RPC section
 int spinrpc_blockflow(int node1, int node2, int block);
+char *spinrpc_get_blockflow();
 
 #endif
