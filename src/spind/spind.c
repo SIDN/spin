@@ -48,6 +48,82 @@ STAT_MODULE(spind)
  *
  */
 
+#define CJS
+#ifdef CJS
+
+#include "cJSON.h"
+
+static node_t*
+decode_node_info(char *data, int datalen) {
+    cJSON *node_json;
+    node_t *newnode;
+    cJSON *id_json, *mac_json, *name_json, *ips_json, *ip_json, *domains_json, *domain_json;
+
+    newnode = 0;
+
+    node_json = cJSON_Parse(data);
+    if (node_json == NULL) {
+        spin_log(LOG_ERR, "Unable to parse node data\n");
+        goto end;
+    }
+
+    newnode = node_create(0);
+
+    // id
+    id_json = cJSON_GetObjectItemCaseSensitive(node_json, "id");
+    if (!cJSON_IsNumber(id_json)) {
+        goto end;
+    }
+    newnode->id = id_json->valueint;
+
+    // mac
+    mac_json = cJSON_GetObjectItemCaseSensitive(node_json, "mac");
+    if (!cJSON_IsString(mac_json)) {
+        goto end;
+    }
+    node_set_mac(newnode, mac_json->valuestring);
+
+    // name
+    name_json = cJSON_GetObjectItemCaseSensitive(node_json, "name");
+    if (!cJSON_IsString(name_json)) {
+        goto end;
+    }
+    node_set_name(newnode, name_json->valuestring);
+
+    // ips
+    ips_json = cJSON_GetObjectItemCaseSensitive(node_json, "ips");
+    if (!cJSON_IsArray(ips_json)) {
+        goto end;
+    }
+    cJSON_ArrayForEach(ip_json, ips_json) {
+        ip_t ipval;
+
+        if (!cJSON_IsString(ip_json) || !spin_pton(&ipval, ip_json->valuestring)) {
+            goto end;
+        }
+        node_add_ip(newnode, &ipval);
+    }
+
+
+    // domains
+    domains_json = cJSON_GetObjectItemCaseSensitive(node_json, "domains");
+    if (!cJSON_IsArray(domains_json)) {
+        goto end;
+    }
+    cJSON_ArrayForEach(domain_json, domains_json) {
+        if (!cJSON_IsString(ip_json)) {
+            goto end;
+        }
+        node_add_domain(newnode, domain_json->valuestring);
+    }
+
+end:
+    cJSON_Delete(node_json);
+    return (node_t *) newnode;
+}
+
+#else /* CJS */
+
 #include "jsmn.h"
 #define NTOKENS 200
 
@@ -197,6 +273,8 @@ decode_node_info(char *data, int datalen) {
     }
     return newnode;
 }
+
+#endif /* CJS */
 
 #define NODE_FILENAME_DIR "/etc/spin/nodestore"
 #define NODEPAIRFILE "/etc/spin/nodepair.list"
