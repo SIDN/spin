@@ -72,6 +72,7 @@ decode_node_info(char *data, int datalen) {
     // id
     id_json = cJSON_GetObjectItemCaseSensitive(node_json, "id");
     if (!cJSON_IsNumber(id_json)) {
+        spin_log(LOG_DEBUG, "No id in node\n");
         goto end;
     }
     newnode->id = id_json->valueint;
@@ -79,26 +80,30 @@ decode_node_info(char *data, int datalen) {
     // mac
     mac_json = cJSON_GetObjectItemCaseSensitive(node_json, "mac");
     if (!cJSON_IsString(mac_json)) {
-        goto end;
+        spin_log(LOG_DEBUG, "No mac in node\n");
+    } else {
+        node_set_mac(newnode, mac_json->valuestring);
     }
-    node_set_mac(newnode, mac_json->valuestring);
 
     // name
     name_json = cJSON_GetObjectItemCaseSensitive(node_json, "name");
     if (!cJSON_IsString(name_json)) {
-        goto end;
+        spin_log(LOG_DEBUG, "No name in node\n");
+    } else {
+        node_set_name(newnode, name_json->valuestring);
     }
-    node_set_name(newnode, name_json->valuestring);
 
     // ips
     ips_json = cJSON_GetObjectItemCaseSensitive(node_json, "ips");
     if (!cJSON_IsArray(ips_json)) {
+        spin_log(LOG_DEBUG, "No ips in node\n");
         goto end;
     }
     cJSON_ArrayForEach(ip_json, ips_json) {
         ip_t ipval;
 
         if (!cJSON_IsString(ip_json) || !spin_pton(&ipval, ip_json->valuestring)) {
+            spin_log(LOG_DEBUG, "No valid ip in node\n");
             goto end;
         }
         node_add_ip(newnode, &ipval);
@@ -108,10 +113,12 @@ decode_node_info(char *data, int datalen) {
     // domains
     domains_json = cJSON_GetObjectItemCaseSensitive(node_json, "domains");
     if (!cJSON_IsArray(domains_json)) {
+        spin_log(LOG_DEBUG, "No domains in node\n");
         goto end;
     }
     cJSON_ArrayForEach(domain_json, domains_json) {
         if (!cJSON_IsString(ip_json)) {
+            spin_log(LOG_DEBUG, "No valid domain in node\n");
             goto end;
         }
         node_add_domain(newnode, domain_json->valuestring);
