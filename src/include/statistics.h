@@ -34,9 +34,10 @@ typedef struct spin_stat *stat_p;
 typedef struct spin_stat {
     const char *        stat_module;        /* Group of counters */
     const char *        stat_name;          /* Name of counter */
-    spin_stat_type_t     stat_type;          /* Type enum */
+    spin_stat_type_t    stat_type;          /* Type enum */
     int                 stat_value;
     int                 stat_count;
+    int                 stat_lastpubcount;  /* Count when last published */
     stat_p              stat_next;
 } spin_stat_t;
 
@@ -50,7 +51,7 @@ void spin_stat_val(stat_p, int);
 
 #define STAT_MODULE(modulename) static const char STAT_CONCAT(STAT_PREF, modname)[] = #modulename ;
 
-#define STAT_COUNTER(ctr, descr, type) static spin_stat_t STAT_CONCAT(STAT_PREF, ctr) = { STAT_CONCAT(STAT_PREF, modname), #descr, type, 0, 0, NULL }
+#define STAT_COUNTER(ctr, descr, type) static spin_stat_t STAT_CONCAT(STAT_PREF, ctr) = { STAT_CONCAT(STAT_PREF, modname), #descr, type, 0, 0, 0, NULL }
 
 #define STAT_VALUE(ctr, val) spin_stat_val(&STAT_CONCAT(STAT_PREF, ctr), val)
 

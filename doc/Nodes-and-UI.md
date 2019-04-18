@@ -53,17 +53,17 @@ Currently about once per second modified nodes are examined:
 
 Node becomes persistent(persistence level goes up from zero0:  
 
-c2b_node_persistent_start(nodenum)
-Node stops being persistent(or disappears totally):
+c2b_node_persistent_start(nodenum)  
+Node stops being persistent(or disappears totally):  
 c2b_node_persistent_end(nodenum)  
 
 Node has (new) Ip address, this function is called for all initial IP addresses when a node becomes persistent, and also for all IP addresses when a node is modified. So the same address can be added multiple times, the c2b_node_ipaddress function must be able to handle this.
 
 c2b_node_ipaddress(nodenum, ip-addr)
 
-Functions to start and end 
-c2b_blockflow_start(nodenum1, nodenum2)
-c2b_blockflow_end(nodenum1, nodenum2)
+Functions to start and end   
+c2b_blockflow_start(nodenum1, nodenum2)  
+c2b_blockflow_end(nodenum1, nodenum2)  
 Start and ends the blocking of a flow((nodenum1 < nodenum2)
 
 #### core2block implementation details
