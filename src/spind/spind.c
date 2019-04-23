@@ -11,6 +11,8 @@
 #include <time.h>
 #include <assert.h>
 
+#include "cJSON.h"
+
 #include "spinconfig.h"
 #include "pkt_info.h"
 #include "util.h"
@@ -47,11 +49,6 @@ STAT_MODULE(spind)
  * Code to store and retrieve node info from files for persistency
  *
  */
-
-#define CJS
-#ifdef CJS
-
-#include "cJSON.h"
 
 static node_t*
 decode_node_info(char *data, int datalen) {
@@ -128,160 +125,6 @@ end:
     cJSON_Delete(node_json);
     return (node_t *) newnode;
 }
-
-#else /* CJS */
-
-#include "jsmn.h"
-#define NTOKENS 200
-
-// Do longest keywords here first, to prevent initial substring matching
-enum nkw {
-    NKW_IS_EXCEPTED,
-    NKW_IS_BLOCKED,
-    NKW_LASTSEEN,
-    NKW_DOMAINS,
-    NKW_NAME,
-    NKW_MAC,
-    NKW_IPS,
-    NKW_ID,
-    N_NKW
-};
-
-char *nodekeyw[] = {
-[NKW_IS_EXCEPTED] = "is_excepted",
-[NKW_IS_BLOCKED] = "is_blocked",
-[NKW_LASTSEEN] = "lastseen",
-[NKW_DOMAINS] = "domains",
-[NKW_NAME] = "name",
-[NKW_MAC] = "mac",
-[NKW_IPS] = "ips",
-[NKW_ID] = "id",
-};
-
-static enum nkw
-find_nkw(char *begin, int len) {
-    int i;
-    const char * kw;
-    int klen;
-
-    for (i=0; i<N_NKW; i++) {
-        kw = nodekeyw[i];
-        klen = strlen(kw);
-        if (strncmp(kw, begin, klen) == 0) {
-            return i;
-        }
-    }
-    return i;
-}
-
-static char *
-find_str(char *s, char *e) {
-
-    *e = 0; /* Should be safe */
-    return s;
-}
-
-static int
-find_num(char *s, char *e) {
-
-    return atoi(find_str(s,e));
-}
-
-#define CHECK_TYPE(n, t) if (tokens[n].type != t) { spin_log(LOG_ERR, "Token %d bad type\n", n); return 0; }
-#define CHECK_TRUTH(tr) if (!(tr)) { spin_log(LOG_ERR, "Unknown error in parse\n"); return 0; }
-
-static node_t*
-decode_node_info(char *data, int datalen) {
-    jsmn_parser p;
-    jsmntok_t tokens[NTOKENS];
-    int result;
-    int i, aix;
-    int nexttok;
-    node_t *newnode;
-    char *mac, *name;
-    int old_id;
-
-    jsmn_init(&p);
-    result = jsmn_parse(&p, data, datalen, tokens, NTOKENS);
-    if (result < 0) {
-        spin_log(LOG_ERR, "Unable to parse node data\n");
-        return 0;
-    }
-    CHECK_TYPE(0, JSMN_OBJECT);
-
-    newnode = node_create(0);
-    nexttok = 1;
-    for (i=0; i<tokens[0].size; i++) {
-        int key, val;
-        enum nkw kw;
-
-        key = nexttok;
-        CHECK_TYPE(key, JSMN_STRING);
-        kw = find_nkw(data+tokens[key].start, tokens[key].end - tokens[key].start);
-        CHECK_TRUTH(kw!=N_NKW);
-        nexttok++;
-        val = nexttok;
-        switch(kw) {
-        case NKW_ID:
-            // Setup mapping between old and new numbers
-            CHECK_TYPE(val, JSMN_PRIMITIVE);
-            old_id = find_num(data+tokens[val].start, data+tokens[val].end);
-            newnode->id = old_id;
-            break;
-        case N_NKW:
-            // Cannot happen, but compiler wants it
-        case NKW_IS_EXCEPTED:
-        case NKW_IS_BLOCKED:
-        case NKW_LASTSEEN:
-            // These will be set again by other software
-            break;
-        case NKW_MAC:
-            // Store mac Address
-            CHECK_TYPE(val, JSMN_STRING);
-            mac = find_str(data+tokens[val].start, data+tokens[val].end);
-            node_set_mac(newnode, mac);
-            break;
-        case NKW_NAME:
-            // Store name
-            CHECK_TYPE(val, JSMN_STRING);
-            name = find_str(data+tokens[val].start, data+tokens[val].end);
-            node_set_name(newnode, name);
-            break;
-        case NKW_IPS:
-            // Store IP addresses
-            CHECK_TYPE(val, JSMN_ARRAY);
-            for (aix=1; aix <= tokens[val].size; aix++) {
-                char *ipaddr;
-                ip_t ipval;
-                int retval;
-
-                CHECK_TYPE(val+aix, JSMN_STRING);
-                ipaddr = find_str(data+tokens[val+aix].start, data+tokens[val+aix].end);
-                retval = spin_pton(&ipval, ipaddr);
-                CHECK_TRUTH(retval);
-                node_add_ip(newnode, &ipval);
-            }
-            nexttok = val+aix-1;
-            break;
-        case NKW_DOMAINS:
-            // Store IP addresses
-            CHECK_TYPE(val, JSMN_ARRAY);
-            for (aix=1; aix <= tokens[val].size; aix++) {
-                char *domainname;
-
-                CHECK_TYPE(val+aix, JSMN_STRING);
-                domainname = find_str(data+tokens[val+aix].start, data+tokens[val+aix].end);
-                node_add_domain(newnode, domainname);
-            }
-            nexttok = val+aix-1;
-            break;
-        }
-        nexttok++;
-    }
-    return newnode;
-}
-
-#endif /* CJS */
 
 #define NODE_FILENAME_DIR "/etc/spin/nodestore"
 #define NODEPAIRFILE "/etc/spin/nodepair.list"

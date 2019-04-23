@@ -15,6 +15,8 @@ STAT_MODULE(node_cache)
 
 STAT_COUNTER(nodes, nodes, STAT_TOTAL);
 
+#define CJS
+
 node_t*
 node_create(int id) {
     int i;
@@ -267,57 +269,6 @@ node_print(node_t* node) {
         spin_log(LOG_DEBUG, "        %s\n", (unsigned char*)cur->key);
         cur = tree_next(cur);
     }
-}
-
-unsigned int
-node2json(node_t* node, buffer_t* json_buf) {
-    // unsigned int s = 0;
-    tree_entry_t* cur;
-    char ip_str[INET6_ADDRSTRLEN];
-
-    buffer_write(json_buf, "{ \"id\": %d, ", node->id);
-    if (node->name != NULL) {
-        buffer_write(json_buf, " \"name\": \"%s\", ", node->name);
-    }
-    if (node->mac != NULL) {
-        buffer_write(json_buf, " \"mac\": \"%s\", ", node->mac);
-    }
-    if (node->is_blocked) {
-        buffer_write(json_buf, " \"is_blocked\": \"true\", ");
-    }
-    if (node->is_allowed) {
-        buffer_write(json_buf, " \"is_excepted\": \"true\", ");
-    }
-    buffer_write(json_buf, " \"lastseen\": %u, ", node->last_seen);
-
-    buffer_write(json_buf, " \"ips\": [ ");
-    cur = tree_first(node->ips);
-    while (cur != NULL) {
-        buffer_write(json_buf, "\"");
-        spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
-        buffer_write(json_buf, ip_str);
-        //s += spin_ntop(dest + s, (uint8_t*)cur->key, max_len - s);
-        buffer_write(json_buf, "\"");
-        cur = tree_next(cur);
-        if (cur != NULL) {
-            buffer_write(json_buf, ", ");
-        }
-    }
-    buffer_write(json_buf, " ], ");
-
-    buffer_write(json_buf, " \"domains\": [ ");
-    cur = tree_first(node->domains);
-    while (cur != NULL) {
-        buffer_write(json_buf, "\"%s\"", (uint8_t*)cur->key);
-        cur = tree_next(cur);
-        if (cur != NULL) {
-            buffer_write(json_buf, ", ");
-        }
-    }
-    buffer_write(json_buf, " ] }");
-
-    // Temp
-    return 1;
 }
 
 void node_callback_new(node_cache_t* node_cache, modfunc mf) {
@@ -646,6 +597,127 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     tree_add(node_cache->nodes, sizeof(new_id), new_id_mem, sizeof(node_t), node, 0);
     return 1;
 }
+
+#ifdef CJS
+
+#include "cJSON.h"
+
+cJSON *
+node_json(node_t* node) {
+    cJSON *nodeobj;
+    cJSON *arobj;
+    cJSON *strobj;
+    tree_entry_t* cur;
+    char ip_str[INET6_ADDRSTRLEN];
+
+    nodeobj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(nodeobj, "id", node->id);
+    if (node->name != NULL) {
+        cJSON_AddStringToObject(nodeobj, "name", node->name);
+    }
+    if (node->mac != NULL) {
+        cJSON_AddStringToObject(nodeobj, "mac", node->mac);
+    }
+    if (node->is_blocked) {
+        cJSON_AddBoolToObject(nodeobj, "is_blocked", 1);
+    }
+    if (node->is_allowed) {
+        cJSON_AddBoolToObject(nodeobj, "is_excepted", 1);
+    }
+    cJSON_AddNumberToObject(nodeobj, "lastseen", node->last_seen);
+
+    // ips
+    arobj = cJSON_CreateArray();
+    cur = tree_first(node->ips);
+    while (cur != NULL) {
+        spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
+        strobj = cJSON_CreateString(ip_str);
+        cJSON_AddItemToArray(arobj, strobj);
+        cur = tree_next(cur);
+    }
+    cJSON_AddItemToObject(nodeobj, "ips", arobj);
+
+    // domains
+    arobj = cJSON_CreateArray();
+    cur = tree_first(node->domains);
+    while (cur != NULL) {
+        strobj = cJSON_CreateString((char*)cur->key);
+        cJSON_AddItemToArray(arobj, strobj);
+        cur = tree_next(cur);
+    }
+    cJSON_AddItemToObject(nodeobj, "domains", arobj);
+
+    return nodeobj;
+}
+
+// Temporary backwards hack
+unsigned int
+node2json(node_t* node, buffer_t* json_buf) {
+    cJSON *cj;
+    char *cjstr;
+
+    cj = node_json(node);
+    cjstr = cJSON_PrintUnformatted(cj);
+
+    cJSON_Delete(cj);
+    buffer_write(json_buf, "%s", cjstr);
+
+    return 1;
+}
+#else /* CJS */
+
+unsigned int
+node2json(node_t* node, buffer_t* json_buf) {
+    // unsigned int s = 0;
+    tree_entry_t* cur;
+    char ip_str[INET6_ADDRSTRLEN];
+
+    buffer_write(json_buf, "{ \"id\": %d, ", node->id);
+    if (node->name != NULL) {
+        buffer_write(json_buf, " \"name\": \"%s\", ", node->name);
+    }
+    if (node->mac != NULL) {
+        buffer_write(json_buf, " \"mac\": \"%s\", ", node->mac);
+    }
+    if (node->is_blocked) {
+        buffer_write(json_buf, " \"is_blocked\": \"true\", ");
+    }
+    if (node->is_allowed) {
+        buffer_write(json_buf, " \"is_excepted\": \"true\", ");
+    }
+    buffer_write(json_buf, " \"lastseen\": %u, ", node->last_seen);
+
+    buffer_write(json_buf, " \"ips\": [ ");
+    cur = tree_first(node->ips);
+    while (cur != NULL) {
+        buffer_write(json_buf, "\"");
+        spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
+        buffer_write(json_buf, ip_str);
+        //s += spin_ntop(dest + s, (uint8_t*)cur->key, max_len - s);
+        buffer_write(json_buf, "\"");
+        cur = tree_next(cur);
+        if (cur != NULL) {
+            buffer_write(json_buf, ", ");
+        }
+    }
+    buffer_write(json_buf, " ], ");
+
+    buffer_write(json_buf, " \"domains\": [ ");
+    cur = tree_first(node->domains);
+    while (cur != NULL) {
+        buffer_write(json_buf, "\"%s\"", (uint8_t*)cur->key);
+        cur = tree_next(cur);
+        if (cur != NULL) {
+            buffer_write(json_buf, ", ");
+        }
+    }
+    buffer_write(json_buf, " ] }");
+
+    // Temp
+    return 1;
+}
+
+#endif /* CJS */ 
 
 unsigned int
 pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf) {
