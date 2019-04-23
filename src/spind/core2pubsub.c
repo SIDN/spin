@@ -334,13 +334,162 @@ void handle_json_command(const char* data) {
         tokens[2].end-tokens[2].start, data+tokens[2].start);
 }
 
+#define CJS
+#ifdef CJS
+
+#include "cJSON.h"
+
+int getint_cJSONobj(cJSON *cjarg, char *fieldname) {
+    cJSON *f_json;
+
+    f_json = cJSON_GetObjectItemCaseSensitive(cjarg, fieldname);
+    if (!cJSON_IsNumber(f_json)) {
+        return 0;
+    }
+    return f_json->valueint;
+}
+
+char* getstr_cJSONobj(cJSON *cjarg, char *fieldname) {
+    cJSON *f_json;
+
+    f_json = cJSON_GetObjectItemCaseSensitive(cjarg, fieldname);
+    if (!cJSON_IsString(f_json)) {
+        return NULL;
+    }
+    return f_json->valuestring;
+}
+
+void handle_json_command_detail2(int verb, int object, cJSON *argument_json) {
+    int node_id_arg = 0;
+    ip_t ip_arg;
+    char *str_arg;
+    // in a few cases, we need to update the node cache
+    node_t* node;
+
+    //
+    // First some common argument handling
+    //
+
+    switch(verb) {
+    case PSC_V_ADD:
+    case PSC_V_REM:
+        // Add names is different
+        if (object == PSC_O_NAME)
+            break;
+        if (!cJSON_IsNumber(argument_json)) {
+            spin_log(LOG_ERR, "Cannot parse node_id\n");
+            return;
+        }
+        node_id_arg = argument_json->valueint;
+        spin_log(LOG_DEBUG, "Spin verb %d, object %d, node-id %d\n", verb, object, node_id_arg);
+        break;
+    case PSC_V_REM_IP:
+        if (!cJSON_IsString(argument_json) || !spin_pton(&ip_arg, argument_json->valuestring)) {
+            spin_log(LOG_ERR, "Cannot parse ip-addr\n");
+            return;
+        }
+        spin_log(LOG_DEBUG, "Spin verb %d, object %d, ip XX\n", verb, object);
+        break;
+    case PSC_V_RESET:
+        if (object != PSC_O_IGNORE) {
+            spin_log(LOG_ERR, "Reset of non-ignore\n");
+            return;
+        }
+        handle_command_reset_ignores();
+        return;
+    }
+
+    //
+    // Now handle objects
+    //
+
+    switch(object) {
+    case PSC_O_NAME:
+        switch(verb) {
+        case PSC_V_GET:
+            // TODO
+            // handle_command_get_names();
+            break;
+        case PSC_V_ADD:
+            node_id_arg = getint_cJSONobj(argument_json, "node-id");
+            str_arg = getstr_cJSONobj(argument_json, "name");
+            if (node_id_arg != 0 && str_arg != NULL) {
+                handle_command_add_name(node_id_arg, str_arg);
+            }
+            break;
+        }
+        break;  //NAME
+
+    case PSC_O_BLOCK:
+    case PSC_O_IGNORE:
+    case PSC_O_ALLOW:
+        switch(verb) {
+        case PSC_V_GET:
+            break;
+        case PSC_V_ADD:
+        case PSC_V_REM:
+            handle_list_membership(object, verb, node_id_arg);
+            break;
+        case PSC_V_REM_IP:
+            handle_command_remove_ip_from_list(object, &ip_arg);
+            node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip_arg);
+            if (node) {
+                node->is_onlist[object] = 0;
+            }
+            break;
+        }
+        handle_command_get_iplist(object, getnames[object]);
+        break;  //BLOCK IGNORE and ALLOW
+    }
+}
+
+void
+handle_json_command2(char *data) {
+    cJSON *command_json;
+    cJSON *method_json;
+    cJSON *argument_json;
+    char *method;
+    int verb, object;
+
+    command_json = cJSON_Parse(data);
+    if (command_json == NULL) {
+        spin_log(LOG_ERR, "Unable to parse command\n");
+        goto end;
+    }
+
+    method_json = cJSON_GetObjectItemCaseSensitive (command_json, "command");
+    if (!cJSON_IsString(method_json)) {
+        spin_log(LOG_ERR, "No command found\n");
+        goto end;
+    }
+    method = method_json->valuestring;
+
+    argument_json = cJSON_GetObjectItemCaseSensitive (command_json, "argument");
+    if (argument_json == NULL) {
+        spin_log(LOG_ERR, "No argument found\n");
+        goto end;
+    }
+
+    spin_log(LOG_DEBUG, "Parsed mqtt command: %s %s\n", method, cJSON_PrintUnformatted(argument_json));
+
+    if (find_command(strlen(method), method, &verb, &object)) {
+        handle_json_command_detail2(verb, object, argument_json);
+    }
+
+end:
+    cJSON_Delete(command_json);
+}
+
+
+#endif /* CJS */
 
 // Hook from Mosquitto code called with incoming messages
 
 void do_mosq_message(struct mosquitto* mosq, void* user_data, const struct mosquitto_message* msg) {
 
     if (strcmp(msg->topic, mqtt_channel_commands) == 0) {
-        handle_json_command(msg->payload);
+        handle_json_command2(msg->payload);
+        // handle_json_command(msg->payload);
     }
 
     // TODO, what if other channel?
