@@ -2,7 +2,7 @@
 #include <mosquitto.h>
 
 #include "node_cache.h"
-#include "jsmn.h"
+// #include "jsmn.h"
 #include "util.h"
 #include "mainloop.h"
 #include "spinconfig.h"
@@ -19,6 +19,9 @@ struct mosquitto* mosq;
 extern node_cache_t* node_cache;
 
 STAT_MODULE(pubsub)
+
+#define CJS
+#include "cJSON.h"
 
 /*
  * Code that pushes gathered results back to Spin traffic channel for
@@ -57,6 +60,7 @@ void send_command_restart() {
     buffer_destroy(response_json);
 }
 
+#ifndef CJS
 // returns 1 on success, 0 on error
 static int
 json_parse_int_arg(int* dest,
@@ -130,6 +134,8 @@ json_parse_node_id_name_arg(int* node_id,
     return (name_found && id_found);
 }
 
+#endif /* CJS */
+
 /*
  * All commands implemented by Pub/Sub interface
  */
@@ -200,6 +206,7 @@ static int find_command(int name_len, const char *name_str, int *verb, int *obje
     return 0;
 }
 
+#ifndef CJS
 
 #define MAXNAMELEN      80      // Maximum identifier length; TODO */
 
@@ -334,10 +341,9 @@ void handle_json_command(const char* data) {
         tokens[2].end-tokens[2].start, data+tokens[2].start);
 }
 
-#define CJS
-#ifdef CJS
+#endif /* CJS */
 
-#include "cJSON.h"
+#ifdef CJS
 
 int getint_cJSONobj(cJSON *cjarg, char *fieldname) {
     cJSON *f_json;
@@ -381,14 +387,14 @@ void handle_json_command_detail2(int verb, int object, cJSON *argument_json) {
             return;
         }
         node_id_arg = argument_json->valueint;
-        spin_log(LOG_DEBUG, "Spin verb %d, object %d, node-id %d\n", verb, object, node_id_arg);
+        // spin_log(LOG_DEBUG, "Spin verb %d, object %d, node-id %d\n", verb, object, node_id_arg);
         break;
     case PSC_V_REM_IP:
         if (!cJSON_IsString(argument_json) || !spin_pton(&ip_arg, argument_json->valuestring)) {
             spin_log(LOG_ERR, "Cannot parse ip-addr\n");
             return;
         }
-        spin_log(LOG_DEBUG, "Spin verb %d, object %d, ip XX\n", verb, object);
+        // spin_log(LOG_DEBUG, "Spin verb %d, object %d, ip XX\n", verb, object);
         break;
     case PSC_V_RESET:
         if (object != PSC_O_IGNORE) {
@@ -470,7 +476,7 @@ handle_json_command2(char *data) {
         goto end;
     }
 
-    spin_log(LOG_DEBUG, "Parsed mqtt command: %s %s\n", method, cJSON_PrintUnformatted(argument_json));
+    // spin_log(LOG_DEBUG, "Parsed mqtt command: %s %s\n", method, cJSON_PrintUnformatted(argument_json));
 
     if (find_command(strlen(method), method, &verb, &object)) {
         handle_json_command_detail2(verb, object, argument_json);
