@@ -330,7 +330,7 @@ node_cache_destroy(node_cache_t* node_cache) {
     free(node_cache);
 }
 
-static void
+void
 node_cache_print(node_cache_t* node_cache) {
     tree_entry_t* cur = tree_first(node_cache->nodes);
     node_t* cur_node;
@@ -600,67 +600,70 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
 
 #ifdef CJS
 
-#include "cJSON.h"
+#include "spindata.h"
 
-cJSON *
-node_json(node_t* node) {
-    cJSON *nodeobj;
-    cJSON *arobj;
-    cJSON *strobj;
-    tree_entry_t* cur;
-    char ip_str[INET6_ADDRSTRLEN];
 
-    nodeobj = cJSON_CreateObject();
-    cJSON_AddNumberToObject(nodeobj, "id", node->id);
-    if (node->name != NULL) {
-        cJSON_AddStringToObject(nodeobj, "name", node->name);
-    }
-    if (node->mac != NULL) {
-        cJSON_AddStringToObject(nodeobj, "mac", node->mac);
-    }
-    if (node->is_blocked) {
-        cJSON_AddBoolToObject(nodeobj, "is_blocked", 1);
-    }
-    if (node->is_allowed) {
-        cJSON_AddBoolToObject(nodeobj, "is_excepted", 1);
-    }
-    cJSON_AddNumberToObject(nodeobj, "lastseen", node->last_seen);
-
-    // ips
-    arobj = cJSON_CreateArray();
-    cur = tree_first(node->ips);
-    while (cur != NULL) {
-        spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
-        strobj = cJSON_CreateString(ip_str);
-        cJSON_AddItemToArray(arobj, strobj);
-        cur = tree_next(cur);
-    }
-    cJSON_AddItemToObject(nodeobj, "ips", arobj);
-
-    // domains
-    arobj = cJSON_CreateArray();
-    cur = tree_first(node->domains);
-    while (cur != NULL) {
-        strobj = cJSON_CreateString((char*)cur->key);
-        cJSON_AddItemToArray(arobj, strobj);
-        cur = tree_next(cur);
-    }
-    cJSON_AddItemToObject(nodeobj, "domains", arobj);
-
-    return nodeobj;
-}
-
-// Temporary backwards hack
+// Temporary backwards hacks
 unsigned int
 node2json(node_t* node, buffer_t* json_buf) {
-    cJSON *cj;
-    char *cjstr;
+    spin_data sd;
+    char *sdstr;
 
-    cj = node_json(node);
-    cjstr = cJSON_PrintUnformatted(cj);
+    sd = node_json(node);
+    sdstr = spin_data_serialize(sd);
 
-    cJSON_Delete(cj);
-    buffer_write(json_buf, "%s", cjstr);
+    spin_data_delete(sd);
+    buffer_write(json_buf, "%s", sdstr);
+
+    free(sdstr);
+
+    return 1;
+}
+
+unsigned int
+pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf) {
+    spin_data sd;
+    char *sdstr;
+
+    sd = pkt_info_json(node_cache, pkt_info);
+    sdstr = spin_data_serialize(sd);
+
+    spin_data_delete(sd);
+    buffer_write(json_buf, "%s", sdstr);
+
+    free(sdstr);
+
+    return 1;
+}
+
+unsigned int
+dns_query_pkt_info2json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info, buffer_t* json_buf) {
+    spin_data sd;
+    char *sdstr;
+
+    sd = dns_query_pkt_info_json(node_cache, dns_pkt_info);
+    sdstr = spin_data_serialize(sd);
+
+    spin_data_delete(sd);
+    buffer_write(json_buf, "%s", sdstr);
+
+    free(sdstr);
+
+    return 1;
+}
+
+unsigned int
+create_traffic_command(node_cache_t* node_cache, flow_list_t* flow_list, buffer_t* json_buf, uint32_t timestamp) {
+    spin_data sd;
+    char *sdstr;
+
+    sd = create_traffic_json(node_cache, flow_list, timestamp);
+    sdstr = spin_data_serialize(sd);
+
+    spin_data_delete(sd);
+    buffer_write(json_buf, "%s", sdstr);
+
+    free(sdstr);
 
     return 1;
 }
@@ -716,8 +719,6 @@ node2json(node_t* node, buffer_t* json_buf) {
     // Temp
     return 1;
 }
-
-#endif /* CJS */ 
 
 unsigned int
 pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf) {
@@ -836,6 +837,53 @@ dns_query_pkt_info2json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info, 
     //return s;
 }
 
+unsigned int
+flow_list2json(node_cache_t* node_cache, flow_list_t* flow_list, buffer_t* json_buf) {
+    unsigned int s = 0;
+    tree_entry_t* cur;
+    pkt_info_t pkt_info;
+    flow_data_t* fd;
+
+    flow_list->total_size = 0;
+    flow_list->total_count = 0;
+
+    cur = tree_first(flow_list->flows);
+    while (cur != NULL) {
+        memcpy(&pkt_info, cur->key, 38);
+        fd = (flow_data_t*) cur->data;
+        pkt_info.payload_size = fd->payload_size;
+        flow_list->total_size += fd->payload_size;
+        pkt_info.packet_count = fd->packet_count;
+        flow_list->total_count += fd->packet_count;
+        s += pkt_info2json(node_cache, &pkt_info, json_buf);
+        cur = tree_next(cur);
+        if (cur != NULL) {
+            buffer_write(json_buf, ", ");
+        }
+    }
+
+    return s;
+}
+
+// note: this only does one pkt_info atm
+unsigned int
+create_traffic_command(node_cache_t* node_cache, flow_list_t* flow_list, buffer_t* json_buf, uint32_t timestamp) {
+    unsigned int s = 0;
+
+    buffer_write(json_buf, "{ \"command\": \"traffic\", \"argument\": \"\", ");
+    buffer_write(json_buf, "\"result\": { \"flows\": [ ");
+    s += flow_list2json(node_cache, flow_list, json_buf);
+    buffer_write(json_buf, "], ");
+    buffer_write(json_buf, " \"timestamp\": %u, ", timestamp);
+    buffer_write(json_buf, " \"total_size\": %llu, ", flow_list->total_size);
+    buffer_write(json_buf, " \"total_count\": %llu } }", flow_list->total_count);
+    return s;
+
+}
+
+#endif /* CJS */ 
+
+
 flow_list_t* flow_list_create(uint32_t timestamp) {
 
     flow_list_t* flow_list = (flow_list_t*)malloc(sizeof(flow_list_t));
@@ -882,47 +930,4 @@ void flow_list_clear(flow_list_t* flow_list, uint32_t timestamp) {
 int flow_list_empty(flow_list_t* flow_list) {
 
     return tree_empty(flow_list->flows);
-}
-
-unsigned int
-flow_list2json(node_cache_t* node_cache, flow_list_t* flow_list, buffer_t* json_buf) {
-    unsigned int s = 0;
-    tree_entry_t* cur;
-    pkt_info_t pkt_info;
-    flow_data_t* fd;
-
-    flow_list->total_size = 0;
-    flow_list->total_count = 0;
-
-    cur = tree_first(flow_list->flows);
-    while (cur != NULL) {
-        memcpy(&pkt_info, cur->key, 38);
-        fd = (flow_data_t*) cur->data;
-        pkt_info.payload_size = fd->payload_size;
-        flow_list->total_size += fd->payload_size;
-        pkt_info.packet_count = fd->packet_count;
-        flow_list->total_count += fd->packet_count;
-        s += pkt_info2json(node_cache, &pkt_info, json_buf);
-        cur = tree_next(cur);
-        if (cur != NULL) {
-            buffer_write(json_buf, ", ");
-        }
-    }
-
-    return s;
-}
-
-// note: this only does one pkt_info atm
-unsigned int
-create_traffic_command(node_cache_t* node_cache, flow_list_t* flow_list, buffer_t* json_buf, uint32_t timestamp) {
-    unsigned int s = 0;
-
-    buffer_write(json_buf, "{ \"command\": \"traffic\", \"argument\": \"\", ");
-    buffer_write(json_buf, "\"result\": { \"flows\": [ ");
-    s += flow_list2json(node_cache, flow_list, json_buf);
-    buffer_write(json_buf, "], ");
-    buffer_write(json_buf, " \"timestamp\": %u, ", timestamp);
-    buffer_write(json_buf, " \"total_size\": %llu, ", flow_list->total_size);
-    buffer_write(json_buf, " \"total_count\": %llu } }", flow_list->total_count);
-    return s;
 }

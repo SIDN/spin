@@ -89,9 +89,9 @@ node_cache_t* node_cache_create(void);
 void node_cache_destroy(node_cache_t* node_cache);
 void node_callback_new(node_cache_t*, modfunc);
 
-/*
 void node_cache_print(node_cache_t* node_cache);
 
+/*
 void node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp);
  */
 void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp);
@@ -146,7 +146,9 @@ void flow_list_add_pktinfo(flow_list_t* flow_list, pkt_info_t* pkt_info);
 int flow_list_should_send(flow_list_t* flow_list, uint32_t timestamp);
 void flow_list_clear(flow_list_t* flow_list, uint32_t timestamp);
 int flow_list_empty(flow_list_t* flow_list);
+/*
 unsigned int flow_list2json(node_cache_t* node_cache, flow_list_t* flow_list, buffer_t* json_buf);
+*/
 
 unsigned int create_traffic_command(node_cache_t* node_cache, flow_list_t* flow_list, buffer_t* json_buf, uint32_t timestamp);
 

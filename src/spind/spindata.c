@@ -1,0 +1,256 @@
+#include <assert.h>
+
+#include "tree.h"
+#include "node_cache.h"
+#include "spin_log.h"
+
+#include "spindata.h"
+
+extern int omitnode;
+
+char *
+spin_data_serialize(spin_data sd) {
+    char *result;
+
+    result = cJSON_PrintUnformatted(sd);
+
+    // result is malloced, should be freed
+    return result;
+}
+
+void
+spin_data_delete(spin_data sd) {
+
+    cJSON_Delete(sd);
+}
+
+//  Also needed for lists
+spin_data
+ipar_json(tree_t *iptree) {
+    cJSON *arobj, *strobj;
+    tree_entry_t* cur;
+    char ip_str[INET6_ADDRSTRLEN];
+
+    arobj = cJSON_CreateArray();
+    cur = tree_first(iptree);
+    while (cur != NULL) {
+        spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
+        strobj = cJSON_CreateString(ip_str);
+        cJSON_AddItemToArray(arobj, strobj);
+        cur = tree_next(cur);
+    }
+    return arobj;
+}
+
+spin_data
+node_json(node_t* node) {
+    cJSON *nodeobj;
+    cJSON *arobj;
+    cJSON *strobj;
+    tree_entry_t* cur;
+
+    nodeobj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(nodeobj, "id", node->id);
+    if (node->name != NULL) {
+        cJSON_AddStringToObject(nodeobj, "name", node->name);
+    }
+    if (node->mac != NULL) {
+        cJSON_AddStringToObject(nodeobj, "mac", node->mac);
+    }
+    if (node->is_blocked) {
+        cJSON_AddBoolToObject(nodeobj, "is_blocked", 1);
+    }
+    if (node->is_allowed) {
+        cJSON_AddBoolToObject(nodeobj, "is_excepted", 1);
+    }
+    cJSON_AddNumberToObject(nodeobj, "lastseen", node->last_seen);
+
+    arobj = ipar_json(node->ips);
+#ifdef notdef
+    // ips
+    arobj = cJSON_CreateArray();
+    cur = tree_first(node->ips);
+    while (cur != NULL) {
+        spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
+        strobj = cJSON_CreateString(ip_str);
+        cJSON_AddItemToArray(arobj, strobj);
+        cur = tree_next(cur);
+    }
+#endif
+    cJSON_AddItemToObject(nodeobj, "ips", arobj);
+
+    // domains
+    arobj = cJSON_CreateArray();
+    cur = tree_first(node->domains);
+    while (cur != NULL) {
+        strobj = cJSON_CreateString((char*)cur->key);
+        cJSON_AddItemToArray(arobj, strobj);
+        cur = tree_next(cur);
+    }
+    cJSON_AddItemToObject(nodeobj, "domains", arobj);
+
+    return nodeobj;
+}
+
+static spin_data
+noderef_json(node_t *node) {
+    cJSON* nodeobj;
+
+    if (omitnode) {
+        nodeobj = cJSON_CreateNumber(node->id);
+    } else {
+        nodeobj = node_json(node);
+    }
+    return nodeobj;
+}
+
+spin_data
+pkt_info_json(node_cache_t* node_cache, pkt_info_t* pkt_info) {
+    cJSON *pktobj;
+    node_t* src_node;
+    node_t* dest_node;
+    ip_t ip;
+
+    ip.family = pkt_info->family;
+    memcpy(ip.addr, pkt_info->src_addr, 16);
+    src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    memcpy(ip.addr, pkt_info->dest_addr, 16);
+    dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    if (src_node == NULL) {
+        char pkt_str[1024];
+        spin_log(LOG_ERR, "[XX] ERROR! src node not found in cache!\n");
+        pktinfo2str(pkt_str, pkt_info, 1024);
+        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
+        spin_log(LOG_DEBUG, "[XX] node cache:\n");
+        node_cache_print(node_cache);
+        return 0;
+    }
+    if (dest_node == NULL) {
+        char pkt_str[1024];
+        spin_log(LOG_ERR, "[XX] ERROR! dest node not found in cache!\n");
+        pktinfo2str(pkt_str, pkt_info, 1024);
+        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
+        spin_log(LOG_DEBUG, "[XX] node cache:\n");
+        node_cache_print(node_cache);
+        return 0;
+    }
+    assert(src_node != NULL);
+    assert(dest_node != NULL);
+
+    pktobj = cJSON_CreateObject();
+
+    cJSON_AddItemToObject(pktobj, "from", noderef_json(src_node));
+    cJSON_AddItemToObject(pktobj, "to", noderef_json(dest_node));
+
+    cJSON_AddNumberToObject(pktobj, "protocol", pkt_info->protocol);
+    cJSON_AddNumberToObject(pktobj, "from_port", pkt_info->src_port);
+    cJSON_AddNumberToObject(pktobj, "to_port", pkt_info->dest_port);
+    cJSON_AddNumberToObject(pktobj, "size", pkt_info->payload_size);
+    cJSON_AddNumberToObject(pktobj, "count", pkt_info->packet_count);
+
+    return(pktobj);
+}
+
+#define DNAME_SIZE  512
+spin_data
+dns_query_pkt_info_json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info) {
+    cJSON *pktobj;
+    node_t* src_node;
+    // the 'node' that was queried; this could be a node that we already know
+    node_t* dns_node;
+    char dname_str[DNAME_SIZE];
+    ip_t ip;
+
+    dns_dname2str(dname_str, dns_pkt_info->dname, DNAME_SIZE);
+
+    ip.family = dns_pkt_info->family;
+    memcpy(ip.addr, dns_pkt_info->ip, 16);
+
+    spin_log(LOG_DEBUG, "[XX] creating dns query command\n");
+
+    dns_node = node_cache_find_by_domain(node_cache, dname_str);
+    if (dns_node == NULL) {
+        // something went wrong, we should have just added t
+        char pkt_str[1024];
+        spin_log(LOG_ERR, "[XX] ERROR! DNS node not found in cache!\n");
+        dns_pktinfo2str(pkt_str, dns_pkt_info, 1024);
+        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
+        spin_log(LOG_DEBUG, "[XX] node cache:\n");
+        node_cache_print(node_cache);
+        return 0;
+    }
+
+    src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    if (src_node == NULL) {
+        printf("[XX] error, src node not found in cache");
+        char pkt_str[1024];
+        spin_log(LOG_ERR, "[XX] ERROR! src node not found in cache!\n");
+        dns_pktinfo2str(pkt_str, dns_pkt_info, 1024);
+        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
+        spin_log(LOG_DEBUG, "[XX] node cache:\n");
+        node_cache_print(node_cache);
+        return 0;
+    }
+
+    pktobj = cJSON_CreateObject();
+
+    cJSON_AddItemToObject(pktobj, "from", noderef_json(src_node));
+    cJSON_AddItemToObject(pktobj, "queriednode", noderef_json(dns_node));
+    cJSON_AddStringToObject(pktobj, "query", dname_str);
+
+    return pktobj;
+}
+
+static spin_data
+flow_list2json(node_cache_t* node_cache, flow_list_t* flow_list) {
+    cJSON *flobj, *pktobj;
+    tree_entry_t* cur;
+    pkt_info_t pkt_info;
+    flow_data_t* fd;
+
+    flobj = cJSON_CreateArray();
+
+    flow_list->total_size = 0;
+    flow_list->total_count = 0;
+
+    cur = tree_first(flow_list->flows);
+    while (cur != NULL) {
+        memcpy(&pkt_info, cur->key, 38);
+        fd = (flow_data_t*) cur->data;
+        pkt_info.payload_size = fd->payload_size;
+        flow_list->total_size += fd->payload_size;
+        pkt_info.packet_count = fd->packet_count;
+        flow_list->total_count += fd->packet_count;
+
+        pktobj = pkt_info_json(node_cache, &pkt_info);
+        cJSON_AddItemToArray(flobj, pktobj);
+
+        cur = tree_next(cur);
+    }
+
+    return flobj;
+}
+
+spin_data
+create_traffic_json (node_cache_t* node_cache, flow_list_t* flow_list, uint32_t timestamp) {
+    cJSON *trobj;
+    cJSON *cmdobj;
+    cJSON *flobj;
+
+    flobj = flow_list2json(node_cache, flow_list);
+
+    trobj = cJSON_CreateObject();
+    cJSON_AddItemToObject(trobj, "flows", flobj);
+    cJSON_AddNumberToObject(trobj, "timestamp", timestamp);
+    cJSON_AddNumberToObject(trobj, "total_size", flow_list->total_size);
+    cJSON_AddNumberToObject(trobj, "total_count", flow_list->total_count);
+
+    // This should not be here
+    cmdobj = cJSON_CreateObject();
+    cJSON_AddStringToObject(cmdobj, "command", "traffic");
+    cJSON_AddStringToObject(cmdobj, "argument", "");
+    cJSON_AddItemToObject(cmdobj, "result", trobj);
+
+    return cmdobj;
+}
+
