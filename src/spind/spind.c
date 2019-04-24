@@ -448,35 +448,6 @@ spinrpc_blockflow(int node1, int node2, int block) {
     return result;
 }
 
-#ifdef notdef
-static void
-nodepairtree2json(tree_t* tree, buffer_t* result) {
-    tree_entry_t* cur;
-    char *prefix;
-    int *nodenump;
-
-    cur = tree_first(tree);
-
-    if (cur == NULL) {
-        // empty tree
-        buffer_write(result, " [ ] ");
-        return;
-    }
-
-    // Prefix is [ at first, after that ,
-    prefix = " [ ";
-
-    while (cur != NULL) {
-        nodenump = (int *) cur->key;
-        buffer_write(result, prefix);
-        buffer_write(result, "{ \"node1\": %d, \"node2\": %d}", nodenump[0], nodenump[1]);
-        prefix = " , ";
-        cur = tree_next(cur);
-    }
-    buffer_write(result, " ] ");
-}
-#endif
-
 char *
 spinrpc_get_blockflow() {
     spin_data ar_sd, cmd_sd;
@@ -575,28 +546,40 @@ report_block(int af, int proto, uint8_t *src_addr, uint8_t *dest_addr, unsigned 
 // TODO: move this out to the library, this feels like pretty commonly shared code
 struct list_info {
     tree_t *        li_tree;                 // Tree of IP addresses
-    char *          li_filename;             // Name of shadow file
-    int             li_modified;     // File should be written
+    char *          li_listname;             // Name of list
+    int             li_modified;             // File should be written
 } ipl_list_ar[N_IPLIST] = {
-    { 0, "/etc/spin/block.list",   0 },
-    { 0, "/etc/spin/ignore.list",  0 },
-    { 0, "/etc/spin/allow.list",   0 },
+    { 0, "block",   0 },
+    { 0, "ignore",  0 },
+    { 0, "allow",   0 },
 };
 
 #define ipl_block ipl_list_ar[IPLIST_BLOCK]
 #define ipl_ignore ipl_list_ar[IPLIST_IGNORE]
 #define ipl_allow ipl_list_ar[IPLIST_ALLOW]
 
+
+// Make name of shadow file
+static char*
+ipl_filename(struct list_info *lip) {
+    static char listname[30];
+
+    sprintf(listname, "/etc/spin/%s.list", lip->li_listname);
+    return listname;
+}
+
 void wf_ipl(void *arg, int data, int timeout) {
     int i;
     struct list_info *lip;
+    char *fname;
 
     if (timeout) {
         // What else could it be ??
         for (i=0; i<N_IPLIST; i++) {
             lip = &ipl_list_ar[i];
             if (lip->li_modified) {
-                store_ip_tree(lip->li_tree, lip->li_filename);
+                fname = ipl_filename(lip);
+                store_ip_tree(lip->li_tree, fname);
                 lip->li_modified = 0;
             }
         }
@@ -605,10 +588,12 @@ void wf_ipl(void *arg, int data, int timeout) {
 
 void init_ipl(struct list_info *lip) {
     int cnt;
+    char *fname;
 
     lip->li_tree = tree_create(cmp_ips);
-    cnt = read_ip_tree(lip->li_tree, lip->li_filename);
-    spin_log(LOG_DEBUG, "File %s, read %d entries\n", lip->li_filename, cnt);
+    fname = ipl_filename(lip);
+    cnt = read_ip_tree(lip->li_tree, fname);
+    spin_log(LOG_DEBUG, "File %s, read %d entries\n", fname, cnt);
 }
 
 void init_all_ipl() {
@@ -849,35 +834,6 @@ void handle_command_add_name(int node_id, char* name) {
     // TODO: make filename configurable? right now it will silently fail
     node_names_write_userconfig(node_cache->names, "/etc/spin/names.conf");
 }
-
-#ifdef notdef
-static void
-iptree2json(tree_t* tree, buffer_t* result) {
-    tree_entry_t* cur;
-    char ip_str[INET6_ADDRSTRLEN];
-    char *prefix;
-
-    cur = tree_first(tree);
-
-    if (cur == NULL) {
-        // empty tree
-        buffer_write(result, " [ ] ");
-        return;
-    }
-
-    // Prefix is [ at first, after that ,
-    prefix = " [ ";
-
-    while (cur != NULL) {
-        spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
-        buffer_write(result, prefix);
-        buffer_write(result, "\"%s\" ", ip_str);
-        prefix = " , ";
-        cur = tree_next(cur);
-    }
-    buffer_write(result, " ] ");
-}
-#endif
 
 void handle_command_get_iplist(int iplist, const char* json_command) {
     spin_data ipt_sd, cmd_sd;

@@ -46,4 +46,6 @@ On *SPIN/traffic/flow* the flows seen recently. There will be no node informatio
 
 On *SPIN/traffic/dns* the DNS requests. Again information about nodes will only be their number.
 
+This does not give Blocked messages their own place. Separate channel, or perhaps with admin or flow?
+
 For the statistics, assuming we keep them on Mosquitto, we could use something like: *SPIN/stat/module/counter* topics making it easy for someone just to query one counter. Making all counters retainable will get you the latest value with one call.

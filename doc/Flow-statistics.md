@@ -7,7 +7,7 @@ Issues:
 - Keeping track of a certain amount of flows per node will not have this problem, but the nodes they talked to might be gone. This could be solved by a certain type of persistence. If a certain node is used in other information do not do timeout on it.
 - Keeping track of nodenumbers in general needs care when merging nodes.
 
-## Proposal
+## Proposal 1
 
 ### Flows
 We keep a list of flows, indexed by src/dst pairs.
@@ -36,4 +36,27 @@ But eventually it has to go.
 When merging nodes we have to go through the flow table to also merge corresponding flows. We have to set values reasonable. What when one of the flows turns out to be blocked, and the other one isn't?
 
 
+## Proposal 2
+
+### Nodes and devices
+
+We introduce the concept of local devices. Local devices are supposed to be devices in-home, on one or more VLAN's. We will make nodes be slightly different when they are also a device.
+
+Devices will have a separate administration. Internally that probablky means a separate table or tree, separate numbering and more RPC's dealing with them.
+
+To prevent double administration a device will have an associated node. The device points to the node, and vice versa.
+
+Nodes will have reference counts, iso persistence. Each data structure in *spind* that points to a node(either by pointer of use of number) will increase the reference counter. Nodes with a non-zero reference count will not be discarded due to non-use. The other data-structures become responsible for cleaning up the reference.
+
+When nodes with non-zero reference counts are merged into another node the other datastructures must be called to  cleanup.
+
+### Flows
+
+Flow information will be kept for devices only. Same information as in proposal 1, but now it will be kept in a datastructure attached to the device, and indexed by the "other node".
+Reference counts for the "other node" will be affected as above.
+What if the "other node" is also a device? Do we keep the flow twice?
+
+When merging nodes we will have to go through the flow information for each device and merge there too.
+Same question on blocked flows as in proposal 1.
+Also when merging nodes that are both devices we will have to also merge devices. Can that happen, and what do we do?
 

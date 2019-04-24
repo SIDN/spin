@@ -93,6 +93,22 @@ spin_data_noderef(node_t *node) {
     return nodeobj;
 }
 
+static node_t *lookup_ip(node_cache_t *node_cache, ip_t *ip, pkt_info_t *pkt_info, char *sd) {
+    node_t *result;
+
+    result = node_cache_find_by_ip(node_cache, sizeof(ip_t), ip);
+    if (result == NULL) {
+        char pkt_str[1024];
+        spin_log(LOG_ERR, "[XX] ERROR! %s node not found in cache!\n");
+        pktinfo2str(pkt_str, pkt_info, 1024);
+        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
+        spin_log(LOG_DEBUG, "[XX] node cache:\n");
+        node_cache_print(node_cache);
+        return 0;
+    }
+    return result;
+}
+
 spin_data
 spin_data_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info) {
     cJSON *pktobj;
@@ -102,29 +118,14 @@ spin_data_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info) {
 
     ip.family = pkt_info->family;
     memcpy(ip.addr, pkt_info->src_addr, 16);
-    src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    src_node = lookup_ip(node_cache, &ip, pkt_info, "src");
+    // src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
     memcpy(ip.addr, pkt_info->dest_addr, 16);
-    dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
-    if (src_node == NULL) {
-        char pkt_str[1024];
-        spin_log(LOG_ERR, "[XX] ERROR! src node not found in cache!\n");
-        pktinfo2str(pkt_str, pkt_info, 1024);
-        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
-        spin_log(LOG_DEBUG, "[XX] node cache:\n");
-        node_cache_print(node_cache);
+    dest_node = lookup_ip(node_cache, &ip, pkt_info, "dst");
+    // dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    if (src_node == NULL || dest_node == NULL) {
         return 0;
     }
-    if (dest_node == NULL) {
-        char pkt_str[1024];
-        spin_log(LOG_ERR, "[XX] ERROR! dest node not found in cache!\n");
-        pktinfo2str(pkt_str, pkt_info, 1024);
-        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
-        spin_log(LOG_DEBUG, "[XX] node cache:\n");
-        node_cache_print(node_cache);
-        return 0;
-    }
-    assert(src_node != NULL);
-    assert(dest_node != NULL);
 
     pktobj = cJSON_CreateObject();
 
@@ -226,9 +227,10 @@ spin_data_create_mqtt_command(const char* command, char* argument, spin_data res
     cJSON *cmdobj;
 
     cmdobj = cJSON_CreateObject();
-    cJSON_AddStringToObject(cmdobj, "command", command);
+    if (command != NULL) {
+        cJSON_AddStringToObject(cmdobj, "command", command);
+    }
     if (argument != NULL) {
-        // Backward compatibility, sometimes argument is not given
         cJSON_AddStringToObject(cmdobj, "argument", argument);
     }
     if (result != NULL) {
