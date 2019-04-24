@@ -609,7 +609,7 @@ node2json(node_t* node, buffer_t* json_buf) {
     spin_data sd;
     char *sdstr;
 
-    sd = node_json(node);
+    sd = spin_data_node(node);
     sdstr = spin_data_serialize(sd);
 
     spin_data_delete(sd);
@@ -625,7 +625,7 @@ pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf
     spin_data sd;
     char *sdstr;
 
-    sd = pkt_info_json(node_cache, pkt_info);
+    sd = spin_data_pkt_info(node_cache, pkt_info);
     sdstr = spin_data_serialize(sd);
 
     spin_data_delete(sd);
@@ -641,7 +641,7 @@ dns_query_pkt_info2json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info, 
     spin_data sd;
     char *sdstr;
 
-    sd = dns_query_pkt_info_json(node_cache, dns_pkt_info);
+    sd = spin_data_dns_query_pkt_info(node_cache, dns_pkt_info);
     sdstr = spin_data_serialize(sd);
 
     spin_data_delete(sd);
@@ -657,7 +657,7 @@ create_traffic_command(node_cache_t* node_cache, flow_list_t* flow_list, buffer_
     spin_data sd;
     char *sdstr;
 
-    sd = create_traffic_json(node_cache, flow_list, timestamp);
+    sd = spin_data_create_traffic(node_cache, flow_list, timestamp);
     sdstr = spin_data_serialize(sd);
 
     spin_data_delete(sd);

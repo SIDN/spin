@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <mosquitto.h>
 
-#include "cJSON.h"
+#include "spindata.h"
 
 #include "node_cache.h"
 #include "util.h"
@@ -41,6 +41,26 @@ void core2pubsub_publish(buffer_t *buf) {
     STAT_VALUE(ctr, buffer_size(buf));
     pubsub_publish(mqtt_channel_traffic, buffer_size(buf), buffer_str(buf), 0);
 }
+
+void core2pubsub_publish_chan(char *channel, spin_data sd, int retain) {
+    STAT_COUNTER(ctr, chan-publish, STAT_TOTAL);
+    char *message;
+    int message_len;
+
+    if (channel == NULL) {
+        // default
+        channel = mqtt_channel_traffic;
+    }
+
+    message = spin_data_serialize(sd);
+    message_len = strlen(message);
+    STAT_VALUE(ctr, message_len);
+
+    pubsub_publish(channel, message_len, message, retain);
+
+    free(message);
+}
+
 
 /* End push back code */
 

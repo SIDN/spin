@@ -26,7 +26,7 @@ spin_data_delete(spin_data sd) {
 
 //  Also needed for lists
 spin_data
-ipar_json(tree_t *iptree) {
+spin_data_ipar(tree_t *iptree) {
     cJSON *arobj, *strobj;
     tree_entry_t* cur;
     char ip_str[INET6_ADDRSTRLEN];
@@ -43,7 +43,7 @@ ipar_json(tree_t *iptree) {
 }
 
 spin_data
-node_json(node_t* node) {
+spin_data_node(node_t* node) {
     cJSON *nodeobj;
     cJSON *arobj;
     cJSON *strobj;
@@ -65,18 +65,7 @@ node_json(node_t* node) {
     }
     cJSON_AddNumberToObject(nodeobj, "lastseen", node->last_seen);
 
-    arobj = ipar_json(node->ips);
-#ifdef notdef
-    // ips
-    arobj = cJSON_CreateArray();
-    cur = tree_first(node->ips);
-    while (cur != NULL) {
-        spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
-        strobj = cJSON_CreateString(ip_str);
-        cJSON_AddItemToArray(arobj, strobj);
-        cur = tree_next(cur);
-    }
-#endif
+    arobj = spin_data_ipar(node->ips);
     cJSON_AddItemToObject(nodeobj, "ips", arobj);
 
     // domains
@@ -93,19 +82,19 @@ node_json(node_t* node) {
 }
 
 static spin_data
-noderef_json(node_t *node) {
+spin_data_noderef(node_t *node) {
     cJSON* nodeobj;
 
     if (omitnode) {
         nodeobj = cJSON_CreateNumber(node->id);
     } else {
-        nodeobj = node_json(node);
+        nodeobj = spin_data_node(node);
     }
     return nodeobj;
 }
 
 spin_data
-pkt_info_json(node_cache_t* node_cache, pkt_info_t* pkt_info) {
+spin_data_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info) {
     cJSON *pktobj;
     node_t* src_node;
     node_t* dest_node;
@@ -139,8 +128,8 @@ pkt_info_json(node_cache_t* node_cache, pkt_info_t* pkt_info) {
 
     pktobj = cJSON_CreateObject();
 
-    cJSON_AddItemToObject(pktobj, "from", noderef_json(src_node));
-    cJSON_AddItemToObject(pktobj, "to", noderef_json(dest_node));
+    cJSON_AddItemToObject(pktobj, "from", spin_data_noderef(src_node));
+    cJSON_AddItemToObject(pktobj, "to", spin_data_noderef(dest_node));
 
     cJSON_AddNumberToObject(pktobj, "protocol", pkt_info->protocol);
     cJSON_AddNumberToObject(pktobj, "from_port", pkt_info->src_port);
@@ -153,7 +142,7 @@ pkt_info_json(node_cache_t* node_cache, pkt_info_t* pkt_info) {
 
 #define DNAME_SIZE  512
 spin_data
-dns_query_pkt_info_json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info) {
+spin_data_dns_query_pkt_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info) {
     cJSON *pktobj;
     node_t* src_node;
     // the 'node' that was queried; this could be a node that we already know
@@ -194,8 +183,8 @@ dns_query_pkt_info_json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info) 
 
     pktobj = cJSON_CreateObject();
 
-    cJSON_AddItemToObject(pktobj, "from", noderef_json(src_node));
-    cJSON_AddItemToObject(pktobj, "queriednode", noderef_json(dns_node));
+    cJSON_AddItemToObject(pktobj, "from", spin_data_noderef(src_node));
+    cJSON_AddItemToObject(pktobj, "queriednode", spin_data_noderef(dns_node));
     cJSON_AddStringToObject(pktobj, "query", dname_str);
 
     return pktobj;
@@ -222,7 +211,7 @@ flow_list2json(node_cache_t* node_cache, flow_list_t* flow_list) {
         pkt_info.packet_count = fd->packet_count;
         flow_list->total_count += fd->packet_count;
 
-        pktobj = pkt_info_json(node_cache, &pkt_info);
+        pktobj = spin_data_pkt_info(node_cache, &pkt_info);
         cJSON_AddItemToArray(flobj, pktobj);
 
         cur = tree_next(cur);
@@ -231,10 +220,25 @@ flow_list2json(node_cache_t* node_cache, flow_list_t* flow_list) {
     return flobj;
 }
 
+
 spin_data
-create_traffic_json (node_cache_t* node_cache, flow_list_t* flow_list, uint32_t timestamp) {
-    cJSON *trobj;
+spin_data_create_mqtt_command(const char* command, char* argument, spin_data result) {
     cJSON *cmdobj;
+
+    cmdobj = cJSON_CreateObject();
+    cJSON_AddStringToObject(cmdobj, "command", command);
+    if (argument != NULL) {
+        // Backward compatibility, sometimes argument is not given
+        cJSON_AddStringToObject(cmdobj, "argument", argument);
+    }
+    cJSON_AddItemToObject(cmdobj, "result", result);
+
+    return cmdobj;
+}
+
+spin_data
+spin_data_create_traffic (node_cache_t* node_cache, flow_list_t* flow_list, uint32_t timestamp) {
+    cJSON *trobj;
     cJSON *flobj;
 
     flobj = flow_list2json(node_cache, flow_list);
@@ -245,12 +249,5 @@ create_traffic_json (node_cache_t* node_cache, flow_list_t* flow_list, uint32_t 
     cJSON_AddNumberToObject(trobj, "total_size", flow_list->total_size);
     cJSON_AddNumberToObject(trobj, "total_count", flow_list->total_count);
 
-    // This should not be here
-    cmdobj = cJSON_CreateObject();
-    cJSON_AddStringToObject(cmdobj, "command", "traffic");
-    cJSON_AddStringToObject(cmdobj, "argument", "");
-    cJSON_AddItemToObject(cmdobj, "result", trobj);
-
-    return cmdobj;
+    return spin_data_create_mqtt_command("traffic", "", trobj);
 }
-

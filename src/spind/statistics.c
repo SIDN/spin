@@ -1,9 +1,5 @@
-#define CJS
-
-#ifdef CJS
 #include <stdlib.h>
-#include "cJSON.h"
-#endif
+#include "spindata.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -13,14 +9,11 @@
 
 #if DO_SPIN_STATS
 
-void pubsub_publish(char *, int, char *, int);
-
-#ifdef CJS
+void core2pubsub_publish_chan(char *, spin_data, int);
 
 static void
 statpub(stat_p sp) {
     char tpbuf[100];
-    char *jsonstr;
     cJSON *statobj, *membobj;
 
     statobj = cJSON_CreateObject();
@@ -38,28 +31,12 @@ statpub(stat_p sp) {
     cJSON_AddNumberToObject(statobj, "value", sp->stat_value);
     cJSON_AddNumberToObject(statobj, "count", sp->stat_count);
 
-    jsonstr = cJSON_PrintUnformatted(statobj);
+    sprintf(tpbuf, "SPIN/stat/%s/%s", sp->stat_module, sp->stat_name);
+
+    core2pubsub_publish_chan(tpbuf, statobj, 1);
 
     cJSON_Delete(statobj);
-
-    sprintf(tpbuf, "SPIN/stat/%s/%s", sp->stat_module, sp->stat_name);
-    pubsub_publish(tpbuf, strlen(jsonstr), jsonstr, 1);
-    free(jsonstr);
 }
-
-#else /* CJS */
-static void
-statpub(stat_p sp) {
-    char tpbuf[100];
-    char jsbuf[512];
-
-    sprintf(jsbuf, "{ \"module\": \"%s\", \"name\": \"%s\", \"type\": %d, \"value\": %d, \"count\": %d }",
-        sp->stat_module, sp->stat_name,
-        sp->stat_type, sp->stat_value, sp->stat_count);
-    sprintf(tpbuf, "SPIN/stat/%s/%s", sp->stat_module, sp->stat_name);
-    pubsub_publish(tpbuf, strlen(jsbuf), jsbuf, 1);
-}
-#endif /* CJS */
 
 static void
 wf_stat(void * arg, int data, int timeout) {

@@ -11,7 +11,7 @@
 #include <time.h>
 #include <assert.h>
 
-#include "cJSON.h"
+#include "spindata.h"
 
 #include "spinconfig.h"
 #include "pkt_info.h"
@@ -31,6 +31,7 @@
 #include "statistics.h"
 #include "version.h"
 
+
 node_cache_t* node_cache;
 dns_cache_t* dns_cache;
 
@@ -43,6 +44,7 @@ int stop_on_error;
 int omitnode;
 
 STAT_MODULE(spind)
+
 
 /*
  *
@@ -145,12 +147,15 @@ node_filename_str(char *nodenum) {
 }
 
 static void
-store_node_info(int nodenum, buffer_t *node_json) {
+store_node_info(int nodenum, spin_data sd) {
     FILE *nodefile;
+    char *sdstr;
 
     mkdir(NODE_FILENAME_DIR, 0777);
     nodefile = fopen(node_filename_int(nodenum), "w");
-    fprintf(nodefile, "%s\n", buffer_str(node_json));
+    sdstr = spin_data_serialize(sd);
+    fprintf(nodefile, "%s\n", sdstr);
+    free(sdstr);
     fclose(nodefile);
 }
 
@@ -174,20 +179,13 @@ unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argum
 }
 
 static void
-send_command_node_info(int nodenum, buffer_t *node_json) {
-    buffer_t* response_json = buffer_create(JSONBUFSIZ);
+send_command_node_info(int nodenum, spin_data sd) {
     char mosqchan[100];
+    spin_data command;
 
-    create_mqtt_command(response_json, "nodeInfo", NULL, buffer_str(node_json));
-    if (buffer_finish(response_json)) {
-        // Subdivide channel
-        sprintf(mosqchan, "SPIN/traffic/node/%d", nodenum);
-        pubsub_publish(mosqchan,
-                buffer_size(response_json), buffer_str(response_json), 1);
-    } else {
-        spin_log(LOG_WARNING, "Error converting nodeInfo to JSON; partial packet: %s\n", buffer_str(response_json));
-    }
-    buffer_destroy(response_json);
+    command = spin_data_create_mqtt_command("nodeInfo", NULL, sd);
+    sprintf(mosqchan, "SPIN/traffic/node/%d", nodenum);
+    core2pubsub_publish_chan(mosqchan, command, 1);
 }
 
 static void
@@ -203,25 +201,18 @@ update_node_ips(int nodenum, tree_t *tree) {
 
 static void
 node_is_updated(node_t *node) {
-    buffer_t* node_json = buffer_create(JSONBUFSIZ);
-    unsigned int p_size;
+    spin_data sd;
 
-    p_size = node2json(node, node_json);
-    if (p_size > 0) {
-        buffer_finish(node_json);
-        // work
-        send_command_node_info(node->id, node_json);
-        if (node->persistent) /* Persistent? */ {
-            // Store modified node in file
-            store_node_info(node->id, node_json);
+    sd = spin_data_node(node);
+    send_command_node_info(node->id, sd);
+    if (node->persistent) /* Persistent? */ {
+        // Store modified node in file
+        store_node_info(node->id, sd);
 
-            // Update IP addresses in c2b
-            update_node_ips(node->id, node->ips);
-        }
-    } else {
-        spin_log(LOG_DEBUG, "[XX] node2json failed(size 0)\n");
+        // Update IP addresses in c2b
+        update_node_ips(node->id, node->ips);
     }
-    buffer_destroy(node_json);
+    spin_data_delete(sd);
 }
 
 static void
@@ -514,27 +505,15 @@ spinrpc_get_blockflow() {
  */
 
 void send_command_blocked(pkt_info_t* pkt_info) {
-    buffer_t* response_json = buffer_create(JSONBUFSIZ);
-    buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
-    unsigned int p_size;
+    spin_data pkt_sd, cmd_sd;
 
     // Publish recently changed nodes
     publish_nodes();
 
-    p_size = pkt_info2json(node_cache, pkt_info, pkt_json);
-    if (p_size > 0) {
-        buffer_finish(pkt_json);
-        create_mqtt_command(response_json, "blocked", NULL, buffer_str(pkt_json));
-        if (buffer_finish(response_json)) {
-            core2pubsub_publish(response_json);
-        } else {
-            spin_log(LOG_WARNING, "Error converting blocked pkt_info to JSON; partial packet: %s\n", buffer_str(response_json));
-        }
-    } else {
-        spin_log(LOG_DEBUG, "[XX] did not get an actual block command (size 0)\n");
-    }
-    buffer_destroy(response_json);
-    buffer_destroy(pkt_json);
+    pkt_sd = spin_data_pkt_info(node_cache, pkt_info);
+    cmd_sd = spin_data_create_mqtt_command("blocked", NULL, pkt_sd);
+    core2pubsub_publish_chan(NULL, cmd_sd, 0);
+    spin_data_delete(cmd_sd);
 }
 
 void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
