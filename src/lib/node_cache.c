@@ -600,8 +600,8 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
 
 #ifdef CJS
 
+#ifdef notdef
 #include "spindata.h"
-
 
 // Temporary backwards hacks
 unsigned int
@@ -667,6 +667,7 @@ create_traffic_command(node_cache_t* node_cache, flow_list_t* flow_list, buffer_
 
     return 1;
 }
+#endif
 #else /* CJS */
 
 unsigned int

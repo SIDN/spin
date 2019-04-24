@@ -67,15 +67,12 @@ void core2pubsub_publish_chan(char *channel, spin_data sd, int retain) {
 /* (Re)start command Mosquitto server only */
 
 void send_command_restart() {
-    buffer_t* response_json = buffer_create(4096);
-    create_mqtt_command(response_json, "serverRestart", NULL, NULL);
-    buffer_finish(response_json);
-    if (buffer_ok(response_json)) {
-        core2pubsub_publish(response_json);
-    } else {
-        spin_log(LOG_ERR, "error: response size too large\n");
-    }
-    buffer_destroy(response_json);
+    spin_data cmd_sd;
+
+    cmd_sd = spin_data_create_mqtt_command("serverRestart", NULL, NULL);
+    core2pubsub_publish_chan(NULL, cmd_sd, 0);
+
+    spin_data_delete(cmd_sd);
 }
 
 /*

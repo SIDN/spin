@@ -231,13 +231,15 @@ spin_data_create_mqtt_command(const char* command, char* argument, spin_data res
         // Backward compatibility, sometimes argument is not given
         cJSON_AddStringToObject(cmdobj, "argument", argument);
     }
-    cJSON_AddItemToObject(cmdobj, "result", result);
+    if (result != NULL) {
+        cJSON_AddItemReferenceToObject(cmdobj, "result", result);
+    }
 
     return cmdobj;
 }
 
 spin_data
-spin_data_create_traffic (node_cache_t* node_cache, flow_list_t* flow_list, uint32_t timestamp) {
+spin_data_create_traffic(node_cache_t* node_cache, flow_list_t* flow_list, uint32_t timestamp) {
     cJSON *trobj;
     cJSON *flobj;
 
@@ -250,4 +252,27 @@ spin_data_create_traffic (node_cache_t* node_cache, flow_list_t* flow_list, uint
     cJSON_AddNumberToObject(trobj, "total_count", flow_list->total_count);
 
     return spin_data_create_mqtt_command("traffic", "", trobj);
+}
+
+spin_data
+spin_data_nodepairtree(tree_t* tree) {
+    cJSON *arobj, *npobj;
+    tree_entry_t* cur;
+    int *nodenump;
+
+    arobj = cJSON_CreateArray();
+
+    cur = tree_first(tree);
+    while (cur != NULL) {
+        nodenump = (int *) cur->key;
+
+        npobj = cJSON_CreateObject();
+        cJSON_AddNumberToObject(npobj, "node1", nodenump[0]);
+        cJSON_AddNumberToObject(npobj, "node2", nodenump[1]);
+        cJSON_AddItemToArray(arobj, npobj);
+
+        cur = tree_next(cur);
+    }
+
+    return arobj;
 }

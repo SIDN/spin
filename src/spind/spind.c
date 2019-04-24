@@ -165,18 +165,6 @@ store_node_info(int nodenum, spin_data sd) {
 
 #define JSONBUFSIZ      4096
 
-unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argument, char* result) {
-
-    buffer_write(buf, "{ \"command\": \"%s\"", command);
-    if (argument != NULL) {
-        buffer_write(buf, ", \"argument\": %s", argument);
-    }
-    if (result != NULL) {
-        buffer_write(buf, ", \"result\": %s", result);
-    }
-    buffer_write(buf, " }");
-    return buf->pos;
-}
 
 static void
 send_command_node_info(int nodenum, spin_data sd) {
@@ -184,8 +172,11 @@ send_command_node_info(int nodenum, spin_data sd) {
     spin_data command;
 
     command = spin_data_create_mqtt_command("nodeInfo", NULL, sd);
+
     sprintf(mosqchan, "SPIN/traffic/node/%d", nodenum);
     core2pubsub_publish_chan(mosqchan, command, 1);
+
+    spin_data_delete(command);
 }
 
 static void
@@ -457,6 +448,7 @@ spinrpc_blockflow(int node1, int node2, int block) {
     return result;
 }
 
+#ifdef notdef
 static void
 nodepairtree2json(tree_t* tree, buffer_t* result) {
     tree_entry_t* cur;
@@ -483,21 +475,19 @@ nodepairtree2json(tree_t* tree, buffer_t* result) {
     }
     buffer_write(result, " ] ");
 }
+#endif
 
 char *
 spinrpc_get_blockflow() {
-    buffer_t* response_json = buffer_create(JSONBUFSIZ);
+    spin_data ar_sd, cmd_sd;
     char *retval;
 
-    buffer_write(response_json, "{\"result\": ");
-    nodepairtree2json(nodepair_tree, response_json);
-    buffer_write(response_json, "}");
-    if (buffer_finish(response_json)) {
-        retval = strdup(buffer_str(response_json));
-    } else {
-        retval = "{ -1 }";
-    }
-    return strdup(retval);
+    ar_sd = spin_data_nodepairtree(nodepair_tree);
+    cmd_sd = spin_data_create_mqtt_command(NULL, NULL, ar_sd);
+    retval =  spin_data_serialize(cmd_sd);
+    spin_data_delete(ar_sd);
+    spin_data_delete(cmd_sd);
+    return retval;
 }
 
 /*
@@ -512,37 +502,26 @@ void send_command_blocked(pkt_info_t* pkt_info) {
 
     pkt_sd = spin_data_pkt_info(node_cache, pkt_info);
     cmd_sd = spin_data_create_mqtt_command("blocked", NULL, pkt_sd);
+
     core2pubsub_publish_chan(NULL, cmd_sd, 0);
+
     spin_data_delete(cmd_sd);
+    spin_data_delete(pkt_sd);
 }
 
 void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
-    buffer_t* response_json = buffer_create(JSONBUFSIZ);
-    buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
-    unsigned int p_size;
-    STAT_COUNTER(ctr, dnsquerysize, STAT_MAX);
+    spin_data dns_sd, cmd_sd;
 
     // Publish recently changed nodes
     publish_nodes();
 
-    p_size = dns_query_pkt_info2json(node_cache, pkt_info, pkt_json);
-    if (p_size > 0) {
-        spin_log(LOG_DEBUG, "[XX] got an actual dns query command (size >0)\n");
-        buffer_finish(pkt_json);
+    dns_sd = spin_data_dns_query_pkt_info(node_cache, pkt_info);
+    cmd_sd = spin_data_create_mqtt_command("dnsquery", NULL, dns_sd);
 
-        STAT_VALUE(ctr, strlen(buffer_str(pkt_json)));
+    core2pubsub_publish_chan(NULL, cmd_sd, 0);
 
-        create_mqtt_command(response_json, "dnsquery", NULL, buffer_str(pkt_json));
-        if (buffer_finish(response_json)) {
-            core2pubsub_publish(response_json);
-        } else {
-            spin_log(LOG_WARNING, "Error converting dnsquery pkt_info to JSON; partial packet: %s\n", buffer_str(response_json));
-        }
-    } else {
-        spin_log(LOG_DEBUG, "[XX] did not get an actual dns query command (size 0)\n");
-    }
-    buffer_destroy(response_json);
-    buffer_destroy(pkt_json);
+    spin_data_delete(cmd_sd);
+    spin_data_delete(dns_sd);
 }
 
 // function definition below
@@ -555,21 +534,18 @@ void maybe_sendflow(flow_list_t *flow_list, time_t now) {
     if (flow_list_should_send(flow_list, now)) {
         STAT_VALUE(ctr1, 1);
         if (!flow_list_empty(flow_list)) {
-            buffer_t* json_buf = buffer_create(JSONBUFSIZ);
-
-            buffer_allow_resize(json_buf);
+            spin_data cmd_sd;
 
             // Publish recently changed nodes
             publish_nodes();
 
             // create json, send it
             STAT_VALUE(ctr2, 1);
-            create_traffic_command(node_cache, flow_list, json_buf, now);
-            if (buffer_finish(json_buf)) {
-                core2pubsub_publish(json_buf);
-                // mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
-            }
-            buffer_destroy(json_buf);
+            cmd_sd = spin_data_create_traffic(node_cache, flow_list, now);
+            core2pubsub_publish_chan(NULL, cmd_sd, 0);
+
+            spin_data_delete(cmd_sd);
+
         }
         flow_list_clear(flow_list, now);
     }
@@ -874,6 +850,7 @@ void handle_command_add_name(int node_id, char* name) {
     node_names_write_userconfig(node_cache->names, "/etc/spin/names.conf");
 }
 
+#ifdef notdef
 static void
 iptree2json(tree_t* tree, buffer_t* result) {
     tree_entry_t* cur;
@@ -900,34 +877,18 @@ iptree2json(tree_t* tree, buffer_t* result) {
     }
     buffer_write(result, " ] ");
 }
+#endif
 
 void handle_command_get_iplist(int iplist, const char* json_command) {
-    buffer_t* response_json = buffer_create(JSONBUFSIZ);
-    buffer_t* result_json = buffer_create(JSONBUFSIZ);
+    spin_data ipt_sd, cmd_sd;
 
-    iptree2json(ipl_list_ar[iplist].li_tree, result_json);
-    if (!buffer_ok(result_json)) {
-        buffer_destroy(result_json);
-        buffer_destroy(response_json);
-        return;
-    }
-    buffer_finish(result_json);
+    ipt_sd = spin_data_ipar(ipl_list_ar[iplist].li_tree);
+    cmd_sd = spin_data_create_mqtt_command(json_command, NULL, ipt_sd);
 
-    spin_log(LOG_DEBUG, "get_iplist result %s\n", buffer_str(result_json));
+    core2pubsub_publish_chan(NULL, cmd_sd, 0);
 
-    create_mqtt_command(response_json, json_command, NULL, buffer_str(result_json));
-    if (!buffer_ok(response_json)) {
-        buffer_destroy(result_json);
-        buffer_destroy(response_json);
-        return;
-    }
-    buffer_finish(response_json);
-
-    core2pubsub_publish(response_json);
-
-    buffer_destroy(result_json);
-    buffer_destroy(response_json);
-
+    spin_data_delete(ipt_sd);
+    spin_data_delete(cmd_sd);
 }
 
 void int_handler(int signal) {
