@@ -229,11 +229,11 @@ function handleTrafficMessage(data) {
             var f = arr[i];
             // defined in spingraph.js
             //alert("FIND NODE: " + f['from'])
+            // New version of protocol: if from_node or to_node is numeric, load from cache
             var from_node = getNodeInfo(f['from']);
             var to_node = getNodeInfo(f['to']);
 
             if (from_node != null && to_node != null && from_node && to_node) {
-                // New version of protocol: if from_node or to_node is numeric, load from cache
                 addFlow(timestamp + time_sync, from_node, to_node, f['count'], f['size']);
             } else {
                 console.error("partial message: " + JSON.stringify(data))
