@@ -5,6 +5,7 @@ var time_sync = 0; // Time difference (seconds) between server and client
 var active = false; // Determines whether we are active or not
 
 var datacache = []; // array of all data items to be added on the next iteration.
+var nodeinfo = []; // caching array with all node information
 
 function init() {
     connectToMQTT();
@@ -85,6 +86,10 @@ function onTrafficMessage(msg) {
                 //handleTrafficMessage(result);
                 datacache.push(result); // push to cache
                 break;
+            case 'nodeInfo':
+                // This implements the new nodeInfo messages
+                // These are publishes on different channels
+                handleNodeInfo(result);
             case 'blocked':
                 //console.log("Got blocked command: " + msg);
                 handleBlockedMessage(result);
@@ -140,7 +145,7 @@ function onTrafficMessage(msg) {
 function onTrafficOpen(evt) {
     // Once a connection has been made, make a subscription and send a message..
     console.log("Connected");
-    client.subscribe("SPIN/traffic");
+    client.subscribe("SPIN/traffic/#");
 
     sendCommand("get_ignores", {})//, "")
     sendCommand("get_blocks", {})//, "")
@@ -224,10 +229,11 @@ function handleTrafficMessage(data) {
             var f = arr[i];
             // defined in spingraph.js
             //alert("FIND NODE: " + f['from'])
-            var from_node = f['from'];
-            var to_node = f['to'];
+            var from_node = getNodeInfo(f['from']);
+            var to_node = getNodeInfo(f['to']);
 
-            if (from_node != null && to_node != null) {
+            if (from_node != null && to_node != null && from_node && to_node) {
+                // New version of protocol: if from_node or to_node is numeric, load from cache
                 addFlow(timestamp + time_sync, from_node, to_node, f['count'], f['size']);
             } else {
                 console.error("partial message: " + JSON.stringify(data))
@@ -279,6 +285,25 @@ function handleDNSQueryMessage(data) {
     var from_node = data['from'];
     var dns_node = data['queriednode'];
     addDNSQuery(from_node, dns_node);
+}
+
+// Handles nodeInfo command
+function handleNodeInfo(data) {
+    nodeinfo[data["id"]] = data;
+}
+
+function getNodeInfo(id) {
+    if (Number.isInteger(id)) {
+        if (nodeinfo.includes(id)) {
+            return nodeinfo[id];
+        } else {
+            console.error("no nodeInfo for node " + from_node)
+            return false;
+        }
+    } else {
+        // probably old-style protocol
+        return id;
+    }
 }
 
 function serverRestart() {
