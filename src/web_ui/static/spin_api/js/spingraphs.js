@@ -671,15 +671,11 @@ function nodeSelected(event) {
             graph_peak_bytes = null;
         }
         
+        $("#nodeinfo-peakdet").hide(); // Always hide peak detection, show when active.
 		if (node.mac) {
             // Obtain peak information from server.
             // Uses variable selectedNodeId as set above.
             getPeakInformation();
-            $("#nodeinfo-peakdet").show();
-            $("#nodeinfo-peakdetvis").html("Loading...")
-            $("#nodeinfo-peakdetvis2").html("Loading...")
-		} else {
-			$("#nodeinfo-peakdet").hide();
 		}
 
         //sendCommand("ip2hostname", node.address);
@@ -1138,8 +1134,7 @@ function getPeakInformation() {
  */
 function handlePeakInformation(result) {
 	var container = document.getElementById('nodeinfo-peakdetvis');
-    //
-
+    $("#nodeinfo-peakdet").show()
     /*
      * If there is no graph yet, make one.
      * Otherwise, change only the inner dataset.
@@ -1262,5 +1257,4 @@ function handlePeakInformation(result) {
     } else {
         $("#nodeinfo-training:visible").hide();
     }
-
 }
