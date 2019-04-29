@@ -1,8 +1,9 @@
 #include <stdlib.h>
 #include <mosquitto.h>
 
+#include "spindata.h"
+
 #include "node_cache.h"
-#include "jsmn.h"
 #include "util.h"
 #include "mainloop.h"
 #include "spinconfig.h"
@@ -26,108 +27,45 @@ STAT_MODULE(pubsub)
  */
 
 void
-pubsub_publish(char *channel, int payloadlen, const void* payload) {
+pubsub_publish(char *channel, int payloadlen, const void* payload, int retain) {
 
     /*
      * There is a result from command, but for now ignored
      */
-    mosquitto_publish(mosq, NULL, channel, payloadlen, payload, 0, false);
+    mosquitto_publish(mosq, NULL, channel, payloadlen, payload, 0, retain);
 }
 
-void core2pubsub_publish(buffer_t *buf) {
-    STAT_COUNTER(ctr, traffic-publish, STAT_TOTAL);
+void core2pubsub_publish_chan(char *channel, spin_data sd, int retain) {
+    STAT_COUNTER(ctr, chan-publish, STAT_TOTAL);
+    char *message;
+    int message_len;
 
-    STAT_VALUE(ctr, buffer_size(buf));
-    pubsub_publish(mqtt_channel_traffic, buffer_size(buf), buffer_str(buf));
+    if (channel == NULL) {
+        // default
+        channel = mqtt_channel_traffic;
+    }
+
+    message = spin_data_serialize(sd);
+    message_len = strlen(message);
+    STAT_VALUE(ctr, message_len);
+
+    pubsub_publish(channel, message_len, message, retain);
+
+    free(message);
 }
+
 
 /* End push back code */
 
 /* (Re)start command Mosquitto server only */
 
 void send_command_restart() {
-    buffer_t* response_json = buffer_create(4096);
-    create_mqtt_command(response_json, "serverRestart", NULL, NULL);
-    buffer_finish(response_json);
-    if (buffer_ok(response_json)) {
-        core2pubsub_publish(response_json);
-    } else {
-        spin_log(LOG_ERR, "error: response size too large\n");
-    }
-    buffer_destroy(response_json);
-}
+    spin_data cmd_sd;
 
-// returns 1 on success, 0 on error
-static int
-json_parse_int_arg(int* dest,
-                       const char* json_str,
-                       jsmntok_t* tokens,
-                       int argument_token_i) {
-    jsmntok_t token = tokens[argument_token_i];
+    cmd_sd = spin_data_create_mqtt_command("serverRestart", NULL, NULL);
+    core2pubsub_publish_chan(NULL, cmd_sd, 0);
 
-    if (token.type != JSMN_PRIMITIVE)
-        return 0;
-    *dest = atoi(json_str + token.start);
-    return 1;
-}
-
-static int
-json_parse_string_arg(char* dest,
-                          size_t dest_size,
-                          const char* json_str,
-                          jsmntok_t* tokens,
-                          int argument_token_i) {
-    jsmntok_t token = tokens[argument_token_i];
-    if (token.type != JSMN_STRING)
-        return 0;
-    snprintf(dest, dest_size, "%.*s", token.end - token.start, json_str+token.start);
-    return 1;
-}
-
-static int
-json_parse_ip_arg(ip_t* dest,
-                      const char* json_str,
-                      jsmntok_t* tokens,
-                      int argument_token_i) {
-    char ip_str[INET6_ADDRSTRLEN];
-
-    if (!json_parse_string_arg(ip_str, INET6_ADDRSTRLEN,
-                        json_str, tokens, argument_token_i))
-        return 0;
-    if(!spin_pton(dest, ip_str))
-        return 0;
-    return 1;
-}
-
-// more complex argument, of the form
-// { "node_id": <int>, "name": <str> }
-static int
-json_parse_node_id_name_arg(int* node_id,
-                                char* name,
-                                size_t name_size,
-                                const char* json_str,
-                                jsmntok_t* tokens,
-                                int argument_token_i) {
-    jsmntok_t token = tokens[argument_token_i];
-    int i, i_n, i_v, id_found = 0, name_found = 0;
-
-    if (token.type != JSMN_OBJECT || token.size != 2)
-        return 0;
-    for (i = 0; i < token.size; i++) {
-        // i*2 is name, i*2 + 1 is value
-        i_n = argument_token_i + i*2 + 1;
-        i_v = argument_token_i + i*2 + 2;
-        if (strncmp("name", json_str + tokens[i_n].start, tokens[i_n].end-tokens[i_n].start) == 0) {
-            if(!json_parse_string_arg(name, name_size, json_str, tokens, i_v))
-                return 0;
-            name_found = 1;
-        } else if (strncmp("node_id", json_str + tokens[i_n].start, tokens[i_n].end-tokens[i_n].start) == 0) {
-            if(!json_parse_int_arg(node_id, json_str, tokens, i_v))
-                return 0;
-            id_found = 1;
-        }
-    }
-    return (name_found && id_found);
+    spin_data_delete(cmd_sd);
 }
 
 /*
@@ -200,17 +138,30 @@ static int find_command(int name_len, const char *name_str, int *verb, int *obje
     return 0;
 }
 
+int getint_cJSONobj(cJSON *cjarg, char *fieldname) {
+    cJSON *f_json;
 
-#define MAXNAMELEN      80      // Maximum identifier length; TODO */
+    f_json = cJSON_GetObjectItemCaseSensitive(cjarg, fieldname);
+    if (!cJSON_IsNumber(f_json)) {
+        return 0;
+    }
+    return f_json->valueint;
+}
 
+char* getstr_cJSONobj(cJSON *cjarg, char *fieldname) {
+    cJSON *f_json;
 
-void handle_json_command_detail(int verb, int object,
-                           const char* json_str,
-                           jsmntok_t* tokens,
-                           int argument_token_i) {
+    f_json = cJSON_GetObjectItemCaseSensitive(cjarg, fieldname);
+    if (!cJSON_IsString(f_json)) {
+        return NULL;
+    }
+    return f_json->valuestring;
+}
+
+void handle_json_command_detail2(int verb, int object, cJSON *argument_json) {
     int node_id_arg = 0;
     ip_t ip_arg;
-    char str_arg[MAXNAMELEN+1];
+    char *str_arg;
     // in a few cases, we need to update the node cache
     node_t* node;
 
@@ -224,18 +175,19 @@ void handle_json_command_detail(int verb, int object,
         // Add names is different
         if (object == PSC_O_NAME)
             break;
-        if (!json_parse_int_arg(&node_id_arg, json_str, tokens, argument_token_i)) {
+        if (!cJSON_IsNumber(argument_json)) {
             spin_log(LOG_ERR, "Cannot parse node_id\n");
             return;
         }
-        spin_log(LOG_DEBUG, "Spin verb %d, object %d, node-id %d\n", verb, object, node_id_arg);
+        node_id_arg = argument_json->valueint;
+        // spin_log(LOG_DEBUG, "Spin verb %d, object %d, node-id %d\n", verb, object, node_id_arg);
         break;
     case PSC_V_REM_IP:
-        if (!json_parse_ip_arg(&ip_arg, json_str, tokens, argument_token_i)) {
+        if (!cJSON_IsString(argument_json) || !spin_pton(&ip_arg, argument_json->valuestring)) {
             spin_log(LOG_ERR, "Cannot parse ip-addr\n");
             return;
         }
-        spin_log(LOG_DEBUG, "Spin verb %d, object %d, ip XX\n", verb, object);
+        // spin_log(LOG_DEBUG, "Spin verb %d, object %d, ip XX\n", verb, object);
         break;
     case PSC_V_RESET:
         if (object != PSC_O_IGNORE) {
@@ -258,11 +210,11 @@ void handle_json_command_detail(int verb, int object,
             // handle_command_get_names();
             break;
         case PSC_V_ADD:
-            if (!json_parse_node_id_name_arg(&node_id_arg, str_arg, MAXNAMELEN, json_str, tokens, argument_token_i)) {
-                spin_log(LOG_ERR, "Cannot parse node_id\n");
-                return;
+            node_id_arg = getint_cJSONobj(argument_json, "node-id");
+            str_arg = getstr_cJSONobj(argument_json, "name");
+            if (node_id_arg != 0 && str_arg != NULL) {
+                handle_command_add_name(node_id_arg, str_arg);
             }
-            handle_command_add_name(node_id_arg, str_arg);
             break;
         }
         break;  //NAME
@@ -290,47 +242,41 @@ void handle_json_command_detail(int verb, int object,
     }
 }
 
-void handle_json_command(const char* data) {
-    jsmn_parser p;
-    // todo: alloc these upon global init, realloc when necessary?
-    const size_t tok_count = 10;
-    jsmntok_t tokens[tok_count];
-    int result;
+void
+handle_json_command2(char *data) {
+    cJSON *command_json;
+    cJSON *method_json;
+    cJSON *argument_json;
+    char *method;
     int verb, object;
-    int datalen;
-    STAT_COUNTER(ctr, message-bytes-in, STAT_TOTAL);
 
-    datalen = strlen(data);
-    STAT_VALUE(ctr, datalen);
-    jsmn_init(&p);
-    result = jsmn_parse(&p, data, datalen, tokens, 10);
-    if (result < 0) {
-        spin_log(LOG_ERR, "Error: unable to parse json data: %d\n", result);
-        return;
+    command_json = cJSON_Parse(data);
+    if (command_json == NULL) {
+        spin_log(LOG_ERR, "Unable to parse command\n");
+        goto end;
     }
-    // token should be object, first child should be "command":
-    if (tokens[0].type != JSMN_OBJECT) {
-        spin_log(LOG_ERR, "Error: unknown json data\n");
-        return;
+
+    method_json = cJSON_GetObjectItemCaseSensitive (command_json, "command");
+    if (!cJSON_IsString(method_json)) {
+        spin_log(LOG_ERR, "No command found\n");
+        goto end;
     }
-    // token 1 should be "command",
-    // token 2 should be the command name (e.g. "get_ignores")
-    // token 3 should be "arguments",
-    // token 4 should be an object with the arguments (possibly empty)
-    if (tokens[1].type != JSMN_STRING || strncmp(data+tokens[1].start, "command", 7) != 0) {
-        spin_log(LOG_ERR, "Error: json data not command\n");
-        return;
+    method = method_json->valuestring;
+
+    argument_json = cJSON_GetObjectItemCaseSensitive (command_json, "argument");
+    if (argument_json == NULL) {
+        spin_log(LOG_ERR, "No argument found\n");
+        goto end;
     }
-    if (tokens[3].type != JSMN_STRING || strncmp(data+tokens[3].start, "argument", 8) != 0) {
-        spin_log(LOG_ERR, "Error: json data does not contain argument field\n");
-        return;
+
+    // spin_log(LOG_DEBUG, "Parsed mqtt command: %s %s\n", method, cJSON_PrintUnformatted(argument_json));
+
+    if (find_command(strlen(method), method, &verb, &object)) {
+        handle_json_command_detail2(verb, object, argument_json);
     }
-    if (find_command(tokens[2].end - tokens[2].start, data+tokens[2].start,
-                        &verb, &object)) {
-        handle_json_command_detail(verb, object, data, tokens, 4);
-        return;
-    }
-    spin_log(LOG_ERR, "Error: json command not understood\n");
+
+end:
+    cJSON_Delete(command_json);
 }
 
 
@@ -339,7 +285,8 @@ void handle_json_command(const char* data) {
 void do_mosq_message(struct mosquitto* mosq, void* user_data, const struct mosquitto_message* msg) {
 
     if (strcmp(msg->topic, mqtt_channel_commands) == 0) {
-        handle_json_command(msg->payload);
+        handle_json_command2(msg->payload);
+        // handle_json_command(msg->payload);
     }
 
     // TODO, what if other channel?

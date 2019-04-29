@@ -196,6 +196,7 @@ void mainloop_run() {
                     // Who knows what is right
                     fds[pollnum].fd *= -1;
                 }
+
                 if (fds[pollnum].revents & POLLIN) {
                     argdata = 1;
                 }

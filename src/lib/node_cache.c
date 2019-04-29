@@ -1,4 +1,3 @@
-
 #include "spin_log.h"
 
 #include <assert.h>
@@ -10,13 +9,15 @@
 #include "spin_cfg.h"
 #include "statistics.h"
 
-STAT_MODULE(node_cache)
+extern int omitnode;
 
-static int node_cache_add_node(node_cache_t* node_cache, node_t* node);
+STAT_MODULE(node_cache)
 
 STAT_COUNTER(nodes, nodes, STAT_TOTAL);
 
-static node_t*
+#define CJS
+
+node_t*
 node_create(int id) {
     int i;
 
@@ -31,10 +32,12 @@ node_create(int id) {
         node->is_onlist[i] = 0;
     }
     node->last_seen = 0;
+    node->modified = 0;
+    node->persistent = 0;
     return node;
 }
 
-static void
+void
 node_destroy(node_t* node) {
 
     STAT_VALUE(nodes, -1);
@@ -53,7 +56,7 @@ node_destroy(node_t* node) {
     free(node);
 }
 
-static void
+void
 node_add_ip(node_t* node, ip_t* ip) {
     STAT_COUNTER(ctr, add-ip, STAT_TOTAL);
 
@@ -61,7 +64,7 @@ node_add_ip(node_t* node, ip_t* ip) {
     tree_add(node->ips, sizeof(ip_t), ip, 0, NULL, 1);
 }
 
-static void
+void
 node_add_domain(node_t* node, char* domain) {
     STAT_COUNTER(ctr, add-domain, STAT_TOTAL);
 
@@ -69,7 +72,7 @@ node_add_domain(node_t* node, char* domain) {
     tree_add(node->domains, strlen(domain) + 1, domain, 0, NULL, 1);
 }
 
-static void
+void
 node_set_mac(node_t* node, char* mac) {
     STAT_COUNTER(ctr, set-mac, STAT_TOTAL);
 
@@ -99,6 +102,12 @@ node_set_name(node_t* node, char* name) {
 
 static void
 node_set_last_seen(node_t* node, uint32_t last_seen) {
+    node->last_seen = last_seen;
+}
+
+void
+node_set_modified(node_t* node, uint32_t last_seen) {
+    node->modified = 1;
     node->last_seen = last_seen;
 }
 
@@ -153,8 +162,10 @@ static void
 node_merge(node_t* dest, node_t* src) {
     tree_entry_t* cur;
     int i;
+    int m, modified = 0;
     STAT_COUNTER(ip_size, ip-tree-size, STAT_MAX);
     STAT_COUNTER(domain_size, domain-tree-size, STAT_MAX);
+    STAT_COUNTER(modded, node-modified, STAT_TOTAL);
 
     if (dest->name == NULL) {
         node_set_name(dest, src->name);
@@ -173,17 +184,27 @@ node_merge(node_t* dest, node_t* src) {
 
     cur = tree_first(src->ips);
     while (cur != NULL) {
-        tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        m = tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        if (m) {
+            modified = 1;
+        }
         cur = tree_next(cur);
     }
     STAT_VALUE(ip_size, tree_size(dest->ips));
 
     cur = tree_first(src->domains);
     while (cur != NULL) {
-        tree_add(dest->domains, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        m = tree_add(dest->domains, cur->key_size, cur->key, cur->data_size, cur->data, 1);
+        if (m) {
+            modified = 1;
+        }
         cur = tree_next(cur);
     }
     STAT_VALUE(domain_size, tree_size(dest->domains));
+    STAT_VALUE(modded, modified);
+    if (modified) {
+        dest->modified = 1;
+    }
 }
 
 node_t* node_clone(node_t* node) {
@@ -250,61 +271,28 @@ node_print(node_t* node) {
     }
 }
 
-static unsigned int
-node2json(node_t* node, buffer_t* json_buf) {
-    unsigned int s = 0;
-    tree_entry_t* cur;
-    char ip_str[INET6_ADDRSTRLEN];
+void node_callback_new(node_cache_t* node_cache, modfunc mf) {
+    tree_entry_t* cur = tree_first(node_cache->nodes);
+    node_t* node;
+    int nfound;
+    STAT_COUNTER(ctr, publish-new, STAT_TOTAL);
 
-    buffer_write(json_buf, "{ \"id\": %d, ", node->id);
-    if (node->name != NULL) {
-        buffer_write(json_buf, " \"name\": \"%s\", ", node->name);
-    }
-    if (node->mac != NULL) {
-        buffer_write(json_buf, " \"mac\": \"%s\", ", node->mac);
-    }
-    if (node->is_blocked) {
-        buffer_write(json_buf, " \"is_blocked\": \"true\", ");
-    }
-    if (node->is_allowed) {
-        buffer_write(json_buf, " \"is_excepted\": \"true\", ");
-    }
-    buffer_write(json_buf, " \"lastseen\": %u, ", node->last_seen);
-
-    buffer_write(json_buf, " \"ips\": [ ");
-    cur = tree_first(node->ips);
+    nfound = 0;
     while (cur != NULL) {
-        buffer_write(json_buf, "\"");
-        spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
-        buffer_write(json_buf, ip_str);
-        //s += spin_ntop(dest + s, (uint8_t*)cur->key, max_len - s);
-        buffer_write(json_buf, "\"");
-        cur = tree_next(cur);
-        if (cur != NULL) {
-            buffer_write(json_buf, ", ");
+        node = (node_t*)cur->data;
+        if (node->modified) {
+            (*mf)(node);
+            nfound++;
+            node->modified = 0;
         }
-    }
-    buffer_write(json_buf, " ], ");
-
-    buffer_write(json_buf, " \"domains\": [ ");
-    cur = tree_first(node->domains);
-    while (cur != NULL) {
-        buffer_write(json_buf, "\"%s\"", (uint8_t*)cur->key);
         cur = tree_next(cur);
-        if (cur != NULL) {
-            buffer_write(json_buf, ", ");
-        }
     }
-    buffer_write(json_buf, " ] }");
-
-    return s;
+    STAT_VALUE(ctr, nfound);
 }
 
 /*
  * Create and destroy node_cache
- * As far as I can see only done once in current node, only one node cache in use
  *
- * Perhaps TODO
  */
 
 node_cache_t*
@@ -342,7 +330,7 @@ node_cache_destroy(node_cache_t* node_cache) {
     free(node_cache);
 }
 
-static void
+void
 node_cache_print(node_cache_t* node_cache) {
     tree_entry_t* cur = tree_first(node_cache->nodes);
     node_t* cur_node;
@@ -417,6 +405,7 @@ void node_cache_clean(node_cache_t* node_cache, uint32_t older_than) {
         node = (node_t*)cur->data;
         next = tree_next(cur);
         if (node->last_seen < older_than) {
+            // TODO: signal disappearance to listeners
             node_destroy(node);
             cur->data = NULL;
             tree_remove_entry(node_cache->nodes, cur);
@@ -520,7 +509,7 @@ void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, 
     dns_dname2str(dname_str, dns_pkt->dname, 512);
 
     node_t* node = node_create(0);
-    node_set_last_seen(node, timestamp);
+    node_set_modified(node, timestamp);
     node_add_ip(node, &ip);
     node_add_domain(node, dname_str);
     add_mac_and_name(node_cache, node, &ip);
@@ -540,7 +529,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     // add the node with the domain name; if it is not known
     // this will result in a 'node' with only the domain name
     node_t* node = node_create(0);
-    node_set_last_seen(node, timestamp);
+    node_set_modified(node, timestamp);
     node_add_domain(node, dname_str);
     node_cache_add_node(node_cache, node);
 
@@ -550,7 +539,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     STAT_VALUE(ctr, node == NULL);
     if (node == NULL) {
         node = node_create(0);
-        node_set_last_seen(node, timestamp);
+        node_set_modified(node, timestamp);
         node_add_ip(node, &ip);
         node_cache_add_node(node_cache, node);
     }
@@ -558,7 +547,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
 
 // return 0 if it existed/was merged
 // return 1 if it was new
-static int
+int
 node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     int new_id, *new_id_mem;
     tree_entry_t* cur = tree_first(node_cache->nodes);
@@ -581,12 +570,11 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
                 // note: we don't need to restart the loop since we know we have not found
                 // any mergable items so far
 
-                // TODO: this need to signal that existing nodes have been merged
-                // or will we ignore that and let time fix it?
                 node_merge(node, tree_node);
 
                 // clean up the tree
                 nxt = tree_next(cur);
+                // TODO: signal merge to listeners
                 node_destroy(tree_node);
                 cur->data = NULL;
                 tree_remove_entry(node_cache->nodes, cur);
@@ -610,107 +598,6 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     return 1;
 }
 
-unsigned int
-pkt_info2json(node_cache_t* node_cache, pkt_info_t* pkt_info, buffer_t* json_buf) {
-    unsigned int s = 0;
-    node_t* src_node;
-    node_t* dest_node;
-    ip_t ip;
-
-    ip.family = pkt_info->family;
-    memcpy(ip.addr, pkt_info->src_addr, 16);
-    src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
-    memcpy(ip.addr, pkt_info->dest_addr, 16);
-    dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
-    if (src_node == NULL) {
-        char pkt_str[1024];
-        spin_log(LOG_ERR, "[XX] ERROR! src node not found in cache!\n");
-        pktinfo2str(pkt_str, pkt_info, 1024);
-        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
-        spin_log(LOG_DEBUG, "[XX] node cache:\n");
-        node_cache_print(node_cache);
-        return 0;
-    }
-    if (dest_node == NULL) {
-        char pkt_str[1024];
-        spin_log(LOG_ERR, "[XX] ERROR! dest node not found in cache!\n");
-        pktinfo2str(pkt_str, pkt_info, 1024);
-        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
-        spin_log(LOG_DEBUG, "[XX] node cache:\n");
-        node_cache_print(node_cache);
-        return 0;
-    }
-    assert(src_node != NULL);
-    assert(dest_node != NULL);
-
-    buffer_write(json_buf, "{ \"from\": ");
-    s += node2json(src_node, json_buf);
-    buffer_write(json_buf, ", \"to\": ");
-    s += node2json(dest_node, json_buf);
-    buffer_write(json_buf, ", \"protocol\": %d", pkt_info->protocol);
-    buffer_write(json_buf, ", \"from_port\": %d", pkt_info->src_port);
-    buffer_write(json_buf, ", \"to_port\": %d", pkt_info->dest_port);
-    buffer_write(json_buf, ", \"size\": %llu", pkt_info->payload_size);
-    buffer_write(json_buf, ", \"count\": %llu }", pkt_info->packet_count);
-    // temp fix; size is not actually tracked right now
-    return 1;
-    //return s;
-}
-
-#define DNAME_SIZE  512
-unsigned int
-dns_query_pkt_info2json(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_info, buffer_t* json_buf) {
-    unsigned int s = 0;
-    node_t* src_node;
-    // the 'node' that was queried; this could be a node that we already know
-    node_t* dns_node;
-    char dname_str[DNAME_SIZE];
-    ip_t ip;
-
-    dns_dname2str(dname_str, dns_pkt_info->dname, DNAME_SIZE);
-
-    ip.family = dns_pkt_info->family;
-    memcpy(ip.addr, dns_pkt_info->ip, 16);
-
-    spin_log(LOG_DEBUG, "[XX] creating dns query command\n");
-
-    dns_node = node_cache_find_by_domain(node_cache, dname_str);
-    if (dns_node == NULL) {
-        // something went wrong, we should have just added t
-        char pkt_str[1024];
-        spin_log(LOG_ERR, "[XX] ERROR! DNS node not found in cache!\n");
-        dns_pktinfo2str(pkt_str, dns_pkt_info, 1024);
-        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
-        spin_log(LOG_DEBUG, "[XX] node cache:\n");
-        node_cache_print(node_cache);
-        return 0;
-    }
-
-    src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
-    if (src_node == NULL) {
-        printf("[XX] error, src node not found in cache");
-        char pkt_str[1024];
-        spin_log(LOG_ERR, "[XX] ERROR! src node not found in cache!\n");
-        dns_pktinfo2str(pkt_str, dns_pkt_info, 1024);
-        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
-        spin_log(LOG_DEBUG, "[XX] node cache:\n");
-        node_cache_print(node_cache);
-        return 0;
-    }
-
-    buffer_write(json_buf, "{ \"from\": ");
-    s += node2json(src_node, json_buf);
-    s += buffer_write(json_buf, ", \"queriednode\": ");
-    s += node2json(dns_node, json_buf);
-    s += buffer_write(json_buf, ", \"query\": \"%s\"", dname_str);
-    s += buffer_write(json_buf, " }");
-
-    spin_log(LOG_DEBUG, "[XX] dns query command created, size %d\n", s);
-    // temp fix; size is not actually tracked right now
-    return 1;
-    //return s;
-}
-
 flow_list_t* flow_list_create(uint32_t timestamp) {
 
     flow_list_t* flow_list = (flow_list_t*)malloc(sizeof(flow_list_t));
@@ -731,7 +618,9 @@ void flow_list_add_pktinfo(flow_list_t* flow_list, pkt_info_t* pkt_info) {
     flow_data_t fd;
     flow_data_t* efd;
     tree_entry_t* cur = tree_find(flow_list->flows, 38, pkt_info);
+    STAT_COUNTER(ctr, flow-exist, STAT_TOTAL);
 
+    STAT_VALUE(ctr, cur != NULL);
     if (cur != NULL) {
         efd = (flow_data_t*)cur->data;
         efd->payload_size += pkt_info->payload_size;
@@ -757,47 +646,4 @@ void flow_list_clear(flow_list_t* flow_list, uint32_t timestamp) {
 int flow_list_empty(flow_list_t* flow_list) {
 
     return tree_empty(flow_list->flows);
-}
-
-unsigned int
-flow_list2json(node_cache_t* node_cache, flow_list_t* flow_list, buffer_t* json_buf) {
-    unsigned int s = 0;
-    tree_entry_t* cur;
-    pkt_info_t pkt_info;
-    flow_data_t* fd;
-
-    flow_list->total_size = 0;
-    flow_list->total_count = 0;
-
-    cur = tree_first(flow_list->flows);
-    while (cur != NULL) {
-        memcpy(&pkt_info, cur->key, 38);
-        fd = (flow_data_t*) cur->data;
-        pkt_info.payload_size = fd->payload_size;
-        flow_list->total_size += fd->payload_size;
-        pkt_info.packet_count = fd->packet_count;
-        flow_list->total_count += fd->packet_count;
-        s += pkt_info2json(node_cache, &pkt_info, json_buf);
-        cur = tree_next(cur);
-        if (cur != NULL) {
-            buffer_write(json_buf, ", ");
-        }
-    }
-
-    return s;
-}
-
-// note: this only does one pkt_info atm
-unsigned int
-create_traffic_command(node_cache_t* node_cache, flow_list_t* flow_list, buffer_t* json_buf, uint32_t timestamp) {
-    unsigned int s = 0;
-
-    buffer_write(json_buf, "{ \"command\": \"traffic\", \"argument\": \"\", ");
-    buffer_write(json_buf, "\"result\": { \"flows\": [ ");
-    s += flow_list2json(node_cache, flow_list, json_buf);
-    buffer_write(json_buf, "], ");
-    buffer_write(json_buf, " \"timestamp\": %u, ", timestamp);
-    buffer_write(json_buf, " \"total_size\": %llu, ", flow_list->total_size);
-    buffer_write(json_buf, " \"total_count\": %llu } }", flow_list->total_count);
-    return s;
 }

@@ -20,10 +20,13 @@ When receiving messages you can, but do not have to, look at the topic they were
 
 Furthermore Mosquitto allows for one message per topic that is retained, meaning that if a retained message is sent to topic x, even while nobody is listening, as soon as someone subscribes to topic x he will get this retained message immediately followed by all new messages to topic x.
 
+This retained message can be deleted by posting an empty retained message.
+
 ## Proposal
 
 We split up the traffic topic:
 
+- SPIN/traffic/admin
 - SPIN/traffic/flow
 - SPIN/traffic/dns
 - SPIN/traffic/node/(nodenum)
@@ -33,12 +36,16 @@ Backwards compatibility for all current listeners could be to listen to *SPIN/tr
 
 Information published:
 
-On *SPIN/traffic/list/allow* the current allowed list as a retained message, meaning all listeners do not have to send a command anymore to get the latest list. Same of course for block and ignore and all other lists we can come up with.
+On *SPIN/traffic/admin* administrative messages, including but not limited to messages about nodes ending existence, either by being merged into other nodes, or by lack of traffic. Also the serverRestart message is a good one for this.
 
-On *SPIN/traffic/node/1* the information about node 1. This is published as a retained message anytime the information about node 1 changes, perhaps slightly delayed(TBD). Any listeners to *SPIN/traffic/node/+* or more will always be up to date with all the latest node info.
+On *SPIN/traffic/list/allow* the current allowed list as a retained message, meaning all listeners do not have to send a command anymore to get the latest list. Same of course for block and ignore and all other lists we can come up with. Blocked flows perhaps?
+
+On *SPIN/traffic/node/1* the information about node 1. This is published as a retained message anytime the information about node 1 changes, perhaps slightly delayed(TBD). Any listeners to *SPIN/traffic/node/+* or more will always be up to date with all the latest node info. When a node disapperas the message will be replaced by the empty string.
 
 On *SPIN/traffic/flow* the flows seen recently. There will be no node information here, nodes will be just named by their number.
 
 On *SPIN/traffic/dns* the DNS requests. Again information about nodes will only be their number.
+
+This does not give Blocked messages their own place. Separate channel, or perhaps with admin or flow?
 
 For the statistics, assuming we keep them on Mosquitto, we could use something like: *SPIN/stat/module/counter* topics making it easy for someone just to query one counter. Making all counters retainable will get you the latest value with one call.
