@@ -6,6 +6,13 @@
 
 #include "spindata.h"
 
+#include "statistics.h"
+
+STAT_MODULE(spindata)
+
+STAT_COUNTER(totalstr, spindata-string, STAT_TOTAL);
+STAT_COUNTER(totalsd, spindata-sd, STAT_TOTAL);
+
 extern int omitnode;
 
 char *
@@ -14,13 +21,22 @@ spin_data_serialize(spin_data sd) {
 
     result = cJSON_PrintUnformatted(sd);
 
+    STAT_VALUE(totalstr, 1);
     // result is malloced, should be freed
     return result;
 }
 
 void
+spin_data_ser_delete(char *str) {
+
+    STAT_VALUE(totalstr, -1);
+    free(str);
+}
+
+void
 spin_data_delete(spin_data sd) {
 
+    STAT_VALUE(totalsd, -1);
     cJSON_Delete(sd);
 }
 
@@ -30,7 +46,9 @@ spin_data_ipar(tree_t *iptree) {
     cJSON *arobj, *strobj;
     tree_entry_t* cur;
     char ip_str[INET6_ADDRSTRLEN];
+    STAT_COUNTER(ctr, spindata-ipar, STAT_TOTAL);
 
+    STAT_VALUE(ctr, 1);
     arobj = cJSON_CreateArray();
     cur = tree_first(iptree);
     while (cur != NULL) {
@@ -39,6 +57,7 @@ spin_data_ipar(tree_t *iptree) {
         cJSON_AddItemToArray(arobj, strobj);
         cur = tree_next(cur);
     }
+    STAT_VALUE(totalsd, 1);
     return arobj;
 }
 
@@ -48,6 +67,9 @@ spin_data_node(node_t* node) {
     cJSON *arobj;
     cJSON *strobj;
     tree_entry_t* cur;
+    STAT_COUNTER(ctr, spindata-node, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
 
     nodeobj = cJSON_CreateObject();
     cJSON_AddNumberToObject(nodeobj, "id", node->id);
@@ -67,6 +89,7 @@ spin_data_node(node_t* node) {
 
     arobj = spin_data_ipar(node->ips);
     cJSON_AddItemToObject(nodeobj, "ips", arobj);
+    STAT_VALUE(totalsd, -1);
 
     // domains
     arobj = cJSON_CreateArray();
@@ -78,15 +101,20 @@ spin_data_node(node_t* node) {
     }
     cJSON_AddItemToObject(nodeobj, "domains", arobj);
 
+    STAT_VALUE(totalsd, 1);
     return nodeobj;
 }
 
 static spin_data
 spin_data_noderef(node_t *node) {
     cJSON* nodeobj;
+    STAT_COUNTER(ctr, spindata-noderef, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
 
     if (omitnode) {
         nodeobj = cJSON_CreateNumber(node->id);
+        STAT_VALUE(totalsd, 1);
     } else {
         nodeobj = spin_data_node(node);
     }
@@ -115,6 +143,9 @@ spin_data_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info) {
     node_t* src_node;
     node_t* dest_node;
     ip_t ip;
+    STAT_COUNTER(ctr, spindata-pktinfo, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
 
     ip.family = pkt_info->family;
     memcpy(ip.addr, pkt_info->src_addr, 16);
@@ -130,7 +161,9 @@ spin_data_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info) {
     pktobj = cJSON_CreateObject();
 
     cJSON_AddItemToObject(pktobj, "from", spin_data_noderef(src_node));
+    STAT_VALUE(totalsd, -1);
     cJSON_AddItemToObject(pktobj, "to", spin_data_noderef(dest_node));
+    STAT_VALUE(totalsd, -1);
 
     cJSON_AddNumberToObject(pktobj, "protocol", pkt_info->protocol);
     cJSON_AddNumberToObject(pktobj, "from_port", pkt_info->src_port);
@@ -138,6 +171,7 @@ spin_data_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info) {
     cJSON_AddNumberToObject(pktobj, "size", pkt_info->payload_size);
     cJSON_AddNumberToObject(pktobj, "count", pkt_info->packet_count);
 
+    STAT_VALUE(totalsd, 1);
     return(pktobj);
 }
 
@@ -150,6 +184,9 @@ spin_data_dns_query_pkt_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_i
     node_t* dns_node;
     char dname_str[DNAME_SIZE];
     ip_t ip;
+    STAT_COUNTER(ctr, spindata-dnsquery, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
 
     dns_dname2str(dname_str, dns_pkt_info->dname, DNAME_SIZE);
 
@@ -185,9 +222,12 @@ spin_data_dns_query_pkt_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_i
     pktobj = cJSON_CreateObject();
 
     cJSON_AddItemToObject(pktobj, "from", spin_data_noderef(src_node));
+    STAT_VALUE(totalsd, -1);
     cJSON_AddItemToObject(pktobj, "queriednode", spin_data_noderef(dns_node));
+    STAT_VALUE(totalsd, -1);
     cJSON_AddStringToObject(pktobj, "query", dname_str);
 
+    STAT_VALUE(totalsd, 1);
     return pktobj;
 }
 
@@ -197,6 +237,9 @@ flow_list2json(node_cache_t* node_cache, flow_list_t* flow_list) {
     tree_entry_t* cur;
     pkt_info_t pkt_info;
     flow_data_t* fd;
+    STAT_COUNTER(ctr, spindata-flowlist, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
 
     flobj = cJSON_CreateArray();
 
@@ -214,10 +257,12 @@ flow_list2json(node_cache_t* node_cache, flow_list_t* flow_list) {
 
         pktobj = spin_data_pkt_info(node_cache, &pkt_info);
         cJSON_AddItemToArray(flobj, pktobj);
+        STAT_VALUE(totalsd, -1);
 
         cur = tree_next(cur);
     }
 
+    STAT_VALUE(totalsd, 1);
     return flobj;
 }
 
@@ -225,6 +270,9 @@ flow_list2json(node_cache_t* node_cache, flow_list_t* flow_list) {
 spin_data
 spin_data_create_mqtt_command(const char* command, char* argument, spin_data result) {
     cJSON *cmdobj;
+    STAT_COUNTER(ctr, spindata-mqttcommand, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
 
     cmdobj = cJSON_CreateObject();
     if (command != NULL) {
@@ -237,6 +285,7 @@ spin_data_create_mqtt_command(const char* command, char* argument, spin_data res
         cJSON_AddItemReferenceToObject(cmdobj, "result", result);
     }
 
+    STAT_VALUE(totalsd, 1);
     return cmdobj;
 }
 
@@ -244,11 +293,15 @@ spin_data
 spin_data_create_traffic(node_cache_t* node_cache, flow_list_t* flow_list, uint32_t timestamp) {
     cJSON *trobj;
     cJSON *flobj;
+    STAT_COUNTER(ctr, spindata-traffic, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
 
     flobj = flow_list2json(node_cache, flow_list);
 
     trobj = cJSON_CreateObject();
     cJSON_AddItemToObject(trobj, "flows", flobj);
+    STAT_VALUE(totalsd, -1);
     cJSON_AddNumberToObject(trobj, "timestamp", timestamp);
     cJSON_AddNumberToObject(trobj, "total_size", flow_list->total_size);
     cJSON_AddNumberToObject(trobj, "total_count", flow_list->total_count);
@@ -261,6 +314,9 @@ spin_data_nodepairtree(tree_t* tree) {
     cJSON *arobj, *npobj;
     tree_entry_t* cur;
     int *nodenump;
+    STAT_COUNTER(ctr, spindata-nodepairtree, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
 
     arobj = cJSON_CreateArray();
 
@@ -276,5 +332,6 @@ spin_data_nodepairtree(tree_t* tree) {
         cur = tree_next(cur);
     }
 
+    STAT_VALUE(totalsd, 1);
     return arobj;
 }

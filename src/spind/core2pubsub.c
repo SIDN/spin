@@ -51,7 +51,7 @@ void core2pubsub_publish_chan(char *channel, spin_data sd, int retain) {
 
     pubsub_publish(channel, message_len, message, retain);
 
-    free(message);
+    spin_data_ser_delete(message);
 }
 
 

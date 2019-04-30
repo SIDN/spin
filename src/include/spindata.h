@@ -7,6 +7,7 @@
 typedef cJSON *spin_data;
 
 char *spin_data_serialize(spin_data sd);
+void spin_data_ser_delete(char *str);
 void spin_data_delete(spin_data sd);
 
 spin_data spin_data_ipar(tree_t *iptree);

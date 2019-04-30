@@ -155,7 +155,7 @@ store_node_info(int nodenum, spin_data sd) {
     nodefile = fopen(node_filename_int(nodenum), "w");
     sdstr = spin_data_serialize(sd);
     fprintf(nodefile, "%s\n", sdstr);
-    free(sdstr);
+    spin_data_ser_delete(sdstr);
     fclose(nodefile);
 }
 
