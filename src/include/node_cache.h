@@ -37,18 +37,21 @@ typedef struct {
 
 typedef void (*modfunc)(node_t *);
 
-/*
 node_t* node_create(int id);
+/*
 void node_destroy(node_t* node);
 node_t* node_clone(node_t* node);
+*/
 
 void node_add_ip(node_t* node, ip_t* ip);
 void node_add_domain(node_t* node, char* domain);
 */
 
 void node_set_name(node_t* node, char* name);
-/*
 void node_set_mac(node_t* node, char* mac);
+void node_set_modified(node_t *node, uint32_t now);
+void node_callback_new(node_cache_t *node_cache, modfunc);
+/*
 void node_set_blocked(node_t* node, int blocked);
 void node_set_excepted(node_t* node, int excepted);
 void node_set_last_seen(node_t* node, uint32_t lastg_seen);
