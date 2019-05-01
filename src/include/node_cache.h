@@ -87,6 +87,9 @@ typedef struct {
     // this is a non-memory tree, indexed by the ip addresses
     // unused, TODO, HvS
     tree_t* ip_refs;
+    tree_t* mac_refs;
+    tree_t* domain_refs;
+
     // keep a counter for new ids
     int available_id;
     // arp cache for mac lookups
