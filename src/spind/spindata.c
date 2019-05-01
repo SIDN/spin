@@ -282,7 +282,7 @@ spin_data_create_mqtt_command(const char* command, char* argument, spin_data res
         cJSON_AddStringToObject(cmdobj, "argument", argument);
     }
     if (result != NULL) {
-        cJSON_AddItemReferenceToObject(cmdobj, "result", result);
+        cJSON_AddItemToObject(cmdobj, "result", result);
     }
 
     STAT_VALUE(totalsd, 1);
