@@ -45,12 +45,10 @@ node_t* node_clone(node_t* node);
 
 void node_add_ip(node_t* node, ip_t* ip);
 void node_add_domain(node_t* node, char* domain);
-*/
 
 void node_set_name(node_t* node, char* name);
 void node_set_mac(node_t* node, char* mac);
 void node_set_modified(node_t *node, uint32_t now);
-void node_callback_new(node_cache_t *node_cache, modfunc);
 /*
 void node_set_blocked(node_t* node, int blocked);
 void node_set_excepted(node_t* node, int excepted);
@@ -90,6 +88,8 @@ typedef struct {
 
 node_cache_t* node_cache_create(void);
 void node_cache_destroy(node_cache_t* node_cache);
+
+void node_callback_new(node_cache_t *node_cache, modfunc);
 
 /*
 void node_cache_print(node_cache_t* node_cache);
