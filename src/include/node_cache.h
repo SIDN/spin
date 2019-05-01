@@ -10,8 +10,18 @@
 
 #include <stdint.h>
 
+/*
+ * Struct to contain "device" specific stuff, that is for local devices
+ */
+
+typedef struct {
+    char *dv_mac;
+} device_t;
+
 typedef struct {
     int id;
+    // can be null
+    device_t *device;
     // note: ip's are in a sizeof(ip_t)-byte format (family + ip, padded with 12 zeroes in case of ipv4)
     // they are stored in the keys, data is empty
     tree_t* ips;
@@ -20,7 +30,7 @@ typedef struct {
     // can be null
     char* name;
     // can be null
-    char* mac;
+    // char* mac;
     // some additional info about this node
     int is_onlist[N_IPLIST];
 
