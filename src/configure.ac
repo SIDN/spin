@@ -61,6 +61,16 @@ AC_CHECK_LIB([uci], [uci_alloc_context],
         AC_DEFINE([USE_UCI], [0], [Do not use UCI for configuration])
     ])
 
+AC_CHECK_LIB([ubus], [ubus_connect],
+    [
+        use_ubus=1
+        AC_DEFINE([USE_UBUS], [1], [Use UBUS for RPC])
+    ],
+    [
+        use_ubus=0
+    ])
+AM_CONDITIONAL([USE_UBUS],  [test "x$use_ubus" = "x1"])
+
 AC_ARG_WITH(linux-headers,
     AC_HELP_STRING([--with-linux-headers=PATH], [specify path of linux headers]),
     [ AC_SUBST(KERNELPATH, "$withval") ]
