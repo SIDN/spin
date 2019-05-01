@@ -11,6 +11,8 @@
 #include <time.h>
 #include <assert.h>
 
+#include "config.h"
+
 #include "spindata.h"
 
 #include "spinconfig.h"
@@ -973,7 +975,9 @@ int main(int argc, char** argv) {
 
     omitnode = spinconfig_pubsub_omitnode();
 
+#if USE_UBUS
     ubus_main();
+#endif
 
     mainloop_run();
 
