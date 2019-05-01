@@ -195,7 +195,6 @@ node_is_updated(node_t *node) {
     spin_data sd;
 
     sd = spin_data_node(node);
-    send_command_node_info(node->id, sd);
     if (node->persistent) /* Persistent? */ {
         // Store modified node in file
         store_node_info(node->id, sd);
@@ -203,7 +202,8 @@ node_is_updated(node_t *node) {
         // Update IP addresses in c2b
         update_node_ips(node->id, node->ips);
     }
-    spin_data_delete(sd);
+    // This effectively deletes sd
+    send_command_node_info(node->id, sd);
 }
 
 static void
