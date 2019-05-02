@@ -458,7 +458,6 @@ spinrpc_get_blockflow() {
     ar_sd = spin_data_nodepairtree(nodepair_tree);
     cmd_sd = spin_data_create_mqtt_command(NULL, NULL, ar_sd);
     retval =  spin_data_serialize(cmd_sd);
-    spin_data_delete(ar_sd);
     spin_data_delete(cmd_sd);
     return retval;
 }
@@ -479,7 +478,6 @@ void send_command_blocked(pkt_info_t* pkt_info) {
     core2pubsub_publish_chan(NULL, cmd_sd, 0);
 
     spin_data_delete(cmd_sd);
-    spin_data_delete(pkt_sd);
 }
 
 void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
@@ -494,7 +492,6 @@ void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
     core2pubsub_publish_chan(NULL, cmd_sd, 0);
 
     spin_data_delete(cmd_sd);
-    spin_data_delete(dns_sd);
 }
 
 // function definition below
@@ -845,7 +842,6 @@ void handle_command_get_iplist(int iplist, const char* json_command) {
 
     core2pubsub_publish_chan(NULL, cmd_sd, 0);
 
-    spin_data_delete(ipt_sd);
     spin_data_delete(cmd_sd);
 }
 

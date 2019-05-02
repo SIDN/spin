@@ -15,34 +15,7 @@ STAT_MODULE(node_cache)
 
 STAT_COUNTER(nodes, nodes, STAT_TOTAL);
 
-device_t*
-device_create() {
-    device_t *dev;
-
-    dev= (device_t *) malloc(sizeof(device_t));
-    dev->dv_mac = NULL;
-
-    return dev;
-}
-
-void
-device_destroy(device_t *dev) {
-
-    if (dev->dv_mac) {
-        free(dev->dv_mac);
-        dev->dv_mac = NULL;
-    }
-}
-
-device_set_mac(device_t *dev, char *mac) {
-
-    if (dev->dv_mac != NULL) {
-        // TODO: mac lookup tree
-        free(dev->dv_mac);
-    }
-    dev->dv_mac = strndup(mac, 18);
-    // TODO: mac lookup tree
-}
+#define CJS
 
 node_t*
 node_create(int id) {
@@ -54,7 +27,7 @@ node_create(int id) {
     node->ips = tree_create(cmp_ips);
     node->domains = tree_create(cmp_domains);
     node->name = NULL;
-    node->device = NULL;
+    node->mac = NULL;
     for (i=0;i<N_IPLIST;i++) {
         node->is_onlist[i] = 0;
     }
@@ -72,10 +45,9 @@ node_destroy(node_t* node) {
     node->ips = NULL;
     tree_destroy(node->domains);
     node->domains = NULL;
-    if (node->device) {
-        device_destroy(node->device);
-        free(node->device);
-        node->device = NULL;
+    if (node->mac) {
+        free(node->mac);
+        node->mac = NULL;
     }
     if (node->name) {
         free(node->name);
@@ -108,10 +80,10 @@ node_set_mac(node_t* node, char* mac) {
     if (mac == NULL) {
         return;
     }
-    if (node->device == NULL) {
-        node->device = device_create();
+    if (node->mac != NULL) {
+        free(node->mac);
     }
-    device_set_mac(node->device, mac);
+    node->mac = strndup(mac, 18);
 }
 
 void
@@ -329,8 +301,6 @@ node_cache_create() {
     node_cache->nodes = tree_create(cmp_ints);
 
     node_cache->ip_refs = tree_create(cmp_ips);
-    node_cache->mac_refs = tree_create(cmp_strs);
-    node_cache->domain_refs = tree_create(cmp_strs);
 
     node_cache->available_id = 1;
 
