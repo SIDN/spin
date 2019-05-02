@@ -70,7 +70,9 @@ static void ip_key2str(char* buf, size_t buf_len, const uint8_t* ip_key_data) {
 
 void
 cache_tree_add_ip(node_cache_t *node_cache, node_t* node, ip_t* ip) {
+    STAT_COUNTER(ctr, cache-tree-add-ip, STAT_TOTAL);
 
+    STAT_VALUE(ctr, 1);
     if (node->id != 0) {
         tree_add(node_cache->ip_refs, sizeof(ip_t), ip, sizeof(node), (void *) node , 1);
     }
@@ -79,14 +81,16 @@ cache_tree_add_ip(node_cache_t *node_cache, node_t* node, ip_t* ip) {
 void
 cache_tree_remove_ip(node_cache_t *node_cache, node_t* node, ip_t* ip) {
     tree_entry_t* cur;
+    STAT_COUNTER(ctr, cache-tree-remove-ip, STAT_TOTAL);
 
+    STAT_VALUE(ctr, 1);
     cur = tree_find(node_cache->ip_refs, sizeof(ip_t), ip);
     if (cur != 0) {
         tree_remove_entry(node_cache->ip_refs, cur);
     }
 }
 
-void cache_tree_print_ip(tree_t *iptree) {
+void node_tree_print_ip(tree_t *iptree) {
     tree_entry_t *cur;
 
     cur = tree_first(iptree);
@@ -97,7 +101,31 @@ void cache_tree_print_ip(tree_t *iptree) {
         node = (node_t*) cur->data;
 
         ip_key2str(ip_str, 256, cur->key);
-        fprintf(stderr, "Addr %s -> node %d\n", ip_str, node->id);
+        spin_log(LOG_ERR, "Node: %d has addr %s\n", node->id, ip_str);
+
+        cur = tree_next(cur);
+    }
+}
+
+void cache_tree_print_ip(tree_t *iptree) {
+    tree_entry_t *cur;
+
+    cur = tree_first(iptree);
+    while (cur != NULL) {
+        node_t *node;
+        char ip_str[256];
+        tree_entry_t *innode;
+
+        node = (node_t*) cur->data;
+
+        ip_key2str(ip_str, 256, cur->key);
+        spin_log(LOG_DEBUG, "Addr %s -> node %d\n", ip_str, node->id);
+
+        innode = tree_find(node->ips, cur->key_size, cur->key);
+        if (innode == 0) {
+            spin_log(LOG_ERR, "Addr %s should have been in node %d\n", ip_str, node->id);
+            node_tree_print_ip(node->ips);
+        }
 
         cur = tree_next(cur);
     }
