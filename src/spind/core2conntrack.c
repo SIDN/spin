@@ -81,12 +81,17 @@ static int check_ignore_local(pkt_info_t* pkt, node_cache_t* node_cache) {
     ip_t ip;
     node_t* src_node;
     node_t* dest_node;
+    STAT_COUNTER(ctr, ignore-local, STAT_TOTAL);
+    int result;
+
     ip.family = pkt->family;
     memcpy(ip.addr, pkt->src_addr, 16);
     src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
     memcpy(ip.addr, pkt->dest_addr, 16);
     dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
-    return (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL));
+    result = (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL));
+    STAT_VALUE(ctr, result);
+    return result;
 }
 
 static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
@@ -98,6 +103,9 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
     // TODO: remove time() calls, use the single one at caller
     uint32_t now = time(NULL);
     STAT_COUNTER(ctr, callback, STAT_TOTAL);
+    STAT_COUNTER(ctrsf, sendflow, STAT_TOTAL);
+    STAT_COUNTER(ctrlocal, ignore-local, STAT_TOTAL);
+    STAT_COUNTER(ctrignore, ignore-ip, STAT_TOTAL);
 
     STAT_VALUE(ctr, 1);
     maybe_sendflow(cb_data->flow_list, now);
@@ -119,6 +127,7 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
         // this device, unless local_mode is set
         if (!cb_data->local_mode && check_ignore_local(&pkt_info, cb_data->node_cache)) {
             nfct_destroy(ct);
+            STAT_VALUE(ctrlocal, 1);
             return MNL_CB_OK;
         }
         // check for configured ignores as well
@@ -128,9 +137,11 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
             addr_in_ignore_list(pkt_info.family, pkt_info.dest_addr)
            ) {
             nfct_destroy(ct);
+            STAT_VALUE(ctrignore, 1);
             return MNL_CB_OK;
         }
 
+        STAT_VALUE(ctrsf, 1);
         flow_list_add_pktinfo(cb_data->flow_list, &pkt_info);
     }
 
