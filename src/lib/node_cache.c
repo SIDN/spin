@@ -1,6 +1,7 @@
 #include "spin_log.h"
 
 #include <assert.h>
+#include <stdlib.h>
 #include <arpa/inet.h>
 #include "util.h"
 #include "spin_list.h"
@@ -866,8 +867,6 @@ oldnode(tree_t *reftree, size_t size, void *data) {
 
         node = * ((node_t**) oldleaf->data);
 
-        fprintf(stderr, "oldnode %p\n", node);
-        fprintf(stderr, "oldnode id %d\n", node->id);
         return node;
     }
     
@@ -885,7 +884,6 @@ add_node_to_ar(node_t *node, node_t **ar, int *nelem) {
      */
 
     for(i=0; i< *nelem; i++) {
-        fprintf(stderr, "add_node i=%d\n", i);
         if (ar[i] == node) {
             return;
         }
@@ -893,6 +891,22 @@ add_node_to_ar(node_t *node, node_t **ar, int *nelem) {
     assert(*nelem < MAXOLD);
     ar[*nelem] = node;
     *nelem += 1;
+}
+
+static int
+nodecompar(const void *a, const void *b) {
+    node_t *na, *nb;
+
+    na = (node_t *) a;
+    nb = (node_t *) b;
+
+    if (na->id == 0) {
+        return -1;
+    }
+    if (nb->id == 0) {
+        return 1;
+    }
+    return (nb->id - na->id);
 }
 
 int
@@ -949,11 +963,14 @@ new_node_cache_add_node(node_cache_t *node_cache, node_t *node) {
 
     if (nnodes_to_merge > 1) {
 
-        fprintf(stderr, "Merge nodes:");
-        for (i=0; i < nnodes_to_merge; i++) {
-            fprintf(stderr, " %d", nodes_to_merge[i]->id);
+        qsort(nodes_to_merge, nnodes_to_merge, sizeof(node), nodecompar);
+        if (nnodes_to_merge > 2) {
+            fprintf(stderr, "Merge nodes:");
+            for (i=0; i < nnodes_to_merge; i++) {
+                fprintf(stderr, " %d", nodes_to_merge[i]->id);
+            }
+            fprintf(stderr, "\n");
         }
-        fprintf(stderr, "\n");
 
         // Actually go merge
         return 1;
