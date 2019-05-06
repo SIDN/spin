@@ -15,7 +15,18 @@ STAT_MODULE(node_cache)
 
 STAT_COUNTER(nodes, nodes, STAT_TOTAL);
 
-#define CJS
+char *octal(char *s) {
+    static char buf[1000];
+    char *p;
+
+    p = buf;
+    while (*s) {
+        sprintf(p, "%3o ", *s);
+        p+=4;
+        s++;
+    }
+    return buf;
+}
 
 node_t*
 node_create(int id) {
@@ -70,7 +81,9 @@ static void ip_key2str(char* buf, size_t buf_len, const uint8_t* ip_key_data) {
 void
 cache_tree_add_keytonode(tree_t *totree, node_t* node, size_t key_len, void* key_data) {
 
-    tree_add(totree, key_len, key_data, sizeof(node), (void *) &node , 1);
+    if (node->id != 0) {
+        tree_add(totree, key_len, key_data, sizeof(node), (void *) &node , 1);
+    }
 }
 
 void
@@ -116,6 +129,27 @@ void node_tree_print_ip(tree_t *iptree) {
     }
 }
 
+void node_tree_print_domain(tree_t *domaintree) {
+    tree_entry_t *cur;
+
+    cur = tree_first(domaintree);
+    while (cur != NULL) {
+        node_t *node;
+        int nodeid;
+
+        if (cur->data_size) {
+            node = * ((node_t**) cur->data);
+            nodeid = node->id;
+        } else {
+            nodeid = 0;
+        }
+
+        spin_log(LOG_ERR, "Node: %d has domain len %d %s\n", nodeid, cur->key_size, octal(cur->key));
+
+        cur = tree_next(cur);
+    }
+}
+
 void cache_tree_print_ip(tree_t *iptree) {
     tree_entry_t *cur;
 
@@ -140,9 +174,33 @@ void cache_tree_print_ip(tree_t *iptree) {
     }
 }
 
+void cache_tree_print_domain(tree_t *iptree) {
+    tree_entry_t *cur;
+
+    cur = tree_first(iptree);
+    while (cur != NULL) {
+        node_t *node;
+        tree_entry_t *innode;
+
+        node = * ((node_t**) cur->data);
+
+        spin_log(LOG_DEBUG, "Domain %s -> node %d\n", (char *) cur->key, node->id);
+
+        innode = tree_find(node->domains, cur->key_size, cur->key);
+        if (innode == 0) {
+            spin_log(LOG_ERR, "Domain %s should have been in node %d\n", cur->key, node->id);
+            spin_log(LOG_ERR, "Length: %d str=%s\n", cur->key_size, octal(cur->key));
+            node_tree_print_domain(node->domains);
+        }
+
+        cur = tree_next(cur);
+    }
+}
+
 void cache_tree_print(node_cache_t *node_cache) {
 
     cache_tree_print_ip(node_cache->ip_refs);
+    cache_tree_print_domain(node_cache->domain_refs);
 }
 
 void
@@ -159,7 +217,8 @@ cache_tree_add_domain(node_cache_t *node_cache, node_t* node, char* domain) {
     STAT_COUNTER(ctr, cache-tree-add-domain, STAT_TOTAL);
 
     STAT_VALUE(ctr, 1);
-    cache_tree_add_keytonode(node_cache->domain_refs, node, strlen(domain+1), domain);
+    fprintf(stderr, "Add domain %s to node %d\n", domain, node->id);
+    cache_tree_add_keytonode(node_cache->domain_refs, node, strlen(domain) + 1, domain);
 }
 
 void
@@ -168,7 +227,7 @@ cache_tree_remove_domain(node_cache_t *node_cache, node_t* node, char* domain) {
     STAT_COUNTER(ctr, cache-tree-remove-domain, STAT_TOTAL);
 
     STAT_VALUE(ctr, 1);
-    cur = tree_find(node_cache->domain_refs, strlen(domain)+1, domain);
+    cur = tree_find(node_cache->domain_refs, strlen(domain) + 1, domain);
     if (cur != 0) {
         tree_remove_entry(node_cache->domain_refs, cur);
     }
@@ -243,7 +302,7 @@ node_shares_element(node_t* node, node_t* othernode) {
         if (tree_find(othernode->ips, cur_me->key_size, cur_me->key) != NULL) {
             char ip_str[256];
             ip_key2str(ip_str, 256, cur_me->key);
-            spin_log(LOG_DEBUG, "[MERGE] Nodes %d and %d share IP address %s\n", node->id, othernode->id, ip_str);
+            spin_log(LOG_DEBUG, "[MERGE2] Nodes %d and %d share IP address %s\n", node->id, othernode->id, ip_str);
             return 1;
         }
         cur_me = tree_next(cur_me);
@@ -280,9 +339,6 @@ node_shares_element_tree(tree_t *eltree, tree_t *ntree, node_t *othernode) {
             if (pointed_node == othernode) {
                 STAT_VALUE(ctr1, 1);
                 return 1;
-            } else {
-                fprintf(stderr, "pointed %p, other %p\n", pointed_node, othernode);
-                fprintf(stderr, "pointed id %d, other %d\n", pointed_node->id, othernode->id);
             }
         }
         leaf = tree_next(leaf);
@@ -296,14 +352,14 @@ static int
 node_shares_element_new(node_cache_t *node_cache, node_t *node, node_t *othernode) {
 
 
-    spin_log(LOG_DEBUG, "Node cache IP's\n");
-    node_tree_print_ip(node_cache->ip_refs);
-    spin_log(LOG_DEBUG, "IP's of node %d\n", node->id);
-    node_tree_print_ip(node->ips);
-    spin_log(LOG_DEBUG, "IP's of othernode %d\n", othernode->id);
-    node_tree_print_ip(othernode->ips);
+    // spin_log(LOG_DEBUG, "Node cache IP's\n");
+    // node_tree_print_ip(node_cache->ip_refs);
+    // spin_log(LOG_DEBUG, "IP's of node %d\n", node->id);
+    // node_tree_print_ip(node->ips);
+    // spin_log(LOG_DEBUG, "IP's of othernode %d\n", othernode->id);
+    // node_tree_print_ip(othernode->ips);
     if (node_shares_element_tree(node_cache->ip_refs, node->ips, othernode)) {
-        spin_log(LOG_DEBUG, "[MERGE] Nodes %d and %d share some IP address\n", node->id, othernode->id);
+        spin_log(LOG_DEBUG, "[MERGE2] Nodes %d and %d share some IP address\n", node->id, othernode->id);
         return 1;
     }
     if (node_shares_element_tree(node_cache->domain_refs, node->domains, othernode)) {
@@ -829,6 +885,21 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     node->id = new_id;
 
     tree_add(node_cache->nodes, sizeof(new_id), new_id_mem, sizeof(node_t), node, 0);
+#ifdef NEWSHARES
+{
+    tree_entry_t *cur_me = tree_first(node->ips);
+    while (cur_me != NULL) {
+        cache_tree_add_ip(node_cache, node, (ip_t*) cur_me->key);
+        cur_me = tree_next(cur_me);
+    }
+
+    cur_me = tree_first(node->domains);
+    while (cur_me != NULL) {
+        cache_tree_add_domain(node_cache, node, (char *) cur_me->key);
+        cur_me = tree_next(cur_me);
+    }
+}
+#endif
     return 1;
 }
 
