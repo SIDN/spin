@@ -897,14 +897,14 @@ static int
 nodecompar(const void *a, const void *b) {
     node_t *na, *nb;
 
-    na = (node_t *) a;
-    nb = (node_t *) b;
+    na = *((node_t **) a);
+    nb = *((node_t **) b);
 
     if (na->id == 0) {
-        return -1;
+        return 1;
     }
     if (nb->id == 0) {
-        return 1;
+        return -1;
     }
     return (nb->id - na->id);
 }
@@ -914,7 +914,7 @@ new_node_cache_add_node(node_cache_t *node_cache, node_t *node) {
     node_t *nodes_to_merge[MAXOLD];
     int i, nnodes_to_merge;
     tree_entry_t *newleaf;
-    node_t *existing_node;
+    node_t *existing_node, *src_node, *dest_node;
     STAT_COUNTER(ctr, nodes-to-merge, STAT_MAX);
 
     /*
@@ -973,6 +973,12 @@ new_node_cache_add_node(node_cache_t *node_cache, node_t *node) {
         }
 
         // Actually go merge
+        dest_node = nodes_to_merge[0];
+        for (i=1; i<nnodes_to_merge; i++) {
+            src_node = nodes_to_merge[i];
+
+            fprintf(stderr, "Go and merge node %d into %d\n", src_node->id, dest_node->id);
+        }
         return 1;
     }
 
