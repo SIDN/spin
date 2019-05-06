@@ -279,17 +279,21 @@ node_shares_element_tree(tree_t *eltree, tree_t *ntree, node_t *othernode) {
         leaf = tree_next(leaf);
     }
 
-    STAT_VALUE(ctr, 1);
+    STAT_VALUE(ctr, 0);
     return 0;
 }
 
 static int
 node_shares_element_new(node_cache_t *node_cache, node_t *node, node_t *othernode) {
 
-    if (node_shares_element_tree(node_cache->ip_refs, node->ips, othernode))
+    if (node_shares_element_tree(node_cache->ip_refs, node->ips, othernode)) {
+        spin_log(LOG_DEBUG, "[MERGE] Nodes %d and %d share some IP address\n", node->id, othernode->id);
         return 1;
-    if (node_shares_element_tree(node_cache->domain_refs, node->domains, othernode))
+    }
+    if (node_shares_element_tree(node_cache->domain_refs, node->domains, othernode)) {
+        spin_log(LOG_DEBUG, "[MERGE3] Nodes %d and %d share some domain name\n", node->id, othernode->id);
         return 1;
+    }
     return 0;
 }
 
