@@ -405,7 +405,7 @@ node_merge(node_cache_t *node_cache, node_t* dest, node_t* src) {
         node_set_name(dest, src->name);
         modified = 1;
     }
-    if (dest->mac == NULL) {
+    if (dest->mac == NULL && src->mac != NULL) {
         node_set_mac(dest, src->mac);
         cache_tree_remove_mac(node_cache, src, src->mac);
         cache_tree_add_mac(node_cache, dest, src->mac);
@@ -865,6 +865,9 @@ oldnode(tree_t *reftree, size_t size, void *data) {
         assert(oldleaf->data_size == sizeof(node));
 
         node = * ((node_t**) oldleaf->data);
+
+        fprintf(stderr, "oldnode %p\n", node);
+        fprintf(stderr, "oldnode id %d\n", node->id);
         return node;
     }
     
@@ -882,6 +885,7 @@ add_node_to_ar(node_t *node, node_t **ar, int *nelem) {
      */
 
     for(i=0; i< *nelem; i++) {
+        fprintf(stderr, "add_node i=%d\n", i);
         if (ar[i] == node) {
             return;
         }
@@ -894,10 +898,10 @@ add_node_to_ar(node_t *node, node_t **ar, int *nelem) {
 int
 new_node_cache_add_node(node_cache_t *node_cache, node_t *node) {
     node_t *nodes_to_merge[MAXOLD];
-    int nnodes_to_merge;
+    int i, nnodes_to_merge;
     tree_entry_t *newleaf;
     node_t *existing_node;
-    STAT_COUNTER(ctr, nodes-to-merge, STAT_TOTAL);
+    STAT_COUNTER(ctr, nodes-to-merge, STAT_MAX);
 
     /*
      * When merging the incoming node always participates
@@ -912,18 +916,48 @@ new_node_cache_add_node(node_cache_t *node_cache, node_t *node) {
      * We look at Mac, Ip-addresses and Domains
      */
 
+    if (node->mac) {
+        existing_node = oldnode(node_cache->mac_refs, strlen(node->mac) + 1, node->mac);
+        if (existing_node != NULL) {
+            add_node_to_ar(existing_node, nodes_to_merge, &nnodes_to_merge);
+        }
+    }
+
     newleaf = tree_first(node->ips);
 
     while (newleaf != NULL) {
         existing_node = oldnode(node_cache->ip_refs, newleaf->key_size, newleaf->key);
-        if (existing_node != 0) {
+        if (existing_node != NULL) {
             add_node_to_ar(existing_node, nodes_to_merge, &nnodes_to_merge);
         }
         
         newleaf = tree_next(newleaf);
     }
 
-    STAT_VALUE(ctr, 1);
+    newleaf = tree_first(node->domains);
+
+    while (newleaf != NULL) {
+        existing_node = oldnode(node_cache->domain_refs, newleaf->key_size, newleaf->key);
+        if (existing_node != NULL) {
+            add_node_to_ar(existing_node, nodes_to_merge, &nnodes_to_merge);
+        }
+        
+        newleaf = tree_next(newleaf);
+    }
+
+    STAT_VALUE(ctr, nnodes_to_merge);
+
+    if (nnodes_to_merge > 1) {
+
+        fprintf(stderr, "Merge nodes:");
+        for (i=0; i < nnodes_to_merge; i++) {
+            fprintf(stderr, " %d", nodes_to_merge[i]->id);
+        }
+        fprintf(stderr, "\n");
+
+        // Actually go merge
+        return 1;
+    }
 
     return 0;
 }
