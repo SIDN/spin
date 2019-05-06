@@ -243,6 +243,27 @@ node_add_domain(node_t* node, char* domain) {
 }
 
 void
+cache_tree_add_mac(node_cache_t *node_cache, node_t* node, char* mac) {
+    STAT_COUNTER(ctr, cache-tree-add-mac, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
+    fprintf(stderr, "Add mac %s to node %d\n", mac, node->id);
+    cache_tree_add_keytonode(node_cache->mac_refs, node, strlen(mac) + 1, mac);
+}
+
+void
+cache_tree_remove_mac(node_cache_t *node_cache, node_t* node, char* mac) {
+    tree_entry_t* cur;
+    STAT_COUNTER(ctr, cache-tree-remove-mac, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
+    cur = tree_find(node_cache->mac_refs, strlen(mac) + 1, mac);
+    if (cur != 0) {
+        tree_remove_entry(node_cache->mac_refs, cur);
+    }
+}
+
+void
 node_set_mac(node_t* node, char* mac) {
     STAT_COUNTER(ctr, set-mac, STAT_TOTAL);
 
@@ -386,6 +407,8 @@ node_merge(node_cache_t *node_cache, node_t* dest, node_t* src) {
     }
     if (dest->mac == NULL) {
         node_set_mac(dest, src->mac);
+        cache_tree_remove_mac(node_cache, src, src->mac);
+        cache_tree_add_mac(node_cache, dest, src->mac);
         modified = 1;
     }
     if (dest->last_seen < src->last_seen) {
@@ -831,6 +854,81 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     }
 }
 
+node_t *
+oldnode(tree_t *reftree, size_t size, void *data) {
+    node_t *node;
+    tree_entry_t *oldleaf;
+
+    oldleaf = tree_find(reftree, size, data);
+   
+    if (oldleaf != NULL) {
+        assert(oldleaf->data_size == sizeof(node));
+
+        node = * ((node_t**) oldleaf->data);
+        return node;
+    }
+    
+    return NULL;
+}
+
+#define MAXOLD  64
+
+static void
+add_node_to_ar(node_t *node, node_t **ar, int *nelem) {
+    int i;
+
+    /*
+     * First check if already there
+     */
+
+    for(i=0; i< *nelem; i++) {
+        if (ar[i] == node) {
+            return;
+        }
+    }
+    assert(*nelem < MAXOLD);
+    ar[*nelem] = node;
+    *nelem += 1;
+}
+
+int
+new_node_cache_add_node(node_cache_t *node_cache, node_t *node) {
+    node_t *nodes_to_merge[MAXOLD];
+    int nnodes_to_merge;
+    tree_entry_t *newleaf;
+    node_t *existing_node;
+    STAT_COUNTER(ctr, nodes-to-merge, STAT_TOTAL);
+
+    /*
+     * When merging the incoming node always participates
+     */
+    nodes_to_merge[0] = node;
+    nnodes_to_merge = 1;
+
+    /*
+     * First find all nodes in the cache this node overlaps
+     * We will merge all these nodes
+     *
+     * We look at Mac, Ip-addresses and Domains
+     */
+
+    newleaf = tree_first(node->ips);
+
+    while (newleaf != NULL) {
+        existing_node = oldnode(node_cache->ip_refs, newleaf->key_size, newleaf->key);
+        if (existing_node != 0) {
+            add_node_to_ar(existing_node, nodes_to_merge, &nnodes_to_merge);
+        }
+        
+        newleaf = tree_next(newleaf);
+    }
+
+    STAT_VALUE(ctr, 1);
+
+    return 0;
+}
+
+
 // return 0 if it existed/was merged
 // return 1 if it was new
 int
@@ -841,6 +939,9 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     int node_found = 0;
     tree_entry_t* nxt;
     STAT_COUNTER(ctr, node-sharing, STAT_TOTAL);
+
+    // Test hook first
+    new_node_cache_add_node(node_cache, node);
 
     while (cur != NULL) {
         tree_node = (node_t*) cur->data;
