@@ -4,6 +4,7 @@
 #include "node_cache.h"
 #include "spin_log.h"
 
+#include "spinhook.h"
 #include "spindata.h"
 
 #include "statistics.h"
@@ -181,6 +182,8 @@ spin_data_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info) {
     cJSON_AddNumberToObject(pktobj, "to_port", pkt_info->dest_port);
     cJSON_AddNumberToObject(pktobj, "size", pkt_info->payload_size);
     cJSON_AddNumberToObject(pktobj, "count", pkt_info->packet_count);
+
+    spinhook_traffic(src_node, dest_node, pkt_info->packet_count, pkt_info->payload_size);
 
     STAT_VALUE(totalsd, 1);
     return(pktobj);

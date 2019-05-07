@@ -919,6 +919,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
 
     if (node->mac) {
         cache_tree_add_mac(node_cache, node, node->mac);
+        spinhook_makedevice(node);
     }
 
     leaf = tree_first(node->ips);
