@@ -208,6 +208,22 @@ node_is_updated(node_t *node) {
     send_command_node_info(node->id, sd);
 }
 
+void
+send_command_nodegone(node_t *node) {
+    spin_data sd;
+    spin_data command;
+    char mosqchan[100];
+
+    sd = spin_data_node(node);
+
+    command = spin_data_create_mqtt_command("nodeGone", NULL, sd);
+
+    sprintf(mosqchan, "SPIN/traffic/node/%d", node->id);
+    core2pubsub_publish_chan(mosqchan, command, 1);
+
+    spin_data_delete(command);
+}
+
 static void
 publish_nodes() {
 

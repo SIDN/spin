@@ -65,12 +65,8 @@ node_destroy(node_t* node) {
 
 void
 cache_tree_add_keytonode(tree_t *totree, node_t* node, size_t key_len, void* key_data) {
-    STAT_COUNTER(ctr, keytonode, STAT_TOTAL);
 
-    if (node->id != 0) {
-        tree_add(totree, key_len, key_data, sizeof(node), (void *) &node , 1);
-    }
-    STAT_VALUE(ctr, node->id != 0);
+    tree_add(totree, key_len, key_data, sizeof(node), (void *) &node , 1);
 }
 
 void
@@ -82,7 +78,7 @@ cache_tree_add_ip(node_cache_t *node_cache, node_t* node, ip_t* ip) {
 }
 
 void
-cache_tree_remove_ip(node_cache_t *node_cache, node_t* node, ip_t* ip) {
+cache_tree_remove_ip(node_cache_t *node_cache, ip_t* ip) {
     tree_entry_t* cur;
     STAT_COUNTER(ctr, cache-tree-remove-ip, STAT_TOTAL);
 
@@ -219,7 +215,7 @@ cache_tree_add_domain(node_cache_t *node_cache, node_t* node, char* domain) {
 }
 
 void
-cache_tree_remove_domain(node_cache_t *node_cache, node_t* node, char* domain) {
+cache_tree_remove_domain(node_cache_t *node_cache, char* domain) {
     tree_entry_t* cur;
     STAT_COUNTER(ctr, cache-tree-remove-domain, STAT_TOTAL);
 
@@ -245,7 +241,7 @@ cache_tree_add_mac(node_cache_t *node_cache, node_t* node, char* mac) {
 }
 
 void
-cache_tree_remove_mac(node_cache_t *node_cache, node_t* node, char* mac) {
+cache_tree_remove_mac(node_cache_t *node_cache, char* mac) {
     tree_entry_t* cur;
     STAT_COUNTER(ctr, cache-tree-remove-mac, STAT_TOTAL);
 
@@ -308,7 +304,7 @@ node_merge(node_cache_t *node_cache, node_t* dest, node_t* src) {
     }
     if (dest->mac == NULL && src->mac != NULL) {
         node_set_mac(dest, src->mac);
-        cache_tree_remove_mac(node_cache, src, src->mac);
+        cache_tree_remove_mac(node_cache, src->mac);
         cache_tree_add_mac(node_cache, dest, src->mac);
         modified = 1;
     }
@@ -327,7 +323,7 @@ node_merge(node_cache_t *node_cache, node_t* dest, node_t* src) {
         ip_t *curip;
 
         curip = (ip_t *) cur->key;
-        cache_tree_remove_ip(node_cache, src, curip);
+        cache_tree_remove_ip(node_cache, curip);
         cache_tree_add_ip(node_cache, dest, curip);
 
         m = tree_add(dest->ips, cur->key_size, cur->key, cur->data_size, cur->data, 1);
@@ -344,7 +340,7 @@ node_merge(node_cache_t *node_cache, node_t* dest, node_t* src) {
         char *curdomain;
 
         curdomain = (char *) cur->key;
-        cache_tree_remove_domain(node_cache, src, curdomain);
+        cache_tree_remove_domain(node_cache, curdomain);
         cache_tree_add_domain(node_cache, dest, curdomain);
 
         m = tree_add(dest->domains, cur->key_size, cur->key, cur->data_size, cur->data, 1);
@@ -594,7 +590,7 @@ node_clean(node_cache_t *node_cache, node_t *node) {
         ip_t *curip;
 
         curip = (ip_t *) leaf->key;
-        cache_tree_remove_ip(node_cache, node, curip);
+        cache_tree_remove_ip(node_cache, curip);
 
         leaf = tree_next(leaf);
     }
@@ -604,7 +600,7 @@ node_clean(node_cache_t *node_cache, node_t *node) {
         char *curdomain;
 
         curdomain = (char *) leaf->key;
-        cache_tree_remove_domain(node_cache, node, curdomain);
+        cache_tree_remove_domain(node_cache, curdomain);
 
         leaf = tree_next(leaf);
     }
@@ -690,7 +686,6 @@ node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
     node_set_last_seen(node, timestamp);
     add_mac_and_name(node_cache, node, ip);
     node_add_ip(node, ip);
-    // cache_tree_add_ip(node_cache, node, ip);
     new = node_cache_add_node(node_cache, node);
     STAT_VALUE(ctr, new);
     if (new == 1) {
@@ -733,9 +728,7 @@ void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, 
     node_t* node = node_create(0);
     node_set_modified(node, timestamp);
     node_add_ip(node, &ip);
-    // cache_tree_add_ip(node_cache, node, &ip);
     node_add_domain(node, dname_str);
-    // cache_tree_add_domain(node_cache, node, dname_str);
     add_mac_and_name(node_cache, node, &ip);
     node_cache_add_node(node_cache, node);
 }
@@ -755,7 +748,6 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     node_t* node = node_create(0);
     node_set_modified(node, timestamp);
     node_add_domain(node, dname_str);
-    // cache_tree_add_domain(node_cache, node, dname_str);
     node_cache_add_node(node_cache, node);
 
     // in this case, the dns_pkt's ip address is a separate node!
@@ -766,7 +758,6 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
         node = node_create(0);
         node_set_modified(node, timestamp);
         node_add_ip(node, &ip);
-        // cache_tree_add_ip(node_cache, node, &ip);
         node_cache_add_node(node_cache, node);
     }
 }
@@ -884,27 +875,22 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
     if (nnodes_to_merge > 1) {
 
         qsort(nodes_to_merge, nnodes_to_merge, sizeof(node), nodecompar);
-#ifdef notdef
-        if (nnodes_to_merge > 2) {
-            fprintf(stderr, "Merge nodes:");
-            for (i=0; i < nnodes_to_merge; i++) {
-                fprintf(stderr, " %d", nodes_to_merge[i]->id);
-            }
-            fprintf(stderr, "\n");
-        }
-#endif
 
         // Actually go merge
         dest_node = nodes_to_merge[0];
         for (i=1; i<nnodes_to_merge; i++) {
             int thisid;
             tree_entry_t *thisleaf;
+            void send_command_nodegone(node_t*);
 
             src_node = nodes_to_merge[i];
             thisid = src_node->id;
 
             spin_log(LOG_DEBUG, "Go and merge node %d into %d\n", thisid, dest_node->id);
             node_merge(node_cache, dest_node, src_node);
+            if (thisid != 0) {
+                send_command_nodegone(src_node);
+            }
             node_destroy(src_node);
             if (thisid != 0) {
                 // Existing nodes must be taken out of tree
@@ -949,84 +935,6 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
 
     return 0;
 }
-
-
-#ifdef notdef
-// return 0 if it existed/was merged
-// return 1 if it was new
-int
-node_cache_add_node(node_cache_t* node_cache, node_t* node) {
-#ifdef notdef
-    int new_id, *new_id_mem;
-    tree_entry_t* cur = tree_first(node_cache->nodes);
-    node_t* tree_node;
-    int node_found = 0;
-    tree_entry_t* nxt;
-    STAT_COUNTER(ctr, node-sharing, STAT_TOTAL);
-#endif
-
-    // Test hook first
-    return new_node_cache_add_node(node_cache, node);
-
-#ifdef notdef
-    while (cur != NULL) {
-        tree_node = (node_t*) cur->data;
-        if (node_shares_element(node, tree_node)
-#ifdef NEWSHARES
-            || node_shares_element_new(node_cache, node, tree_node)
-#endif
-                                    ) {
-            if (!node_found) {
-                node_merge(node_cache, tree_node, node);
-                node_found = 1;
-                // TODO: walk the rest of the cache too, we may need to merge more nodes now
-                node_destroy(node);
-                node = tree_node;
-                cur = tree_next(cur);
-            } else {
-                // note: we don't need to restart the loop since we know we have not found
-                // any mergable items so far
-
-                node_merge(node_cache, node, tree_node);
-
-                // clean up the tree
-                nxt = tree_next(cur);
-                // TODO: signal merge to listeners
-                node_destroy(tree_node);
-                cur->data = NULL;
-                tree_remove_entry(node_cache->nodes, cur);
-                cur = nxt;
-            }
-        } else {
-            cur = tree_next(cur);
-        }
-    }
-    STAT_VALUE(ctr, node_found);
-    if (node_found) {
-        return 0;
-    }
-    // ok no elements at all, add as a new one
-    new_id = node_cache_get_new_id(node_cache);
-    new_id_mem = (int*) malloc(sizeof(new_id));
-    memcpy(new_id_mem, &new_id, sizeof(new_id));
-    node->id = new_id;
-
-    tree_add(node_cache->nodes, sizeof(new_id), new_id_mem, sizeof(node_t), node, 0);
-    tree_entry_t *cur_me = tree_first(node->ips);
-    while (cur_me != NULL) {
-        cache_tree_add_ip(node_cache, node, (ip_t*) cur_me->key);
-        cur_me = tree_next(cur_me);
-    }
-
-    cur_me = tree_first(node->domains);
-    while (cur_me != NULL) {
-        cache_tree_add_domain(node_cache, node, (char *) cur_me->key);
-        cur_me = tree_next(cur_me);
-    }
-    return 1;
-#endif
-}
-#endif
 
 flow_list_t* flow_list_create(uint32_t timestamp) {
 
