@@ -154,6 +154,28 @@ test_buffer_resize() {
     buffer_destroy(buf);
 }
 
+void
+test_buffer_va_list() {
+    const char *fmt = "%s, %s";
+    const char *a = "123456";
+    const char *b = "abcdef";
+    char check[16];
+
+    buffer_t* buf = buffer_create(8);
+    buffer_allow_resize(buf);
+
+    buffer_write(buf, fmt, a, b);
+
+    assert(buf->max == 16);
+    assert(buffer_ok(buf));
+    buffer_finish(buf);
+
+    sprintf(check, fmt, a, b);
+    check_bufstr(buf, check);
+
+    buffer_destroy(buf);
+}
+
 // note; if this test fails it may leave a tmp file around
 void
 test_ip_tree_read_write() {
@@ -204,6 +226,7 @@ int main(int argc, char** argv) {
     test_buffer_write_1();
     test_buffer_write_2();
     test_buffer_resize();
+    test_buffer_va_list();
     test_ip_tree_read_write();
     return 0;
 }

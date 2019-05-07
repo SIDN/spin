@@ -204,7 +204,9 @@ void buffer_resize(buffer_t* buffer) {
 int
 buffer_writev(buffer_t* buffer, const char* format, va_list args) {
     int written = 0;
+    int result;
     size_t remaining;
+    va_list args_copy;
 
     if (!buffer->ok || buffer->finished) {
         return -1;
@@ -213,20 +215,32 @@ buffer_writev(buffer_t* buffer, const char* format, va_list args) {
     if (buffer->max < buffer->pos) {
         return -1;
     }
+
+    // A va_list cannot be reused so make a copy now in case we need it. We
+    // will need it when we have to resize the buffer after a failed call to
+    // vsnprintf(3).
+    va_copy(args_copy, args);
+
     remaining = buffer->max - buffer->pos;
     written = vsnprintf(buffer->data + buffer->pos, remaining, format, args);
     if (written == -1 || written+buffer->pos >= buffer->max) {
         if (buffer->allow_resize) {
             buffer_resize(buffer);
-            return buffer_writev(buffer, format, args);
+            result = buffer_writev(buffer, format, args_copy);
+            goto out;
         } else {
             buffer->ok = 0;
-            return -1;
+            result = -1;
+            goto out;
         }
     } else {
         buffer->pos += written;
     }
-    return 0;
+    result = 0;
+
+out:
+    va_end(args_copy);
+    return result;
 }
 
 int buffer_write(buffer_t* buffer, const char* format, ...) {
