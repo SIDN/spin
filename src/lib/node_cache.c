@@ -36,6 +36,7 @@ node_create(int id) {
     node->last_seen = 0;
     node->modified = 0;
     node->persistent = 0;
+    node->references = 0;
     node->device = NULL;
     return node;
 }
@@ -437,6 +438,23 @@ void node_callback_new(node_cache_t* node_cache, modfunc mf) {
             nfound++;
             node->modified = 0;
         }
+        cur = tree_next(cur);
+    }
+    STAT_VALUE(ctr, nfound);
+}
+
+void node_callback_devices(node_cache_t* node_cache, modfunc mf) {
+    tree_entry_t* cur;
+    node_t* node;
+    int nfound;
+    STAT_COUNTER(ctr, publish-all, STAT_TOTAL);
+
+    nfound = 0;
+    cur = tree_first(node_cache->mac_refs);
+    while (cur != NULL) {
+        node = * ((node_t**) cur->data);
+        (*mf)(node);
+        nfound++;
         cur = tree_next(cur);
     }
     STAT_VALUE(ctr, nfound);
@@ -886,7 +904,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
             src_node = nodes_to_merge[i];
             thisid = src_node->id;
 
-            spin_log(LOG_DEBUG, "Go and merge node %d into %d\n", thisid, dest_node->id);
+            // spin_log(LOG_DEBUG, "Go and merge node %d into %d\n", thisid, dest_node->id);
             node_merge(node_cache, dest_node, src_node);
             if (thisid != 0) {
                 spinhook_nodesmerged(dest_node, src_node);

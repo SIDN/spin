@@ -1,9 +1,10 @@
 #include "spindata.h"
 #include "rpc_json.h"
+#include "spinhook.h"
 
 spin_data jsonrpc_blockflow(spin_data arg) {
 
-    return arg;
+    return spinhook_json(arg);
 }
 
 struct funclist {

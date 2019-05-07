@@ -39,8 +39,10 @@ typedef struct {
     uint32_t last_seen;
     // and for publication purposes also if it changed
     uint8_t modified;
-    // and for storage if persistent
+    // and for keeping if in blocking
     uint32_t persistent;
+    // and references of flows
+    uint32_t references;
     device_t* device;
 } node_t;
 
@@ -104,6 +106,7 @@ node_cache_t* node_cache_create(void);
 void node_cache_destroy(node_cache_t* node_cache);
 
 void node_callback_new(node_cache_t *node_cache, modfunc);
+void node_callback_devices(node_cache_t *node_cache, modfunc);
 
 void node_cache_print(node_cache_t* node_cache);
 /*
