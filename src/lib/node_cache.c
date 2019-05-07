@@ -16,6 +16,8 @@ STAT_MODULE(node_cache)
 
 STAT_COUNTER(nodes, nodes, STAT_TOTAL);
 
+#undef NEWMERGEDEBUG
+
 node_t*
 node_create(int id) {
     int i;
@@ -61,25 +63,14 @@ node_destroy(node_t* node) {
     free(node);
 }
 
-static void ip_key2str(char* buf, size_t buf_len, const uint8_t* ip_key_data) {
-    int family = (int)ip_key_data[0];
-    size_t offset;
-    if (family == AF_INET) {
-        offset = 13;
-    } else {
-        offset = 1;
-    }
-    ntop(family, buf, (const uint8_t*)&ip_key_data[offset], buf_len);
-}
-
 void
 cache_tree_add_keytonode(tree_t *totree, node_t* node, size_t key_len, void* key_data) {
+    STAT_COUNTER(ctr, keytonode, STAT_TOTAL);
 
     if (node->id != 0) {
-        spin_log(LOG_DEBUG, "Add to %p: %d %p", totree, key_len, key_data);
         tree_add(totree, key_len, key_data, sizeof(node), (void *) &node , 1);
-        spin_log(LOG_DEBUG, "\n");
     }
+    STAT_VALUE(ctr, node->id != 0);
 }
 
 void
@@ -98,6 +89,18 @@ cache_tree_remove_ip(node_cache_t *node_cache, node_t* node, ip_t* ip) {
     STAT_VALUE(ctr, 1);
     cur = tree_find(node_cache->ip_refs, sizeof(ip_t), ip);
     tree_remove_entry(node_cache->ip_refs, cur);
+}
+
+#ifdef NEWMERGEDEBUG
+static void ip_key2str(char* buf, size_t buf_len, const uint8_t* ip_key_data) {
+    int family = (int)ip_key_data[0];
+    size_t offset;
+    if (family == AF_INET) {
+        offset = 13;
+    } else {
+        offset = 1;
+    }
+    ntop(family, buf, (const uint8_t*)&ip_key_data[offset], buf_len);
 }
 
 void node_tree_print_ip(tree_t *iptree) {
@@ -189,11 +192,14 @@ void cache_tree_print_domain(tree_t *iptree) {
         cur = tree_next(cur);
     }
 }
+#endif
 
 void cache_tree_print(node_cache_t *node_cache) {
 
+#ifdef NEWMERGEDEBUG
     cache_tree_print_ip(node_cache->ip_refs);
     cache_tree_print_domain(node_cache->domain_refs);
+#endif
 }
 
 void
@@ -235,7 +241,6 @@ cache_tree_add_mac(node_cache_t *node_cache, node_t* node, char* mac) {
     STAT_COUNTER(ctr, cache-tree-add-mac, STAT_TOTAL);
 
     STAT_VALUE(ctr, 1);
-    fprintf(stderr, "Add mac %s to node %d\n", mac, node->id);
     cache_tree_add_keytonode(node_cache->mac_refs, node, strlen(mac) + 1, mac);
 }
 
@@ -496,10 +501,10 @@ node_cache_print(node_cache_t* node_cache) {
 
 }
 
-#undef NEWFINDBYIP
+#define NEWFIND
 node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* ip) {
     // TODO: this is very inefficient; we should add a second tree for ip searching
-#ifndef NEWFINDBYIP
+#ifndef NEWFIND
     tree_entry_t* cur = tree_first(node_cache->nodes);
     node_t* node;
     STAT_COUNTER(ctr, find-by-ip, STAT_TOTAL);
@@ -535,6 +540,7 @@ node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* i
 }
 
 node_t* node_cache_find_by_domain(node_cache_t* node_cache, char* dname) {
+    #ifndef NEWFIND
     tree_entry_t* cur = tree_first(node_cache->nodes);
     node_t* node;
     STAT_COUNTER(ctr, find-by-domain, STAT_TOTAL);
@@ -552,6 +558,21 @@ node_t* node_cache_find_by_domain(node_cache_t* node_cache, char* dname) {
     }
     STAT_VALUE(ctr, loopcnt);
     return NULL;
+#else
+    node_t *node;
+    tree_entry_t *leaf;
+    STAT_COUNTER(ctr, find-by-domain, STAT_TOTAL);
+
+    leaf = tree_find(node_cache->domain_refs, strlen(dname) + 1, dname);
+    if (leaf != NULL) {
+        node = * ((node_t**) leaf->data);
+        STAT_VALUE(ctr, 1);
+        return node;
+    }
+
+    STAT_VALUE(ctr, 0);
+    return NULL;
+#endif
 }
 
 node_t* node_cache_find_by_id(node_cache_t* node_cache, int node_id) {
@@ -669,7 +690,7 @@ node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
     node_set_last_seen(node, timestamp);
     add_mac_and_name(node_cache, node, ip);
     node_add_ip(node, ip);
-    cache_tree_add_ip(node_cache, node, ip);
+    // cache_tree_add_ip(node_cache, node, ip);
     new = node_cache_add_node(node_cache, node);
     STAT_VALUE(ctr, new);
     if (new == 1) {
@@ -712,9 +733,9 @@ void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, 
     node_t* node = node_create(0);
     node_set_modified(node, timestamp);
     node_add_ip(node, &ip);
-    cache_tree_add_ip(node_cache, node, &ip);
+    // cache_tree_add_ip(node_cache, node, &ip);
     node_add_domain(node, dname_str);
-    cache_tree_add_domain(node_cache, node, dname_str);
+    // cache_tree_add_domain(node_cache, node, dname_str);
     add_mac_and_name(node_cache, node, &ip);
     node_cache_add_node(node_cache, node);
 }
@@ -734,7 +755,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     node_t* node = node_create(0);
     node_set_modified(node, timestamp);
     node_add_domain(node, dname_str);
-    cache_tree_add_domain(node_cache, node, dname_str);
+    // cache_tree_add_domain(node_cache, node, dname_str);
     node_cache_add_node(node_cache, node);
 
     // in this case, the dns_pkt's ip address is a separate node!
@@ -745,7 +766,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
         node = node_create(0);
         node_set_modified(node, timestamp);
         node_add_ip(node, &ip);
-        cache_tree_add_ip(node_cache, node, &ip);
+        // cache_tree_add_ip(node_cache, node, &ip);
         node_cache_add_node(node_cache, node);
     }
 }
@@ -863,6 +884,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
     if (nnodes_to_merge > 1) {
 
         qsort(nodes_to_merge, nnodes_to_merge, sizeof(node), nodecompar);
+#ifdef notdef
         if (nnodes_to_merge > 2) {
             fprintf(stderr, "Merge nodes:");
             for (i=0; i < nnodes_to_merge; i++) {
@@ -870,6 +892,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
             }
             fprintf(stderr, "\n");
         }
+#endif
 
         // Actually go merge
         dest_node = nodes_to_merge[0];
@@ -880,16 +903,13 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
             src_node = nodes_to_merge[i];
             thisid = src_node->id;
 
-            spin_log(LOG_DEBUG, "Go and merge node %d into %d", thisid, dest_node->id);
+            spin_log(LOG_DEBUG, "Go and merge node %d into %d\n", thisid, dest_node->id);
             node_merge(node_cache, dest_node, src_node);
-            spin_log(LOG_DEBUG, "\n");
-            spin_log(LOG_DEBUG, "Destroy node %d", thisid);
             node_destroy(src_node);
-            spin_log(LOG_DEBUG, "\n");
             if (thisid != 0) {
                 // Existing nodes must be taken out of tree
                 thisleaf = tree_find(node_cache->nodes, sizeof(thisid), &thisid);
-                spin_log(LOG_DEBUG, "Found node %d at %p\n", thisid, thisleaf);
+                // set data to 0, else it will be freed again
                 thisleaf->data = NULL;
                 tree_remove_entry(node_cache->nodes, thisleaf);
             }
