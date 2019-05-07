@@ -11,6 +11,10 @@
 #include <stdint.h>
 
 typedef struct {
+    int dv_info;    // placeholder
+} device_t;
+
+typedef struct {
     int id;
     // note: ip's are in a sizeof(ip_t)-byte format (family + ip, padded with 12 zeroes in case of ipv4)
     // they are stored in the keys, data is empty
@@ -30,6 +34,7 @@ typedef struct {
     uint8_t modified;
     // and for storage if persistent
     uint32_t persistent;
+    device_t* device;
 } node_t;
 
 #define is_blocked is_onlist[IPLIST_BLOCK]

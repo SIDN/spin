@@ -33,6 +33,7 @@ node_create(int id) {
     node->last_seen = 0;
     node->modified = 0;
     node->persistent = 0;
+    node->device = NULL;
     return node;
 }
 
@@ -52,6 +53,11 @@ node_destroy(node_t* node) {
         free(node->name);
         node->name = NULL;
     }
+    if (node->device) {
+        free(node->device);
+        node->device = NULL;
+    }
+
     free(node);
 }
 
@@ -70,7 +76,9 @@ void
 cache_tree_add_keytonode(tree_t *totree, node_t* node, size_t key_len, void* key_data) {
 
     if (node->id != 0) {
+        spin_log(LOG_DEBUG, "Add to %p: %d %p", totree, key_len, key_data);
         tree_add(totree, key_len, key_data, sizeof(node), (void *) &node , 1);
+        spin_log(LOG_DEBUG, "\n");
     }
 }
 
@@ -799,7 +807,7 @@ int
 node_cache_add_node(node_cache_t *node_cache, node_t *node) {
     node_t *nodes_to_merge[MAXOLD];
     int i, nnodes_to_merge;
-    tree_entry_t *newleaf;
+    tree_entry_t *leaf, *newleaf;
     node_t *existing_node, *src_node, *dest_node;
     int new_id, *new_id_mem;
     STAT_COUNTER(ctr, nodes-to-merge, STAT_MAX);
@@ -872,40 +880,53 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
             src_node = nodes_to_merge[i];
             thisid = src_node->id;
 
-            spin_log(LOG_DEBUG, "Go and merge node %d into %d\n", thisid, dest_node->id);
+            spin_log(LOG_DEBUG, "Go and merge node %d into %d", thisid, dest_node->id);
             node_merge(node_cache, dest_node, src_node);
+            spin_log(LOG_DEBUG, "\n");
+            spin_log(LOG_DEBUG, "Destroy node %d", thisid);
             node_destroy(src_node);
+            spin_log(LOG_DEBUG, "\n");
             if (thisid != 0) {
                 // Existing nodes must be taken out of tree
                 thisleaf = tree_find(node_cache->nodes, sizeof(thisid), &thisid);
+                spin_log(LOG_DEBUG, "Found node %d at %p\n", thisid, thisleaf);
+                thisleaf->data = NULL;
                 tree_remove_entry(node_cache->nodes, thisleaf);
             }
         }
         return 1;
     }
 
-    // ok no elements at all, add as a new one
+    // ok no shared elements at all, add as a new node
     new_id = node_cache_get_new_id(node_cache);
     new_id_mem = (int*) malloc(sizeof(new_id));
     memcpy(new_id_mem, &new_id, sizeof(new_id));
     node->id = new_id;
 
     tree_add(node_cache->nodes, sizeof(new_id), new_id_mem, sizeof(node_t), node, 0);
-#ifdef NEWSHARES
-{
-    tree_entry_t *cur_me = tree_first(node->ips);
-    while (cur_me != NULL) {
-        cache_tree_add_ip(node_cache, node, (ip_t*) cur_me->key);
-        cur_me = tree_next(cur_me);
+
+    /*
+     * Add cache tree entries for previous node 0
+     */
+
+    spin_log(LOG_DEBUG, "Just created node %d\n", node->id);
+
+    if (node->mac) {
+        cache_tree_add_mac(node_cache, node, node->mac);
     }
 
-    cur_me = tree_first(node->domains);
-    while (cur_me != NULL) {
-        cache_tree_add_domain(node_cache, node, (char *) cur_me->key);
-        cur_me = tree_next(cur_me);
+    leaf = tree_first(node->ips);
+    while (leaf != NULL) {
+        cache_tree_add_ip(node_cache, node, (ip_t*) leaf->key);
+        leaf = tree_next(leaf);
     }
-}
-#endif
+
+    leaf = tree_first(node->domains);
+    while (leaf != NULL) {
+        cache_tree_add_domain(node_cache, node, (char *) leaf->key);
+        leaf = tree_next(leaf);
+    }
+
     return 0;
 }
 
@@ -971,8 +992,6 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
     node->id = new_id;
 
     tree_add(node_cache->nodes, sizeof(new_id), new_id_mem, sizeof(node_t), node, 0);
-#ifdef NEWSHARES
-{
     tree_entry_t *cur_me = tree_first(node->ips);
     while (cur_me != NULL) {
         cache_tree_add_ip(node_cache, node, (ip_t*) cur_me->key);
@@ -984,8 +1003,6 @@ node_cache_add_node(node_cache_t* node_cache, node_t* node) {
         cache_tree_add_domain(node_cache, node, (char *) cur_me->key);
         cur_me = tree_next(cur_me);
     }
-}
-#endif
     return 1;
 #endif
 }
