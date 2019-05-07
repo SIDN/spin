@@ -40,6 +40,17 @@ spin_data_delete(spin_data sd) {
     cJSON_Delete(sd);
 }
 
+spin_data
+spin_data_merge(int node1, int node2) {
+    cJSON *resobj;
+
+    resobj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(resobj, "id", node1);
+    cJSON_AddNumberToObject(resobj, "merged-to", node2);
+
+    return resobj;
+}
+
 //  Also needed for lists
 spin_data
 spin_data_ipar(tree_t *iptree) {

@@ -11,7 +11,14 @@
 #include <stdint.h>
 
 typedef struct {
-    int dv_info;    // placeholder
+    int     dvf_packets;
+    int     dvf_bytes;
+    int     dvf_idleperiods;
+    int     dvf_activelastperiod;
+} devflow_t;
+
+typedef struct {
+    tree_t *dv_flowtree;
 } device_t;
 
 typedef struct {

@@ -8,6 +8,7 @@
 #include "node_cache.h"
 #include "netlink_commands.h"
 #include "spin_cfg.h"
+#include "spinhook.h"
 #include "statistics.h"
 
 extern int omitnode;
@@ -881,7 +882,6 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
         for (i=1; i<nnodes_to_merge; i++) {
             int thisid;
             tree_entry_t *thisleaf;
-            void send_command_nodegone(node_t*);
 
             src_node = nodes_to_merge[i];
             thisid = src_node->id;
@@ -889,7 +889,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
             spin_log(LOG_DEBUG, "Go and merge node %d into %d\n", thisid, dest_node->id);
             node_merge(node_cache, dest_node, src_node);
             if (thisid != 0) {
-                send_command_nodegone(src_node);
+                spinhook_nodesmerged(dest_node, src_node);
             }
             node_destroy(src_node);
             if (thisid != 0) {
