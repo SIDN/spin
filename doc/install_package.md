@@ -15,7 +15,7 @@ Architecture depends on your specific router model, you can see which one you ne
 Add the SIDN feed key to opkg:
 
     cd /tmp
-    wget https://valibox.sidnlabs.nl/download/packages/sidn_public.key
+    wget https://valibox.sidnlabs.nl/downloads/packages/sidn_public.key
     opkg-key add sidn_public.key
 
 Update the package feeds:
