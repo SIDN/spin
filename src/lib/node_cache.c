@@ -443,7 +443,7 @@ void node_callback_new(node_cache_t* node_cache, modfunc mf) {
     STAT_VALUE(ctr, nfound);
 }
 
-void node_callback_devices(node_cache_t* node_cache, modfunc mf) {
+void node_callback_devices(node_cache_t* node_cache, cleanfunc mf) {
     tree_entry_t* cur;
     node_t* node;
     int nfound;
@@ -453,7 +453,7 @@ void node_callback_devices(node_cache_t* node_cache, modfunc mf) {
     cur = tree_first(node_cache->mac_refs);
     while (cur != NULL) {
         node = * ((node_t**) cur->data);
-        (*mf)(node);
+        (*mf)(node_cache, node);
         nfound++;
         cur = tree_next(cur);
     }

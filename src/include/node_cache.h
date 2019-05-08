@@ -105,8 +105,10 @@ typedef struct {
 node_cache_t* node_cache_create(void);
 void node_cache_destroy(node_cache_t* node_cache);
 
+typedef void (*cleanfunc)(node_cache_t *, node_t*);
+
 void node_callback_new(node_cache_t *node_cache, modfunc);
-void node_callback_devices(node_cache_t *node_cache, modfunc);
+void node_callback_devices(node_cache_t *node_cache, cleanfunc);
 
 void node_cache_print(node_cache_t* node_cache);
 /*

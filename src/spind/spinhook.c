@@ -85,10 +85,27 @@ spin_data spinhook_json(spin_data arg) {
 }
 
 static void
-node_func(node_t *node) {
+device_flow_remove(node_cache_t *node_cache, tree_t *ftree, tree_entry_t* leaf) {
+    node_t *remnode;
+    int remnodenum;
+
+    remnodenum = * (int *) leaf->key;
+    spin_log(LOG_DEBUG, "Remove flow to %d\n", remnodenum);
+
+    remnode = node_cache_find_by_id(node_cache, remnodenum);
+    assert(remnode != 0);
+    remnode->references--;
+
+    tree_remove_entry(ftree, leaf);
+}
+
+#define MAX_IDLE_PERIODS    10
+
+static void
+device_clean(node_cache_t *node_cache, node_t *node) {
     device_t *dev;
-    tree_entry_t *leaf;
-    int remnode;
+    tree_entry_t *leaf, *nextleaf;
+    int remnodenum;
     devflow_t *dfp;
 
     dev = node->device;
@@ -97,20 +114,33 @@ node_func(node_t *node) {
     spin_log(LOG_DEBUG, "Flows of node %d:\n", node->id);
     leaf = tree_first(dev->dv_flowtree);
     while (leaf != NULL) {
-        remnode = * (int *) leaf->key;
+        nextleaf = tree_next(leaf);
+        remnodenum = * (int *) leaf->key;
         dfp = (devflow_t *) leaf->data;
-        spin_log(LOG_DEBUG, "to node %d: %d %d %d %d\n", remnode,
+        spin_log(LOG_DEBUG, "to node %d: %d %d %d %d\n", remnodenum,
             dfp->dvf_packets, dfp->dvf_bytes,
             dfp->dvf_idleperiods, dfp->dvf_activelastperiod);
 
-        leaf = tree_next(leaf);
+        if (dfp->dvf_activelastperiod) {
+            dfp->dvf_idleperiods = 0;
+            dfp->dvf_activelastperiod = 0;
+        } else {
+            dfp->dvf_idleperiods++;
+            if (dfp->dvf_idleperiods <= MAX_IDLE_PERIODS) {
+                dfp->dvf_activelastperiod = 0;
+            } else {
+                device_flow_remove(node_cache, dev->dv_flowtree, leaf);
+            }
+        }
+
+        leaf = nextleaf;
     }
 }
 
 void
 spinhook_clean(node_cache_t *node_cache) {
 
-    node_callback_devices(node_cache, node_func);
+    node_callback_devices(node_cache, device_clean);
 }
 
 void
