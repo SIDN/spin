@@ -453,6 +453,7 @@ void node_callback_devices(node_cache_t* node_cache, cleanfunc mf) {
     cur = tree_first(node_cache->mac_refs);
     while (cur != NULL) {
         node = * ((node_t**) cur->data);
+        assert(node->device);
         (*mf)(node_cache, node);
         nfound++;
         cur = tree_next(cur);
@@ -634,7 +635,7 @@ void node_cache_clean(node_cache_t* node_cache, uint32_t older_than) {
     while (cur != NULL) {
         node = (node_t*)cur->data;
         next = tree_next(cur);
-        if (node->last_seen < older_than) {
+        if (!node->references && !node->persistent && node->last_seen < older_than) {
             // TODO: signal disappearance to listeners
             node_clean(node_cache, node);
             node_destroy(node);

@@ -25,6 +25,7 @@ void
 spinhook_makedevice(node_t *node) {
     device_t *dev;
 
+    spin_log(LOG_DEBUG, "Promote node %d to device", node->id);
     assert(node->device == 0);
     dev = malloc(sizeof(device_t));
     dev->dv_flowtree = tree_create(cmp_ints);
@@ -108,9 +109,12 @@ device_clean(node_cache_t *node_cache, node_t *node) {
     int remnodenum;
     devflow_t *dfp;
 
+    spin_log(LOG_DEBUG, "Flows of node %d:\n", node->id);
     dev = node->device;
-    if (dev == NULL)
+    if (dev == NULL) {
+        spin_log(LOG_DEBUG, "No device!\n");
         return;
+    }
     spin_log(LOG_DEBUG, "Flows of node %d:\n", node->id);
     leaf = tree_first(dev->dv_flowtree);
     while (leaf != NULL) {
