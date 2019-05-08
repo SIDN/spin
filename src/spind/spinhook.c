@@ -27,7 +27,7 @@ spinhook_makedevice(node_t *node) {
 
     spin_log(LOG_DEBUG, "Promote node %d to device", node->id);
     assert(node->device == 0);
-    dev = malloc(sizeof(device_t));
+    dev = (device_t *) malloc(sizeof(device_t));
     dev->dv_flowtree = tree_create(cmp_ints);
     node->device = dev;
 }
@@ -70,14 +70,20 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes) {
 
 void
 spinhook_traffic(node_t *src_node, node_t *dest_node, int packetcnt, int packetbytes) {
+    int found = 0;
 
     spin_log(LOG_DEBUG, "Traffic %d->%d (%d, %d)\n",
                 src_node->id, dest_node->id, packetcnt, packetbytes);
     if (src_node->device) {
         do_traffic(src_node->device, dest_node, packetcnt, packetbytes);
+        found++;
     }
     if (dest_node->device) {
         do_traffic(dest_node->device, src_node, packetcnt, packetbytes);
+        found++;
+    }
+    if (!found) {
+        spin_log(LOG_ERR, "No device in %d to %d traffic\n", src_node->id, dest_node->id);
     }
 }
 
@@ -115,7 +121,6 @@ device_clean(node_cache_t *node_cache, node_t *node) {
         spin_log(LOG_DEBUG, "No device!\n");
         return;
     }
-    spin_log(LOG_DEBUG, "Flows of node %d:\n", node->id);
     leaf = tree_first(dev->dv_flowtree);
     while (leaf != NULL) {
         nextleaf = tree_next(leaf);
