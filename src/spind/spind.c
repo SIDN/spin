@@ -26,6 +26,7 @@
 #include "spin_log.h"
 #include "core2pubsub.h"
 #include "core2block.h"
+#include "core2extsrc.h"
 #include "core2nflog_dns.h"
 #include "core2conntrack.h"
 
@@ -882,6 +883,8 @@ int main(int argc, char** argv) {
     init_core2nflog_dns(node_cache, dns_cache);
 
     init_core2block();
+
+    init_core2extsrc(node_cache, dns_cache);
 
     init_ipl_list_ar();
 

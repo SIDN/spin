@@ -13,6 +13,7 @@ libspin_a_SOURCES = pkt_info.c \
 					dns.h \
 					dns_cache.h \
 					dns_cache.c \
+					extsrc.c \
 					tree.h \
 					tree.c \
 					node_cache.h \
