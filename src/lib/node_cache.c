@@ -675,10 +675,7 @@ node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
     add_mac_and_name(node_cache, node, ip);
     node_add_ip(node, ip);
     new = node_cache_add_node(node_cache, node);
-    if (!new) {
-        spin_log(LOG_DEBUG, "Node %d not new\n", node->id);
-        return;
-    }
+    assert(new);
 
     // It was new; reread the DHCP leases table, and set the name if it wasn't set yet
     node_names_read_dhcpleases(node_cache->names, "/var/dhcp.leases");

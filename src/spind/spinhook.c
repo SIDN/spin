@@ -150,9 +150,9 @@ spinhook_clean(node_cache_t *node_cache) {
 static void
 node_merge_flow(node_cache_t *node_cache, node_t *node, int srcnodenum, int dstnodenum) {
     device_t *dev;
-    tree_entry_t *leaf;
+    tree_entry_t *srcleaf, *dstleaf;
     int *remnodenump;
-    devflow_t *dfp;
+    devflow_t *dfp, *destdfp;
     node_t *src_node, *dest_node;
     STAT_COUNTER(ctr, merge-flow, STAT_TOTAL);
 
@@ -161,11 +161,11 @@ node_merge_flow(node_cache_t *node_cache, node_t *node, int srcnodenum, int dstn
 
     spin_log(LOG_DEBUG, "Renumber %d->%d in flows(%d) of node %d:\n", srcnodenum, dstnodenum, dev->dv_nflows, node->id);
 
-    leaf = tree_find(dev->dv_flowtree, sizeof(srcnodenum), &srcnodenum);
+    srcleaf = tree_find(dev->dv_flowtree, sizeof(srcnodenum), &srcnodenum);
      
-    STAT_VALUE(ctr, leaf!= NULL);
+    STAT_VALUE(ctr, srcleaf!= NULL);
 
-    if (leaf == NULL) {
+    if (srcleaf == NULL) {
         // Nothing do to  here
         return;
     }
@@ -173,25 +173,44 @@ node_merge_flow(node_cache_t *node_cache, node_t *node, int srcnodenum, int dstn
     // This flow must be renumbered
     spin_log(LOG_DEBUG, "Found entry\n");
 
+    // Merge these two flow numbers if destination also in flowlist
+    dstleaf = tree_find(dev->dv_flowtree, sizeof(dstnodenum), &dstnodenum);
+
     src_node = node_cache_find_by_id(node_cache, srcnodenum);
     assert(src_node != NULL);
-    dest_node = node_cache_find_by_id(node_cache, dstnodenum);
-    assert(dest_node != NULL);
+    assert(src_node->references > 0);
 
-    remnodenump = (int *) leaf->key;
+    remnodenump = (int *) srcleaf->key;
 
-    dfp = (devflow_t *) leaf->data;
-    leaf->key = NULL;
-    leaf->data = NULL;
-    tree_remove_entry(dev->dv_flowtree, leaf);
+    dfp = (devflow_t *) srcleaf->data;
+    srcleaf->key = NULL;
+    srcleaf->data = NULL;
+    tree_remove_entry(dev->dv_flowtree, srcleaf);
     spin_log(LOG_DEBUG, "Removed old leaf\n");
 
-    // Reuse memory of key and data, renumber key
-    *remnodenump = dstnodenum;
-    tree_add(dev->dv_flowtree, sizeof(int), remnodenump, sizeof(devflow_t), dfp, 0);
-    spin_log(LOG_DEBUG, "Added new leaf\n");
+    if (dstleaf != 0) {
+        // Merge the numbers
+        destdfp = (devflow_t *) dstleaf->data;
+        destdfp->dvf_packets += dfp->dvf_packets;;
+        destdfp->dvf_bytes += dfp->dvf_bytes;
+        destdfp->dvf_idleperiods = 0;
+        destdfp->dvf_activelastperiod = 1;
+
+        free(remnodenump);
+        free(dfp);
+
+        dev->dv_nflows--;
+    } else {
+        // Reuse memory of key and data, renumber key
+        dest_node = node_cache_find_by_id(node_cache, dstnodenum);
+        assert(dest_node != NULL);
+
+        *remnodenump = dstnodenum;
+        tree_add(dev->dv_flowtree, sizeof(int), remnodenump, sizeof(devflow_t), dfp, 0);
+        spin_log(LOG_DEBUG, "Added new leaf\n");
+        dest_node->references++;
+    }
     src_node->references--;
-    dest_node->references++;
 }
 
 void
