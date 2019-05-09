@@ -6,20 +6,9 @@
 #include "core2pubsub.h"
 #include "spin_log.h"
 
-void
-spinhook_nodesmerged(node_t *dest_node, node_t *src_node) {
-    spin_data command;
-    spin_data sd;
-    char mosqchan[100];
+#include "statistics.h"
 
-    sd = spin_data_merge(src_node->id, dest_node->id);
-    command = spin_data_create_mqtt_command("nodeMerge", NULL, sd);
-
-    sprintf(mosqchan, "SPIN/traffic/node/%d", dest_node->id);
-    core2pubsub_publish_chan(mosqchan, command, 1);
-
-    spin_data_delete(command);
-}
+STAT_MODULE(spinhook)
 
 void
 spinhook_makedevice(node_t *node) {
@@ -29,6 +18,7 @@ spinhook_makedevice(node_t *node) {
     assert(node->device == 0);
     dev = (device_t *) malloc(sizeof(device_t));
     dev->dv_flowtree = tree_create(cmp_ints);
+    dev->dv_nflows = 0;
     node->device = dev;
 }
 
@@ -38,9 +28,11 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes) {
     int nodeid = node->id;
     devflow_t *dfp;
     int *newint;
+    STAT_COUNTER(ctr, traffic, STAT_TOTAL);
 
-    spin_log(LOG_DEBUG, "do_traffic to node %d (%d,%d)\n", node->id,cnt,bytes);
+    // spin_log(LOG_DEBUG, "do_traffic to node %d (%d,%d)\n", node->id,cnt,bytes);
     leaf = tree_find(dev->dv_flowtree, sizeof(nodeid), &nodeid);
+    STAT_VALUE(ctr, leaf!=NULL);
     if (leaf == NULL) {
         spin_log(LOG_DEBUG, "Create new devflow_t\n");
         dfp = malloc(sizeof(devflow_t));
@@ -54,26 +46,22 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes) {
         // Add flow record indexed by destination nodeid
         // Own the storage here
         tree_add(dev->dv_flowtree, sizeof(int), newint, sizeof(devflow_t), dfp, 0);
+        dev->dv_nflows++;
         // Increase node reference count
         node->references++;
     } else {
-        spin_log(LOG_DEBUG, "Found existing devflow_t\n");
+        // spin_log(LOG_DEBUG, "Found existing devflow_t\n");
         dfp = (devflow_t *) leaf->data;
     }
     dfp->dvf_packets += cnt;
     dfp->dvf_bytes += bytes;
     dfp->dvf_activelastperiod = 1;
-    spin_log(LOG_DEBUG, "dvf: %d %d %d %d\n",
-        dfp->dvf_packets, dfp->dvf_bytes,
-        dfp->dvf_idleperiods, dfp->dvf_activelastperiod);
 }
 
 void
 spinhook_traffic(node_t *src_node, node_t *dest_node, int packetcnt, int packetbytes) {
     int found = 0;
 
-    spin_log(LOG_DEBUG, "Traffic %d->%d (%d, %d)\n",
-                src_node->id, dest_node->id, packetcnt, packetbytes);
     if (src_node->device) {
         do_traffic(src_node->device, dest_node, packetcnt, packetbytes);
         found++;
@@ -95,6 +83,7 @@ static void
 device_flow_remove(node_cache_t *node_cache, tree_t *ftree, tree_entry_t* leaf) {
     node_t *remnode;
     int remnodenum;
+    STAT_COUNTER(ctr, flow-remove, STAT_TOTAL);
 
     remnodenum = * (int *) leaf->key;
     spin_log(LOG_DEBUG, "Remove flow to %d\n", remnodenum);
@@ -104,23 +93,25 @@ device_flow_remove(node_cache_t *node_cache, tree_t *ftree, tree_entry_t* leaf) 
     remnode->references--;
 
     tree_remove_entry(ftree, leaf);
+
+    STAT_VALUE(ctr, 1);
 }
 
 #define MAX_IDLE_PERIODS    10
 
 static void
-device_clean(node_cache_t *node_cache, node_t *node) {
+device_clean(node_cache_t *node_cache, node_t *node, int node1, int node2) {
     device_t *dev;
     tree_entry_t *leaf, *nextleaf;
     int remnodenum;
     devflow_t *dfp;
+    int removed = 0;
+    STAT_COUNTER(ctr, device-clean, STAT_TOTAL);
 
-    spin_log(LOG_DEBUG, "Flows of node %d:\n", node->id);
     dev = node->device;
-    if (dev == NULL) {
-        spin_log(LOG_DEBUG, "No device!\n");
-        return;
-    }
+    assert(dev != NULL);
+
+    spin_log(LOG_DEBUG, "Flows(%d) of node %d:\n", dev->dv_nflows, node->id);
     leaf = tree_first(dev->dv_flowtree);
     while (leaf != NULL) {
         nextleaf = tree_next(leaf);
@@ -139,17 +130,91 @@ device_clean(node_cache_t *node_cache, node_t *node) {
                 dfp->dvf_activelastperiod = 0;
             } else {
                 device_flow_remove(node_cache, dev->dv_flowtree, leaf);
+                dev->dv_nflows--;
+                removed++;
             }
         }
 
         leaf = nextleaf;
     }
+
+    STAT_VALUE(ctr, removed);
 }
 
 void
 spinhook_clean(node_cache_t *node_cache) {
 
-    node_callback_devices(node_cache, device_clean);
+    node_callback_devices(node_cache, device_clean, 0, 0);
+}
+
+static void
+node_merge_flow(node_cache_t *node_cache, node_t *node, int srcnodenum, int dstnodenum) {
+    device_t *dev;
+    tree_entry_t *leaf;
+    int *remnodenump;
+    devflow_t *dfp;
+    node_t *src_node, *dest_node;
+    STAT_COUNTER(ctr, merge-flow, STAT_TOTAL);
+
+    dev = node->device;
+    assert(dev != NULL);
+
+    spin_log(LOG_DEBUG, "Renumber %d->%d in flows(%d) of node %d:\n", srcnodenum, dstnodenum, dev->dv_nflows, node->id);
+
+    leaf = tree_find(dev->dv_flowtree, sizeof(srcnodenum), &srcnodenum);
+     
+    STAT_VALUE(ctr, leaf!= NULL);
+
+    if (leaf == NULL) {
+        // Nothing do to  here
+        return;
+    }
+
+    // This flow must be renumbered
+    spin_log(LOG_DEBUG, "Found entry\n");
+
+    src_node = node_cache_find_by_id(node_cache, srcnodenum);
+    assert(src_node != NULL);
+    dest_node = node_cache_find_by_id(node_cache, dstnodenum);
+    assert(dest_node != NULL);
+
+    remnodenump = (int *) leaf->key;
+
+    dfp = (devflow_t *) leaf->data;
+    leaf->key = NULL;
+    leaf->data = NULL;
+    tree_remove_entry(dev->dv_flowtree, leaf);
+    spin_log(LOG_DEBUG, "Removed old leaf\n");
+
+    // Reuse memory of key and data, renumber key
+    *remnodenump = dstnodenum;
+    tree_add(dev->dv_flowtree, sizeof(int), remnodenump, sizeof(devflow_t), dfp, 0);
+    spin_log(LOG_DEBUG, "Added new leaf\n");
+    src_node->references--;
+    dest_node->references++;
+}
+
+void
+flows_merged(node_cache_t *node_cache, int node1, int node2) {
+
+    node_callback_devices(node_cache, node_merge_flow, node1, node2);
+}
+
+void
+spinhook_nodesmerged(node_cache_t *node_cache, node_t *dest_node, node_t *src_node) {
+    spin_data command;
+    spin_data sd;
+    char mosqchan[100];
+
+    sd = spin_data_merge(src_node->id, dest_node->id);
+    command = spin_data_create_mqtt_command("nodeMerge", NULL, sd);
+
+    sprintf(mosqchan, "SPIN/traffic/node/%d", dest_node->id);
+    core2pubsub_publish_chan(mosqchan, command, 1);
+
+    spin_data_delete(command);
+
+    flows_merged(node_cache, src_node->id, dest_node->id);
 }
 
 void

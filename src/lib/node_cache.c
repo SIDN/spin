@@ -443,18 +443,18 @@ void node_callback_new(node_cache_t* node_cache, modfunc mf) {
     STAT_VALUE(ctr, nfound);
 }
 
-void node_callback_devices(node_cache_t* node_cache, cleanfunc mf) {
+void node_callback_devices(node_cache_t* node_cache, cleanfunc mf, int node1, int node2) {
     tree_entry_t* cur;
     node_t* node;
     int nfound;
-    STAT_COUNTER(ctr, publish-all, STAT_TOTAL);
+    STAT_COUNTER(ctr, publish-device, STAT_TOTAL);
 
     nfound = 0;
     cur = tree_first(node_cache->mac_refs);
     while (cur != NULL) {
         node = * ((node_t**) cur->data);
         assert(node->device);
-        (*mf)(node_cache, node);
+        (*mf)(node_cache, node, node1, node2);
         nfound++;
         cur = tree_next(cur);
     }
@@ -517,28 +517,7 @@ node_cache_print(node_cache_t* node_cache) {
 
 }
 
-#define NEWFIND
 node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* ip) {
-    // TODO: this is very inefficient; we should add a second tree for ip searching
-#ifndef NEWFIND
-    tree_entry_t* cur = tree_first(node_cache->nodes);
-    node_t* node;
-    STAT_COUNTER(ctr, find-by-ip, STAT_TOTAL);
-    int loopcnt=0;
-
-    while (cur != NULL) {
-        loopcnt++;
-        node = (node_t*)cur->data;
-        // can we use a node_has_ip?
-        if (tree_find(node->ips, sizeof(ip_t), ip) != NULL) {
-            STAT_VALUE(ctr, loopcnt);
-            return node;
-        }
-        cur = tree_next(cur);
-    }
-    STAT_VALUE(ctr, loopcnt);
-    return NULL;
-#else
     node_t *node;
     tree_entry_t *leaf;
     STAT_COUNTER(ctr, find-by-ip, STAT_TOTAL);
@@ -552,29 +531,9 @@ node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* i
 
     STAT_VALUE(ctr, 0);
     return NULL;
-#endif
 }
 
 node_t* node_cache_find_by_domain(node_cache_t* node_cache, char* dname) {
-    #ifndef NEWFIND
-    tree_entry_t* cur = tree_first(node_cache->nodes);
-    node_t* node;
-    STAT_COUNTER(ctr, find-by-domain, STAT_TOTAL);
-    int loopcnt=0;
-
-    while (cur != NULL) {
-        loopcnt++;
-        node = (node_t*)cur->data;
-        // can we use a node_has_domain?
-        if (tree_find(node->domains, strlen(dname) + 1, dname) != NULL) {
-            STAT_VALUE(ctr, loopcnt);
-            return node;
-        }
-        cur = tree_next(cur);
-    }
-    STAT_VALUE(ctr, loopcnt);
-    return NULL;
-#else
     node_t *node;
     tree_entry_t *leaf;
     STAT_COUNTER(ctr, find-by-domain, STAT_TOTAL);
@@ -588,7 +547,6 @@ node_t* node_cache_find_by_domain(node_cache_t* node_cache, char* dname) {
 
     STAT_VALUE(ctr, 0);
     return NULL;
-#endif
 }
 
 node_t* node_cache_find_by_id(node_cache_t* node_cache, int node_id) {
@@ -698,25 +656,36 @@ node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
     // todo: add an search-by-ip tree and don't do anything if we
     // have this one already? (do set mac if now known,
     // and update last_seen)
-    node_t* node = node_create(0);
+    node_t* node;
     char* name;
     int new;
     STAT_COUNTER(ctr, add-ip-info, STAT_TOTAL);
 
-    node_set_last_seen(node, timestamp);
+    node = node_cache_find_by_ip(node_cache, sizeof(ip_t),ip);
+    STAT_VALUE(ctr,  node == NULL);
+    if (node != NULL) {
+        node_set_last_seen(node, timestamp);
+        return;
+    }
+
+    // It is new, go through the whole rigmarole
+
+    node = node_create(0);
+    node_set_modified(node, timestamp);
     add_mac_and_name(node_cache, node, ip);
     node_add_ip(node, ip);
     new = node_cache_add_node(node_cache, node);
-    STAT_VALUE(ctr, new);
-    if (new == 1) {
-        // It was new; reread the DHCP leases table, and set the name if it wasn't set yet
-        node_names_read_dhcpleases(node_cache->names, "/var/dhcp.leases");
-        if (node->mac && !node->name) {
-            name = node_names_find_mac(node_cache->names, node->mac);
-            if (name != NULL) {
-                node_set_name(node, name);
-            }
+    if (!new) {
+        spin_log(LOG_DEBUG, "Node %d not new\n", node->id);
+        return;
+    }
 
+    // It was new; reread the DHCP leases table, and set the name if it wasn't set yet
+    node_names_read_dhcpleases(node_cache->names, "/var/dhcp.leases");
+    if (node->mac && !node->name) {
+        name = node_names_find_mac(node_cache->names, node->mac);
+        if (name != NULL) {
+            node_set_name(node, name);
         }
     }
 }
@@ -903,12 +872,17 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
             tree_entry_t *thisleaf;
 
             src_node = nodes_to_merge[i];
+
+            if (src_node->device && dest_node->device) {
+                spin_log(LOG_ERR, "Merge two devices!!!\n");
+            }
+
             thisid = src_node->id;
 
             // spin_log(LOG_DEBUG, "Go and merge node %d into %d\n", thisid, dest_node->id);
             node_merge(node_cache, dest_node, src_node);
             if (thisid != 0) {
-                spinhook_nodesmerged(dest_node, src_node);
+                spinhook_nodesmerged(node_cache, dest_node, src_node);
             }
             node_destroy(src_node);
             if (thisid != 0) {
@@ -919,7 +893,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
                 tree_remove_entry(node_cache->nodes, thisleaf);
             }
         }
-        return 1;
+        return 0;
     }
 
     // ok no shared elements at all, add as a new node
@@ -953,7 +927,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
         leaf = tree_next(leaf);
     }
 
-    return 0;
+    return 1;
 }
 
 flow_list_t* flow_list_create(uint32_t timestamp) {

@@ -19,6 +19,7 @@ typedef struct {
 
 typedef struct {
     tree_t *dv_flowtree;
+    int dv_nflows;
 } device_t;
 
 typedef struct {
@@ -105,10 +106,10 @@ typedef struct {
 node_cache_t* node_cache_create(void);
 void node_cache_destroy(node_cache_t* node_cache);
 
-typedef void (*cleanfunc)(node_cache_t *, node_t*);
+typedef void (*cleanfunc)(node_cache_t *, node_t*, int, int);
 
 void node_callback_new(node_cache_t *node_cache, modfunc);
-void node_callback_devices(node_cache_t *node_cache, cleanfunc);
+void node_callback_devices(node_cache_t *node_cache, cleanfunc, int, int);
 
 void node_cache_print(node_cache_t* node_cache);
 /*
