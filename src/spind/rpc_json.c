@@ -2,15 +2,23 @@
 #include "rpc_json.h"
 #include "spinhook.h"
 
+#include "spin_log.h"
+
 spin_data jsonrpc_blockflow(spin_data arg) {
 
     return spinhook_json(arg);
+}
+
+spin_data jsonrpc_hello(spin_data arg) {
+
+    return cJSON_CreateString("hello world");
 }
 
 struct funclist {
     const char * rpc_name;
     rpcfunc      rpc_func;
 } funclist[] = {
+    { "hello",  jsonrpc_hello },
     { "get_blockflow",    jsonrpc_blockflow },
     { 0, 0}
 };
@@ -107,3 +115,23 @@ call_ubus2json(const char *method, char *args) {
 
     return resultstr;
 }
+
+char *
+call_string_jsonrpc(char *args) {
+    spin_data rpc, json_res;
+    char *resultstr;
+
+    rpc = cJSON_Parse(args);
+
+    spin_log(LOG_DEBUG, "About to call rpc_json\n");
+    json_res = rpc_json(rpc);
+    spin_log(LOG_DEBUG, "Back from call rpc_json\n");
+
+    resultstr = cJSON_PrintUnformatted(json_res);
+
+    cJSON_Delete(rpc);
+    cJSON_Delete(json_res);
+
+    return resultstr;
+}
+
