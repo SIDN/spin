@@ -6,31 +6,6 @@
 
 extern node_cache_t* node_cache;
 
-spin_data jsonrpc_blockflow(spin_data arg) {
-
-    return spinhook_json(arg);
-}
-
-spin_data jsonrpc_devices(spin_data arg) {
-
-    return spin_data_devicelist(node_cache);
-}
-
-spin_data jsonrpc_hello(spin_data arg) {
-
-    return cJSON_CreateString("hello world");
-}
-
-struct funclist {
-    const char * rpc_name;
-    rpcfunc      rpc_func;
-} funclist[] = {
-    { "hello",  jsonrpc_hello },
-    { "get_devices",  jsonrpc_devices },
-    { "get_blockflow",    jsonrpc_blockflow },
-    { 0, 0}
-};
-
 static spin_data
 make_answer(spin_data id) {
     spin_data retobj;
@@ -53,6 +28,49 @@ json_error(spin_data call_info, int errorno) {
     cJSON_AddNumberToObject(errorobj, "error", errorno);
     return errorobj;
 }
+
+spin_data jsonrpc_blockflow(spin_data arg) {
+
+    return spinhook_json(arg);
+}
+
+spin_data jsonrpc_devices(spin_data arg) {
+
+    return spin_data_devicelist(node_cache);
+}
+
+spin_data jsonrpc_deviceflow(spin_data arg) {
+    node_t *node;
+
+    spin_log(LOG_DEBUG, "Start of deviceflow\n");
+    if (!cJSON_IsString(arg)) {
+        spin_log(LOG_DEBUG, "Not a string\n");
+        return NULL;
+    }
+    spin_log(LOG_DEBUG, "Getting node by mac\n");
+    node = node_cache_find_by_mac(node_cache, arg->valuestring);
+    if (node == NULL) {
+        spin_log(LOG_DEBUG, "Not a MAC address\n");
+        return NULL;
+    }
+    return spin_data_flowlist(node);
+}
+
+spin_data jsonrpc_hello(spin_data arg) {
+
+    return cJSON_CreateString("hello world");
+}
+
+struct funclist {
+    const char * rpc_name;
+    rpcfunc      rpc_func;
+} funclist[] = {
+    { "hello",  jsonrpc_hello },
+    { "get_devices",  jsonrpc_devices },
+    { "get_deviceflow",  jsonrpc_deviceflow },
+    { "get_blockflow",    jsonrpc_blockflow },
+    { 0, 0}
+};
 
 spin_data rpc_json(spin_data call_info) {
     spin_data jsonrpc;

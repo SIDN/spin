@@ -533,6 +533,22 @@ node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* i
     return NULL;
 }
 
+node_t* node_cache_find_by_mac(node_cache_t* node_cache, char* macaddr) {
+    node_t *node;
+    tree_entry_t *leaf;
+    STAT_COUNTER(ctr, find-by-mac, STAT_TOTAL);
+
+    leaf = tree_find(node_cache->mac_refs, strlen(macaddr) + 1, macaddr);
+    if (leaf != NULL) {
+        node = * ((node_t**) leaf->data);
+        STAT_VALUE(ctr, 1);
+        return node;
+    }
+
+    STAT_VALUE(ctr, 0);
+    return NULL;
+}
+
 node_t* node_cache_find_by_domain(node_cache_t* node_cache, char* dname) {
     node_t *node;
     tree_entry_t *leaf;
@@ -563,6 +579,9 @@ static void
 node_clean(node_cache_t *node_cache, node_t *node) {
     tree_entry_t *leaf;
 
+    if (node->mac) {
+        cache_tree_remove_mac(node_cache, node->mac);
+    }
     leaf = tree_first(node->ips);
     while (leaf != NULL) {
         ip_t *curip;

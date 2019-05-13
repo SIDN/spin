@@ -167,6 +167,32 @@ spin_data_devicelist(node_cache_t *node_cache) {
     return node_ar_obj;
 }
 
+spin_data
+spin_data_flowlist(node_t *node) {
+    cJSON *flow_ar_obj, *flow_obj;
+    int *nodenump;
+    devflow_t *dfp;
+    tree_entry_t* cur;
+
+    flow_ar_obj = cJSON_CreateArray();
+    if (node->device) {
+        cur = tree_first(node->device->dv_flowtree);
+        while (cur != NULL) {
+            nodenump = (int *) cur->key;
+            dfp = (devflow_t *) cur->data;
+            flow_obj = cJSON_CreateObject();
+            cJSON_AddNumberToObject(flow_obj, "to", *nodenump);
+            cJSON_AddNumberToObject(flow_obj, "packets", dfp->dvf_packets);
+            cJSON_AddNumberToObject(flow_obj, "bytes", dfp->dvf_bytes);
+
+            cJSON_AddItemToArray(flow_ar_obj, flow_obj);
+
+            cur = tree_next(cur);
+        }
+    }
+    return flow_ar_obj;
+}
+
 static node_t *lookup_ip(node_cache_t *node_cache, ip_t *ip, pkt_info_t *pkt_info, char *sd) {
     node_t *result;
 

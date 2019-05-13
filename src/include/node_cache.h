@@ -132,6 +132,7 @@ node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* i
  * if you are looking for a node by its wireformat domain
  */
 node_t* node_cache_find_by_domain(node_cache_t* node_cache, char* dname);
+node_t* node_cache_find_by_mac(node_cache_t* node_cache, char* macaddr);
 node_t* node_cache_find_by_id(node_cache_t* node_cache, int node_id);
 
 /**

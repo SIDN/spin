@@ -209,7 +209,7 @@ node_is_updated(node_t *node) {
     send_command_node_info(node->id, sd);
 }
 
-static void
+void
 publish_nodes() {
 
     // Currently called just before traffic messages
