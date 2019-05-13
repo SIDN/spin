@@ -4,9 +4,16 @@
 
 #include "spin_log.h"
 
+extern node_cache_t* node_cache;
+
 spin_data jsonrpc_blockflow(spin_data arg) {
 
     return spinhook_json(arg);
+}
+
+spin_data jsonrpc_devices(spin_data arg) {
+
+    return spin_data_devicelist(node_cache);
 }
 
 spin_data jsonrpc_hello(spin_data arg) {
@@ -19,6 +26,7 @@ struct funclist {
     rpcfunc      rpc_func;
 } funclist[] = {
     { "hello",  jsonrpc_hello },
+    { "get_devices",  jsonrpc_devices },
     { "get_blockflow",    jsonrpc_blockflow },
     { 0, 0}
 };

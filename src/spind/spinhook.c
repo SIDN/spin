@@ -100,7 +100,7 @@ device_flow_remove(node_cache_t *node_cache, tree_t *ftree, tree_entry_t* leaf) 
 #define MAX_IDLE_PERIODS    10
 
 static void
-device_clean(node_cache_t *node_cache, node_t *node, int node1, int node2) {
+device_clean(node_cache_t *node_cache, node_t *node, void *ap) {
     device_t *dev;
     tree_entry_t *leaf, *nextleaf;
     int remnodenum;
@@ -144,20 +144,25 @@ device_clean(node_cache_t *node_cache, node_t *node, int node1, int node2) {
 void
 spinhook_clean(node_cache_t *node_cache) {
 
-    node_callback_devices(node_cache, device_clean, 0, 0);
+    node_callback_devices(node_cache, device_clean, NULL);
 }
 
 static void
-node_merge_flow(node_cache_t *node_cache, node_t *node, int srcnodenum, int dstnodenum) {
+node_merge_flow(node_cache_t *node_cache, node_t *node, void *ap) {
     device_t *dev;
     tree_entry_t *srcleaf, *dstleaf;
     int *remnodenump;
     devflow_t *dfp, *destdfp;
     node_t *src_node, *dest_node;
     STAT_COUNTER(ctr, merge-flow, STAT_TOTAL);
+    int *nodenumbers = (int *) ap;
+    int srcnodenum, dstnodenum;
 
     dev = node->device;
     assert(dev != NULL);
+
+    srcnodenum = nodenumbers[0];
+    dstnodenum = nodenumbers[1];
 
     spin_log(LOG_DEBUG, "Renumber %d->%d in flows(%d) of node %d:\n", srcnodenum, dstnodenum, dev->dv_nflows, node->id);
 
@@ -215,8 +220,11 @@ node_merge_flow(node_cache_t *node_cache, node_t *node, int srcnodenum, int dstn
 
 void
 flows_merged(node_cache_t *node_cache, int node1, int node2) {
+    int nodenumbers[2];
 
-    node_callback_devices(node_cache, node_merge_flow, node1, node2);
+    nodenumbers[0] = node1;
+    nodenumbers[1] = node2;
+    node_callback_devices(node_cache, node_merge_flow, (void *) nodenumbers);
 }
 
 void

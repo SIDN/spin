@@ -443,7 +443,7 @@ void node_callback_new(node_cache_t* node_cache, modfunc mf) {
     STAT_VALUE(ctr, nfound);
 }
 
-void node_callback_devices(node_cache_t* node_cache, cleanfunc mf, int node1, int node2) {
+void node_callback_devices(node_cache_t* node_cache, cleanfunc mf, void * ap) {
     tree_entry_t* cur;
     node_t* node;
     int nfound;
@@ -454,7 +454,7 @@ void node_callback_devices(node_cache_t* node_cache, cleanfunc mf, int node1, in
     while (cur != NULL) {
         node = * ((node_t**) cur->data);
         assert(node->device);
-        (*mf)(node_cache, node, node1, node2);
+        (*mf)(node_cache, node, ap);
         nfound++;
         cur = tree_next(cur);
     }
@@ -589,17 +589,25 @@ void node_cache_clean(node_cache_t* node_cache, uint32_t older_than) {
     tree_entry_t* next;
     node_t* node;
     size_t deleted = 0;
+    STAT_COUNTER(nretained, old-retained, STAT_TOTAL);
+
     spin_log(LOG_DEBUG, "[cache] clean up cache, timestamp %u\n", older_than);
     while (cur != NULL) {
         node = (node_t*)cur->data;
         next = tree_next(cur);
-        if (!node->references && !node->persistent && node->last_seen < older_than) {
-            // TODO: signal disappearance to listeners
-            node_clean(node_cache, node);
-            node_destroy(node);
-            cur->data = NULL;
-            tree_remove_entry(node_cache->nodes, cur);
-            deleted++;
+        if (node->last_seen < older_than) {
+            if (!node->references && !node->persistent) {
+                spinhook_nodedeleted(node_cache, node);
+
+                node_clean(node_cache, node);
+                node_destroy(node);
+                cur->data = NULL;
+                tree_remove_entry(node_cache->nodes, cur);
+                deleted++;
+                STAT_VALUE(nretained, 1);
+            } else {
+                STAT_VALUE(nretained, 0);
+            }
         }
         cur = next;
     }

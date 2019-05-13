@@ -19,4 +19,5 @@ spin_data spin_data_dns_query_pkt_info(node_cache_t* node_cache, dns_pkt_info_t*
 spin_data spin_data_create_mqtt_command(const char* command, char* argument, spin_data result);
 spin_data spin_data_create_traffic(node_cache_t* node_cache, flow_list_t* flow_list, uint32_t timestamp);
 spin_data spin_data_nodepairtree(tree_t* tree);
+spin_data spin_data_devicelist(node_cache_t *node_cache);
 #endif

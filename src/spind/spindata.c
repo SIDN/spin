@@ -143,6 +143,30 @@ spin_data_noderef(node_t *node) {
     return nodeobj;
 }
 
+static void
+device_node(node_cache_t *node_cache, node_t *node, void *ap) {
+    cJSON *arobj = (cJSON *) ap;
+    spin_data nodeobj;
+
+    spin_log(LOG_DEBUG, "device_node node %d %p\n", node->id, ap);
+    nodeobj = spin_data_node(node);
+    cJSON_AddItemToArray(arobj, nodeobj);
+    spin_log(LOG_DEBUG, "end device_node\n");
+}
+
+spin_data
+spin_data_devicelist(node_cache_t *node_cache) {
+    cJSON *node_ar_obj;
+
+    spin_log(LOG_DEBUG, "device_list\n");
+    node_ar_obj = cJSON_CreateArray();
+    spin_log(LOG_DEBUG, "go callback %p\n", node_ar_obj);
+    node_callback_devices(node_cache, device_node, (void *) node_ar_obj);
+    spin_log(LOG_DEBUG, "end device_list\n");
+
+    return node_ar_obj;
+}
+
 static node_t *lookup_ip(node_cache_t *node_cache, ip_t *ip, pkt_info_t *pkt_info, char *sd) {
     node_t *result;
 
