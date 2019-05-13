@@ -42,12 +42,22 @@ spin_data_delete(spin_data sd) {
 }
 
 spin_data
-spin_data_merge(int node1, int node2) {
+spin_data_nodes_merged(int node1, int node2) {
     cJSON *resobj;
 
     resobj = cJSON_CreateObject();
     cJSON_AddNumberToObject(resobj, "id", node1);
     cJSON_AddNumberToObject(resobj, "merged-to", node2);
+
+    return resobj;
+}
+
+spin_data
+spin_data_node_deleted(int node) {
+    cJSON *resobj;
+
+    resobj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(resobj, "id", node);
 
     return resobj;
 }

@@ -220,18 +220,39 @@ flows_merged(node_cache_t *node_cache, int node1, int node2) {
 }
 
 void
+spinhook_nodedeleted(node_cache_t *node_cache, node_t *node) {
+    spin_data command;
+    spin_data sd;
+    char mosqchan[100];
+
+    sd = spin_data_node_deleted(node->id);
+    command = spin_data_create_mqtt_command("nodeDeleted", NULL, sd);
+
+    sprintf(mosqchan, "SPIN/admin");
+    core2pubsub_publish_chan(mosqchan, command, 0);
+
+    sprintf(mosqchan, "SPIN/traffic/node/%d", node->id);
+    core2pubsub_publish_chan(mosqchan, NULL, 1);
+
+    spin_data_delete(command);
+}
+
+void
 spinhook_nodesmerged(node_cache_t *node_cache, node_t *dest_node, node_t *src_node) {
     spin_data command;
     spin_data sd;
     char mosqchan[100];
 
-    sd = spin_data_merge(src_node->id, dest_node->id);
+    sd = spin_data_nodes_merged(src_node->id, dest_node->id);
     command = spin_data_create_mqtt_command("nodeMerge", NULL, sd);
 
-    sprintf(mosqchan, "SPIN/traffic/node/%d", dest_node->id);
-    core2pubsub_publish_chan(mosqchan, command, 1);
+    sprintf(mosqchan, "SPIN/admin");
+    core2pubsub_publish_chan(mosqchan, command, 0);
 
     spin_data_delete(command);
+
+    sprintf(mosqchan, "SPIN/traffic/node/%d", src_node->id);
+    core2pubsub_publish_chan(mosqchan, NULL, 1);
 
     flows_merged(node_cache, src_node->id, dest_node->id);
 }

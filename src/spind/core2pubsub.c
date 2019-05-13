@@ -47,13 +47,16 @@ void core2pubsub_publish_chan(char *channel, spin_data sd, int retain) {
         channel = mqtt_channel_traffic;
     }
 
-    message = spin_data_serialize(sd);
-    message_len = strlen(message);
-    STAT_VALUE(ctr, message_len);
-
-    pubsub_publish(channel, message_len, message, retain);
-
-    spin_data_ser_delete(message);
+    if (sd != NULL) {
+        message = spin_data_serialize(sd);
+        message_len = strlen(message);
+        STAT_VALUE(ctr, message_len);
+        pubsub_publish(channel, message_len, message, retain);
+        spin_data_ser_delete(message);
+    } else {
+        // Empty message to retain
+        pubsub_publish(channel, 0, "", retain);
+    }
 }
 
 

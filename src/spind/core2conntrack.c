@@ -104,7 +104,7 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
     uint32_t now = time(NULL);
     STAT_COUNTER(ctr, callback, STAT_TOTAL);
     STAT_COUNTER(ctrsf, sendflow, STAT_TOTAL);
-    STAT_COUNTER(ctrlocal, ignore-local, STAT_TOTAL);
+    STAT_COUNTER(ctrlocal, cb-ignore-local, STAT_TOTAL);
     STAT_COUNTER(ctrignore, ignore-ip, STAT_TOTAL);
 
     STAT_VALUE(ctr, 1);

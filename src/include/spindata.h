@@ -10,7 +10,8 @@ char *spin_data_serialize(spin_data sd);
 void spin_data_ser_delete(char *str);
 void spin_data_delete(spin_data sd);
 
-spin_data spin_data_merge(int node1, int node2);
+spin_data spin_data_nodes_merged(int node1, int node2);
+spin_data spin_data_node_deleted(int node);
 spin_data spin_data_ipar(tree_t *iptree);
 spin_data spin_data_node(node_t* node);
 spin_data spin_data_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info);
