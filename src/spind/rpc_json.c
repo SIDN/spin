@@ -23,8 +23,6 @@ json_error(spin_data call_info, int errorno) {
 
     idobj = cJSON_GetObjectItemCaseSensitive(call_info, "id");
     errorobj = make_answer(idobj);
-    // This should not be present I think
-    // cJSON_AddNullToObject(errorobj, "result");
     cJSON_AddNumberToObject(errorobj, "error", errorno);
     return errorobj;
 }
@@ -37,15 +35,12 @@ spin_data jsonrpc_devices(spin_data arg) {
 spin_data jsonrpc_deviceflow(spin_data arg) {
     node_t *node;
 
-    spin_log(LOG_DEBUG, "Start of deviceflow\n");
+    // Argument is string with MAC-address
     if (!cJSON_IsString(arg)) {
-        spin_log(LOG_DEBUG, "Not a string\n");
         return NULL;
     }
-    spin_log(LOG_DEBUG, "Getting node by mac\n");
     node = node_cache_find_by_mac(node_cache, arg->valuestring);
     if (node == NULL) {
-        spin_log(LOG_DEBUG, "Not a MAC address\n");
         return NULL;
     }
     return spin_data_flowlist(node);
@@ -143,9 +138,9 @@ call_string_jsonrpc(char *args) {
 
     rpc = cJSON_Parse(args);
 
-    spin_log(LOG_DEBUG, "About to call rpc_json\n");
+    // spin_log(LOG_DEBUG, "About to call rpc_json\n");
     json_res = rpc_json(rpc);
-    spin_log(LOG_DEBUG, "Back from call rpc_json\n");
+    // spin_log(LOG_DEBUG, "Back from call rpc_json\n");
 
     resultstr = cJSON_PrintUnformatted(json_res);
 

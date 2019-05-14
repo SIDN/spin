@@ -352,6 +352,7 @@ node_merge(node_cache_t *node_cache, node_t* dest, node_t* src) {
         cur = tree_next(cur);
     }
     STAT_VALUE(domain_size, tree_size(dest->domains));
+
     STAT_VALUE(modded, modified);
     if (modified) {
         dest->modified = 1;
@@ -517,12 +518,12 @@ node_cache_print(node_cache_t* node_cache) {
 
 }
 
-node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* ip) {
+node_t* node_cache_find_by_mac(node_cache_t* node_cache, char* macaddr) {
     node_t *node;
     tree_entry_t *leaf;
-    STAT_COUNTER(ctr, find-by-ip, STAT_TOTAL);
+    STAT_COUNTER(ctr, find-by-mac, STAT_TOTAL);
 
-    leaf = tree_find(node_cache->ip_refs, sizeof(ip_t), ip);
+    leaf = tree_find(node_cache->mac_refs, strlen(macaddr) + 1, macaddr);
     if (leaf != NULL) {
         node = * ((node_t**) leaf->data);
         STAT_VALUE(ctr, 1);
@@ -533,12 +534,12 @@ node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* i
     return NULL;
 }
 
-node_t* node_cache_find_by_mac(node_cache_t* node_cache, char* macaddr) {
+node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* ip) {
     node_t *node;
     tree_entry_t *leaf;
-    STAT_COUNTER(ctr, find-by-mac, STAT_TOTAL);
+    STAT_COUNTER(ctr, find-by-ip, STAT_TOTAL);
 
-    leaf = tree_find(node_cache->mac_refs, strlen(macaddr) + 1, macaddr);
+    leaf = tree_find(node_cache->ip_refs, sizeof(ip_t), ip);
     if (leaf != NULL) {
         node = * ((node_t**) leaf->data);
         STAT_VALUE(ctr, 1);
@@ -615,7 +616,7 @@ void node_cache_clean(node_cache_t* node_cache, uint32_t older_than) {
         node = (node_t*)cur->data;
         next = tree_next(cur);
         if (node->last_seen < older_than) {
-            if (!node->references && !node->persistent) {
+            if (!node->device && !node->references && !node->persistent) {
                 spinhook_nodedeleted(node_cache, node);
 
                 node_clean(node_cache, node);
