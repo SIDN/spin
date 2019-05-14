@@ -9,7 +9,9 @@
 // int local_mode: set to 1 to not ignore this device's data
 //
 // We may want to add some options here (such as a configurable queue number)
-void init_core2conntrack(node_cache_t* node_cache, int local_mode);
+
+typedef void (*trafficfunc)(node_cache_t *, node_t *, node_t *, int, int);
+void init_core2conntrack(node_cache_t* node_cache, int local_mode, trafficfunc);
 void cleanup_core2conntrack();
 
 #endif

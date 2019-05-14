@@ -967,7 +967,7 @@ int main(int argc, char** argv) {
 
     init_cache();
 
-    init_core2conntrack(node_cache, local_mode);
+    init_core2conntrack(node_cache, local_mode, spinhook_traffic);
     init_core2nflog_dns(node_cache, dns_cache);
 
     init_core2block();

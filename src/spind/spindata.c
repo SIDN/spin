@@ -222,10 +222,8 @@ spin_data_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info) {
     ip.family = pkt_info->family;
     memcpy(ip.addr, pkt_info->src_addr, 16);
     src_node = lookup_ip(node_cache, &ip, pkt_info, "src");
-    // src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
     memcpy(ip.addr, pkt_info->dest_addr, 16);
     dest_node = lookup_ip(node_cache, &ip, pkt_info, "dst");
-    // dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
     if (src_node == NULL || dest_node == NULL) {
         return 0;
     }
@@ -243,7 +241,7 @@ spin_data_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info) {
     cJSON_AddNumberToObject(pktobj, "size", pkt_info->payload_size);
     cJSON_AddNumberToObject(pktobj, "count", pkt_info->packet_count);
 
-    spinhook_traffic(src_node, dest_node, pkt_info->packet_count, pkt_info->payload_size);
+    // spinhook_traffic(src_node, dest_node, pkt_info->packet_count, pkt_info->payload_size);
 
     STAT_VALUE(totalsd, 1);
     return(pktobj);

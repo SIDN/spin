@@ -59,7 +59,7 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes) {
 }
 
 void
-spinhook_traffic(node_t *src_node, node_t *dest_node, int packetcnt, int packetbytes) {
+spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, int packetcnt, int packetbytes) {
     int found = 0;
 
     if (src_node->device) {
@@ -72,6 +72,8 @@ spinhook_traffic(node_t *src_node, node_t *dest_node, int packetcnt, int packetb
     }
     if (!found) {
         spin_log(LOG_ERR, "No device in %d to %d traffic\n", src_node->id, dest_node->id);
+
+        // Probably ARP cache must be reread and acted upon here
     }
 }
 

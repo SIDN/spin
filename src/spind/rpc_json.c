@@ -99,10 +99,13 @@ spin_data rpc_json(spin_data call_info) {
 
     jsonretval = (*p->rpc_func)(jsonparams);
 
-    jsonanswer = make_answer(jsonid);
-    cJSON_AddItemToObject(jsonanswer, "result", jsonretval);
+    if (jsonid != 0) {
+        jsonanswer = make_answer(jsonid);
+        cJSON_AddItemToObject(jsonanswer, "result", jsonretval);
+        return jsonanswer;
+    }
 
-    return jsonanswer;
+    return NULL;
 }
 
 char *
