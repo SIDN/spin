@@ -75,10 +75,6 @@ spinhook_traffic(node_t *src_node, node_t *dest_node, int packetcnt, int packetb
     }
 }
 
-spin_data spinhook_json(spin_data arg) {
-    return arg;
-}
-
 static void
 device_flow_remove(node_cache_t *node_cache, tree_t *ftree, tree_entry_t* leaf) {
     node_t *remnode;
@@ -98,6 +94,7 @@ device_flow_remove(node_cache_t *node_cache, tree_t *ftree, tree_entry_t* leaf) 
 }
 
 #define MAX_IDLE_PERIODS    10
+#define MIN_DEV_NEIGHBOURS  5
 
 static void
 device_clean(node_cache_t *node_cache, node_t *node, void *ap) {
@@ -122,17 +119,15 @@ device_clean(node_cache_t *node_cache, node_t *node, void *ap) {
             dfp->dvf_idleperiods, dfp->dvf_activelastperiod);
 
         if (dfp->dvf_activelastperiod) {
-            dfp->dvf_idleperiods = 0;
+            dfp->dvf_idleperiods = -1;
             dfp->dvf_activelastperiod = 0;
-        } else {
-            dfp->dvf_idleperiods++;
-            if (dfp->dvf_idleperiods <= MAX_IDLE_PERIODS) {
-                dfp->dvf_activelastperiod = 0;
-            } else {
-                device_flow_remove(node_cache, dev->dv_flowtree, leaf);
-                dev->dv_nflows--;
-                removed++;
-            }
+        }
+
+        dfp->dvf_idleperiods++;
+        if (dev->dv_nflows > MIN_DEV_NEIGHBOURS && dfp->dvf_idleperiods > MAX_IDLE_PERIODS) {
+            device_flow_remove(node_cache, dev->dv_flowtree, leaf);
+            dev->dv_nflows--;
+            removed++;
         }
 
         leaf = nextleaf;
