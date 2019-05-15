@@ -28,7 +28,7 @@ Build dependencies:
 - make
 - autoconf
 - libnfnetlink-dev
-- linux-headers-<version>
+- linux-headers-&lt;version&gt;
 
     `apt-get install gcc make autoconf libnfnetlink-dev libmnl-dev libnetfilter-queue-dev`
 
@@ -53,7 +53,7 @@ Lua dependencies (for client tooling and message broker):
 
 
 Runtime dependencies:
-- mosquitto (for spin_mqtt.lua)
+- mosquitto (or any MQTT software that supports websockets as well)
 
 
 Run in the source dir:
@@ -64,22 +64,11 @@ Run in the source dir:
     make
 ```
 
-After this step is complete, the following files are available:
-- kernelmod/spin.ko
-A loadable linux kernel module
-- src/spin_print
-A test tool that prints messages sent by the kernel module
-- src/spin_config
-A simple configuration tool for the kernel module (note: there is a lua version that has more features)
+After this step is complete, you can find the spin daemon in the spind directory. The tools/spin_print and tools/spin_config tools are supporting tools for older versions and deprectaed in the latest release.
 
-The lua/ directory has a number of lua tools and programs:
-- spin_mqtt.lua
-This is the main SPIN daemon; it reads data from the kernel module and passes it on to the topic SPIN/traffic on the message broker running on localhost
-- spin_config.lua
-A config tool similar to the C version in src/, but has a few more features.
-- spin_print.lua
-A print test tool similar to the C version in src/.
+SPIN sends its data to MQTT, which any MQTT client can then read. A web-based client ('the bubble app') can be found in `src/web_ui/static/spin_api/`, the main HTML file is `graph.html`, and depending on where you host it, you can access it from a browser with the URL `file://<path>/graph.html?mqtt_host=<ip address of MQTT server>`.
 
+src/web_ui also contains a small web API server that uses lua-minithttp, with currently a limited subset of the intended functionality; we are working on RPC calls that will then be exposed to the web API.
 
 ## For OpenWRT
 
@@ -109,38 +98,30 @@ http://192.168.8.1/www/spin/graph.html to see it in action.
 When installed locally, a few manual steps are required:
 
 1. Configure and start an MQTT service; this needs to listen to port 1883 (mqtt) and 1884 (websockets protocol).
-2. Load the kernel module `insmod kernelmod/spin.ko`
-3. (optional) configure the kernel module with `lua/spin_config.lua`
-4. Start the spin daemon `lua/spin_mqtt.lua`
-5. Edit `html/js/mqtt_client.js` and change the ip address on the first line to `127.0.0.1`
-6. Open `html/graph.html` in a browser
+2. Load the relevant kernel modules: `modprobe nf_conntrack_ipv4 nf_conntrack_ipv6 nfnetlink_log nfnetlink_queue`
+3. Enable conntrack accounting: `sysctl net.netfilter.nf_conntrack_acct=1`
+4. Start the spin daemon `spind/spind -l -o -m <mqtt_host>`
+5. Load the spin bubble app by visiting `file::///<path>/web_ui/static/spin_api/graph.html?mqtt_host=<mqtt host>`
 
-
+mqtt host defaults to 127.0.0.1 for the daemon, and to 192.168.8.1 for graph.html
 
 # High-level technical overview
 
 The software contains three parts:
 
-- a kernel module collector that reads packet traffic data
-- a user-space daemon that aggregates that data, sends it to an mqtt broker, and controls the kernel module
+- a daemon that aggregates traffic and DNS information (with nf_conntract and nflog) and sends it to MQTT
 - a html/javascript front-end for the user
-- a RESTful API
+- a RESTful API (currently only a subset of the intended funcitonality)
 
-The kernel module hooks into the packet filter system, and tracks packets on the forwarding and outgoing paths; it will report about this traffic on a netlink port, to which the user-space daemon can connect. The information it reports comprises three separate elements:
-
+The information that is sent to MQTT contains the following types:
 * Traffic: information about traffic itself, source address, destination address, ports, and payload sizes
 * Blocked: information about traffic that was blocked (by SPIN, not by the general firewall)
 * DNS: domain names that have been resolved into IP addresses (so the visualizer can show which domain names were used to initiate traffic)
 
-The user-space daemon connects to the kernel module and sends the information to a local MQTT broker. It will send this information to the topic SPIN/traffic, in the form of JSON data.
-The daemon will also listen for configuration commands in the topic SPIN/commands.
+The daemon will also listen for configuration commands in the MQTT topic SPIN/commands. This will be replaces by RPC calls in the near future.
 
 
 # Data protocols and APIs
-
-## Kernel module to userspace programs
-
-For the communication protocol between a user-space program and the kernel module, see [doc/netlink_protocol.md](doc/netlink_protocol.md).
 
 ## MQTT messages
 
