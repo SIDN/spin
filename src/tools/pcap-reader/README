@@ -1,45 +1,42 @@
 
 	pcap-reader:
-	Parse a pcap file and emit (almost) SPIN-compatible JSON
+	Parse a pcap file and communicate results to spind
 
 
 ==> Introduction
 
-The program in this repository parses a PCAP file and prints SPIN-compatible
-JSON (with some caveats) to stdout.
-
-The run.sh script is provided for convenience. The script pipes the output of
-the program to mosquitto_pub such that the JSON will be published immediately to
-the ``SPIN/traffic'' MQTT channel.
-
-Caveats:
- * This program currently does not know anything about SPIN node ID's; all
-   ``nodes'' have ID 1. The SPIN ``bolletjesapp'' does not like this at all.
+The program in this repository parses a PCAP file and communicates its findings
+to spind through a socket.
 
 
 ==> Dependencies
 
- * libldns
  * libpcap
 
 
 ==> Compiling the program
 
-  $ make -f Makefile.Debian	# or Makefile.OpenBSD if using OpenBSD
+Make sure you passed --enable-pcap-reader to the SPIN configure script. Once
+you've done that, you can run make in this directory to build pcap-reader.
+
+  $ cd spin/src/
+  $ autoreconf --install
+  $ ./configure --enable-pcap-reader
+  $ make
+  $ cd tools/pcap-reader/
+  $ make
 
 
 ==> Usage
 
-Parse file.pcap. The JSON output will be published to the ``SPIN/traffic'' MQTT
-channel on the server running at 192.168.8.1.
+Parse file.pcap.
 
-  $ ./run.sh file.pcap 192.168.8.1
+  $ sudo ./pcap-reader -r file.pcap
 
-Parse file.pcap. The JSON will be printed to stdout.
+Listen on eth0.
 
-  $ ./pcap -r file.pcap
+  $ sudo ./pcap-reader -i eth0
 
-Listen on eth0. The JSON output will be printed to stdout.
-
-  $ sudo ./pcap -i eth0
+Note: for now, it is necessary to run pcap-reader as root. This is because the
+socket created by spind can only be written to by the root user.
 
