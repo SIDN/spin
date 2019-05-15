@@ -10,7 +10,7 @@
 //
 // We may want to add some options here (such as a configurable queue number)
 
-typedef void (*trafficfunc)(node_cache_t *, node_t *, node_t *, int, int);
+typedef void (*trafficfunc)(node_cache_t *, node_t *, node_t *, int, int, uint32_t);
 void init_core2conntrack(node_cache_t* node_cache, int local_mode, trafficfunc);
 void cleanup_core2conntrack();
 

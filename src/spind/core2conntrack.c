@@ -137,7 +137,7 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
 
         if (src_node != NULL && dest_node != NULL) {
             // Inform flow accounting layer
-            (*cb_data->traffic_hook)(cb_data->node_cache, src_node, dest_node, pkt_info.packet_count, pkt_info.payload_size);
+            (*cb_data->traffic_hook)(cb_data->node_cache, src_node, dest_node, pkt_info.packet_count, pkt_info.payload_size, now);
 
             // small experiment, try to ignore messages from and to
             // this device, unless local_mode is set

@@ -679,6 +679,37 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
     // spin_log(LOG_DEBUG, "[XX] mac at %p\n", node->mac);
 }
 
+void
+node_cache_update_arp(node_cache_t *node_cache, uint32_t timestamp) {
+    tree_entry_t* leaf;
+    node_t *node;
+    char *mac;
+    ip_t *ip;
+
+    // Code called when arp table seems out of date
+
+    arp_table_read(node_cache->arp_table);
+
+    // Make sure all mac addresses are in node table
+
+    leaf = tree_first(node_cache->arp_table->entries);
+    spin_log(LOG_DEBUG, "[arp table reread]\n");
+    while (leaf != NULL) {
+        mac = (char *) leaf->data;
+        node = node_cache_find_by_mac(node_cache, mac);
+        if (node == NULL) {
+            ip = (ip_t *) leaf->key;
+            // New MAC address
+            node = node_create(0);
+            node_set_modified(node, timestamp);
+            add_mac_and_name(node_cache, node, ip);
+            node_add_ip(node, ip);
+            (void) node_cache_add_node(node_cache, node);
+        }
+        leaf = tree_next(leaf);
+    }
+}
+
 static void
 node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
     // todo: add an search-by-ip tree and don't do anything if we

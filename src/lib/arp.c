@@ -29,7 +29,6 @@ void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
     tree_add(arp_table->entries, sizeof(ip_t), &ip, strlen(mac) + 1, mac, 1);
 }
 
-
 void arp_table_read(arp_table_t* arp_table) {
     FILE *fp;
     char ip[INET6_ADDRSTRLEN];

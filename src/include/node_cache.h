@@ -13,6 +13,7 @@
 typedef struct {
     int     dvf_packets;
     int     dvf_bytes;
+    uint32_t dvf_timestamp;
     int     dvf_idleperiods;
     int     dvf_activelastperiod;
 } devflow_t;
@@ -111,6 +112,7 @@ typedef void (*cleanfunc)(node_cache_t *, node_t*, void *);
 void node_callback_new(node_cache_t *node_cache, modfunc);
 void node_callback_devices(node_cache_t *node_cache, cleanfunc, void *);
 
+void node_cache_update_arp(node_cache_t *node_cache, uint32_t timestamp);
 void node_cache_print(node_cache_t* node_cache);
 /*
 

@@ -23,7 +23,7 @@ spinhook_makedevice(node_t *node) {
 }
 
 void
-do_traffic(device_t *dev, node_t *node, int cnt, int bytes) {
+do_traffic(device_t *dev, node_t *node, int cnt, int bytes, uint32_t timestamp) {
     tree_entry_t *leaf;
     int nodeid = node->id;
     devflow_t *dfp;
@@ -38,6 +38,7 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes) {
         dfp = malloc(sizeof(devflow_t));
         dfp->dvf_packets = 0;
         dfp->dvf_bytes = 0;
+        dfp->dvf_timestamp = 0;
         dfp->dvf_idleperiods = 0;
         dfp->dvf_activelastperiod = 0;
 
@@ -55,25 +56,27 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes) {
     }
     dfp->dvf_packets += cnt;
     dfp->dvf_bytes += bytes;
+    dfp->dvf_timestamp = timestamp;
     dfp->dvf_activelastperiod = 1;
 }
 
 void
-spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, int packetcnt, int packetbytes) {
+spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, int packetcnt, int packetbytes, uint32_t timestamp) {
     int found = 0;
 
     if (src_node->device) {
-        do_traffic(src_node->device, dest_node, packetcnt, packetbytes);
+        do_traffic(src_node->device, dest_node, packetcnt, packetbytes, timestamp);
         found++;
     }
     if (dest_node->device) {
-        do_traffic(dest_node->device, src_node, packetcnt, packetbytes);
+        do_traffic(dest_node->device, src_node, packetcnt, packetbytes, timestamp);
         found++;
     }
     if (!found) {
         spin_log(LOG_ERR, "No device in %d to %d traffic\n", src_node->id, dest_node->id);
 
         // Probably ARP cache must be reread and acted upon here
+        node_cache_update_arp(node_cache, timestamp);
     }
 }
 
