@@ -896,7 +896,6 @@ void init_cache() {
     dns_cache = dns_cache_create();
     node_cache = node_cache_create();
 
-    spinhook_init();
     mainloop_register("node_cache_clean", node_cache_clean_wf, (void *) 0, 0, CLEAN_TIMEOUT);
 }
 

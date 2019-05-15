@@ -91,7 +91,9 @@ and the second one is get_deviceflow:
 	 "jsonrpc": "2.0",
 	 "id": 82542,
 	 "method": "get_deviceflow",
-	 "params": "c0:e8:62:2d:cc:12"
+	 "params": {
+	 	"device": "c0:e8:62:2d:cc:12"
+	 }
 	}
 
 giving:

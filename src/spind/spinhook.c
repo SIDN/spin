@@ -90,6 +90,7 @@ device_flow_remove(node_cache_t *node_cache, tree_t *ftree, tree_entry_t* leaf) 
     assert(remnode != 0);
     remnode->references--;
 
+    // This also frees key and data
     tree_remove_entry(ftree, leaf);
 
     STAT_VALUE(ctr, 1);
@@ -263,8 +264,4 @@ spinhook_nodesmerged(node_cache_t *node_cache, node_t *dest_node, node_t *src_no
     core2pubsub_publish_chan(mosqchan, NULL, 1);
 
     flows_merged(node_cache, src_node->id, dest_node->id);
-}
-
-void
-spinhook_init() {
 }

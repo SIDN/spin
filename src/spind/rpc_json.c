@@ -147,9 +147,7 @@ call_string_jsonrpc(char *args) {
 
     rpc = cJSON_Parse(args);
 
-    // spin_log(LOG_DEBUG, "About to call rpc_json\n");
     json_res = rpc_json(rpc);
-    // spin_log(LOG_DEBUG, "Back from call rpc_json\n");
 
     resultstr = cJSON_PrintUnformatted(json_res);
 
