@@ -32,9 +32,11 @@ spin_data jsonrpc_devices(spin_data arg) {
     return spin_data_devicelist(node_cache);
 }
 
-spin_data jsonrpc_deviceflow(spin_data arg) {
+spin_data jsonrpc_deviceflow(spin_data params) {
     node_t *node;
+    spin_data arg;
 
+    arg = cJSON_GetObjectItemCaseSensitive(params, "device");
     // Argument is string with MAC-address
     if (!cJSON_IsString(arg)) {
         return NULL;
@@ -86,6 +88,10 @@ spin_data rpc_json(spin_data call_info) {
     method = jsonmethod->valuestring;
 
     jsonparams = cJSON_GetObjectItemCaseSensitive(call_info, "params");
+
+    if (jsonparams != NULL && !cJSON_IsObject(jsonparams)) {
+        return json_error(call_info, 1);
+    }
 
     for (p=funclist; p->rpc_name; p++) {
         if (strcmp(p->rpc_name, method) == 0) {
