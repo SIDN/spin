@@ -179,6 +179,7 @@ spin_data_flowlist(node_t *node) {
             cJSON_AddNumberToObject(flow_obj, "to", *nodenump);
             cJSON_AddNumberToObject(flow_obj, "packets", dfp->dvf_packets);
             cJSON_AddNumberToObject(flow_obj, "bytes", dfp->dvf_bytes);
+            cJSON_AddNumberToObject(flow_obj, "lastseen", dfp->dvf_lastseen);
 
             cJSON_AddItemToArray(flow_ar_obj, flow_obj);
 

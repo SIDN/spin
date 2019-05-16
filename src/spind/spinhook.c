@@ -38,7 +38,7 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes, uint32_t timestamp) 
         dfp = malloc(sizeof(devflow_t));
         dfp->dvf_packets = 0;
         dfp->dvf_bytes = 0;
-        dfp->dvf_timestamp = 0;
+        dfp->dvf_lastseen = 0;
         dfp->dvf_idleperiods = 0;
         dfp->dvf_activelastperiod = 0;
 
@@ -56,7 +56,7 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes, uint32_t timestamp) 
     }
     dfp->dvf_packets += cnt;
     dfp->dvf_bytes += bytes;
-    dfp->dvf_timestamp = timestamp;
+    dfp->dvf_lastseen = timestamp;
     dfp->dvf_activelastperiod = 1;
 }
 
@@ -64,7 +64,7 @@ void
 spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, int packetcnt, int packetbytes, uint32_t timestamp) {
     int found = 0;
 
-    if (src_node == dst_node) {
+    if (src_node == dest_node) {
         // Probably internal stuff
         return;
     }

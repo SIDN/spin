@@ -13,7 +13,7 @@
 typedef struct {
     int     dvf_packets;
     int     dvf_bytes;
-    uint32_t dvf_timestamp;
+    uint32_t dvf_lastseen;
     int     dvf_idleperiods;
     int     dvf_activelastperiod;
 } devflow_t;
