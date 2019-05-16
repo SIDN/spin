@@ -4,6 +4,7 @@
 #include "node_cache.h"
 #include "spin_log.h"
 
+#include "spinhook.h"
 #include "spindata.h"
 
 #include "statistics.h"
@@ -38,6 +39,27 @@ spin_data_delete(spin_data sd) {
 
     STAT_VALUE(totalsd, -1);
     cJSON_Delete(sd);
+}
+
+spin_data
+spin_data_nodes_merged(int node1, int node2) {
+    cJSON *resobj;
+
+    resobj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(resobj, "id", node1);
+    cJSON_AddNumberToObject(resobj, "merged-to", node2);
+
+    return resobj;
+}
+
+spin_data
+spin_data_node_deleted(int node) {
+    cJSON *resobj;
+
+    resobj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(resobj, "id", node);
+
+    return resobj;
 }
 
 //  Also needed for lists
@@ -121,6 +143,52 @@ spin_data_noderef(node_t *node) {
     return nodeobj;
 }
 
+static void
+device_node(node_cache_t *node_cache, node_t *node, void *ap) {
+    cJSON *arobj = (cJSON *) ap;
+    spin_data nodeobj;
+
+    nodeobj = spin_data_node(node);
+    cJSON_AddItemToArray(arobj, nodeobj);
+}
+
+spin_data
+spin_data_devicelist(node_cache_t *node_cache) {
+    cJSON *node_ar_obj;
+
+    node_ar_obj = cJSON_CreateArray();
+    node_callback_devices(node_cache, device_node, (void *) node_ar_obj);
+
+    return node_ar_obj;
+}
+
+spin_data
+spin_data_flowlist(node_t *node) {
+    cJSON *flow_ar_obj, *flow_obj;
+    int *nodenump;
+    devflow_t *dfp;
+    tree_entry_t* cur;
+
+    flow_ar_obj = cJSON_CreateArray();
+    if (node->device) {
+        cur = tree_first(node->device->dv_flowtree);
+        while (cur != NULL) {
+            nodenump = (int *) cur->key;
+            dfp = (devflow_t *) cur->data;
+            flow_obj = cJSON_CreateObject();
+            cJSON_AddNumberToObject(flow_obj, "to", *nodenump);
+            cJSON_AddNumberToObject(flow_obj, "packets", dfp->dvf_packets);
+            cJSON_AddNumberToObject(flow_obj, "bytes", dfp->dvf_bytes);
+            cJSON_AddNumberToObject(flow_obj, "lastseen", dfp->dvf_lastseen);
+
+            cJSON_AddItemToArray(flow_ar_obj, flow_obj);
+
+            cur = tree_next(cur);
+        }
+    }
+    return flow_ar_obj;
+}
+
 static node_t *lookup_ip(node_cache_t *node_cache, ip_t *ip, pkt_info_t *pkt_info, char *sd) {
     node_t *result;
 
@@ -150,10 +218,8 @@ spin_data_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info) {
     ip.family = pkt_info->family;
     memcpy(ip.addr, pkt_info->src_addr, 16);
     src_node = lookup_ip(node_cache, &ip, pkt_info, "src");
-    // src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
     memcpy(ip.addr, pkt_info->dest_addr, 16);
     dest_node = lookup_ip(node_cache, &ip, pkt_info, "dst");
-    // dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
     if (src_node == NULL || dest_node == NULL) {
         return 0;
     }
@@ -170,6 +236,8 @@ spin_data_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info) {
     cJSON_AddNumberToObject(pktobj, "to_port", pkt_info->dest_port);
     cJSON_AddNumberToObject(pktobj, "size", pkt_info->payload_size);
     cJSON_AddNumberToObject(pktobj, "count", pkt_info->packet_count);
+
+    // spinhook_traffic(src_node, dest_node, pkt_info->packet_count, pkt_info->payload_size);
 
     STAT_VALUE(totalsd, 1);
     return(pktobj);

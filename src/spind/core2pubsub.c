@@ -14,6 +14,8 @@
 
 static char *mqtt_channel_traffic;
 static char *mqtt_channel_commands;
+static char mqtt_channel_jsonrpc_q[] = "SPIN/jsonrpc/q";
+static char mqtt_channel_jsonrpc_a[] = "SPIN/jsonrpc/a";
 static int mosquitto_keepalive_time;
 
 struct mosquitto* mosq;
@@ -45,13 +47,16 @@ void core2pubsub_publish_chan(char *channel, spin_data sd, int retain) {
         channel = mqtt_channel_traffic;
     }
 
-    message = spin_data_serialize(sd);
-    message_len = strlen(message);
-    STAT_VALUE(ctr, message_len);
-
-    pubsub_publish(channel, message_len, message, retain);
-
-    spin_data_ser_delete(message);
+    if (sd != NULL) {
+        message = spin_data_serialize(sd);
+        message_len = strlen(message);
+        STAT_VALUE(ctr, message_len);
+        pubsub_publish(channel, message_len, message, retain);
+        spin_data_ser_delete(message);
+    } else {
+        // Empty message to retain
+        pubsub_publish(channel, 0, "", retain);
+    }
 }
 
 
@@ -283,10 +288,22 @@ end:
 // Hook from Mosquitto code called with incoming messages
 
 void do_mosq_message(struct mosquitto* mosq, void* user_data, const struct mosquitto_message* msg) {
+    char *result;
+    char *call_string_jsonrpc(char *);
 
     if (strcmp(msg->topic, mqtt_channel_commands) == 0) {
         handle_json_command2(msg->payload);
         // handle_json_command(msg->payload);
+        return;
+    }
+    if (strcmp(msg->topic, mqtt_channel_jsonrpc_q) == 0) {
+        spin_log(LOG_DEBUG, "Rpc channel: %s\n", msg->payload);
+        result = call_string_jsonrpc(msg->payload);
+        if (result != NULL) {
+            pubsub_publish(mqtt_channel_jsonrpc_a, strlen(result), result, 0);
+            spin_data_ser_delete(result);
+        }
+        return;
     }
 
     // TODO, what if other channel?
@@ -313,9 +330,16 @@ void connect_mosquitto(const char* host, int port) {
         exit(1);
     }
     spin_log(LOG_INFO, "Connected to mqtt server on %s:%d with keepalive value %d\n", host, port, mosquitto_keepalive_time);
+
     result = mosquitto_subscribe(mosq, NULL, mqtt_channel_commands, 0);
     if (result != 0) {
         spin_log(LOG_ERR, "Error subscribing to topic %s: %s\n", mqtt_channel_commands, mosquitto_strerror(result));
+        exit(1);
+    }
+
+    result = mosquitto_subscribe(mosq, NULL, mqtt_channel_jsonrpc_q, 0);
+    if (result != 0) {
+        spin_log(LOG_ERR, "Error subscribing to topic %s: %s\n", mqtt_channel_jsonrpc_q, mosquitto_strerror(result));
         exit(1);
     }
 

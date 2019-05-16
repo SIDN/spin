@@ -1,18 +1,10 @@
 #include "spindata.h"
 #include "rpc_json.h"
+#include "spinhook.h"
 
-spin_data jsonrpc_blockflow(spin_data arg) {
+#include "spin_log.h"
 
-    return arg;
-}
-
-struct funclist {
-    const char * rpc_name;
-    rpcfunc      rpc_func;
-} funclist[] = {
-    { "get_blockflow",    jsonrpc_blockflow },
-    { 0, 0}
-};
+extern node_cache_t* node_cache;
 
 static spin_data
 make_answer(spin_data id) {
@@ -31,11 +23,45 @@ json_error(spin_data call_info, int errorno) {
 
     idobj = cJSON_GetObjectItemCaseSensitive(call_info, "id");
     errorobj = make_answer(idobj);
-    // This should not be present I think
-    // cJSON_AddNullToObject(errorobj, "result");
     cJSON_AddNumberToObject(errorobj, "error", errorno);
     return errorobj;
 }
+
+spin_data jsonrpc_devices(spin_data arg) {
+
+    return spin_data_devicelist(node_cache);
+}
+
+spin_data jsonrpc_deviceflow(spin_data params) {
+    node_t *node;
+    spin_data arg;
+
+    arg = cJSON_GetObjectItemCaseSensitive(params, "device");
+    // Argument is string with MAC-address
+    if (!cJSON_IsString(arg)) {
+        return NULL;
+    }
+    node = node_cache_find_by_mac(node_cache, arg->valuestring);
+    if (node == NULL) {
+        return NULL;
+    }
+    return spin_data_flowlist(node);
+}
+
+spin_data jsonrpc_hello(spin_data arg) {
+
+    return cJSON_CreateString("hello world");
+}
+
+struct funclist {
+    const char * rpc_name;
+    rpcfunc      rpc_func;
+} funclist[] = {
+    { "hello",  jsonrpc_hello },
+    { "get_devices",  jsonrpc_devices },
+    { "get_deviceflow",  jsonrpc_deviceflow },
+    { 0, 0}
+};
 
 spin_data rpc_json(spin_data call_info) {
     spin_data jsonrpc;
@@ -63,6 +89,10 @@ spin_data rpc_json(spin_data call_info) {
 
     jsonparams = cJSON_GetObjectItemCaseSensitive(call_info, "params");
 
+    if (jsonparams != NULL && !cJSON_IsObject(jsonparams)) {
+        return json_error(call_info, 1);
+    }
+
     for (p=funclist; p->rpc_name; p++) {
         if (strcmp(p->rpc_name, method) == 0) {
             break;
@@ -75,10 +105,13 @@ spin_data rpc_json(spin_data call_info) {
 
     jsonretval = (*p->rpc_func)(jsonparams);
 
-    jsonanswer = make_answer(jsonid);
-    cJSON_AddItemToObject(jsonanswer, "result", jsonretval);
+    if (jsonid != 0) {
+        jsonanswer = make_answer(jsonid);
+        cJSON_AddItemToObject(jsonanswer, "result", jsonretval);
+        return jsonanswer;
+    }
 
-    return jsonanswer;
+    return NULL;
 }
 
 char *
@@ -106,3 +139,21 @@ call_ubus2json(const char *method, char *args) {
 
     return resultstr;
 }
+
+char *
+call_string_jsonrpc(char *args) {
+    spin_data rpc, json_res;
+    char *resultstr;
+
+    rpc = cJSON_Parse(args);
+
+    json_res = rpc_json(rpc);
+
+    resultstr = cJSON_PrintUnformatted(json_res);
+
+    cJSON_Delete(rpc);
+    cJSON_Delete(json_res);
+
+    return resultstr;
+}
+

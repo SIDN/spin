@@ -11,6 +11,19 @@
 #include <stdint.h>
 
 typedef struct {
+    int     dvf_packets;
+    int     dvf_bytes;
+    uint32_t dvf_lastseen;
+    int     dvf_idleperiods;
+    int     dvf_activelastperiod;
+} devflow_t;
+
+typedef struct {
+    tree_t *dv_flowtree;
+    int dv_nflows;
+} device_t;
+
+typedef struct {
     int id;
     // note: ip's are in a sizeof(ip_t)-byte format (family + ip, padded with 12 zeroes in case of ipv4)
     // they are stored in the keys, data is empty
@@ -28,8 +41,11 @@ typedef struct {
     uint32_t last_seen;
     // and for publication purposes also if it changed
     uint8_t modified;
-    // and for storage if persistent
+    // and for keeping if in blocking
     uint32_t persistent;
+    // and references of flows
+    uint32_t references;
+    device_t* device;
 } node_t;
 
 #define is_blocked is_onlist[IPLIST_BLOCK]
@@ -78,6 +94,8 @@ typedef struct {
     // this is a non-memory tree, indexed by the ip addresses
     // unused, TODO, HvS
     tree_t* ip_refs;
+    tree_t* domain_refs;
+    tree_t* mac_refs;
     // keep a counter for new ids
     int available_id;
     // arp cache for mac lookups
@@ -89,8 +107,12 @@ typedef struct {
 node_cache_t* node_cache_create(void);
 void node_cache_destroy(node_cache_t* node_cache);
 
-void node_callback_new(node_cache_t *node_cache, modfunc);
+typedef void (*cleanfunc)(node_cache_t *, node_t*, void *);
 
+void node_callback_new(node_cache_t *node_cache, modfunc);
+void node_callback_devices(node_cache_t *node_cache, cleanfunc, void *);
+
+void node_cache_update_arp(node_cache_t *node_cache, uint32_t timestamp);
 void node_cache_print(node_cache_t* node_cache);
 /*
 
@@ -112,6 +134,7 @@ node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* i
  * if you are looking for a node by its wireformat domain
  */
 node_t* node_cache_find_by_domain(node_cache_t* node_cache, char* dname);
+node_t* node_cache_find_by_mac(node_cache_t* node_cache, char* macaddr);
 node_t* node_cache_find_by_id(node_cache_t* node_cache, int node_id);
 
 /**

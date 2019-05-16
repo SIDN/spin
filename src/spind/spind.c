@@ -30,6 +30,7 @@
 
 #include "handle_command.h"
 #include "mainloop.h"
+#include "spinhook.h"
 #include "statistics.h"
 #include "version.h"
 
@@ -208,7 +209,7 @@ node_is_updated(node_t *node) {
     send_command_node_info(node->id, sd);
 }
 
-static void
+void
 publish_nodes() {
 
     // Currently called just before traffic messages
@@ -878,14 +879,24 @@ void print_help() {
 void node_cache_clean_wf() {
     // should we make this configurable?
     const uint32_t node_cache_retain_seconds = spinconfig_node_cache_retain_time();
+    static int runcounter;
     uint32_t older_than = time(NULL) - node_cache_retain_seconds;
-    node_cache_clean(node_cache, older_than);
+
+    spinhook_clean(node_cache);
+    runcounter++;
+    if (runcounter > 3) {
+        node_cache_clean(node_cache, older_than);
+        runcounter = 0;
+    }
 }
+
+#define CLEAN_TIMEOUT 15000
 
 void init_cache() {
     dns_cache = dns_cache_create();
     node_cache = node_cache_create();
-    mainloop_register("node_cache_clean", node_cache_clean_wf, (void *) 0, 0, 60000);
+
+    mainloop_register("node_cache_clean", node_cache_clean_wf, (void *) 0, 0, CLEAN_TIMEOUT);
 }
 
 void cleanup_cache() {
@@ -955,7 +966,7 @@ int main(int argc, char** argv) {
 
     init_cache();
 
-    init_core2conntrack(node_cache, local_mode);
+    init_core2conntrack(node_cache, local_mode, spinhook_traffic);
     init_core2nflog_dns(node_cache, dns_cache);
 
     init_core2block();
