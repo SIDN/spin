@@ -64,6 +64,10 @@ void
 spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, int packetcnt, int packetbytes, uint32_t timestamp) {
     int found = 0;
 
+    if (src_node == dst_node) {
+        // Probably internal stuff
+        return;
+    }
     if (src_node->device) {
         do_traffic(src_node->device, dest_node, packetcnt, packetbytes, timestamp);
         found++;
