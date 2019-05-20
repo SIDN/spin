@@ -4,6 +4,8 @@
 
 #include "spin_log.h"
 
+#include "rpc_common.h"
+
 extern node_cache_t* node_cache;
 
 static spin_data
@@ -53,6 +55,59 @@ spin_data jsonrpc_hello(spin_data arg) {
     return cJSON_CreateString("hello world");
 }
 
+static rpc_arg_t callreg_args[100];
+static rpc_arg_t callreg_res;
+
+static
+spin_data rpc_json_callreg(char *method, spin_data jsonparams) {
+    int nargs;
+    spin_data jsonresult;
+    cJSON *param;
+    int res;
+
+    nargs = 0;
+
+    if (jsonparams != NULL && cJSON_IsObject(jsonparams)) {
+        // Iterate over Object
+        cJSON_ArrayForEach(param, jsonparams) {
+            callreg_args[nargs].rpc_desc.rpca_name = param->string;
+            if (cJSON_IsNumber(param)) {
+                callreg_args[nargs].rpc_desc.rpca_type = RPCAT_INT;
+                callreg_args[nargs].rpc_val.rpca_ivalue = param->valueint;
+            } else if (cJSON_IsString(param)) {
+                callreg_args[nargs].rpc_desc.rpca_type = RPCAT_STRING;
+                callreg_args[nargs].rpc_val.rpca_svalue = param->valuestring;
+            } else {
+                callreg_args[nargs].rpc_desc.rpca_type = RPCAT_COMPLEX;
+                // This must be checked !! TODO
+                callreg_args[nargs].rpc_val.rpca_cvalue = param->child;
+            }
+            nargs++;
+        }
+    }
+    res = rpc_call(method, nargs, callreg_args, &callreg_res);
+
+    if (res != 0) {
+        spin_log(LOG_ERR, "RPC not zero\n");
+    }
+
+    switch(callreg_res.rpc_desc.rpca_type) {
+    case RPCAT_INT:
+        jsonresult = cJSON_CreateNumber(callreg_res.rpc_val.rpca_ivalue);
+        break;
+    case RPCAT_STRING:
+        jsonresult = cJSON_CreateString(callreg_res.rpc_val.rpca_svalue);
+        break;
+    case RPCAT_COMPLEX:
+        jsonresult = callreg_res.rpc_val.rpca_cvalue;
+        break;
+    default: // Cannot happen
+        jsonresult = NULL;
+    }
+
+    return jsonresult;
+}
+
 struct funclist {
     const char * rpc_name;
     rpcfunc      rpc_func;
@@ -100,10 +155,11 @@ spin_data rpc_json(spin_data call_info) {
     }
 
     if (p->rpc_name == 0) {
-        return json_error(call_info, 1);
+        // return json_error(call_info, 1);
+        jsonretval = rpc_json_callreg(method, jsonparams);
+    } else {
+        jsonretval = (*p->rpc_func)(jsonparams);
     }
-
-    jsonretval = (*p->rpc_func)(jsonparams);
 
     if (jsonid != 0) {
         jsonanswer = make_answer(jsonid);

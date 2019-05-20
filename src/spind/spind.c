@@ -30,6 +30,8 @@
 #include "core2nflog_dns.h"
 #include "core2conntrack.h"
 
+#include "rpc_common.h"
+
 #include "handle_command.h"
 #include "mainloop.h"
 #include "spinhook.h"
@@ -887,6 +889,8 @@ int main(int argc, char** argv) {
     init_core2extsrc(node_cache, dns_cache);
 
     init_ipl_list_ar();
+
+    init_rpc_common();
 
     init_spinrpc();
 
