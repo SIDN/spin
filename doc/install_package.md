@@ -8,7 +8,9 @@ At this moment this requires a few additional steps.
 
 Log into your openWRT router with ssh, and add the following line to `/etc/opkg/customfeeds.conf`:
 
-    src/gz	sidn	https://valibox.sidnlabs.nl/downloads/packages/snapshots/<architecture>/sidn
+    src/gz	sidn	https://valibox.sidnlabs.nl/downloads/packages/<version>/<architecture>/sidn
+
+Version is either 'snapshots' (for the latest openWRT snapshot) or 'openwrt-18.06' (for the latest openWRT release). 
 
 Architecture depends on your specific router model, you can see which one you need in `/etc/opkg/distfeeds.conf`.
 
