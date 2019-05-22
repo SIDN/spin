@@ -6,21 +6,22 @@
 
 typedef struct rpc_data {
     rpc_func_p rpcd_func;
+    void *rpcd_cb;
     int rpcd_nargs;
     rpc_arg_desc_t *rpcd_args;
-    rpc_arg_desc_t *rpcd_result;
+    rpc_argtype rpcd_result_type;
 } rpc_data_t;
 
 static tree_t *rpcfunctree;
 
 void
-rpc_register(char *name, rpc_func_p func, int nargs, rpc_arg_desc_t *args, rpc_arg_desc_t *result) {
+rpc_register(char *name, rpc_func_p func, void *cb, int nargs, rpc_arg_desc_t *args, rpc_argtype result_type) {
     rpc_data_t rd;
 
     rd.rpcd_func = func;
     rd.rpcd_nargs = nargs;
     rd.rpcd_args = args;
-    rd.rpcd_result = result;
+    rd.rpcd_result_type = result_type;
 
     if (rpcfunctree == NULL) {
         // First call, make tree
@@ -87,8 +88,9 @@ rpc_call(char *name, int nargs, rpc_arg_t *args, rpc_arg_t *result) {
     // Ok, arguments parsed and filled in
     // Let's make the call
 
-    result->rpc_desc = *rdp->rpcd_result;
-    res = (*rdp->rpcd_func)(argumentvals, &result->rpc_val);
+    result->rpc_desc.rpca_name = "unused";
+    result->rpc_desc.rpca_type = rdp->rpcd_result_type;
+    res = (*rdp->rpcd_func)(rdp->rpcd_cb, argumentvals, &result->rpc_val);
 
     free(argumentvals);
 
@@ -101,11 +103,8 @@ rpc_arg_desc_t tf_args[] = {
     { "arg2", RPCAT_STRING },
 };
 
-rpc_arg_desc_t tf_res =
-    { "result", RPCAT_STRING };
-
 static int
-testfunc(rpc_arg_val_t *args, rpc_arg_val_t *result) {
+testfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
     static char buf[100];
 
     fprintf(stderr, "testfunc called\n");
@@ -114,8 +113,18 @@ testfunc(rpc_arg_val_t *args, rpc_arg_val_t *result) {
     return 0;
 }
 
+static int
+devlistfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    spin_data jsonrpc_devices(spin_data arg);
+
+    fprintf(stderr, "devlistfunc called");
+    result->rpca_cvalue = jsonrpc_devices(NULL);
+    return 0;
+}
+
 void
 init_rpc_common() {
 
-    rpc_register("testfunc", testfunc, 2, tf_args, &tf_res);
+    rpc_register("testfunc", testfunc, (void *) 0, 2, tf_args, RPCAT_STRING);
+    rpc_register("devicelist", devlistfunc, (void *) 0, 0, NULL, RPCAT_COMPLEX);
 }

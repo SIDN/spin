@@ -16,19 +16,22 @@ Change profile of device | set_profile | yes | no | no
 Get notifications | get_notifications | yes | no |no
 Set notification | set_notification | yes | no | no
 Get profiles | get_profiles | yes | no | no
-Add name of to node | add_name | no | planned for 0.10 | yes
-Get list of blocked nodes | get_blocks | no | planned for 0.10 | yes
-Add all IP addresses from node to list of blocked nodes | add_block_node | no | planned for 0.10 | yes
-Remove all IP addresses from node from list of blocked nodes | remove_block_node | no | planned for 0.10 | yes
-Remove IP address of blocked list | remove_block_ip | no | planned for 0.10 | yes
-Add all IP addresses from node to list of ignored nodes | add_ignore_node | no | planned for 0.10 | yes
-Remove all IP addresses from node from list of ignored nodes | remove_ignore_node | no | planned for 0.10 | yes
-Remove IP address of ignored list | remove_ignore_ip | no | planned for 0.10 | yes
-Add all IP addresses from node to list of allowed nodes | add_allow_node | no | planned for 0.10 | yes
-Remove all IP addresses from node from list of allowed nodes | remove_allow_node | no | planned for 0.10 | yes
-Remove IP address of allowed list | remove_allow_ip | no | planned for 0.10 | yes
-Reset list of ignored IP addresses to default | reset_ignores | no | planned for 0.10| yes
+Add name of to node | add_name | no | no | yes
+Get list of blocked nodes | get_blocks | no | no | yes
+Add all IP addresses from node to list of blocked nodes | add_block_node | no | no | yes
+Remove all IP addresses from node from list of blocked nodes | remove_block_node | no | no | yes
+Remove IP address of blocked list | remove_block_ip | no | no | yes
+Add all IP addresses from node to list of ignored nodes | add_ignore_node | no | no | yes
+Remove all IP addresses from node from list of ignored nodes | remove_ignore_node | no | no | yes
+Remove IP address of ignored list | remove_ignore_ip | no | no | yes
+Add all IP addresses from node to list of allowed nodes | add_allow_node | no | no | yes
+Remove all IP addresses from node from list of allowed nodes | remove_allow_node | no | no | yes
+Remove IP address of allowed list | remove_allow_ip | no | no | yes
+Reset list of ignored IP addresses to default | reset_ignores | no | no| yes
 Block flow between two nodes | blockflow | no |  in 0.10 | no
 Get list of blocked flows | get_blockflow | no |  in 0.10| no
+Get flows of device | get_deviceflow | yes | in 0.10 | no
+Create node | create_node | yes | in 0.10 | no
+Add IP address to node | add_ip_node | yes | in 0.10 | no
 
 The WebAPI calls and MQTT calls  are documented in the file Spin-API.md

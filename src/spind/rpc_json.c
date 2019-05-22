@@ -212,4 +212,3 @@ call_string_jsonrpc(char *args) {
 
     return resultstr;
 }
-
