@@ -21,7 +21,6 @@
 
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <linux/netlink.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
