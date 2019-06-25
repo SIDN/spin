@@ -140,6 +140,45 @@ static int spin_get_blockflow(struct ubus_context *ctx, struct ubus_object *obj,
 	return 0;
 }
 
+static const struct blobmsg_policy rpc_policy[] = {
+};
+
+static int spin_rpc(struct ubus_context *ctx, struct ubus_object *obj,
+		      struct ubus_request_data *req, const char *method,
+		      struct blob_attr *msg)
+{
+        char *args, *result;
+#ifdef notdef
+	struct blob_attr *tb[__RPC_MAX];
+        char *rpc_method="";
+        struct blob_attr *restmsg;
+#endif
+
+        args = blobmsg_format_json(msg, true);
+        result = call_ubus2jsonnew(args);
+
+#ifdef notdef
+	blobmsg_parse(rpc_policy, ARRAY_SIZE(rpc_policy), tb, blob_data(msg), blob_len(msg));
+	if (tb[RPC_METHOD])
+		rpc_method = blobmsg_get_string(tb[RPC_METHOD]);
+
+        restmsg = blob_next(msg);
+        args = blobmsg_format_json(restmsg, true);
+        fprintf(stderr, "rpc() called with method %s args %s\n", method, args);
+
+        result = call_ubus2json(rpc_method, args);
+
+        // END TEST
+
+#endif
+
+	blob_buf_init(&b, 0);
+        blobmsg_add_json_from_string(&b, result);
+        free(result);   // This was malloced
+	ubus_send_reply(ctx, req, b.head);
+	return 0;
+}
+
 static const struct blobmsg_policy tj_policy[] = {
 };
 
@@ -171,6 +210,7 @@ static const struct ubus_method spin_methods[] = {
 	UBUS_METHOD("blockflow", spin_blockflow, blockflow_policy),
 	UBUS_METHOD("get_blockflow", spin_get_blockflow, get_blockflow_policy),
 	UBUS_METHOD("tj", spin_tj, tj_policy),
+	UBUS_METHOD("rpc", spin_rpc, rpc_policy),
 };
 
 static struct ubus_object_type spin_object_type =

@@ -85,6 +85,9 @@ spin_data rpc_json_callreg(char *method, spin_data jsonparams) {
             nargs++;
         }
     }
+
+    spin_log(LOG_DEBUG, "rpc_json_callreg(%s with %d args)\n", method, nargs);
+
     res = rpc_call(method, nargs, callreg_args, &callreg_res);
 
     if (res != 0) {
@@ -168,6 +171,31 @@ spin_data rpc_json(spin_data call_info) {
     }
 
     return NULL;
+}
+
+char *
+call_ubus2jsonnew(char *args) {
+    spin_data rpc, json_res;
+    char *resultstr;
+    static int nextid = 1;
+
+    spin_log(LOG_DEBUG, "jsonnew(%s)\n", args);
+    rpc = cJSON_Parse(args);
+    cJSON_AddStringToObject(rpc, "jsonrpc", "2.0");
+    cJSON_AddNumberToObject(rpc, "id", ++nextid);
+
+    json_res = rpc_json(rpc);
+
+    cJSON_DeleteItemFromObjectCaseSensitive(json_res, "jsonrpc");
+    cJSON_DeleteItemFromObjectCaseSensitive(json_res, "id");
+    resultstr = cJSON_PrintUnformatted(json_res);
+
+    spin_log(LOG_DEBUG, "jsonnew(%s) returns %s\n", args, resultstr);
+
+    cJSON_Delete(rpc);
+    cJSON_Delete(json_res);
+
+    return resultstr;
 }
 
 char *

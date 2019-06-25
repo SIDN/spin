@@ -720,7 +720,7 @@ node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
     int new;
     STAT_COUNTER(ctr, add-ip-info, STAT_TOTAL);
 
-    node = node_cache_find_by_ip(node_cache, sizeof(ip_t),ip);
+    node = node_cache_find_by_ip(node_cache, sizeof(ip_t), ip);
     STAT_VALUE(ctr,  node == NULL);
     if (node != NULL) {
         node_set_last_seen(node, timestamp);

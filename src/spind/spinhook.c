@@ -77,7 +77,7 @@ spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, 
         found++;
     }
     if (!found) {
-        spin_log(LOG_ERR, "No device in %d to %d traffic\n", src_node->id, dest_node->id);
+        spin_log(LOG_DEBUG, "No device in %d to %d traffic\n", src_node->id, dest_node->id);
 
         // Probably ARP cache must be reread and acted upon here
         node_cache_update_arp(node_cache, timestamp);
@@ -181,7 +181,6 @@ node_merge_flow(node_cache_t *node_cache, node_t *node, void *ap) {
     }
 
     // This flow must be renumbered
-    spin_log(LOG_DEBUG, "Found entry\n");
 
     // Merge these two flow numbers if destination also in flowlist
     dstleaf = tree_find(dev->dv_flowtree, sizeof(dstnodenum), &dstnodenum);
@@ -196,7 +195,6 @@ node_merge_flow(node_cache_t *node_cache, node_t *node, void *ap) {
     srcleaf->key = NULL;
     srcleaf->data = NULL;
     tree_remove_entry(dev->dv_flowtree, srcleaf);
-    spin_log(LOG_DEBUG, "Removed old leaf\n");
 
     if (dstleaf != 0) {
         // Merge the numbers
@@ -261,7 +259,7 @@ spinhook_nodesmerged(node_cache_t *node_cache, node_t *dest_node, node_t *src_no
 
     publish_nodes();
     sd = spin_data_nodes_merged(src_node->id, dest_node->id);
-    command = spin_data_create_mqtt_command("nodeMerge", NULL, sd);
+    command = spin_data_create_mqtt_command("nodeMerged", NULL, sd);
 
     core2pubsub_publish_chan(adminchannel, command, 0);
 
