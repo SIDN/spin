@@ -807,6 +807,22 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
 
     //alert("add node: " + node)
     var enode = nodes.get(node.id);
+    if (!enode) {
+        // there is currently a small race condition with nodes from queries
+        // and nodes from traffic; so add one extra check to see it we really
+        // don't have the domain just yet
+        for (let ni = 0; ni < nodesArray.length; ni++) {
+            let curn = nodesArray[ni]
+            for (let di = 0; di < curn.domains.length; di++) {
+                for (let dj = 0; dj < node.domains.length; dj++) {
+                    //alert("try " + dj + " and " + 
+                    if (node.domains[dj] == curn.domains[di]) {
+                        enode = curn
+                    }
+                }
+            }
+        }
+    }
     if (enode) {
         // update is
         enode.label = label;
