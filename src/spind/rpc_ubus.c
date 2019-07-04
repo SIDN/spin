@@ -33,6 +33,7 @@ static struct ubus_context *ctx;
 static struct ubus_subscriber spin_event;
 static struct blob_buf b;
 
+#ifdef notdef
 enum {
 	SPINDLIST_LIST,
 	SPINDLIST_ADDREM,
@@ -139,6 +140,7 @@ static int spin_get_blockflow(struct ubus_context *ctx, struct ubus_object *obj,
 	ubus_send_reply(ctx, req, b.head);
 	return 0;
 }
+#endif
 
 static const struct blobmsg_policy rpc_policy[] = {
 };
@@ -179,6 +181,7 @@ static int spin_rpc(struct ubus_context *ctx, struct ubus_object *obj,
 	return 0;
 }
 
+#ifdef notdef
 static const struct blobmsg_policy tj_policy[] = {
 };
 
@@ -204,12 +207,15 @@ static int spin_tj(struct ubus_context *ctx, struct ubus_object *obj,
 	ubus_send_reply(ctx, req, b.head);
 	return 0;
 }
+#endif
 
 static const struct ubus_method spin_methods[] = {
+#ifdef notdef
 	UBUS_METHOD("spindlist", spin_spindlist, spindlist_policy),
 	UBUS_METHOD("blockflow", spin_blockflow, blockflow_policy),
 	UBUS_METHOD("get_blockflow", spin_get_blockflow, get_blockflow_policy),
 	UBUS_METHOD("tj", spin_tj, tj_policy),
+#endif
 	UBUS_METHOD("rpc", spin_rpc, rpc_policy),
 };
 
