@@ -4,30 +4,98 @@
 
 #include "spin_log.h"
 
+/*
+ * Administration for an RPC
+ */
 typedef struct rpc_data {
-    rpc_func_p rpcd_func;
-    void *rpcd_cb;
-    int rpcd_nargs;
+    rpc_func_p      rpcd_func;
+    void *          rpcd_cb;
+    int             rpcd_nargs;
     rpc_arg_desc_t *rpcd_args;
-    rpc_argtype rpcd_result_type;
+    rpc_argtype     rpcd_result_type;
 } rpc_data_t;
 
 static tree_t *rpcfunctree;
+
+static char * rpcatype(int t) {
+
+    switch (t) {
+    case RPCAT_INT:
+        return "integer";
+    case RPCAT_STRING:
+        return "string";
+    case RPCAT_COMPLEX:
+    default:
+        return "complex";
+    }
+}
+
+static int
+rpclistfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    tree_t * rpctree;
+    tree_entry_t* cur;
+    cJSON *arobj, *argarobj, *argobj, *rpcfuncobj;
+    rpc_data_t *rdp;
+    rpc_arg_desc_t *radp;
+    int i;
+
+    rpctree = (tree_t *) cb;
+
+    arobj = cJSON_CreateArray();
+    cur = tree_first(rpctree);
+    while (cur != NULL) {
+        rpcfuncobj = cJSON_CreateObject();
+
+        cJSON_AddStringToObject(rpcfuncobj, "rpc-name", (char *) cur->key);
+        argarobj = cJSON_CreateArray();
+        rdp = (rpc_data_t *) cur->data;
+        for (i=0; i<rdp->rpcd_nargs; i++) {
+            radp = &rdp->rpcd_args[i];
+            argobj = cJSON_CreateObject();
+            cJSON_AddStringToObject(argobj, "rpc-arg-name", radp->rpca_name);
+            cJSON_AddStringToObject(argobj, "rpc-arg-type", rpcatype(radp->rpca_type));
+
+            cJSON_AddItemToArray(argarobj, argobj);
+        }
+        cJSON_AddItemToObject(rpcfuncobj, "rpc-args", argarobj);
+        cJSON_AddStringToObject(rpcfuncobj, "rpc-result-type", rpcatype(rdp->rpcd_result_type));
+
+        cJSON_AddItemToArray(arobj, rpcfuncobj);
+        cur = tree_next(cur);
+    }
+
+    result->rpca_cvalue = arobj;
+    return 0;
+}
 
 void
 rpc_register(char *name, rpc_func_p func, void *cb, int nargs, rpc_arg_desc_t *args, rpc_argtype result_type) {
     rpc_data_t rd;
 
-    rd.rpcd_func = func;
-    rd.rpcd_nargs = nargs;
-    rd.rpcd_args = args;
-    rd.rpcd_result_type = result_type;
-
     if (rpcfunctree == NULL) {
+        char *listname;
         // First call, make tree
 
         rpcfunctree = tree_create(cmp_strs);
+
+        // Now enter function to list rpc's
+        // This could be a recursive call, but not now
+
+        listname = "rpc.list";
+        rd.rpcd_func = rpclistfunc;
+        rd.rpcd_cb = (void *) rpcfunctree;
+        rd.rpcd_nargs = 0;
+        rd.rpcd_args = NULL;
+        rd.rpcd_result_type = RPCAT_COMPLEX;
+
+        tree_add(rpcfunctree, strlen(listname)+1, listname, sizeof(rd), &rd, 1);
     }
+
+    rd.rpcd_func = func;
+    rd.rpcd_cb = cb;
+    rd.rpcd_nargs = nargs;
+    rd.rpcd_args = args;
+    rd.rpcd_result_type = result_type;
 
     tree_add(rpcfunctree, strlen(name)+1, name, sizeof(rd), &rd, 1);
 }
@@ -56,6 +124,16 @@ rpc_call(char *name, int nargs, rpc_arg_t *args, rpc_arg_t *result) {
     funcnargs = rdp->rpcd_nargs;
     funcargs = rdp->rpcd_args;
     argumentvals = (rpc_arg_val_t *) malloc(funcnargs*sizeof(rpc_arg_val_t));
+
+    if (nargs != funcnargs) {
+        spin_log(LOG_ERR, "Wrong # of args for func %s\n", name);
+        result->rpc_desc.rpca_name = "error";
+        result->rpc_desc.rpca_type = RPCAT_STRING;
+        result->rpc_val.rpca_svalue = "Wrong number of arguments";
+
+        free(argumentvals);
+        return -1;
+    }
 
     for (call_arg=0; call_arg<nargs; call_arg++) {
         rpca = args + call_arg;
@@ -94,37 +172,5 @@ rpc_call(char *name, int nargs, rpc_arg_t *args, rpc_arg_t *result) {
 
     free(argumentvals);
 
-    // Do something with res
     return res;
-}
-
-rpc_arg_desc_t tf_args[] = {
-    { "arg1", RPCAT_INT },
-    { "arg2", RPCAT_STRING },
-};
-
-static int
-testfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
-    static char buf[100];
-
-    fprintf(stderr, "testfunc called\n");
-    sprintf(buf, "Int:%d, String: %s", args[0].rpca_ivalue,args[1].rpca_svalue);
-    result->rpca_svalue = buf;
-    return 0;
-}
-
-static int
-devlistfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
-    spin_data jsonrpc_devices(spin_data arg);
-
-    fprintf(stderr, "devlistfunc called");
-    result->rpca_cvalue = jsonrpc_devices(NULL);
-    return 0;
-}
-
-void
-init_rpc_common() {
-
-    rpc_register("testfunc", testfunc, (void *) 0, 2, tf_args, RPCAT_STRING);
-    rpc_register("devicelist", devlistfunc, (void *) 0, 0, NULL, RPCAT_COMPLEX);
 }

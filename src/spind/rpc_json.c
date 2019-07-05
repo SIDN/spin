@@ -6,8 +6,6 @@
 
 #include "rpc_common.h"
 
-extern node_cache_t* node_cache;
-
 static spin_data
 make_answer(spin_data id) {
     spin_data retobj;
@@ -27,32 +25,6 @@ json_error(spin_data call_info, int errorno) {
     errorobj = make_answer(idobj);
     cJSON_AddNumberToObject(errorobj, "error", errorno);
     return errorobj;
-}
-
-spin_data jsonrpc_devices(spin_data arg) {
-
-    return spin_data_devicelist(node_cache);
-}
-
-spin_data jsonrpc_deviceflow(spin_data params) {
-    node_t *node;
-    spin_data arg;
-
-    arg = cJSON_GetObjectItemCaseSensitive(params, "device");
-    // Argument is string with MAC-address
-    if (!cJSON_IsString(arg)) {
-        return NULL;
-    }
-    node = node_cache_find_by_mac(node_cache, arg->valuestring);
-    if (node == NULL) {
-        return NULL;
-    }
-    return spin_data_flowlist(node);
-}
-
-spin_data jsonrpc_hello(spin_data arg) {
-
-    return cJSON_CreateString("hello world");
 }
 
 static rpc_arg_t callreg_args[100];
@@ -86,8 +58,6 @@ spin_data rpc_json_callreg(char *method, spin_data jsonparams) {
         }
     }
 
-    spin_log(LOG_DEBUG, "rpc_json_callreg(%s with %d args)\n", method, nargs);
-
     res = rpc_call(method, nargs, callreg_args, &callreg_res);
 
     if (res != 0) {
@@ -111,23 +81,12 @@ spin_data rpc_json_callreg(char *method, spin_data jsonparams) {
     return jsonresult;
 }
 
-struct funclist {
-    const char * rpc_name;
-    rpcfunc      rpc_func;
-} funclist[] = {
-    { "hello",  jsonrpc_hello },
-    { "get_devices",  jsonrpc_devices },
-    { "get_deviceflow",  jsonrpc_deviceflow },
-    { 0, 0}
-};
-
 spin_data rpc_json(spin_data call_info) {
     spin_data jsonrpc;
     spin_data jsonid;
     spin_data jsonmethod;
     spin_data jsonparams;
     char *method;
-    struct funclist *p;
     spin_data jsonretval;
     spin_data jsonanswer;
 
@@ -151,18 +110,7 @@ spin_data rpc_json(spin_data call_info) {
         return json_error(call_info, 1);
     }
 
-    for (p=funclist; p->rpc_name; p++) {
-        if (strcmp(p->rpc_name, method) == 0) {
-            break;
-        }
-    }
-
-    if (p->rpc_name == 0) {
-        // return json_error(call_info, 1);
-        jsonretval = rpc_json_callreg(method, jsonparams);
-    } else {
-        jsonretval = (*p->rpc_func)(jsonparams);
-    }
+    jsonretval = rpc_json_callreg(method, jsonparams);
 
     if (jsonid != 0) {
         jsonanswer = make_answer(jsonid);
@@ -198,6 +146,7 @@ call_ubus2jsonnew(char *args) {
     return resultstr;
 }
 
+#ifdef notdef
 char *
 call_ubus2json(const char *method, char *args) {
     spin_data sd;
@@ -223,6 +172,7 @@ call_ubus2json(const char *method, char *args) {
 
     return resultstr;
 }
+#endif
 
 char *
 call_string_jsonrpc(char *args) {

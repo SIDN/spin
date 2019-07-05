@@ -48,8 +48,6 @@ const char* mosq_host;
 int mosq_port;
 int stop_on_error;
 
-int omitnode;
-
 STAT_MODULE(spind)
 
 
@@ -170,9 +168,6 @@ store_node_info(int nodenum, spin_data sd) {
  * End of node info store code
  */
 
-#define JSONBUFSIZ      4096
-
-
 static void
 send_command_node_info(int nodenum, spin_data sd) {
     char mosqchan[100];
@@ -255,7 +250,7 @@ handle_node_info(char *buf, int size) {
     }
 }
 
-#define NODE_READ_SIZE (JSONBUFSIZ+1000)
+#define NODE_READ_SIZE 10240
 
 static void
 retrieve_node_info() {
@@ -335,7 +330,7 @@ int read_nodepair_tree(const char *filename) {
 }
 
 static void
-init_spinrpc() {
+init_blockflow() {
 
     nodepair_tree = tree_create(cmp_2ints);
 
@@ -453,18 +448,6 @@ spinrpc_blockflow(int node1, int node2, int block) {
     }
     STAT_VALUE(ctr, 1);
     return result;
-}
-
-char *
-spinrpc_get_blockflow() {
-    spin_data ar_sd, cmd_sd;
-    char *retval;
-
-    ar_sd = spin_data_nodepairtree(nodepair_tree);
-    cmd_sd = spin_data_create_mqtt_command(NULL, NULL, ar_sd);
-    retval =  spin_data_serialize(cmd_sd);
-    spin_data_delete(cmd_sd);
-    return retval;
 }
 
 /*
@@ -761,6 +744,123 @@ void handle_command_get_iplist(int iplist, const char* json_command) {
     spin_data_delete(cmd_sd);
 }
 
+rpc_arg_desc_t list_member_args[] = {
+    { "list", RPCAT_INT },
+    { "addrem", RPCAT_INT },
+    { "node", RPCAT_INT },
+};
+
+static int spindlistfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+
+    handle_list_membership(args[0].rpca_ivalue, args[1].rpca_ivalue,args[2].rpca_ivalue);
+    result->rpca_ivalue = 0;
+    return 0;
+}
+
+rpc_arg_desc_t addipnode_args[] = {
+    { "node", RPCAT_INT },
+    { "ipaddr", RPCAT_STRING },
+};
+
+static int addipnodefunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    node_t *node;
+    ip_t ipval;
+
+    if (!spin_pton(&ipval, args[1].rpca_svalue)) {
+        result->rpca_ivalue = -1;
+        return -1;
+    }
+    node = node_cache_find_by_ip(node_cache, sizeof(ipval), &ipval);
+    if (node) {
+        result->rpca_ivalue = node->id;
+        return 0;
+    }
+
+    result->rpca_ivalue = 0;
+    return 0;
+}
+
+rpc_arg_desc_t blockflow_args[] = {
+    { "node1", RPCAT_INT },
+    { "node2", RPCAT_INT },
+    { "block", RPCAT_INT },
+};
+
+static int blockflowfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    int res;
+
+    res = spinrpc_blockflow(args[0].rpca_ivalue, args[1].rpca_ivalue,args[2].rpca_ivalue);
+    result->rpca_ivalue = res;
+    return 0;
+}
+
+rpc_arg_desc_t devblockflow_args[] = {
+    { "device", RPCAT_STRING },
+    { "node", RPCAT_INT },
+    { "block", RPCAT_INT },
+};
+
+static int devblockflowfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    int res;
+    node_t *devnode;
+
+    devnode = node_cache_find_by_mac(node_cache, args[0].rpca_svalue);
+    if (devnode == NULL) {
+        // device not found
+        result->rpca_ivalue = -1;
+        return -1;
+    }
+
+    res = spinrpc_blockflow(devnode->id, args[1].rpca_ivalue,args[2].rpca_ivalue);
+    result->rpca_ivalue = res;
+    return 0;
+}
+
+
+static int getblockflowfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    spin_data ar_sd;
+
+    ar_sd = spin_data_nodepairtree(nodepair_tree);
+    result->rpca_cvalue = ar_sd;
+    return 0;
+}
+
+static int
+devlistfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    node_cache_t *node_cache = (node_cache_t *) cb;
+
+    result->rpca_cvalue = spin_data_devicelist(node_cache);
+    return 0;
+}
+
+rpc_arg_desc_t devflow_args[] = {
+    { "device", RPCAT_STRING },
+};
+
+static int devflowfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    node_cache_t *node_cache = (node_cache_t *) cb;
+    node_t *node;
+
+    node = node_cache_find_by_mac(node_cache, args[0].rpca_svalue);
+    if (node == NULL) {
+        return 0;
+    }
+    result->rpca_cvalue = spin_data_flowlist(node);
+    return 0;
+}
+
+void
+init_rpcs(node_cache_t *node_cache) {
+
+    rpc_register("spindlist", spindlistfunc, (void *) 0, 3, list_member_args, RPCAT_INT);
+    rpc_register("add_ip_to_node", addipnodefunc, (void *) 0, 2, addipnode_args, RPCAT_INT);
+    rpc_register("blockflow", blockflowfunc, (void *) 0, 3, blockflow_args, RPCAT_INT);
+    rpc_register("devblockflow", devblockflowfunc, (void *) 0, 3, devblockflow_args, RPCAT_INT);
+    rpc_register("get_blockflow", getblockflowfunc, (void *) 0, 0, 0, RPCAT_COMPLEX);
+    rpc_register("devicelist", devlistfunc, (void *) node_cache, 0, NULL, RPCAT_COMPLEX);
+    rpc_register("get_deviceflow", devflowfunc, (void *) node_cache, 1, devflow_args, RPCAT_COMPLEX);
+}
+
 void int_handler(int signal) {
 
     mainloop_end();
@@ -890,16 +990,14 @@ int main(int argc, char** argv) {
 
     init_ipl_list_ar();
 
-    init_rpc_common();
+    init_rpcs(node_cache);
 
-    init_spinrpc();
+    init_blockflow();
 
     init_mosquitto(mosq_host, mosq_port);
     signal(SIGINT, int_handler);
 
     push_all_ipl();
-
-    omitnode = spinconfig_pubsub_omitnode();
 
 #if USE_UBUS
     ubus_main();

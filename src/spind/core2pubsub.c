@@ -12,6 +12,8 @@
 #include "handle_command.h"
 #include "statistics.h"
 
+#include "rpc_json.h"
+
 static char *mqtt_channel_traffic;
 static char *mqtt_channel_commands;
 static char mqtt_channel_jsonrpc_q[] = "SPIN/jsonrpc/q";
@@ -59,7 +61,6 @@ void core2pubsub_publish_chan(char *channel, spin_data sd, int retain) {
     }
 }
 
-
 /* End push back code */
 
 /* (Re)start command Mosquitto server only */
@@ -90,30 +91,27 @@ void send_command_restart() {
 #define PSC_O_ALLOW             IPLIST_ALLOW
 #define PSC_O_NAME              N_IPLIST + 0
 
-#define STR_AND_LEN(s)  s, (sizeof(s)-1)
-
 static struct pubsub_commands {
     char *      psc_commandstr;         // String of command
-    int         psc_commandlen;         // Length of command
     int         psc_verb;               // Verb
     int         psc_object;             // Object
 } pubsub_commands[] = {
-    { STR_AND_LEN("get_blocks"),        PSC_V_GET,      PSC_O_BLOCK},
-    { STR_AND_LEN("get_ignores"),       PSC_V_GET,      PSC_O_IGNORE},
-    { STR_AND_LEN("get_alloweds"),      PSC_V_GET,      PSC_O_ALLOW},
-    { STR_AND_LEN("get_names"),         PSC_V_GET,      PSC_O_NAME },
-    { STR_AND_LEN("add_block_node"),    PSC_V_ADD,      PSC_O_BLOCK},
-    { STR_AND_LEN("add_ignore_node"),   PSC_V_ADD,      PSC_O_IGNORE},
-    { STR_AND_LEN("add_allow_node"),    PSC_V_ADD,      PSC_O_ALLOW},
-    { STR_AND_LEN("add_name"),          PSC_V_ADD,      PSC_O_NAME},
-    { STR_AND_LEN("remove_block_node"), PSC_V_REM,      PSC_O_BLOCK},
-    { STR_AND_LEN("remove_ignore_node"),PSC_V_REM,      PSC_O_IGNORE},
-    { STR_AND_LEN("remove_allow_node"), PSC_V_REM,      PSC_O_ALLOW},
-    { STR_AND_LEN("remove_block_ip"),   PSC_V_REM_IP,   PSC_O_BLOCK},
-    { STR_AND_LEN("remove_ignore_ip"),  PSC_V_REM_IP,   PSC_O_IGNORE},
-    { STR_AND_LEN("remove_allow_ip"),   PSC_V_REM_IP,   PSC_O_ALLOW},
-    { STR_AND_LEN("reset_ignores"),     PSC_V_RESET,    PSC_O_IGNORE},
-    { 0, 0, 0, 0 }
+    { "get_blocks",        PSC_V_GET,      PSC_O_BLOCK},
+    { "get_ignores",       PSC_V_GET,      PSC_O_IGNORE},
+    { "get_alloweds",      PSC_V_GET,      PSC_O_ALLOW},
+    { "get_names",         PSC_V_GET,      PSC_O_NAME },
+    { "add_block_node",    PSC_V_ADD,      PSC_O_BLOCK},
+    { "add_ignore_node",   PSC_V_ADD,      PSC_O_IGNORE},
+    { "add_allow_node",    PSC_V_ADD,      PSC_O_ALLOW},
+    { "add_name",          PSC_V_ADD,      PSC_O_NAME},
+    { "remove_block_node", PSC_V_REM,      PSC_O_BLOCK},
+    { "remove_ignore_node",PSC_V_REM,      PSC_O_IGNORE},
+    { "remove_allow_node", PSC_V_REM,      PSC_O_ALLOW},
+    { "remove_block_ip",   PSC_V_REM_IP,   PSC_O_BLOCK},
+    { "remove_ignore_ip",  PSC_V_REM_IP,   PSC_O_IGNORE},
+    { "remove_allow_ip",   PSC_V_REM_IP,   PSC_O_ALLOW},
+    { "reset_ignores",     PSC_V_RESET,    PSC_O_IGNORE},
+    { 0, 0, 0 }
 };
 
 static char *getnames[N_IPLIST] = {
@@ -122,18 +120,11 @@ static char *getnames[N_IPLIST] = {
     "alloweds"
 };
 
-static int find_command(int name_len, const char *name_str, int *verb, int *object) {
+static int find_command(const char *name_str, int *verb, int *object) {
     struct pubsub_commands *p;
 
     for (p=pubsub_commands; p->psc_commandstr; p++) {
-        //
-        // We do a strncmp, potential issue with commands that are initial
-        // substring of other commands
-        // Solved by adding length of string with clever macro
-        // Should be done cleaner some day TODO
-
-        if (name_len == p->psc_commandlen &&
-                        strncmp(name_str, p->psc_commandstr, name_len)==0) {
+        if (strcmp(name_str, p->psc_commandstr)==0) {
             // Match
             *verb = p->psc_verb;
             *object = p->psc_object;
@@ -163,7 +154,7 @@ char* getstr_cJSONobj(cJSON *cjarg, char *fieldname) {
     return f_json->valuestring;
 }
 
-void handle_json_command_detail2(int verb, int object, cJSON *argument_json) {
+void handle_json_command_detail(int verb, int object, cJSON *argument_json) {
     int node_id_arg = 0;
     ip_t ip_arg;
     char *str_arg;
@@ -185,14 +176,12 @@ void handle_json_command_detail2(int verb, int object, cJSON *argument_json) {
             return;
         }
         node_id_arg = argument_json->valueint;
-        // spin_log(LOG_DEBUG, "Spin verb %d, object %d, node-id %d\n", verb, object, node_id_arg);
         break;
     case PSC_V_REM_IP:
         if (!cJSON_IsString(argument_json) || !spin_pton(&ip_arg, argument_json->valuestring)) {
             spin_log(LOG_ERR, "Cannot parse ip-addr\n");
             return;
         }
-        // spin_log(LOG_DEBUG, "Spin verb %d, object %d, ip XX\n", verb, object);
         break;
     case PSC_V_RESET:
         if (object != PSC_O_IGNORE) {
@@ -248,7 +237,7 @@ void handle_json_command_detail2(int verb, int object, cJSON *argument_json) {
 }
 
 void
-handle_json_command2(char *data) {
+handle_json_command(char *data) {
     cJSON *command_json;
     cJSON *method_json;
     cJSON *argument_json;
@@ -274,10 +263,8 @@ handle_json_command2(char *data) {
         goto end;
     }
 
-    // spin_log(LOG_DEBUG, "Parsed mqtt command: %s %s\n", method, cJSON_PrintUnformatted(argument_json));
-
-    if (find_command(strlen(method), method, &verb, &object)) {
-        handle_json_command_detail2(verb, object, argument_json);
+    if (find_command(method, &verb, &object)) {
+        handle_json_command_detail(verb, object, argument_json);
     }
 
 end:
@@ -289,11 +276,9 @@ end:
 
 void do_mosq_message(struct mosquitto* mosq, void* user_data, const struct mosquitto_message* msg) {
     char *result;
-    char *call_string_jsonrpc(char *);
 
     if (strcmp(msg->topic, mqtt_channel_commands) == 0) {
-        handle_json_command2(msg->payload);
-        // handle_json_command(msg->payload);
+        handle_json_command(msg->payload);
         return;
     }
     if (strcmp(msg->topic, mqtt_channel_jsonrpc_q) == 0) {
@@ -382,10 +367,6 @@ void init_mosquitto(const char* host, int port) {
     for (object = 0; object < N_IPLIST; object++) {
         handle_command_get_iplist(object, getnames[object]);
     }
-
-    //handle_command_get_iplist(IPLIST_BLOCK, "blocks");
-    //handle_command_get_iplist(IPLIST_IGNORE, "ignores");
-    //handle_command_get_iplist(IPLIST_ALLOW, "alloweds");
 }
 
 void finish_mosquitto() {

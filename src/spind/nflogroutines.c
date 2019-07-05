@@ -178,7 +178,7 @@ nflog_cb(struct nflog_g_handle *qh, struct nfgenmsg *nfmsg, struct nflog_data *n
             spin_log(LOG_DEBUG, "Unknown protocol %x\n", proto);
         }
         nfr[fr_n].nfr_packets++;
-        if (nfr[fr_n].nfr_packets % 100 == 0) {
+        if (nfr[fr_n].nfr_packets % 1000 == 0) {
             spin_log(LOG_INFO, "nflog module %s handled %d packets\n", 
                 nfr[fr_n].nfr_name,
                 nfr[fr_n].nfr_packets);

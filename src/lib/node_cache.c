@@ -11,8 +11,6 @@
 #include "spinhook.h"
 #include "statistics.h"
 
-extern int omitnode;
-
 STAT_MODULE(node_cache)
 
 STAT_COUNTER(nodes, nodes, STAT_TOTAL);
@@ -685,8 +683,15 @@ node_cache_update_arp(node_cache_t *node_cache, uint32_t timestamp) {
     node_t *node;
     char *mac;
     ip_t *ip;
+    static uint32_t lasttime;
 
     // Code called when arp table seems out of date
+
+    // Not too often
+    if (timestamp - lasttime < 10) {
+        return;
+    }
+    lasttime = timestamp;
 
     arp_table_read(node_cache->arp_table);
 

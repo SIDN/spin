@@ -13,7 +13,6 @@ enum configs {
     PUBSUB_CHANNEL_COMMANDS,
     PUBSUB_CHANNEL_TRAFFIC,
     PUBSUB_TIMEOUT,
-    PUBSUB_OMITNODE,
     IPTABLE_QUEUE_DNS,
     IPTABLE_QUEUE_BLOCK,
     IPTABLE_PLACE_DNS,
@@ -41,8 +40,6 @@ struct conf_item {
             { "pubsub_channel_traffic",     "SPIN/traffic",     0   },
     [PUBSUB_TIMEOUT] =
             { "pubsub_timeout",             "60",               0   },
-    [PUBSUB_OMITNODE] =
-            { "pubsub_omitnode",            "0",                0   },
     [IPTABLE_QUEUE_DNS] =
             { "iptable_queue_dns",          "1",                0   },
     [IPTABLE_QUEUE_BLOCK] =
@@ -152,11 +149,6 @@ char *spinconfig_pubsub_channel_traffic() {
 int spinconfig_pubsub_timeout() {
 
     return(spi_int(PUBSUB_TIMEOUT));
-}
-
-int spinconfig_pubsub_omitnode() {
-
-    return(spi_int(PUBSUB_OMITNODE));
 }
 
 int spinconfig_iptable_nflog_dns_group() {

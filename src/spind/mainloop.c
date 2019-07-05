@@ -43,13 +43,13 @@ static void panic(char *s) {
 
 // Register work function:  timeout in millisec
 void mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval) {
-    int i;
 
     spin_log(LOG_DEBUG, "Mainloop registered %s(..., %d, %d)\n", name, fd, toval);
     if (n_mnr >= MAXMNR) {
         panic("Ran out of MNR structs");
     }
     if (fd  != 0) {
+        int i;
         /* File descriptors if non-zero must be unique */
         for (i=0; i<n_mnr; i++) {
             if (mnr[i].mnr_fd == fd) {
@@ -145,7 +145,7 @@ void mainloop_run() {
     STAT_COUNTER(polltime, polltime, STAT_TOTAL);
     STAT_COUNTER(mem, memextra, STAT_MAX);
 
-    mainloop_register("mainloop", wf_mainloop, (void *) 0, 0, 10000);
+    mainloop_register("mainloop", wf_mainloop, (void *) 0, 0, 60000);
     init_mltime();
     for (i=0; i<n_mnr; i++) {
         if (mnr[i].mnr_fd) {

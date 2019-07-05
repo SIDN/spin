@@ -11,6 +11,8 @@
 void maybe_sendflow(flow_list_t *flow_list, time_t now);
 void report_block(int af, int proto, uint8_t *src_addr, uint8_t *dest_addr, unsigned src_port, unsigned dest_port, int payloadsize);
 
+void publish_nodes();
+
 void send_command_dnsquery(dns_pkt_info_t* pkt_info);
 
 void send_command_nodegone(node_t *node);

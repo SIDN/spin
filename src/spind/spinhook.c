@@ -1,5 +1,6 @@
 #include <assert.h>
 
+#include "spind.h"
 #include "node_cache.h"
 #include "spinhook.h"
 #include "spindata.h"
@@ -30,7 +31,6 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes, uint32_t timestamp) 
     int *newint;
     STAT_COUNTER(ctr, traffic, STAT_TOTAL);
 
-    // spin_log(LOG_DEBUG, "do_traffic to node %d (%d,%d)\n", node->id,cnt,bytes);
     leaf = tree_find(dev->dv_flowtree, sizeof(nodeid), &nodeid);
     STAT_VALUE(ctr, leaf!=NULL);
     if (leaf == NULL) {
@@ -51,7 +51,6 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes, uint32_t timestamp) 
         // Increase node reference count
         node->references++;
     } else {
-        // spin_log(LOG_DEBUG, "Found existing devflow_t\n");
         dfp = (devflow_t *) leaf->data;
     }
     dfp->dvf_packets += cnt;
@@ -231,7 +230,6 @@ flows_merged(node_cache_t *node_cache, int node1, int node2) {
 }
 
 static char *adminchannel = "SPIN/traffic/admin";
-extern void publish_nodes();
 
 void
 spinhook_nodedeleted(node_cache_t *node_cache, node_t *node) {
@@ -241,14 +239,13 @@ spinhook_nodedeleted(node_cache_t *node_cache, node_t *node) {
 
     publish_nodes();
     sd = spin_data_node_deleted(node->id);
-    command = spin_data_create_mqtt_command("nodeDeleted", NULL, sd);
 
+    command = spin_data_create_mqtt_command("nodeDeleted", NULL, sd);
     core2pubsub_publish_chan(adminchannel, command, 0);
+    spin_data_delete(command);
 
     sprintf(mosqchan, "SPIN/traffic/node/%d", node->id);
     core2pubsub_publish_chan(mosqchan, NULL, 1);
-
-    spin_data_delete(command);
 }
 
 void
@@ -259,10 +256,9 @@ spinhook_nodesmerged(node_cache_t *node_cache, node_t *dest_node, node_t *src_no
 
     publish_nodes();
     sd = spin_data_nodes_merged(src_node->id, dest_node->id);
+
     command = spin_data_create_mqtt_command("nodeMerged", NULL, sd);
-
     core2pubsub_publish_chan(adminchannel, command, 0);
-
     spin_data_delete(command);
 
     sprintf(mosqchan, "SPIN/traffic/node/%d", src_node->id);
