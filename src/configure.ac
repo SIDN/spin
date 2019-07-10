@@ -78,11 +78,11 @@ AC_ARG_WITH(linux-headers,
 
 MAKEFILES="Makefile src/Makefile"
 
-AC_ARG_ENABLE(pcap-reader,
-              AC_HELP_STRING([--enable-pcap-reader], [enable pcap-reader]),
+AC_ARG_ENABLE(spin-pcap-reader,
+              AC_HELP_STRING([--enable-spin-pcap-reader], [enable spin-pcap-reader]),
               [
-                MAKEFILES="$MAKEFILES tools/pcap-reader/Makefile";
-                AC_CONFIG_FILES(tools/pcap-reader/Makefile)
+                MAKEFILES="$MAKEFILES tools/spin-pcap-reader/Makefile";
+                AC_CONFIG_FILES(tools/spin-pcap-reader/Makefile)
                 CFLAGS="-g -O0"
                 AC_CHECK_LIB([pcap], [pcap_create], [LDFLAGS="$LDFLAGS -lpcap"], [AC_MSG_ERROR([pcap not found])])
               ], [])

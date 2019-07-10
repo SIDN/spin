@@ -6,4 +6,4 @@ fuzzing/generated-pcaps
 fuzzing/randpkt-gen.sh
 fuzzing/*.pcap
 fuzzing/pcaps
-pcap
+spin-pcap-reader
