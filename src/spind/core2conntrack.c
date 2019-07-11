@@ -23,18 +23,6 @@ typedef struct {
 // for now, we just use a static variable to keep the data
 static cb_data_t* cb_data_g;
 
-static inline u_int16_t get_u16_attr(struct nf_conntrack *ct, char ATTR) {
-  return ntohs(nfct_get_attr_u16(ct, ATTR));
-}
-
-static inline u_int32_t get_u32_attr(struct nf_conntrack *ct, char ATTR) {
-  return ntohl(nfct_get_attr_u32(ct, ATTR));
-}
-
-static inline u_int64_t get_u64_attr(struct nf_conntrack *ct, char ATTR) {
-  return be64toh(nfct_get_attr_u64(ct, ATTR));
-}
-
 void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
   u_int32_t tmp;
   STAT_COUNTER(ctr4, ipv4-to-pkt, STAT_TOTAL);
@@ -49,14 +37,14 @@ void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
     memcpy((pkt_info->src_addr) + 12, &tmp, 4);
     tmp = nfct_get_attr_u32(ct, ATTR_IPV4_DST);
     memcpy((pkt_info->dest_addr) + 12, &tmp, 4);
-    pkt_info->src_port = get_u16_attr(ct, ATTR_ORIG_PORT_SRC);
-    pkt_info->dest_port = get_u16_attr(ct, ATTR_ORIG_PORT_DST);
-    pkt_info->payload_size = get_u64_attr(ct, ATTR_ORIG_COUNTER_BYTES);
+    pkt_info->src_port = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_SRC);
+    pkt_info->dest_port = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_DST);
+    pkt_info->payload_size = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_BYTES);
     // We count both the orig and the repl for size and packet numbers
-    pkt_info->payload_size = get_u64_attr(ct, ATTR_ORIG_COUNTER_BYTES);
-    pkt_info->payload_size += get_u64_attr(ct, ATTR_REPL_COUNTER_BYTES);
-    pkt_info->packet_count = get_u64_attr(ct, ATTR_ORIG_COUNTER_PACKETS);
-    pkt_info->packet_count += get_u64_attr(ct, ATTR_REPL_COUNTER_PACKETS);
+    pkt_info->payload_size = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_BYTES);
+    pkt_info->payload_size += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_BYTES);
+    pkt_info->packet_count = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS);
+    pkt_info->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
     pkt_info->payload_offset = 0;
     pkt_info->protocol = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
     STAT_VALUE(ctr4, 1);
@@ -66,8 +54,8 @@ void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
     memcpy((&pkt_info->src_addr[0]), nfct_get_attr(ct, ATTR_IPV6_SRC), 16);
     memcpy((&pkt_info->dest_addr[0]), nfct_get_attr(ct, ATTR_IPV6_DST), 16);
     pkt_info->packet_count = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS);
-    pkt_info->payload_size = get_u64_attr(ct, ATTR_ORIG_COUNTER_BYTES);
-    pkt_info->payload_size += get_u64_attr(ct, ATTR_REPL_COUNTER_BYTES);
+    pkt_info->payload_size = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_BYTES);
+    pkt_info->payload_size += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_BYTES);
     pkt_info->packet_count = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS);
     pkt_info->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
     pkt_info->payload_offset = 0;
