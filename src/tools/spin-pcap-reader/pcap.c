@@ -23,7 +23,6 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <sys/socket.h>
 #include <sys/types.h>
 
 #include <net/if.h>
@@ -55,15 +54,26 @@
 #include "external/interface.h"
 #include "external/extract.h" /* must come after interface.h */
 
-#include "arp_table.h"
+#include "socket.h"
+
+/* spind/lib includes */
 #include "dns.h"
-#include "util.h"
+#include "extsrc.h"
+#include "pkt_info.h"
 
 /* Linux compat */
 #ifndef IPV6_VERSION
 #define IPV6_VERSION		0x60
 #define IPV6_VERSION_MASK	0xf0
 #endif /* IPV6_VERSION */
+
+#if DEBUG
+#define DPRINTF(x...) warnx(x)
+#define DASSERT(x) assert(x)
+#else
+#define DPRINTF(x...) do {} while (0)
+#define DASSERT(x) do {} while (0)
+#endif /* DEBUG */
 
 #ifdef __OpenBSD__
 extern char *malloc_options;
@@ -74,7 +84,9 @@ const u_char *snapend;
 
 static pcap_t *pd;
 
-static struct arp_table *arp_table;
+static struct handle_dns_ctx *handle_dns_ctx;
+
+static int fd;
 
 static void
 sig_handler(int sig)
@@ -107,80 +119,39 @@ usage(const char *error)
 }
 
 static void
-print_packet(const char *mac_from, const char *mac_to, const char *ip_from,
-    const char *ip_to, uint8_t ip_proto, int tcp_initiated, int port_from,
-    int port_to, int size, long long timestamp)
+write_pkt_info_to_socket(pkt_info_t *pkt)
 {
-	printf("{");
-	print_str_str("command", "traffic");
-	print_str_str("argument", "");
-	printf("\"result\": { ");
+	struct extsrc_msg *msg;
 
-	printf("\"flows\": [ ");
+	msg = extsrc_msg_create_pkt_info(pkt);
 
-	printf("{ ");
+	socket_writemsg(fd, msg->data, msg->length);
 
-	print_fromto("from", mac_from, ip_from);
-	print_fromto("to", mac_to, ip_to);
-	print_str_n("protocol", ip_proto);
-	if (tcp_initiated) {
-		print_str_n("x_tcp_initiated", tcp_initiated);
-	}
-	print_str_n("from_port", port_from);
-	print_str_n("to_port", port_to);
-	print_str_n("size", size);
-	print_str_n("count", 1);
-	print_dummy_end();
-
-	printf("} ");
-
-	printf("], "); // flows
-
-	print_str_n("timestamp", timestamp);
-	print_str_n("total_size", -1);
-	print_str_n("total_count", -1);
-	print_dummy_end();
-
-	printf("} "); // result
-
-	printf("}");
-	printf("\n");
+	extsrc_msg_free(msg);
 }
 
 static void
-handle_icmp6(const u_char *bp, const struct ether_header *ep)
+dns_query_hook(dns_pkt_info_t *dns_pkt, int family, uint8_t *src_addr)
 {
-	const struct icmp6_hdr *dp;
-	const struct nd_neighbor_advert *p;
-	char ip[INET6_ADDRSTRLEN];
-	struct ether_addr mac;
-	char macstr[12+5+1];
+	struct extsrc_msg *msg;
 
-	dp = (struct icmp6_hdr *)bp;
+	msg = extsrc_msg_create_dns_query(dns_pkt, family, src_addr);
 
-	TCHECK(dp->icmp6_code);
-	switch (dp->icmp6_type) {
-	case ND_NEIGHBOR_ADVERT:
-		p = (const struct nd_neighbor_advert *)dp;
+	socket_writemsg(fd, msg->data, msg->length);
 
-		TCHECK(p->nd_na_target);
-		inet_ntop(AF_INET6, &p->nd_na_target, ip, sizeof(ip));
+	extsrc_msg_free(msg);
+}
 
-		memcpy(&mac.ether_addr_octet, ep->ether_shost,
-		    sizeof(mac.ether_addr_octet));
-		mactostr(&mac, macstr, sizeof(macstr));
+static void
+dns_answer_hook(dns_pkt_info_t *dns_pkt)
+{
+	struct extsrc_msg *msg;
 
-		arp_table_add(arp_table, ip, macstr);
-		break;
+	msg = extsrc_msg_create_dns_answer(dns_pkt);
 
-	default:
-		break;
-	}
+	socket_writemsg(fd, msg->data, msg->length);
 
-	return;
-
- trunc:
-	warnx("TRUNCATED");
+	extsrc_msg_free(msg);
 }
 
 static void
@@ -198,14 +169,13 @@ handle_ip(const u_char *p, u_int length, const struct ether_header *ep,
 	const struct udphdr *up;
 	const u_char *cp;
 	u_int hlen, len;
-	char *mac_from;
-	char *mac_to;
-	char ip_from[INET6_ADDRSTRLEN];
-	char ip_to[INET6_ADDRSTRLEN];
 	uint8_t ip_proto;
+#ifdef unusedfornow
 	int tcp_initiated = 0;
+#endif
 	int port_from = 0;
 	int port_to = 0;
+	pkt_info_t pkt_info;
 
 	switch (((struct ip *)p)->ip_v) {
 	case 4:
@@ -220,6 +190,8 @@ handle_ip(const u_char *p, u_int length, const struct ether_header *ep,
 		DPRINTF("not an IP packet");
 		return;
 	}
+
+	pkt_info.family = ip6 ? AF_INET6 : AF_INET;
 
 	if (ip6) {
 		if (length < sizeof(struct ip6_hdr)) {
@@ -257,23 +229,33 @@ handle_ip(const u_char *p, u_int length, const struct ether_header *ep,
 		// XXX extension headers
 		ip_proto = ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
 
-		inet_ntop(AF_INET6, &ip6->ip6_src, ip_from, sizeof(ip_from));
-		inet_ntop(AF_INET6, &ip6->ip6_dst, ip_to, sizeof(ip_to));
+		pkt_info.protocol = ip_proto;
+		memcpy(pkt_info.src_addr, &ip6->ip6_src,
+		    sizeof(ip6->ip6_src));
+		memcpy(pkt_info.dest_addr, &ip6->ip6_dst,
+		    sizeof(ip6->ip6_dst));
 	} else {
 		ip_proto = ip->ip_p;
 
-		inet_ntop(AF_INET, &ip->ip_src, ip_from, sizeof(ip_from));
-		inet_ntop(AF_INET, &ip->ip_dst, ip_to, sizeof(ip_to));
+		pkt_info.protocol = ip_proto;
+		memset(pkt_info.src_addr, 0, 12);
+		memcpy(pkt_info.src_addr + 12, &ip->ip_src,
+		    sizeof(ip->ip_src));
+		memset(pkt_info.dest_addr, 0, 12);
+		memcpy(pkt_info.dest_addr + 12, &ip->ip_dst,
+		    sizeof(ip->ip_dst));
 	}
 
 	switch (ip_proto) {
+#if 0
 	case IPPROTO_ICMPV6:
 		if (ip6) {
-			handle_icmp6((const u_char *)(ip6 + 1), ep);
+			handle_icmp6((const u_char *)(ip6 + 1), ep); // XXX
 		} else {
 			warnx("ICMPv6 in IPv4 packet");
 		}
 		break;
+#endif
 
 	case IPPROTO_TCP:
 		if (ip6) {
@@ -284,8 +266,10 @@ handle_ip(const u_char *p, u_int length, const struct ether_header *ep,
 		}
 		TCHECK(*tp);
 
+#ifdef unusedfornow
 		if ((tp->th_flags & (TH_SYN|TH_ACK)) == TH_SYN)
 			tcp_initiated = 1;
+#endif
 
 		port_from = ntohs(tp->th_sport);
 		port_to = ntohs(tp->th_dport);
@@ -309,10 +293,12 @@ handle_ip(const u_char *p, u_int length, const struct ether_header *ep,
 		break;
 	}
 
-	mac_from = arp_table_find_by_ip(arp_table, ip_from);
-	mac_to = arp_table_find_by_ip(arp_table, ip_to);
-	print_packet(mac_from, mac_to, ip_from, ip_to, ip_proto, tcp_initiated,
-	    port_from, port_to, len, ts->tv_sec);
+	pkt_info.src_port = port_from;
+	pkt_info.dest_port = port_to;
+	pkt_info.payload_size = len; // XXX verify
+	pkt_info.packet_count = 1;
+
+	write_pkt_info_to_socket(&pkt_info);
 
 	if (port_from == 53 || port_to == 53) {
 		if (up) {
@@ -321,7 +307,13 @@ handle_ip(const u_char *p, u_int length, const struct ether_header *ep,
 			cp = (const u_char *)(tp + 1);
 		}
 		TCHECK(*cp);
-		handle_dns(cp, len, ts->tv_sec);
+		if (port_from == 53) {
+			handle_dns_answer(handle_dns_ctx, cp, len,
+			    pkt_info.family);
+		} else if (port_to == 53) {
+			handle_dns_query(handle_dns_ctx, cp, len,
+			    pkt_info.src_addr, pkt_info.family);
+		}
 	}
 
 	return;
@@ -335,46 +327,6 @@ handle_ip(const u_char *p, u_int length, const struct ether_header *ep,
 
 }
 
-
-static void
-handle_arp(const u_char *bp, u_int length)
-{
-	const struct ether_arp *ap;
-	u_short op;
-	char ip[INET_ADDRSTRLEN];
-	struct ether_addr mac;
-	char macstr[12+5+1];
-
-	ap = (struct ether_arp *)bp;
-	if ((u_char *)(ap + 1) > snapend) {
-		warnx("[|arp]");
-		return;
-	}
-	if (length < sizeof(struct ether_arp)) {
-		warnx("truncated arp");
-		return;
-	}
-
-	op = EXTRACT_16BITS(&ap->arp_op);
-	switch (op) {
-	case ARPOP_REPLY:
-		memcpy(&mac.ether_addr_octet, ap->arp_sha,
-		    sizeof(mac.ether_addr_octet));
-
-		mactostr(&mac, macstr, sizeof(macstr));
-		inet_ntop(AF_INET, &ap->arp_spa, ip, sizeof(ip));
-
-		arp_table_add(arp_table, ip, macstr);
-		break;
-
-	default:
-		break;
-	}
-}
-
-#ifdef SLOW
-static int counter = 0;
-#endif /* SLOW */
 /*
  * Callback for libpcap. Handles a packet.
  */
@@ -389,14 +341,6 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 	if (h->caplen != h->len) {
 		warnx("caplen %d != len %d, ", h->caplen, h->len);
 	}
-
-#ifdef SLOW
-	++counter;
-	if ((counter & 0xfff) == 0) {
-		sleep(3);
-		counter = 0;
-	}
-#endif /* SLOW */
 
 	packetp = sp;
 	snapend = sp + h->caplen;
@@ -420,9 +364,11 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 		handle_ip(p, caplen, ep, &h->ts);
 		break;
 
+#if 0
 	case ETHERTYPE_ARP:
-		handle_arp(p, caplen);
+		handle_arp(p, caplen); // XXX
 		break;
+#endif
 
 	default:
 		DPRINTF("unknown ether type");
@@ -465,6 +411,8 @@ main(int argc, char *argv[])
 			usage(NULL);
 		}
 	}
+
+	fd = socket_open(EXTSRC_SOCKET_PATH);
 
 	if (device && file)
 		usage("cannot specify both an interface and a file");
@@ -513,7 +461,9 @@ main(int argc, char *argv[])
 		err(1, "pledge");
 #endif /* HAVE_PLEDGE */
 
-	arp_table = arp_table_create();
+	handle_dns_ctx = handle_dns_init(&dns_query_hook, &dns_answer_hook);
+	if (!handle_dns_ctx)
+		errx(1, "handle_dns_init");
 
 	(void)signal(SIGTERM, sig_handler);
 	(void)signal(SIGINT, sig_handler);
@@ -524,10 +474,10 @@ main(int argc, char *argv[])
 	/*
 	 * Done, clean up.
 	 */
-	arp_table_destroy(arp_table);
-
 	if (pd)
 		pcap_close(pd);
+
+	close(fd);
 
 	return 0;
 }

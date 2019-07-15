@@ -7,6 +7,7 @@
 #include "mainloop.h"
 #include "spind.h"
 #include "pkt_info.h"
+#include "ipl.h"
 
 #include "statistics.h"
 

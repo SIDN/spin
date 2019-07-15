@@ -2,6 +2,8 @@
 
 #include "spin_log.h"
 
+#include <sys/socket.h>
+
 #include <assert.h>
 
 #include <errno.h>

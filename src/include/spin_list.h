@@ -1,6 +1,8 @@
 #ifndef SPIN_LIST_H
 #define SPIN_LIST_H
 
+#include "util.h"
+
 enum iplist_index {
     IPLIST_BLOCK,
     IPLIST_IGNORE,

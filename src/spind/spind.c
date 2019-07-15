@@ -18,6 +18,7 @@
 #include "spinconfig.h"
 #include "pkt_info.h"
 #include "util.h"
+#include "ipl.h"
 #include "spin_list.h"
 #include "node_cache.h"
 #include "dns_cache.h"
@@ -25,6 +26,7 @@
 #include "spin_log.h"
 #include "core2pubsub.h"
 #include "core2block.h"
+#include "core2extsrc.h"
 #include "core2nflog_dns.h"
 #include "core2conntrack.h"
 
@@ -543,30 +545,11 @@ report_block(int af, int proto, uint8_t *src_addr, uint8_t *dest_addr, unsigned 
  * a copy written to file.
  * BLOCK, IGNORE, ALLOW
  */
-// TODO: move this out to the library, this feels like pretty commonly shared code
-struct list_info {
-    tree_t *        li_tree;                 // Tree of IP addresses
-    char *          li_listname;             // Name of list
-    int             li_modified;             // File should be written
-} ipl_list_ar[N_IPLIST] = {
+struct list_info ipl_list_ar[N_IPLIST] = {
     { 0, "block",   0 },
     { 0, "ignore",  0 },
     { 0, "allow",   0 },
 };
-
-#define ipl_block ipl_list_ar[IPLIST_BLOCK]
-#define ipl_ignore ipl_list_ar[IPLIST_IGNORE]
-#define ipl_allow ipl_list_ar[IPLIST_ALLOW]
-
-
-// Make name of shadow file
-static char*
-ipl_filename(struct list_info *lip) {
-    static char listname[30];
-
-    sprintf(listname, "/etc/spin/%s.list", lip->li_listname);
-    return listname;
-}
 
 void wf_ipl(void *arg, int data, int timeout) {
     int i;
@@ -586,82 +569,12 @@ void wf_ipl(void *arg, int data, int timeout) {
     }
 }
 
-void init_ipl(struct list_info *lip) {
-    int cnt;
-    char *fname;
-
-    lip->li_tree = tree_create(cmp_ips);
-    fname = ipl_filename(lip);
-    cnt = read_ip_tree(lip->li_tree, fname);
-    spin_log(LOG_DEBUG, "File %s, read %d entries\n", fname, cnt);
-}
-
-void init_all_ipl() {
-    int i;
-    struct list_info *lip;
-
-    for (i=0; i<N_IPLIST; i++) {
-        lip = &ipl_list_ar[i];
-        init_ipl(lip);
-    }
+void
+init_ipl_list_ar() {
+    init_all_ipl(ipl_list_ar);
 
     // Sync trees to files every 2.5 seconds for now
     mainloop_register("IP list sync", wf_ipl, (void *) 0, 0, 2500);
-}
-
-static void
-add_ip_tree_to_li(tree_t* tree, struct list_info *lip) {
-    tree_entry_t* cur;
-
-    if (tree == NULL)
-        return;
-    cur = tree_first(tree);
-    while(cur != NULL) {
-        tree_add(lip->li_tree, cur->key_size, cur->key, cur->data_size, cur->data, 1);
-        cur = tree_next(cur);
-    }
-    lip->li_modified++;
-}
-
-static void
-remove_ip_tree_from_li(tree_t *tree, struct list_info *lip) {
-    tree_entry_t* cur;
-
-    if (tree == NULL) {
-        return;
-    }
-    cur = tree_first(tree);
-    while(cur != NULL) {
-        tree_remove(lip->li_tree, cur->key_size, cur->key);
-        cur = tree_next(cur);
-    }
-    lip->li_modified++;
-}
-
-void remove_ip_from_li(ip_t* ip, struct list_info *lip) {
-
-    tree_remove(lip->li_tree, sizeof(ip_t), ip);
-    lip->li_modified++;
-}
-
-int ip_in_li(ip_t* ip, struct list_info* lip) {
-
-    return tree_find(lip->li_tree, sizeof(ip_t), ip) != NULL;
-}
-
-int ip_in_ignore_list(ip_t* ip) {
-
-    return ip_in_li(ip, &ipl_list_ar[IPLIST_IGNORE]);
-}
-
-// hmz, we probably want to refactor ip_t/the tree list
-// into something that requires less data copying
-int addr_in_ignore_list(int family, uint8_t* addr) {
-    ip_t ip;
-
-    ip.family = family;
-    memcpy(ip.addr, addr, 16);
-    return ip_in_ignore_list(&ip);
 }
 
 #define MAXSR 3 /* More than this would be excessive */
@@ -971,7 +884,9 @@ int main(int argc, char** argv) {
 
     init_core2block();
 
-    init_all_ipl();
+    init_core2extsrc(node_cache, dns_cache);
+
+    init_ipl_list_ar();
 
     init_spinrpc();
 
