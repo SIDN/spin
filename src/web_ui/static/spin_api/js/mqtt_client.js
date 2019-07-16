@@ -294,10 +294,10 @@ function handleNodeInfo(data) {
 
 function getNodeInfo(id) {
     if (Number.isInteger(id)) {
-        if (nodeinfo.includes(id)) {
+        if (nodeinfo[id]) {
             return nodeinfo[id];
         } else {
-            console.error("no nodeInfo for node " + from_node)
+            console.error("no nodeInfo for node " + id)
             return false;
         }
     } else {
