@@ -24,6 +24,9 @@
  */
 
 #include <sys/types.h>
+#define __USE_GNU /* for TIMESPEC_TO_TIMEVAL */
+#include <sys/time.h>
+#undef __USE_GNU
 
 #include <net/if.h>
 #ifdef HAVE_NET_ETHERTYPES_H
@@ -49,6 +52,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "external/external.h"
 #include "external/interface.h"
@@ -78,6 +82,8 @@
 #ifdef __OpenBSD__
 extern char *malloc_options;
 #endif /* __OpenBSD__ */
+
+int Rflag;	/* replay as fast as possible rather than at recorded speed */
 
 const u_char *packetp;
 const u_char *snapend;
@@ -327,6 +333,48 @@ handle_ip(const u_char *p, u_int length, const struct ether_header *ep,
 
 }
 
+static void
+monotime(struct timeval *tv)
+{
+	struct timespec ts;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
+		err(1, "clock_gettime");
+	}
+
+	TIMESPEC_TO_TIMEVAL(tv, &ts);
+}
+
+static void
+maybe_sleep(const struct timeval *cur_pcap)
+{
+	static struct timeval last_pcap = { 0, 0 };
+	static struct timeval last_wall = { 0, 0 };
+	struct timeval cur_wall;
+	struct timeval diff_pcap;
+	struct timeval diff_wall;
+	struct timeval to_sleep;
+
+	monotime(&cur_wall);
+
+	if (timerisset(&last_wall)) {
+		timersub(cur_pcap, &last_pcap, &diff_pcap);
+		timersub(&cur_wall, &last_wall, &diff_wall);
+
+		if (timercmp(&diff_wall, &diff_pcap, <)) {
+			timersub(&diff_pcap, &diff_wall, &to_sleep);
+
+			if (select(0, NULL, NULL, NULL, &to_sleep) == -1 &&
+			    errno != EINTR) {
+				err(1, "select");
+			}
+		}
+	}
+
+	memcpy(&last_pcap, cur_pcap, sizeof(last_pcap));
+	memcpy(&last_wall, &cur_wall, sizeof(last_wall));
+}
+
 /*
  * Callback for libpcap. Handles a packet.
  */
@@ -361,6 +409,11 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 	switch (ether_type) {
 	case ETHERTYPE_IP:
 	case ETHERTYPE_IPV6:
+		// XXX find a better place for this piece of code
+		if (!Rflag) {
+			maybe_sleep(&h->ts);
+		}
+
 		handle_ip(p, caplen, ep, &h->ts);
 		break;
 
@@ -394,7 +447,7 @@ main(int argc, char *argv[])
 	malloc_options = "S";
 #endif /* __OpenBSD__ */
 
-	while ((ch = getopt(argc, argv, "f:hi:r:")) != -1) {
+	while ((ch = getopt(argc, argv, "f:hi:Rr:")) != -1) {
 		switch(ch) {
 		case 'f':
 			filter = optarg;
@@ -403,6 +456,9 @@ main(int argc, char *argv[])
 			usage(NULL);
 		case 'i':
 			device = optarg;
+			break;
+		case 'R':
+			Rflag = 1;
 			break;
 		case 'r':
 			file = optarg;
@@ -418,6 +474,9 @@ main(int argc, char *argv[])
 		usage("cannot specify both an interface and a file");
 	if (!device && !file)
 		device = "eth0";
+
+	if (device && Rflag)
+		usage("specifying an interface and -R are incompatible");
 
 	if ((pcap_errbuf = malloc(PCAP_ERRBUF_SIZE)) == NULL)
 		err(1, "malloc");
