@@ -219,6 +219,22 @@ publish_nodes() {
     node_callback_new(node_cache, node_is_updated);
 }
 
+static node_t *
+find_node_id(int node_id) {
+    node_t *node;
+
+    /*
+     * Find it and give warning if non-existent. This should not happen.
+     */
+    node = node_cache_find_by_id(node_cache, node_id);
+    if (node == NULL) {
+        spin_log(LOG_WARNING, "Node-id %d not found!\n", node_id);
+        return NULL;
+    }
+    return node;
+}
+
+
 /*
  * RPC implementing code
  *
@@ -400,6 +416,9 @@ spinrpc_blockflow_start(int node1, int node2) {
     // new pair to block
     store_nodepairs();
     c2b_blockflow_start(node1, node2);
+    /*
+     * add device->node block flag if applicable
+     */
     return 0;
 }
 
@@ -432,6 +451,7 @@ spinrpc_blockflow(int node1, int node2, int block) {
     int result;
     int sn1, sn2;
     STAT_COUNTER(ctr, rpc-blockflow, STAT_TOTAL);
+    node_t *n1, *n2;
 
     if (node1 == node2) {
         return 1;
@@ -447,6 +467,15 @@ spinrpc_blockflow(int node1, int node2, int block) {
         result = spinrpc_blockflow_stop(sn1, sn2);
     }
     STAT_VALUE(ctr, 1);
+    n1 = find_node_id(node1);
+    n2 = find_node_id(node2);
+    if (n1->device) {
+        spinhook_block_dev_node_flow(n1->device, n2, block);
+    }
+    if (n2->device) {
+        spinhook_block_dev_node_flow(n2->device, n1, block);
+    }
+
     return result;
 }
 
@@ -657,21 +686,6 @@ void handle_command_remove_all_from_list(int iplist) {
     tree_destroy(ipl_list_ar[iplist].li_tree);
 }
 
-static node_t *
-find_node_id(int node_id) {
-    node_t *node;
-
-    /*
-     * Find it and give warning if non-existent. This should not happen.
-     */
-    node = node_cache_find_by_id(node_cache, node_id);
-    if (node == NULL) {
-        spin_log(LOG_WARNING, "Node-id %d not found!\n", node_id);
-        return NULL;
-    }
-    return node;
-}
-
 // Switch code
 void handle_list_membership(int listid, int addrem, int node_id) {
     node_t* node;
@@ -706,9 +720,11 @@ void handle_command_reset_ignores() {
 
 void handle_command_add_name(int node_id, char* name) {
     // find the node
-    node_t* node = node_cache_find_by_id(node_cache, node_id);
+    // node_t* node = node_cache_find_by_id(node_cache, node_id);
+    node_t *node;
     tree_entry_t* ip_entry;
 
+    node = find_node_id(node_id);
     if (node == NULL) {
         return;
     }
@@ -765,18 +781,42 @@ rpc_arg_desc_t addipnode_args[] = {
 static int addipnodefunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
     node_t *node;
     ip_t ipval;
+    int nodenum;
+    char *ipaddr;
+    uint32_t timestamp;
+    int new;
 
-    if (!spin_pton(&ipval, args[1].rpca_svalue)) {
+    nodenum = args[0].rpca_ivalue;
+    ipaddr = args[1].rpca_svalue;
+    
+    timestamp = time(NULL);
+
+    if (!spin_pton(&ipval, ipaddr)) {
         result->rpca_ivalue = -1;
         return -1;
     }
     node = node_cache_find_by_ip(node_cache, sizeof(ipval), &ipval);
     if (node) {
-        result->rpca_ivalue = node->id;
-        return 0;
+        result->rpca_ivalue = -node->id;
+        return -1;
     }
 
-    result->rpca_ivalue = 0;
+    if (nodenum == 0) {
+        node = node_create(0);
+        node_set_modified(node, timestamp);
+        node_add_ip(node, &ipval);
+        new = node_cache_add_node(node_cache, node);
+        assert(new);
+    } else {
+        node = find_node_id(nodenum);
+        if (node == NULL) {
+            result->rpca_ivalue = -1;
+            return -1;
+        }
+        xnode_add_ip(node_cache, node, &ipval);
+        node_set_modified(node, timestamp);
+    }
+    result->rpca_ivalue = node->id;
     return 0;
 }
 

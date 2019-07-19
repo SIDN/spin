@@ -199,6 +199,15 @@ void cache_tree_print(node_cache_t *node_cache) {
 }
 
 void
+xnode_add_ip(node_cache_t *node_cache, node_t* node, ip_t* ip) {
+    STAT_COUNTER(ctr, add-ip, STAT_TOTAL);
+
+    STAT_VALUE(ctr, 1);
+    tree_add(node->ips, sizeof(ip_t), ip, 0, NULL, 1);
+    cache_tree_add_ip(node_cache, node, ip);
+}
+
+void
 node_add_ip(node_t* node, ip_t* ip) {
     STAT_COUNTER(ctr, add-ip, STAT_TOTAL);
 

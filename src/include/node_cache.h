@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 typedef struct {
+    int     dvf_blocked;
     int     dvf_packets;
     int     dvf_bytes;
     uint32_t dvf_lastseen;
@@ -121,6 +122,8 @@ void node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timesta
 void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uint32_t timestamp);
 void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp);
 void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, uint32_t timestamp);
+
+void xnode_add_ip(node_cache_t *node_cache, node_t* node, ip_t* ip);
 
 /**
  * this takes ownership of the given node pointer, do not use or free after!

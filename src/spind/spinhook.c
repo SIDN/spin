@@ -23,8 +23,7 @@ spinhook_makedevice(node_t *node) {
     node->device = dev;
 }
 
-void
-do_traffic(device_t *dev, node_t *node, int cnt, int bytes, uint32_t timestamp) {
+devflow_t *spinhook_get_devflow(device_t *dev, node_t *node) {
     tree_entry_t *leaf;
     int nodeid = node->id;
     devflow_t *dfp;
@@ -36,6 +35,7 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes, uint32_t timestamp) 
     if (leaf == NULL) {
         spin_log(LOG_DEBUG, "Create new devflow_t\n");
         dfp = malloc(sizeof(devflow_t));
+        dfp->dvf_blocked = 0;
         dfp->dvf_packets = 0;
         dfp->dvf_bytes = 0;
         dfp->dvf_lastseen = 0;
@@ -53,6 +53,22 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes, uint32_t timestamp) 
     } else {
         dfp = (devflow_t *) leaf->data;
     }
+    return dfp;
+}
+
+void
+spinhook_block_dev_node_flow(device_t *dev, node_t *node, int blocked) {
+    devflow_t *dfp;
+
+    dfp = spinhook_get_devflow(dev, node);
+    dfp->dvf_blocked = blocked;
+}
+
+void
+do_traffic(device_t *dev, node_t *node, int cnt, int bytes, uint32_t timestamp) {
+    devflow_t *dfp;
+
+    dfp = spinhook_get_devflow(dev, node);
     dfp->dvf_packets += cnt;
     dfp->dvf_bytes += bytes;
     dfp->dvf_lastseen = timestamp;

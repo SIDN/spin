@@ -160,10 +160,14 @@ spin_data_flowlist(node_t *node) {
             nodenump = (int *) cur->key;
             dfp = (devflow_t *) cur->data;
             flow_obj = cJSON_CreateObject();
-            cJSON_AddNumberToObject(flow_obj, "to", *nodenump);
-            cJSON_AddNumberToObject(flow_obj, "packets", dfp->dvf_packets);
-            cJSON_AddNumberToObject(flow_obj, "bytes", dfp->dvf_bytes);
-            cJSON_AddNumberToObject(flow_obj, "lastseen", dfp->dvf_lastseen);
+            if (dfp->dvf_blocked) {
+                cJSON_AddNumberToObject(flow_obj, "blocked", 1);
+            } else {
+                cJSON_AddNumberToObject(flow_obj, "to", *nodenump);
+                cJSON_AddNumberToObject(flow_obj, "packets", dfp->dvf_packets);
+                cJSON_AddNumberToObject(flow_obj, "bytes", dfp->dvf_bytes);
+                cJSON_AddNumberToObject(flow_obj, "lastseen", dfp->dvf_lastseen);
+            }
 
             cJSON_AddItemToArray(flow_ar_obj, flow_obj);
 
