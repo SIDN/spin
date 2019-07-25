@@ -43,6 +43,9 @@ void
 node_destroy(node_t* node) {
 
     STAT_VALUE(nodes, -1);
+    if (node->id > 0) {
+        spin_log(LOG_DEBUG, "Destroying node %d\n", node->id);
+    }
     tree_destroy(node->ips);
     node->ips = NULL;
     tree_destroy(node->domains);
@@ -461,6 +464,9 @@ void node_callback_devices(node_cache_t* node_cache, cleanfunc mf, void * ap) {
     cur = tree_first(node_cache->mac_refs);
     while (cur != NULL) {
         node = * ((node_t**) cur->data);
+        if (!node->device) {
+            node_cache_update_arp(node_cache, 0);
+        }
         assert(node->device);
         (*mf)(node_cache, node, ap);
         nfound++;
@@ -697,7 +703,7 @@ node_cache_update_arp(node_cache_t *node_cache, uint32_t timestamp) {
     // Code called when arp table seems out of date
 
     // Not too often
-    if (timestamp - lasttime < 10) {
+    if (timestamp > 0 && timestamp - lasttime < 10) {
         return;
     }
     lasttime = timestamp;
@@ -977,7 +983,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
         if (dest_node->mac && dest_node->device==NULL) {
             // Remaining node must be promoted to device
 
-            spinhook_makedevice(node);
+            spinhook_makedevice(dest_node);
         }
         return 0;
     }
@@ -998,7 +1004,9 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
 
     if (node->mac) {
         cache_tree_add_mac(node_cache, node, node->mac);
-        spinhook_makedevice(node);
+        if (node->device == NULL) {
+            spinhook_makedevice(node);
+        }
     }
 
     leaf = tree_first(node->ips);

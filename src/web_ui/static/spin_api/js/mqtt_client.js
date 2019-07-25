@@ -61,6 +61,8 @@ function writeToScreen(element, message) {
     el.innerHTML = message;
 }
 
+var REMOVEME=false;
+
 function onTrafficMessage(msg) {
     try {
         var message = JSON.parse(msg)
@@ -77,7 +79,7 @@ function onTrafficMessage(msg) {
                 }
                 break;
             case 'traffic':
-                //console.log("Got traffic command: " + msg);
+                //console.log("Got traffic message: " + msg);
                 //console.log("handling trafficcommand: " + evt.data);
 
                 // First, update time_sync to account for timing differences
@@ -89,29 +91,31 @@ function onTrafficMessage(msg) {
             case 'nodeInfo':
                 // This implements the new nodeInfo messages
                 // These are publishes on different channels
+                //console.log("Got nodeinfo message: " + msg);
                 handleNodeInfo(result);
+                break;
             case 'blocked':
-                //console.log("Got blocked command: " + msg);
+                //console.log("Got blocked message: " + msg);
                 handleBlockedMessage(result);
                 break;
             case 'dnsquery':
-                //console.log("Got blocked command: " + msg);
+                //console.log("Got DNS query message: " + msg);
                 handleDNSQueryMessage(result);
                 break;
             case 'ignores':
-                console.log("Got ignores command: " + msg);
+                //console.log("Got ignores command: " + msg);
                 ignoreList = result;
                 ignoreList.sort();
                 updateIgnoreList();
                 break;
             case 'blocks':
-                console.log("Got blocks command: " + msg);
+                //console.log("Got blocks command: " + msg);
                 blockList = result;
                 blockList.sort();
                 updateBlockList();
                 break;
             case 'alloweds':
-                console.log("Got alloweds command: " + msg);
+                //console.log("Got alloweds command: " + msg);
                 allowedList = result;
                 allowedList.sort();
                 updateAllowedList();
@@ -276,14 +280,14 @@ function moveTimeline(maxtime) {
 }
 
 function handleBlockedMessage(data) {
-    var from_node = data['from'];
-    var to_node = data['to'];
+    var from_node = getNodeInfo(data['from']);
+    var to_node = getNodeInfo(data['to']);
     addBlocked(from_node, to_node);
 }
 
 function handleDNSQueryMessage(data) {
-    var from_node = data['from'];
-    var dns_node = data['queriednode'];
+    var from_node = getNodeInfo(data['from']);
+    var dns_node = getNodeInfo(data['queriednode']);
     addDNSQuery(from_node, dns_node);
 }
 

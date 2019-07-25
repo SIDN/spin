@@ -456,6 +456,12 @@ spinrpc_blockflow(int node1, int node2, int block) {
     if (node1 == node2) {
         return 1;
     }
+    n1 = find_node_id(node1);
+    n2 = find_node_id(node2);
+
+    if (n1 == NULL || n2 == NULL) {
+        return 1;
+    }
     if (node1 < node2) {
         sn1 = node1; sn2 = node2;
     } else {
@@ -467,8 +473,6 @@ spinrpc_blockflow(int node1, int node2, int block) {
         result = spinrpc_blockflow_stop(sn1, sn2);
     }
     STAT_VALUE(ctr, 1);
-    n1 = find_node_id(node1);
-    n2 = find_node_id(node2);
     if (n1->device) {
         spinhook_block_dev_node_flow(n1->device, n2, block);
     }

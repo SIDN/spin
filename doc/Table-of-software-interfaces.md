@@ -9,7 +9,7 @@ Currently a lot of interfaces are implemented using a pseudo-rpc mechanism runni
 
 Functional name | Tech name | WebAPI availibility | RPC/Ubus availability | MQTT
 --- | --- | --- | --- | ---
-Retreive devices and information | get_devices | yes | planned for 0.10 | no
+Retreive devices and information | devicelist | yes | in 0.10 | no
 Get profile of device | get_profile | yes | no | no
 Change profile of device | set_profile | yes | no | no
 ??? | toggle_new | yes | no | no
@@ -29,9 +29,10 @@ Remove all IP addresses from node from list of allowed nodes | remove_allow_node
 Remove IP address of allowed list | remove_allow_ip | no | no | yes
 Reset list of ignored IP addresses to default | reset_ignores | no | no| yes
 Block flow between two nodes | blockflow | no |  in 0.10 | no
+Block flow between device and node|devblockflow|no|in 0.10|no
 Get list of blocked flows | get_blockflow | no |  in 0.10| no
 Get flows of device | get_deviceflow | yes | in 0.10 | no
 Create node | create_node | yes | in 0.10 | no
-Add IP address to node | add_ip_node | yes | in 0.10 | no
+Add IP address to node | add_ip_to_node | yes | in 0.10 | no
 
 The WebAPI calls and MQTT calls  are documented in the file Spin-API.md

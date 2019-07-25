@@ -788,9 +788,14 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
         if (blocked) {
             // Node observes blocked traffic
             colour = colour_blocked;
-        } else if (dnsquery && !nodes.get(node.id)) {
-            // Node does not exist, dnsquery
-            colour = colour_dns;
+        } else if (dnsquery) {
+            // if type is dnsquery, and the node was either already dnsquery or is new,
+            // set color to dnsquery. Otherwise, mark it as 'recent' again.
+            if (nodes.get(node.id) && nodes.get(node.id).color_set != colour_dns) {
+                colour = colour_recent;
+            } else {
+                colour = colour_dns;
+            }
         } else {
             // In all other cases
             colour = colour_recent;
@@ -812,6 +817,7 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
         enode.label = label;
         enode.ips = ips;
         enode.domains = domains;
+        enode.color_set = colour;
         enode.color = { 'background': colour, 'border': border_colour };
         enode.blocked = blocked;
         enode.lastseen = timestamp;
@@ -828,6 +834,7 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
             ips: node.ips ? node.ips : [],
             domains: node.domains ? node.domains : [],
             label: label,
+            color_set: colour,
             color: { 'background': colour, 'border': border_colour },
             value: size,
             count: count,

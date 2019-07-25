@@ -108,7 +108,6 @@ rpc_call(char *name, int nargs, rpc_arg_t *args, rpc_arg_t *result) {
     rpc_arg_desc_t *funcargs, *rpcd;
     rpc_arg_t *rpca;
     int call_arg, def_arg;
-    int argok;
     int res;
     rpc_arg_val_t *argumentvals;
 
@@ -136,27 +135,30 @@ rpc_call(char *name, int nargs, rpc_arg_t *args, rpc_arg_t *result) {
     }
 
     for (call_arg=0; call_arg<nargs; call_arg++) {
+        int argnameok, argtypeok;
+
         rpca = args + call_arg;
-        argok = 0;
+        argnameok = 0;
+        argtypeok = 0;
 
         // Find argument and check type in function definition
         // Arguments can be in wrong order
 
         for (def_arg=0; def_arg<funcnargs; def_arg++) {
             rpcd = funcargs + def_arg;
-            if (strcmp(rpca->rpc_desc.rpca_name, rpcd->rpca_name) == 0 &&
-                            rpca->rpc_desc.rpca_type == rpcd->rpca_type) {
+            argnameok = strcmp(rpca->rpc_desc.rpca_name, rpcd->rpca_name) == 0;
+            argtypeok = rpca->rpc_desc.rpca_type == rpcd->rpca_type;
+            if (argnameok && argtypeok) {
                     argumentvals[def_arg] = rpca->rpc_val;
-                    argok = 1;
                     break;
             }
         }
 
-        if (!argok) {
+        if (argnameok == 0 || argtypeok == 0) {
             spin_log(LOG_ERR, "Argument %s unknown or wrong type\n", rpca->rpc_desc.rpca_name);
             result->rpc_desc.rpca_name = "error";
             result->rpc_desc.rpca_type = RPCAT_STRING;
-            result->rpc_val.rpca_svalue = "No such argument registered";
+            result->rpc_val.rpca_svalue = argnameok == 0 ? "No such argument registered" : "Wrong type of argument";
 
             free(argumentvals);
             return -1;
