@@ -64,6 +64,9 @@ function writeToScreen(element, message) {
 var REMOVEME=false;
 
 function onTrafficMessage(msg) {
+    if (msg === '') {
+        return
+    }
     try {
         var message = JSON.parse(msg)
         var command = message['command'];
@@ -120,11 +123,12 @@ function onTrafficMessage(msg) {
                 allowedList.sort();
                 updateAllowedList();
                 break;
-			case 'peakinfo':
-				//console.log("Got peak information: " + msg);
-				handlePeakInformation(result);
-				break;
+            case 'peakinfo':
+                //console.log("Got peak information: " + msg);
+                handlePeakInformation(result);
+                break;
             case 'nodeUpdate':
+                // obeoslete?
                 console.log("Got node update command: " + msg);
                 // just addNode?
                 //updateNode(result);
@@ -132,19 +136,31 @@ function onTrafficMessage(msg) {
             case 'serverRestart':
                 serverRestart();
                 break;
+            case 'nodeMerged':
+                // remove the old node, update the new node
+                console.log("Got node merged command: " + msg);
+                handleNodeMerged(result);
+                break;
+            case 'nodeDeleted':
+                // remove the old node, update the new node
+                console.log("Got node deleted command: " + msg);
+                handleNodeDeleted(result);
+                break;
             default:
                 console.log("unknown command from server: " + msg);
                 break;
         }
     } catch (error) {
-        console.error("Error handling message: " + msg);
+        console.error("Error handling message: '" + msg + "'");
         if (error.stack) {
+            console.error("Error: " + error.message);
             console.error("Stacktrace: " + error.stack);
         } else {
             console.error("Error: " + error);
         }
     }
 }
+
 
 function onTrafficOpen(evt) {
     // Once a connection has been made, make a subscription and send a message..
@@ -289,6 +305,26 @@ function handleDNSQueryMessage(data) {
     var from_node = getNodeInfo(data['from']);
     var dns_node = getNodeInfo(data['queriednode']);
     addDNSQuery(from_node, dns_node);
+}
+
+function handleNodeMerged(data) {
+    // Do we need to do something with the merged-to?
+    // We probably only need to remove our refs to the old one
+    var deletedNodeId = data['id']
+    var node = getNodeInfo(deletedNodeId)
+    if (node !== null) {
+        deleteNode(deletedNodeId);
+        nodeinfo[data["id"]] = null;
+    }
+}
+
+function handleNodeDeleted(data) {
+    var deletedNodeId = data['id']
+    var node = getNodeInfo(deletedNodeId)
+    if (node !== null) {
+        deleteNode(deletedNodeId);
+        nodeinfo[data["id"]] = null;
+    }
 }
 
 // Handles nodeInfo command
