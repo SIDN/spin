@@ -70,6 +70,13 @@ extsrc_msg_create_dns_answer(dns_pkt_info_t *dns_pkt)
         EXTSRC_MSG_TYPE_DNS_ANSWER);
 }
 
+struct extsrc_msg *
+extsrc_msg_create_arp_table_update(struct extsrc_arp_table_update *up)
+{
+    return extsrc_msg_create((char *)up, sizeof(*up),
+        EXTSRC_MSG_TYPE_ARP_TABLE_UPDATE);
+}
+
 void
 extsrc_msg_free(struct extsrc_msg *msg)
 {

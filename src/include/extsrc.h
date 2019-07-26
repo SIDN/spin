@@ -23,6 +23,8 @@
 #define EXTSRC_MSG_TYPE_DNS_QUERY 2
 /* Payload consists of: dns_pkt_info_t */
 #define EXTSRC_MSG_TYPE_DNS_ANSWER 3
+/* Payload consists of: struct extsrc_arp_table_update */
+#define EXTSRC_MSG_TYPE_ARP_TABLE_UPDATE 4
 
 /*
  * Additional information for the MSG_TYPE_DNS_QUERY message type.
@@ -31,6 +33,18 @@ struct extsrc_dns_query_hdr {
     int family;
     uint8_t src_addr[16];
 };
+
+#define ETHER_ADDR_STRLEN sizeof("aa:bb:cc:dd:ee:ff")
+/*
+ * Payload structure for the EXTSRC_MSG_TYPE_ARP_TABLE_UPDATE message type.
+ * For a certain MAC address, it lists an IP address that should be added to the
+ * ARP table.
+ */
+struct extsrc_arp_table_update {
+    char mac[ETHER_ADDR_STRLEN];
+    ip_t ip;
+};
+#undef ETHER_ADDR_STRLEN
 
 /*
  * END OF MESSAGE TYPE-SPECIFIC #define'S AND STRUCTURES
@@ -78,6 +92,8 @@ struct extsrc_msg *extsrc_msg_create_pkt_info(pkt_info_t *pkt);
 struct extsrc_msg *extsrc_msg_create_dns_query(dns_pkt_info_t *dns_pkt,
     int family, uint8_t *src_addr);
 struct extsrc_msg *extsrc_msg_create_dns_answer(dns_pkt_info_t *dns_pkt);
+struct extsrc_msg
+    *extsrc_msg_create_arp_table_update(struct extsrc_arp_table_update *up);
 
 void extsrc_msg_free(struct extsrc_msg *msg);
 
