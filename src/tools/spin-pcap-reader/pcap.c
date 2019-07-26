@@ -468,8 +468,6 @@ main(int argc, char *argv[])
 		}
 	}
 
-	fd = socket_open(EXTSRC_SOCKET_PATH);
-
 	if (device && file)
 		usage("cannot specify both an interface and a file");
 	if (!device && !file)
@@ -477,6 +475,8 @@ main(int argc, char *argv[])
 
 	if (device && Rflag)
 		usage("specifying an interface and -R are incompatible");
+
+	fd = socket_open(EXTSRC_SOCKET_PATH);
 
 	if ((pcap_errbuf = malloc(PCAP_ERRBUF_SIZE)) == NULL)
 		err(1, "malloc");
