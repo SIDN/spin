@@ -88,8 +88,7 @@ wf_extsrc(void *arg, int data, int timeout)
          * dealt with in a contained fashion (just close the socket and
          * move on).
          */
-        spin_log(LOG_WARNING, "%s: malloc: %s\n", __func__,
-            strerror(errno));
+        spin_log(LOG_WARNING, "%s: malloc: %s\n", __func__, strerror(errno));
         goto fail;
     }
 
@@ -102,21 +101,17 @@ wf_extsrc(void *arg, int data, int timeout)
     switch (hdr.type) {
     case EXTSRC_MSG_TYPE_PKT_INFO:
         if (len != sizeof(struct extsrc_msg_hdr) + sizeof(pkt_info_t)) {
-            spin_log(LOG_WARNING, "%s: incorrect message size\n",
-                __func__);
+            spin_log(LOG_WARNING, "%s: incorrect message size\n", __func__);
             goto fail;
         }
 
-        process_pkt_info((pkt_info_t *)(msg +
-            sizeof(struct extsrc_msg_hdr)));
+        process_pkt_info((pkt_info_t *)(msg + sizeof(struct extsrc_msg_hdr)));
         break;
 
     case EXTSRC_MSG_TYPE_DNS_QUERY:
         if (len != sizeof(struct extsrc_msg_hdr) +
-            sizeof(struct extsrc_dns_query_hdr) +
-            sizeof(dns_pkt_info_t)) {
-            spin_log(LOG_WARNING, "%s: incorrect message size\n",
-                __func__);
+            sizeof(struct extsrc_dns_query_hdr) + sizeof(dns_pkt_info_t)) {
+            spin_log(LOG_WARNING, "%s: incorrect message size\n", __func__);
             goto fail;
         }
 
@@ -127,10 +122,8 @@ wf_extsrc(void *arg, int data, int timeout)
         break;
 
     case EXTSRC_MSG_TYPE_DNS_ANSWER:
-        if (len != sizeof(struct extsrc_msg_hdr) +
-            sizeof(dns_pkt_info_t)) {
-            spin_log(LOG_WARNING, "%s: incorrect message size\n",
-                __func__);
+        if (len != sizeof(struct extsrc_msg_hdr) + sizeof(dns_pkt_info_t)) {
+            spin_log(LOG_WARNING, "%s: incorrect message size\n", __func__);
             goto fail;
         }
 
