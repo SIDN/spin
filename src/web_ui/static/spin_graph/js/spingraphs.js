@@ -16,6 +16,7 @@ var graph2d_1;
 var graph_peak_packets;
 var graph_peak_bytes;
 var selectedNodeId;
+var selectedEdgeId;
 // list of ignores
 var ignoreList = [];
 var blockList = [];
@@ -29,6 +30,8 @@ var colour_recent = "#bbffbb";
 var colour_edge = "#9999ff";
 var colour_blocked = "#ff0000";
 var colour_dns = "#ffab44";
+
+var nodes;
 
 // these are used in the filterlist dialog
 var _selectRange = false,
@@ -122,6 +125,17 @@ function initGraphs() {
             of: "#mynetwork"
         },
         close: nodeInfoClosed,
+    });
+
+    // create the flow information dialog
+    $("#flowinfo").dialog({
+        autoOpen: false,
+        position: {
+            my: "left top",
+            at: "left top",
+            of: "#mynetwork"
+        },
+        close: flowInfoClosed,
     });
 
     // create the ignore node dialog
@@ -494,8 +508,25 @@ function initGraphs() {
         var w = window.open(url, name, "width=400,  height=300, scrollbars=yes");
     });
 
-    $("#block_device_flow").button().on("click", function (evt) {
-        sendAPICommand("asdf");
+    $("#block-flow-button").button().on("click", function (evt) {
+        let edge = edges.get(selectedEdgeId);
+        let block;
+        if (isBlockedEdge(selectedEdgeId)) {
+            block = 0;
+            edge.blocked = false;
+        } else {
+            block = 1;
+            edge.blocked = true;
+        }
+        let params = {
+            "node1": edge.from,
+            "node2": edge.to,
+            "block": block
+        };
+        edges.update(edge)
+        updateEdgeInfo(selectedEdgeId);
+        //alert(JSON.stringify(params));
+        sendRPCCommand("blockflow", params);
     });
 
     showGraph(traffic_dataset);
@@ -613,27 +644,35 @@ function showNetwork() {
             shadow:shadowState,
             arrows:'to',
             smooth:true
+        },
+        interaction: {
+            selectConnectedEdges: false
         }
     };
     network = new vis.Network(container, data, options);
     network.on("selectNode", nodeSelected);
+    network.on("deselectNode", nodeDeselected);
+    network.on("selectEdge", edgeSelected);
+    network.on("deselectEdge", edgeDeselected);
     network.on("dragStart", nodeSelected);
     network.on("zoom", enableZoomLock);
 }
 
+
+
 function updateNodeInfo(nodeId) {
     var node = nodes.get(nodeId);
-	var sizeblabel = 'B';
-	var sizeb = 0;
-	if (node.size > 0) {
-		sizeblabel = ['B','KiB', 'MiB', 'GiB', 'TiB'][Math.floor(Math.log2(node.size)/10)]
-		sizeb = Math.floor(node.size / ([1,1024, 1024**2, 1024**3, 1024**4][Math.floor(Math.log2(node.size)/10)]))
-	} 
+    var sizeblabel = 'B';
+    var sizeb = 0;
+    if (node.size > 0) {
+        sizeblabel = ['B','KiB', 'MiB', 'GiB', 'TiB'][Math.floor(Math.log2(node.size)/10)]
+        sizeb = Math.floor(node.size / ([1,1024, 1024**2, 1024**3, 1024**4][Math.floor(Math.log2(node.size)/10)]))
+    } 
 
     writeToScreen("trafficcount", "<b>Packets seen</b>: " + node.count);
     writeToScreen("trafficsize", "<b>Traffic size</b>: " + sizeb + " " + sizeblabel);
     writeToScreen("ipaddress", "");
-	var d = new Date(node.lastseen * 1000);
+    var d = new Date(node.lastseen * 1000);
     writeToScreen("lastseen", "<b>Last seen</b>: " + d.toLocaleDateString() + " " + d.toLocaleTimeString() + " (" + node.lastseen + ")");
 
     writeToScreen("nodeid", "<b>Node</b>: " + nodeId);
@@ -657,7 +696,39 @@ function updateNodeInfo(nodeId) {
     return node;
 }
 
+function updateEdgeInfo(edgeId) {
+    let edge = edges.get(edgeId);
+    let fromlabel = nodes.get(edge.from).label
+    let tolabel = nodes.get(edge.to).label
+    writeToScreen("fromnodeid", "<b>From</b>: " + fromlabel);
+    writeToScreen("tonodeid", "<b>To</b>: " + tolabel);
+    var label = isBlockedEdge(edgeId) ? "Unblock flow" : "Block flow";
+    $("#block-flow-button").button("option", {
+        "label": label
+    });
+}
+
+function edgeSelected(event) {
+    console.log("[XX] edgeSelected event");
+    selectedEdgeId = event.edges[0];
+    updateEdgeInfo(selectedEdgeId);
+    $("#flowinfo").dialog('open');
+}
+
+function edgeDeselected(event) {
+    selectedEdgeId = 0;
+    console.log("[XX] edgedeSelected event");
+    $("#flowinfo").dialog('close');
+}
+
+function nodeDeselected(event) {
+    selectedNodeId = 0;
+    console.log("[XX] nodeDeselected event");
+    $("#nodeinfo").dialog('close');
+}
+
 function nodeSelected(event) {
+    console.log("[XX] nodeSelected event");
     var nodeId = event.nodes[0];
     if (typeof(nodeId) == 'number' && selectedNodeId != nodeId) {
         var node = updateNodeInfo(nodeId);
@@ -666,7 +737,7 @@ function nodeSelected(event) {
         updateBlockedButton();
         updateAllowedButton();
 
-		/* Arrange peak detection graph */
+        /* Arrange peak detection graph */
         if (graph_peak_packets != null){
             graph_peak_packets.destroy();
             graph_peak_packets = null;
@@ -677,16 +748,17 @@ function nodeSelected(event) {
         }
         
         $("#nodeinfo-peakdet").hide(); // Always hide peak detection, show when active.
-		if (node.mac) {
+        if (node.mac) {
             // Obtain peak information from server.
             // Uses variable selectedNodeId as set above.
             getPeakInformation();
-		}
+        }
 
         //sendCommand("ip2hostname", node.address);
         //writeToScreen("netowner", "Network owner: &lt;searching&gt;");
         //sendCommand("ip2netowner", node.address); // talk to Websocket
         $("#nodeinfo").dialog('option', 'title', node.label);
+        $("#flowinfo").dialog('close');
         $("#nodeinfo").dialog('open');
 
     }
@@ -828,8 +900,8 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
         enode.lastseen = timestamp;
         enode.is_blocked = node.is_blocked;
         enode.is_excepted = node.is_excepted;
-		enode.size += size;
-		enode.count += count;
+        enode.size += size;
+        enode.count += count;
         nodes.update(enode);
     } else {
         // it's new
@@ -857,14 +929,14 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
             }
         });
     }
-	// If node is selected, update labels
+    // If node is selected, update labels
     if (node.id == selectedNodeId) {
         updateNodeInfo(node.id);
     }
 }
 
 // Used in AddFlow()
-function addEdge(from, to, colour) {
+function addEdge(from, to, colour, blocked) {
     var existing = edges.get({
         filter: function(item) {
             return (item.from == from.id && item.to == to.id);
@@ -875,12 +947,16 @@ function addEdge(from, to, colour) {
             id: curEdgeId,
             from: from.id,
             to: to.id,
-            color: {color: colour}
+            color: {color: colour},
+            blocked: blocked
         });
         curEdgeId += 1;
     } else if (existing[0].color.color != colour) {
         // If color changed, update it!
         existing[0].color = {color: colour};
+        if (blocked !== undefined) {
+            existing[0].blocked = blocked;
+        }
         edges.update(existing[0]);
     }
 }
@@ -985,7 +1061,7 @@ function addFlow(timestamp, from, to, count, size) {
     }
     addNode(timestamp, from, false, count, size, "to " + to, "source");
     addNode(timestamp, to, true, count, size, "from " + from, "traffic");
-    addEdge(from, to, colour_edge);
+    addEdge(from, to, colour_edge, false);
     if (!zoom_locked) {
         network.fit({
             duration: 0
@@ -1003,7 +1079,7 @@ function addBlocked(from, to) {
     var timestamp = to["lastseen"];
     addNode(timestamp, from, false, 1, 1, "to " + to, "source");
     addNode(timestamp, to, false, 1, 1, "from " + from, "blocked");
-    addEdge(from, to, colour_blocked);
+    addEdge(from, to, colour_blocked, true);
     if (!zoom_locked) {
         network.fit({
             duration: 0
@@ -1038,6 +1114,23 @@ function isBlocked(node) {
         for (var j = 0; j < node.ips.length; j++) {
             return contains(blockList, node.ips[j]);
         }
+    }
+    return false
+}
+
+// Returns true if the edge is blocked
+// Note that this is more than just the 'blocked' status of the edge;
+// both the source and the target must not be blocked themselves
+// ('blocked' status is set when blocked traffic is seen, but this
+// may be caused by either node being fully blocked, rather than the
+// specific edge)
+function isBlockedEdge(edgeId) {
+    let edge = edges.get(edgeId);
+    if (edge && edge.blocked) {
+        let from = nodes.get(edge.from)
+        let to = nodes.get(edge.to)
+        let result = (edge.blocked && !isBlocked(from) && !isBlocked(to))
+        return result
     }
     return false
 }
@@ -1130,6 +1223,13 @@ function nodeInfoClosed(event, ui) {
     }
 }
 
+/*
+ * On close of FlowInfo window
+ */
+function flowInfoClosed(event, ui) {
+    selectedEdgeId = 0;
+}
+
 /* 
  * Request peak information for a particular nodeId.
  * Uses MQTT to query any running peak detection.
@@ -1145,27 +1245,27 @@ function getPeakInformation() {
  * If closed, stop streaming of information
  */
 function handlePeakInformation(result) {
-	var container = document.getElementById('nodeinfo-peakdetvis');
+    var container = document.getElementById('nodeinfo-peakdetvis');
     $("#nodeinfo-peakdet").show()
     /*
      * If there is no graph yet, make one.
      * Otherwise, change only the inner dataset.
      */
-	var options = {
+    var options = {
         start: "2019-01-01 00:00",
         end: "2019-01-01 00:59",
-		graphHeight: '100px',
-		showMajorLabels: false,
-		showMinorLabels: false,
+        graphHeight: '100px',
+        showMajorLabels: false,
+        showMinorLabels: false,
         zoomable: false,
         moveable: false,
         legend: false,
-		dataAxis: {
-			visible: false,
-			left: { range: { min: 0 }}
-		},
-		drawPoints: { enabled: false }
-	};
+        dataAxis: {
+            visible: false,
+            left: { range: { min: 0 }}
+        },
+        drawPoints: { enabled: false }
+    };
 
     if (graph_peak_bytes == null) {
         // Remove loading text
