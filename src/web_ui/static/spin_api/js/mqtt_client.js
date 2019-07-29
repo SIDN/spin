@@ -26,7 +26,7 @@ function connectToMQTT() {
     var url = new URL(window.location);
     var mqtt_host = url.searchParams.get("mqtt_host");
     if (!mqtt_host) {
-        mqtt_host = "valibox.";
+        mqtt_host = window.location.hostname
     }
     var mqtt_port = url.searchParams.get("mqtt_port");
     if (mqtt_port) {
