@@ -22,7 +22,7 @@ typedef struct {
 } cb_data_t;
 
 // for now, we just use a static variable to keep the data
-static cb_data_t* cb_data_g;
+static cb_data_t* cb_data_g = NULL;
 
 void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
   u_int32_t tmp;
@@ -241,4 +241,5 @@ void init_core2conntrack(node_cache_t* node_cache, int local_mode, trafficfunc h
 void cleanup_core2conntrack() {
     flow_list_destroy(cb_data_g->flow_list);
     free(cb_data_g);
+    cb_data_g = NULL;
 }

@@ -59,6 +59,9 @@ node_destroy(node_t* node) {
         node->name = NULL;
     }
     if (node->device) {
+        if (node->device->dv_flowtree) {
+            tree_destroy(node->device->dv_flowtree);
+        }
         free(node->device);
         node->device = NULL;
     }
@@ -512,6 +515,8 @@ node_cache_destroy(node_cache_t* node_cache) {
     }
     tree_destroy(node_cache->nodes);
     tree_destroy(node_cache->ip_refs);
+    tree_destroy(node_cache->domain_refs);
+    tree_destroy(node_cache->mac_refs);
     arp_table_destroy(node_cache->arp_table);
     node_names_destroy(node_cache->names);
     free(node_cache);

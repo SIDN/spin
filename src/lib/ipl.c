@@ -44,6 +44,16 @@ void init_all_ipl(struct list_info *ipl_list_ar_a) {
     }
 }
 
+void clean_all_ipl() {
+    int i;
+    struct list_info *lip;
+
+    for (i=0; i<N_IPLIST; i++) {
+        lip = &ipl_list_ar[i];
+        tree_destroy(lip->li_tree);
+    }
+}
+
 void
 add_ip_tree_to_li(tree_t* tree, struct list_info *lip) {
     tree_entry_t* cur;

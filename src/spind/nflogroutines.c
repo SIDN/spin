@@ -186,7 +186,7 @@ nflog_cb(struct nflog_g_handle *qh, struct nfgenmsg *nfmsg, struct nflog_data *n
         return 0;
 }
 
-static struct nflog_handle *library_handle;
+static struct nflog_handle *library_handle = NULL;
 static int library_fd;
 
 static void
@@ -248,4 +248,18 @@ void nflogroutine_register(char *name, nflogfunc wf, void *arg, int group_number
     nfr[n_nfr].nfr_wfarg = arg;
     nfr[n_nfr].nfr_qh = qh;
     n_nfr++;
+}
+
+void nflogroutine_close(char* name) {
+    for (int i=0; i < n_nfr; i++) {
+        if (strcmp(nfr[i].nfr_name, name) == 0) {
+            nflog_unbind_group(nfr[i].nfr_qh);
+        }
+    }
+}
+
+void nflog_close_handle() {
+    if (library_handle != NULL) {
+        nflog_close(library_handle);
+    }
 }

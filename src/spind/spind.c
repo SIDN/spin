@@ -29,6 +29,8 @@
 #include "core2extsrc.h"
 #include "core2nflog_dns.h"
 #include "core2conntrack.h"
+#include "nfqroutines.h"
+#include "nflogroutines.h"
 
 #include "rpc_common.h"
 
@@ -241,8 +243,8 @@ find_node_id(int node_id) {
  * This should probably be moved to separate file
  *
  */
-tree_t *nodepair_tree;
-tree_t *nodemap_tree;
+tree_t *nodepair_tree = NULL;
+tree_t *nodemap_tree = NULL;
 
 static void
 handle_node_info(char *buf, int size) {
@@ -357,6 +359,17 @@ init_blockflow() {
     read_nodepair_tree(NODEPAIRFILE);
 
     tree_destroy(nodemap_tree);
+    nodemap_tree = NULL;
+}
+
+void
+cleanup_blockflow() {
+    if (nodemap_tree != NULL) {
+        tree_destroy(nodemap_tree);
+    }
+    if (nodepair_tree != NULL) {
+        tree_destroy(nodepair_tree);
+    }
 }
 
 static int
@@ -1049,10 +1062,19 @@ int main(int argc, char** argv) {
 
     mainloop_run();
 
+    cleanup_blockflow();
     cleanup_cache();
     cleanup_core2block();
+    cleanup_core2conntrack();
+    cleanup_core2nflog_dns();
+    cleanup_core2extsrc();
+
+    nfq_close_handle();
+    nflog_close_handle();
+    rpc_cleanup();
 
     finish_mosquitto();
+    clean_all_ipl();
 
     SPIN_STAT_FINISH();
 

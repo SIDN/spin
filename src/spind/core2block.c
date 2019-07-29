@@ -29,7 +29,7 @@ STAT_MODULE(core2block)
 // static const char stat_modname[]="core2block";
 
 static int dolog;
-static FILE *logfile;
+static FILE *logfile = NULL;
 
 static void
 setup_debug() {
@@ -364,6 +364,8 @@ void init_core2block() {
 }
 
 void cleanup_core2block() {
-
-    // Add freeing of malloced memory for memory-leak detection
+    if (logfile != NULL) {
+        fclose(logfile);
+    }
+    nfqroutine_close("core2block");
 }

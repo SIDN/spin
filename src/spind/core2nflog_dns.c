@@ -19,7 +19,7 @@
 #include "spinconfig.h"
 #include "nflogroutines.h"
 
-static struct handle_dns_ctx *handle_dns_ctx;
+static struct handle_dns_ctx *handle_dns_ctx = NULL;
 
 static void nflog_dns_callback(void* arg, int family, int protocol,
                             uint8_t* data, int size,
@@ -51,4 +51,8 @@ void init_core2nflog_dns(node_cache_t* node_cache, dns_cache_t* dns_cache) {
 }
 
 void cleanup_core2nflog_dns() {
+    nflogroutine_close("core2nflog_dns");
+    if (handle_dns_ctx != NULL) {
+        handle_dns_cleanup(handle_dns_ctx);
+    }
 }

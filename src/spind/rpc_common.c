@@ -15,7 +15,7 @@ typedef struct rpc_data {
     rpc_argtype     rpcd_result_type;
 } rpc_data_t;
 
-static tree_t *rpcfunctree;
+static tree_t *rpcfunctree = NULL;
 
 static char * rpcatype(int t) {
 
@@ -175,4 +175,8 @@ rpc_call(char *name, int nargs, rpc_arg_t *args, rpc_arg_t *result) {
     free(argumentvals);
 
     return res;
+}
+
+void rpc_cleanup() {
+    tree_destroy(rpcfunctree);
 }

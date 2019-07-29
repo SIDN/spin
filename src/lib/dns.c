@@ -105,14 +105,14 @@ handle_dns_answer(const struct handle_dns_ctx *ctx, const u_char *bp, u_int leng
 
     tmp_list = ldns_pkt_rr_list_by_type(p, LDNS_RR_TYPE_A, LDNS_SECTION_ANSWER);
     if (tmp_list != NULL) {
-		ldns_rr_list_cat(answers, tmp_list);
-		ldns_rr_list_free(tmp_list);
-	}
+        ldns_rr_list_cat(answers, tmp_list);
+        ldns_rr_list_free(tmp_list);
+    }
     tmp_list = ldns_pkt_rr_list_by_type(p, LDNS_RR_TYPE_AAAA, LDNS_SECTION_ANSWER);
     if (tmp_list != NULL) {
-		ldns_rr_list_cat(answers, tmp_list);
-		ldns_rr_list_free(tmp_list);
-	}
+        ldns_rr_list_cat(answers, tmp_list);
+        ldns_rr_list_free(tmp_list);
+    }
 
     ips_len = ldns_rr_list_rr_count(answers);
 
@@ -207,3 +207,7 @@ handle_dns_init(void (*query_hook)(dns_pkt_info_t *, int, uint8_t *), void (*ans
     return ctx;
 }
 
+void
+handle_dns_cleanup(struct handle_dns_ctx* ctx) {
+    free(ctx);
+}

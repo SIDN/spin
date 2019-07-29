@@ -214,4 +214,5 @@ void
 cleanup_core2extsrc()
 {
     // XXX should we close the socket here?
+    flow_list_destroy(flow_list);
 }
