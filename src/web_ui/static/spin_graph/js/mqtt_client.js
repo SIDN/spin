@@ -1,3 +1,4 @@
+var server_host = null;
 var client = 0;// = new Paho.MQTT.Client("valibox.", 1884, "Web-" + Math.random().toString(16).slice(-5));
 //var client = new Paho.MQTT.Client("127.0.0.1", 1884, "clientId");
 var last_traffic = 0 // Last received traffic trace
@@ -8,6 +9,12 @@ var datacache = []; // array of all data items to be added on the next iteration
 var nodeinfo = []; // caching array with all node information
 
 function init() {
+    var url = new URL(window.location);
+    server_host = url.searchParams.get("mqtt_host");
+    if (!server_host) {
+        server_host = window.location.hostname
+    }
+
     connectToMQTT();
     initGraphs();
 
@@ -24,17 +31,13 @@ function init() {
 
 function connectToMQTT() {
     var url = new URL(window.location);
-    var mqtt_host = url.searchParams.get("mqtt_host");
-    if (!mqtt_host) {
-        mqtt_host = window.location.hostname
-    }
     var mqtt_port = url.searchParams.get("mqtt_port");
     if (mqtt_port) {
         mqtt_port = parseInt(mqtt_port);
     } else {
         mqtt_port = 1884;
     }
-    client = new Paho.MQTT.Client(mqtt_host, mqtt_port, "Web-" + Math.random().toString(16).slice(-5));
+    client = new Paho.MQTT.Client(server_host, mqtt_port, "Web-" + Math.random().toString(16).slice(-5));
 }
 
 // called when a message arrives
@@ -43,6 +46,7 @@ function onMessageArrived(message) {
     onTrafficMessage(message.payloadString);
 }
 
+// send a command to the MQTT channel 'SPIN/commands'
 function sendCommand(command, argument) {
     var cmd = {}
     cmd['command'] = command;
@@ -54,6 +58,15 @@ function sendCommand(command, argument) {
     message.destinationName = "SPIN/commands";
     client.send(message);
     console.log("Sent to SPIN/commands: " + json_cmd)
+}
+
+// send a command directly to the Web API of spin (spin_webui)
+// this is essentially a web API layer to the RPC mechanism (currently
+// implemented locally through ubus and exposed by spin_webui)
+function sendAPICommand(command, argument) {
+    // server host is the same as mqtt host
+    let api_base = server_host + "/spin_api";
+    alert(api_base);
 }
 
 function writeToScreen(element, message) {

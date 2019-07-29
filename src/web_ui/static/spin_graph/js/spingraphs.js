@@ -493,6 +493,10 @@ function initGraphs() {
         var w = window.open(url, name, "width=400,  height=300, scrollbars=yes");
     });
 
+    $("#block_device_flow").button().on("click", function (evt) {
+        sendAPICommand("asdf");
+    });
+
     showGraph(traffic_dataset);
     showNetwork();
     initTrafficDataView();
