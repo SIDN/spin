@@ -37,8 +37,8 @@ static const struct blobmsg_policy rpc_policy[] = {
 };
 
 static int spin_rpc(struct ubus_context *ctx, struct ubus_object *obj,
-		      struct ubus_request_data *req, const char *method,
-		      struct blob_attr *msg)
+              struct ubus_request_data *req, const char *method,
+              struct blob_attr *msg)
 {
     char *args, *result;
 
@@ -94,29 +94,29 @@ void wf_ubus(void *arg, int data, int timeout) {
 
 int ubus_main()
 {
-	const char *ubus_socket = NULL;
-	int ret;
+    const char *ubus_socket = NULL;
+    int ret;
 
-	ctx = ubus_connect(ubus_socket);
-	if (!ctx) {
-            fprintf(stderr, "Failed to connect to ubus\n");
-            return -1;
-	} else {
-            spin_log(LOG_DEBUG, "Connected to ubus\n");
-        }
+    ctx = ubus_connect(ubus_socket);
+    if (!ctx) {
+        fprintf(stderr, "Failed to connect to ubus\n");
+        return -1;
+    } else {
+        spin_log(LOG_DEBUG, "Connected to ubus\n");
+    }
 
-        fd_set_blocking(ctx->sock.fd, 0);
-        mainloop_register("ubus", wf_ubus, NULL, ctx->sock.fd, 0);
+    fd_set_blocking(ctx->sock.fd, 0);
+    mainloop_register("ubus", wf_ubus, NULL, ctx->sock.fd, 0);
 
-	ret = ubus_add_object(ctx, &spin_object);
-	if (ret) {
-            fprintf(stderr, "Failed to add object: %s\n", ubus_strerror(ret));
-        }
+    ret = ubus_add_object(ctx, &spin_object);
+    if (ret) {
+        fprintf(stderr, "Failed to add object: %s\n", ubus_strerror(ret));
+    }
 
-	ret = ubus_register_subscriber(ctx, &spin_event);
-	if (ret) {
-            fprintf(stderr, "Failed to add watch handler: %s\n", ubus_strerror(ret));
-        }
+    ret = ubus_register_subscriber(ctx, &spin_event);
+    if (ret) {
+        fprintf(stderr, "Failed to add watch handler: %s\n", ubus_strerror(ret));
+    }
 
-	return 0;
+    return 0;
 }

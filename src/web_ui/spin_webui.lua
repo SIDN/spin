@@ -33,6 +33,11 @@ local profile_manager_m = require 'profile_manager'
 
 local TEMPLATE_PATH = "templates/"
 
+-- Some functionality requires RPC calls to the spin daemon.
+-- This module automatically uses UBUS if available, and JSON-RPC
+-- otherwise
+local rpc = require('json_rpc')
+
 posix = require 'posix'
 
 --
@@ -366,10 +371,65 @@ function handler:handle_configuration(request, response)
     return response
 end
 
+function dump(o)
+   if type(o) == 'table' then
+      local s = '{ '
+      for k,v in pairs(o) do
+         if type(k) ~= 'number' then k = '"'..k..'"' end
+         s = s .. '['..k..'] = ' .. dump(v) .. ','
+      end
+      return s .. '} '
+   else
+      return tostring(o)
+   end
+end
+
 function handler:handle_device_list(request, response)
+    print("Calling RPC")
+    local conn = rpc.connect()
+    if not conn then
+        error("failed to connect to RPC mechanism")
+    end
+    result, err = conn:call({ method = "devicelist" })
+    -- TODO: error handling
+
+    ubdata = json.encode(result)
+    local webresult = {}
+    for i=1, #result["result"] do
+        local rdata = result["result"][i]
+        if not rdata["name"] then
+            rdata["name"] = rdata["mac"]
+        end
+        rdata["lastSeen"] = rdata["lastseen"]
+        webresult[rdata["mac"]] = rdata
+    end
     self:set_api_headers(response)
-    response.content = json.encode(self.device_manager:get_devices_seen())
+    response.content = json.encode(webresult)
     response:set_header("Last-Modified", self.device_manager.last_update)
+    return response
+end
+
+function handler:handle_rpc_call(request, response)
+    self:set_api_headers(response)
+    if request.method == "POST" then
+        if request.post_data then
+            local conn = rpc.connect()
+            if not conn then
+                error("failed to connect to RPC mechanism")
+            end
+            result, err = conn:call(request.post_data)
+            if result then
+                response.content = json.encode(result)
+            else
+                response:set_status(500, err)
+            end
+        else
+            response:set_status(400, "Bad request")
+            response.content = json.encode({status = 400, error = "Missing value: 'config' in POST data"})
+        end
+    else
+        response:set_status(405, "Method not allowed")
+    end
     return response
 end
 
@@ -712,6 +772,7 @@ function handler:init(args)
         ["/spin_api/notifications"] = self.handle_notification_list,
         ["/spin_api/notifications/create"] = self.handle_notification_add,
         ["/spin_api/configuration"] = self.handle_configuration,
+        ["/spin_api/rpc"] = self.handle_rpc_call,
         ["/spin_api/ws"] = self.handle_websocket
     }
 

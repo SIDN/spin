@@ -100,14 +100,14 @@ spin_data rpc_json(spin_data call_info) {
 
     jsonmethod = cJSON_GetObjectItemCaseSensitive(call_info, "method");
     if (!cJSON_IsString(jsonmethod)) {
-        return json_error(call_info, 1);
+        return json_error(call_info, 2);
     }
     method = jsonmethod->valuestring;
 
     jsonparams = cJSON_GetObjectItemCaseSensitive(call_info, "params");
 
     if (jsonparams != NULL && !cJSON_IsObject(jsonparams)) {
-        return json_error(call_info, 1);
+        return json_error(call_info, 3);
     }
 
     jsonretval = rpc_json_callreg(method, jsonparams);
@@ -189,4 +189,72 @@ call_string_jsonrpc(char *args) {
     cJSON_Delete(json_res);
 
     return resultstr;
+}
+
+static int rpc_fd;
+
+// When ubus is not available, we listen in a unix domain socket
+// for JSON RPC calls. This is the callback worker function when a call
+// comes in
+static void
+wf_jsonrpc(void *arg, int data, int timeout) {
+    spin_log(LOG_DEBUG, "Got JSON RPC command (data: %d)\n", data);
+    char buf[4096] __attribute__ ((aligned));
+    int rv;
+    int msgsock;
+    char* response = NULL;
+
+    memset(buf, 0, 4096);
+    if (data) {
+        msgsock = accept(rpc_fd, NULL, NULL);
+        rv = recv(msgsock, buf, sizeof(buf), 0);
+        spin_log(LOG_DEBUG, "Received %d bytes of data\n", rv);
+        // TODO: check for incomplete reads
+        spin_log(LOG_DEBUG, "Got data: rv: %d buf: %s\n", rv, buf);
+        response = call_string_jsonrpc(buf);
+        spin_log(LOG_DEBUG, "json rpc called, response: %s\n", response);
+        if (response != NULL) {
+            write(msgsock, response, strlen(response));
+            write(msgsock, "\n", 1);
+        }
+        spin_log(LOG_DEBUG, "Closing domain msg socket\n");
+        close(msgsock);
+    }
+    if (timeout) {
+        // called due to timeout, do nothing
+        spin_log(LOG_DEBUG, "Timeout in RPC call, aborting");
+    }
+}
+
+#include <sys/socket.h>
+#include <sys/un.h>
+#include "mainloop.h"
+
+void
+init_json_rpc() {
+    spin_log(LOG_INFO, "No ubus; setting up JSON RPC handling\n");
+    const char* socket_path = "/tmp/spin.sock";
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path)-1);
+    rpc_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (unlink(socket_path) != 0) {
+        spin_log(LOG_ERR, "Error unlinking domain socket %s: %s\n", socket_path, strerror(errno));
+        exit(errno);
+    }
+    if (bind(rpc_fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
+        spin_log(LOG_ERR, "Error opening domain socket %s: %s\n", socket_path, strerror(errno));
+        exit(errno);
+    }
+    if (listen(rpc_fd, 100) != 0) {
+        spin_log(LOG_ERR, "Error listening on domain socket %s: %s\n", socket_path, strerror(errno));
+        exit(errno);
+    }
+    spin_log(LOG_INFO, "Listening for JSON-RPC commands on %s\n", socket_path);
+    mainloop_register("jsonrpc", wf_jsonrpc, (void *) 0, rpc_fd, 0);
+}
+
+void
+cleanup_json_rpc() {
 }

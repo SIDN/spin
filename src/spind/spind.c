@@ -33,6 +33,7 @@
 #include "nflogroutines.h"
 
 #include "rpc_common.h"
+#include "rpc_json.h"
 
 #include "handle_command.h"
 #include "mainloop.h"
@@ -908,7 +909,6 @@ static int devflowfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
 
 void
 init_rpcs(node_cache_t *node_cache) {
-
     rpc_register("spindlist", spindlistfunc, (void *) 0, 3, list_member_args, RPCAT_INT);
     rpc_register("add_ip_to_node", addipnodefunc, (void *) 0, 2, addipnode_args, RPCAT_INT);
     rpc_register("blockflow", blockflowfunc, (void *) 0, 3, blockflow_args, RPCAT_INT);
@@ -919,7 +919,6 @@ init_rpcs(node_cache_t *node_cache) {
 }
 
 void int_handler(int signal) {
-
     mainloop_end();
 }
 
@@ -1058,6 +1057,9 @@ int main(int argc, char** argv) {
 
 #if USE_UBUS
     ubus_main();
+#else
+    init_json_rpc();
+    //json_rpc_main()?
 #endif
 
     mainloop_run();
