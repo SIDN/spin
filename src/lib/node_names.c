@@ -1,5 +1,6 @@
 
 #include "node_names.h"
+#include "spin_log.h"
 
 #include <stdio.h>
 #include <errno.h>
@@ -348,6 +349,7 @@ node_names_write_userconfig(node_names_t* node_names, const char* filename) {
     tree_entry_t* cur;
     FILE* output_file = fopen(filename, "w");
     char ip_str[INET6_ADDRSTRLEN];
+    int i = 0;
 
     if (output_file == NULL) {
         return -1;
@@ -357,16 +359,21 @@ node_names_write_userconfig(node_names_t* node_names, const char* filename) {
     while (cur != NULL) {
         spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
         fprintf(output_file, "name: %s %s\n", ip_str, (char*)cur->data);
+        spin_log(LOG_DEBUG, "[XX] NODE NAME BY IP: %s %s\n", ip_str, (char*)cur->data);
+        i++;
         cur = tree_next(cur);
     }
     cur = tree_first(node_names->user_names_by_mac);
     while (cur != NULL) {
         fprintf(output_file, "name: %s %s\n", (char*)cur->key, (char*)cur->data);
+        spin_log(LOG_DEBUG, "[XX] NODE NAME BY MAC: %s %s\n", (char*)cur->key, (char*)cur->data);
+        i++;
         cur = tree_next(cur);
     }
 
     fclose(output_file);
-
+    
+    spin_log(LOG_DEBUG, "[XX] WROTE %d NODE NAMES TO %s\n", i, filename);
     return 0;
 }
 
@@ -401,6 +408,7 @@ void node_names_add_user_name_ip(node_names_t* node_names, ip_t* ip, char* name)
 }
 
 void node_names_add_user_name_mac(node_names_t* node_names, char* mac, char* name) {
+    spin_log(LOG_DEBUG, "[XX] UPDATE MAC LIST OF NODE NAMES FOR %s name %s\n", mac, name);
     if (name != NULL && mac != NULL) {
         tree_add(node_names->user_names_by_mac, strlen(mac) + 1, mac, strlen(name)+1, name, 1);
     }

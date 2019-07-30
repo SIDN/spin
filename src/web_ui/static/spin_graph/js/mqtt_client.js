@@ -63,10 +63,23 @@ function sendCommand(command, argument) {
 // send a command directly to the Web API of spin (spin_webui)
 // this is essentially a web API layer to the RPC mechanism (currently
 // implemented locally through ubus and exposed by spin_webui)
+// TODO: remove this again, and call RPC directly (next function)
 function sendAPICommand(command, argument) {
     // server host is the same as mqtt host
     let api_base = server_host + "/spin_api";
     alert(api_base);
+}
+
+function sendRPCCommand(procedure, params) {
+    var xhttp = new XMLHttpRequest();
+    let rpc_endpoint = "http://" + server_host + "/spin_api/rpc";
+    xhttp.open("POST", rpc_endpoint, true);
+    xhttp.setRequestHeader("Content-Type", "application/json");
+    let command = {
+        "method": procedure,
+        "params": params
+    }
+    xhttp.send(JSON.stringify(command));
 }
 
 function writeToScreen(element, message) {

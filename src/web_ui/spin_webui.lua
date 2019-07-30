@@ -417,6 +417,7 @@ function handler:handle_rpc_call(request, response)
             if not conn then
                 error("failed to connect to RPC mechanism")
             end
+            print("[XX] GOT RPC COMMAND: " .. json.encode(request.post_data))
             result, err = conn:call(request.post_data)
             if result then
                 response.content = json.encode(result)

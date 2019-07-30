@@ -907,6 +907,46 @@ static int devflowfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
     return 0;
 }
 
+rpc_arg_desc_t set_device_name_args[] = {
+    { "node", RPCAT_INT },
+    { "name", RPCAT_STRING },
+};
+
+static int set_device_name_func(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    node_cache_t *node_cache = (node_cache_t *) cb;
+    node_t *node;
+    int node_id = args[0].rpca_ivalue;
+    char* node_name = args[1].rpca_svalue;
+    tree_entry_t* ip_entry;
+
+    spin_log(LOG_DEBUG, "[XX] RPC SET NAME OF NODE %d TO %s\n", node_id, node_name);
+    node = node_cache_find_by_id(node_cache, node_id);
+    if (node == NULL) {
+        spin_log(LOG_DEBUG, "[XX] NODE %d NOT FOUND\n", node_id);
+        return 0;
+    }
+    // re-read node names, just in case someone has been editing it
+    // TODO: make filename configurable? right now it will silently fail
+    node_set_name(node, node_name);
+
+    node_names_read_userconfig(node_cache->names, "/etc/spin/names.conf");
+    // if it has a mac address, use that, otherwise, add for all its ip
+    // addresses
+    if (node->mac != NULL) {
+        node_names_add_user_name_mac(node_cache->names, node->mac, node_name);
+    } else {
+        ip_entry = tree_first(node->ips);
+        while (ip_entry != NULL) {
+            node_names_add_user_name_ip(node_cache->names, (ip_t*)ip_entry->key, node_name);
+            ip_entry = tree_next(ip_entry);
+        }
+    }
+
+    node_names_write_userconfig(node_cache->names, "/etc/spin/names.conf");
+    spin_log(LOG_DEBUG, "[XX] NAME SET\n");
+    return 0;
+}
+
 void
 init_rpcs(node_cache_t *node_cache) {
     rpc_register("spindlist", spindlistfunc, (void *) 0, 3, list_member_args, RPCAT_INT);
@@ -916,6 +956,7 @@ init_rpcs(node_cache_t *node_cache) {
     rpc_register("get_blockflow", getblockflowfunc, (void *) 0, 0, 0, RPCAT_COMPLEX);
     rpc_register("devicelist", devlistfunc, (void *) node_cache, 0, NULL, RPCAT_COMPLEX);
     rpc_register("get_deviceflow", devflowfunc, (void *) node_cache, 1, devflow_args, RPCAT_COMPLEX);
+    rpc_register("set_device_name", set_device_name_func, (void *) node_cache, 2, set_device_name_args, RPCAT_COMPLEX);
 }
 
 void int_handler(int signal) {

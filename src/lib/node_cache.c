@@ -291,6 +291,7 @@ node_set_name(node_t* node, char* name) {
         free(node->name);
     }
     node->name = strndup(name, 128);
+    node->modified = 1;
 }
 
 static void

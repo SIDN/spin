@@ -161,7 +161,8 @@ function initGraphs() {
             var newname = name.val();
             argument['node_id'] = selectedNodeId;
             argument['name'] = newname;
-            sendCommand("add_name", argument); // talk to Websocket
+            //sendCommand("add_name", argument); // talk to Websocket
+            sendRPCCommand("set_device_name", { 'node': node.id, 'name': newname });
 
             node.label = newname;
             node.name = newname;
