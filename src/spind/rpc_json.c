@@ -239,9 +239,12 @@ init_json_rpc() {
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path)-1);
     rpc_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (unlink(socket_path) != 0) {
-        spin_log(LOG_ERR, "Error unlinking domain socket %s: %s\n", socket_path, strerror(errno));
-        exit(errno);
+
+    if (!access(socket_path, F_OK )) {
+        if (unlink(socket_path) != 0) {
+            spin_log(LOG_ERR, "Error unlinking domain socket %s: %s\n", socket_path, strerror(errno));
+            exit(errno);
+        }
     }
     if (bind(rpc_fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
         spin_log(LOG_ERR, "Error opening domain socket %s: %s\n", socket_path, strerror(errno));

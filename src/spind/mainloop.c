@@ -202,7 +202,7 @@ void mainloop_run() {
                 }
             }
             if (argdata || argtmout) {
-                spin_log(LOG_DEBUG, "Mainloop calling %s (%d, %d)\n", mnr[i].mnr_name, argdata, argtmout);
+                //spin_log(LOG_DEBUG, "Mainloop calling %s (%d, %d)\n", mnr[i].mnr_name, argdata, argtmout);
                 (*mnr[i].mnr_wf)(mnr[i].mnr_wfarg, argdata, argtmout);
             }
         }

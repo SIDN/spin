@@ -1,6 +1,7 @@
 #include "spindata.h"
 #include "tree.h"
 #include "rpc_common.h"
+#include "rpc_calls.h"
 
 #include "spin_log.h"
 
@@ -178,5 +179,6 @@ rpc_call(char *name, int nargs, rpc_arg_t *args, rpc_arg_t *result) {
 }
 
 void rpc_cleanup() {
+    cleanup_rpcs();
     tree_destroy(rpcfunctree);
 }

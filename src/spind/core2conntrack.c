@@ -212,7 +212,7 @@ int do_read(cb_data_t* cb_data, int inet_family) {
 }
 
 static void core2conntrack_callback(void *arg, int data, int timeout) {
-    spin_log(LOG_DEBUG, "core2conntrack callback\n");
+    //spin_log(LOG_DEBUG, "core2conntrack callback\n");
     if (timeout) {
         do_read(cb_data_g, AF_INET);
         do_read(cb_data_g, AF_INET6);
