@@ -988,7 +988,6 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
         }
         if (dest_node->mac && dest_node->device==NULL) {
             // Remaining node must be promoted to device
-
             spinhook_makedevice(dest_node);
         }
         return 0;

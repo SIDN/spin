@@ -339,7 +339,7 @@ function handleNodeMerged(data) {
     var deletedNodeId = data['id']
     var node = getNodeInfo(deletedNodeId)
     if (node !== null) {
-        deleteNode(deletedNodeId);
+        deleteNode(node);
         nodeinfo[data["id"]] = null;
     }
 }

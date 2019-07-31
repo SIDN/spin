@@ -11,7 +11,7 @@
 
 local socket = require("socket")
 local socket_unix = require("socket.unix")
-local ubus = pcall(require, 'ubus')
+local have_ubus, ubus = pcall(require, 'ubus')
 local json = require 'json'
 
 -- connect to a rpc server, returns an connection object with
@@ -56,10 +56,11 @@ local ubus_rpc_connect = function (opts)
         print("[XX] ubus call()")
         return self.ubus_conn:call("spin", "rpc", command)
     end
+    return conn
 end
 
 local _M = {}
-if ubus then
+if have_ubus then
     _M.connect = ubus_rpc_connect
 else
     _M.connect = json_rpc_connect
