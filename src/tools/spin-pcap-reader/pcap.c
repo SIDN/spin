@@ -119,7 +119,7 @@ usage(const char *error)
 
 	if (error)
 		fprintf(stderr, "%s\n", error);
-	fprintf(stderr, "Usage: %s [-f filter] [-i interface] [-r file]\n",
+	fprintf(stderr, "Usage: %s [-R] [-f filter] [-i interface] [-r file]\n",
 	    __progname);
 	exit(1);
 }
@@ -473,15 +473,14 @@ main(int argc, char *argv[])
 	if (!device && !file)
 		device = "eth0";
 
-	if (device && Rflag)
-		usage("specifying an interface and -R are incompatible");
-
 	fd = socket_open(EXTSRC_SOCKET_PATH);
 
 	if ((pcap_errbuf = malloc(PCAP_ERRBUF_SIZE)) == NULL)
 		err(1, "malloc");
 
 	if (device) {
+		Rflag = 1;
+
 		pd = pcap_create(device, pcap_errbuf);
 		if (!pd)
 			errx(1, "pcap_create: %s", pcap_errbuf);
