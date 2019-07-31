@@ -19,6 +19,8 @@ dnl Checks for header files.
 AC_HEADER_DIRENT
 AC_HEADER_STDC
 AC_CHECK_HEADERS(fcntl.h unistd.h)
+AC_CHECK_HEADER([netinet/if_ether.h], AC_DEFINE([HAVE_NETINET_IF_ETHER_H], [1], [netinet/if_ether.h available]))
+AC_CHECK_HEADER([net/ethernet.h], AC_DEFINE([HAVE_NET_ETHERNET_H], [1], [net/ethernet.h available]))
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

@@ -58,12 +58,14 @@
 #include "external/interface.h"
 #include "external/extract.h" /* must come after interface.h */
 
+#include "nodes.h"
 #include "socket.h"
 
 /* spind/lib includes */
 #include "dns.h"
 #include "extsrc.h"
 #include "pkt_info.h"
+#include "spinhook.h"
 
 /* Linux compat */
 #ifndef IPV6_VERSION
@@ -94,6 +96,8 @@ static struct handle_dns_ctx *handle_dns_ctx;
 
 static int fd;
 
+static node_cache_t *node_cache;
+
 static void
 sig_handler(int sig)
 {
@@ -119,7 +123,8 @@ usage(const char *error)
 
 	if (error)
 		fprintf(stderr, "%s\n", error);
-	fprintf(stderr, "Usage: %s [-R] [-f filter] [-i interface] [-r file]\n",
+	fprintf(stderr,
+	    "Usage: %s [-R] [-f filter] [-i interface] [-m mac] [-r file]\n",
 	    __progname);
 	exit(1);
 }
@@ -158,6 +163,36 @@ dns_answer_hook(dns_pkt_info_t *dns_pkt)
 	socket_writemsg(fd, msg->data, msg->length);
 
 	extsrc_msg_free(msg);
+}
+
+static void
+handle_icmp6(const u_char *bp, const struct ether_header *ep)
+{
+	const struct icmp6_hdr *dp;
+	const struct nd_neighbor_advert *p;
+
+	dp = (struct icmp6_hdr *)bp;
+
+	TCHECK(dp->icmp6_code);
+	switch (dp->icmp6_type) {
+	case ND_NEIGHBOR_ADVERT:
+		p = (const struct nd_neighbor_advert *)dp;
+
+		TCHECK(p->nd_na_target);
+
+		x_node_cache_add_mac_uint8t(node_cache, ep->ether_shost);
+		mark_local_device(fd, node_cache, ep->ether_shost,
+		    p->nd_na_target.s6_addr, AF_INET6);
+		break;
+
+	default:
+		break;
+	}
+
+	return;
+
+ trunc:
+	warnx("TRUNCATED");
 }
 
 static void
@@ -253,15 +288,13 @@ handle_ip(const u_char *p, u_int wirelen, u_int caplen,
 	}
 
 	switch (ip_proto) {
-#if 0
 	case IPPROTO_ICMPV6:
 		if (ip6) {
-			handle_icmp6((const u_char *)(ip6 + 1), ep); // XXX
+			handle_icmp6((const u_char *)(ip6 + 1), ep);
 		} else {
 			warnx("ICMPv6 in IPv4 packet");
 		}
 		break;
-#endif
 
 	case IPPROTO_TCP:
 		if (ip6) {
@@ -379,6 +412,35 @@ maybe_sleep(const struct timeval *cur_pcap)
 	memcpy(&last_wall, &cur_wall, sizeof(last_wall));
 }
 
+static void
+handle_arp(const u_char *bp, u_int length)
+{
+	const struct ether_arp *ap;
+	u_short op;
+
+	ap = (struct ether_arp *)bp;
+	if ((u_char *)(ap + 1) > snapend) {
+		warnx("[|arp]");
+		return;
+	}
+	if (length < sizeof(struct ether_arp)) {
+		warnx("truncated arp");
+		return;
+	}
+
+	op = EXTRACT_16BITS(&ap->arp_op);
+	switch (op) {
+	case ARPOP_REPLY:
+		x_node_cache_add_mac_uint8t(node_cache, ap->arp_sha);
+		mark_local_device(fd, node_cache, ap->arp_sha, ap->arp_spa,
+		    AF_INET);
+		break;
+
+	default:
+		break;
+	}
+}
+
 /*
  * Callback for libpcap. Handles a packet.
  */
@@ -421,11 +483,9 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 		handle_ip(p, h->len, caplen, ep, &h->ts);
 		break;
 
-#if 0
 	case ETHERTYPE_ARP:
-		handle_arp(p, caplen); // XXX
+		handle_arp(p, caplen);
 		break;
-#endif
 
 	default:
 		DPRINTF("unknown ether type");
@@ -451,7 +511,9 @@ main(int argc, char *argv[])
 	malloc_options = "S";
 #endif /* __OpenBSD__ */
 
-	while ((ch = getopt(argc, argv, "f:hi:Rr:")) != -1) {
+	node_cache = node_cache_create();
+
+	while ((ch = getopt(argc, argv, "f:hi:m:Rr:")) != -1) {
 		switch(ch) {
 		case 'f':
 			filter = optarg;
@@ -460,6 +522,10 @@ main(int argc, char *argv[])
 			usage(NULL);
 		case 'i':
 			device = optarg;
+			break;
+		case 'm':
+			// XXX should do input validation
+			x_node_cache_add_mac_macstr(node_cache, optarg);
 			break;
 		case 'R':
 			Rflag = 1;
@@ -540,6 +606,7 @@ main(int argc, char *argv[])
 		pcap_close(pd);
 
 	close(fd);
+	node_cache_destroy(node_cache);
 
 	return 0;
 }
