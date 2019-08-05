@@ -70,7 +70,7 @@ function sendAPICommand(command, argument) {
     alert(api_base);
 }
 
-function sendRPCCommand(procedure, params) {
+function sendRPCCommand(procedure, params, success_callback) {
     var xhttp = new XMLHttpRequest();
     let rpc_endpoint = "http://" + server_host + "/spin_api/rpc";
     xhttp.open("POST", rpc_endpoint, true);
@@ -79,7 +79,27 @@ function sendRPCCommand(procedure, params) {
         "method": procedure,
         "params": params
     }
+    //xhttp.onerror = sendRPCCommandError;
+    xhttp.onload = function () {
+        //alert("[XX] status: " + xhttp.status);
+        if (xhttp.status !== 200) {
+            alert("HTTP error " + xhttp.status + " from SPIN RPC server");
+            console.log(xhttp.response);
+        } else {
+            let response = JSON.parse(xhttp.response)
+            if (response.result == 0) {
+                console.log("Success response from RPC server: " + xhttp.response);
+                if (success_callback) {
+                    success_callback(response);
+                }
+            } else {
+                alert("JSON-RPC error from SPIN RPC server: " + xhttp.response);
+                console.log(xhttp.response);
+            }
+        }
+    };
     xhttp.send(JSON.stringify(command));
+    console.log("Sent RPC command: " + JSON.stringify(command));
 }
 
 function writeToScreen(element, message) {
