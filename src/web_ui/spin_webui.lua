@@ -300,7 +300,7 @@ function handler:handle_tcpdump_stop(request, response)
     if self.active_dumps[dname] ~= nil then
         self.active_dumps[dname]:stop()
     end
-    response:set_header("Location", "/spin/tcpdump?device=" .. device)
+    response:set_header("Location", "/spin_api/tcpdump?device=" .. device)
     response:set_status(302, "Found")
     return response
 end
