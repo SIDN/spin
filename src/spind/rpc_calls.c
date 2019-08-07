@@ -565,6 +565,14 @@ int spindlistfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
  * Please note: make sure you specify the return value of the RPC method well;
  * In most cases it is probably just a status integer, in which case use RPCAT_INT, and
  * the wrappers here will create a JSON-RPC 2.0 response out of it.
+ *
+ * RPC method naming convention:
+ * <operation>_<subject>[_<detail>]*
+ * e.g.
+ * list_devices
+ * add_node_ip
+ * set_flow_block
+ * get_flow_block
  */
 void
 init_rpcs(node_cache_t *node_cache) {
@@ -573,14 +581,16 @@ init_rpcs(node_cache_t *node_cache) {
     nodemap_tree = tree_create(cmp_ints);
     init_blockflow(node_cache);
 
-    rpc_register("add_ip_to_node", addipnodefunc, (void *) node_cache, 2, addipnode_args, RPCAT_INT);
-    rpc_register("blockflow", blockflowfunc, (void *) node_cache, 3, blockflow_args, RPCAT_INT);
-    rpc_register("devblockflow", devblockflowfunc, (void *) node_cache, 3, devblockflow_args, RPCAT_INT);
-    rpc_register("get_blockflow", getblockflowfunc, (void *) 0, 0, 0, RPCAT_COMPLEX);
-    rpc_register("devicelist", devlistfunc, (void *) node_cache, 0, NULL, RPCAT_COMPLEX);
-    rpc_register("get_deviceflow", devflowfunc, (void *) node_cache, 1, devflow_args, RPCAT_COMPLEX);
+    rpc_register("node_add_ip", addipnodefunc, (void *) node_cache, 2, addipnode_args, RPCAT_INT);
+    rpc_register("set_flow_block", blockflowfunc, (void *) node_cache, 3, blockflow_args, RPCAT_INT);
+    rpc_register("set_device_flow_block", devblockflowfunc, (void *) node_cache, 3, devblockflow_args, RPCAT_INT);
+    rpc_register("get_flow_block", getblockflowfunc, (void *) 0, 0, 0, RPCAT_COMPLEX);
+    rpc_register("list_devices", devlistfunc, (void *) node_cache, 0, NULL, RPCAT_COMPLEX);
+    rpc_register("list_device_flows", devflowfunc, (void *) node_cache, 1, devflow_args, RPCAT_COMPLEX);
     rpc_register("set_device_name", set_device_name_func, (void *) node_cache, 2, set_device_name_args, RPCAT_INT);
 }
+
+
 
 void
 cleanup_rpcs() {

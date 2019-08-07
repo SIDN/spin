@@ -390,7 +390,7 @@ function handler:handle_device_list(request, response)
     if not conn then
         error("failed to connect to RPC mechanism")
     end
-    result, err = conn:call({ method = "devicelist" })
+    result, err = conn:call({ method = "list_devices" })
     -- TODO: error handling
 
     ubdata = json.encode(result)

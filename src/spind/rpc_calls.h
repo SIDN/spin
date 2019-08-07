@@ -3,7 +3,7 @@
 
 /*
  * Manually add an IP address to an existing node
- * RPC name: add_ip_to_node
+ * RPC name: node_ad_ip
  * Arguments:
  * node (int): the node ID
  * ipaddr (string): IP address (can be IPv4 or IPv6)

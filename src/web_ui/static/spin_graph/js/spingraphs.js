@@ -526,7 +526,7 @@ function initGraphs() {
         edges.update(edge)
         updateEdgeInfo(selectedEdgeId);
         //alert(JSON.stringify(params));
-        sendRPCCommand("blockflow", params);
+        sendRPCCommand("set_flow_block", params);
     });
 
     showGraph(traffic_dataset);
