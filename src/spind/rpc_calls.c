@@ -30,7 +30,7 @@ int addipnodefunc(void *cb_data, rpc_arg_val_t *args, rpc_arg_val_t *result) {
 
     nodenum = args[0].rpca_ivalue;
     ipaddr = args[1].rpca_svalue;
-    
+
     timestamp = time(NULL);
 
     if (!spin_pton(&ipval, ipaddr)) {
@@ -558,6 +558,11 @@ int spindlistfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
 
 
 
+int
+list_rpc_calls_func(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    result->rpca_cvalue = rpc_list_registered_procedures();
+    return 0;
+}
 
 
 
@@ -588,6 +593,7 @@ init_rpcs(node_cache_t *node_cache) {
     rpc_register("list_devices", devlistfunc, (void *) node_cache, 0, NULL, RPCAT_COMPLEX);
     rpc_register("list_device_flows", devflowfunc, (void *) node_cache, 1, devflow_args, RPCAT_COMPLEX);
     rpc_register("set_device_name", set_device_name_func, (void *) node_cache, 2, set_device_name_args, RPCAT_INT);
+    rpc_register("list_rpc_calls", list_rpc_calls_func, NULL, 0, 0, RPCAT_COMPLEX);
 }
 
 

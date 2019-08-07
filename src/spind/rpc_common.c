@@ -178,6 +178,32 @@ rpc_call(char *name, int nargs, rpc_arg_t *args, rpc_arg_t *result) {
     return res;
 }
 
+/* Returns the entire tree of registered functions as a list
+ * with the following format:
+ * {
+ *   "method": <string>,
+ *   "params": [<param_desc>]
+ *   "return type": [int|bool|string|complex]
+ * }
+ */
+spin_data
+rpc_list_registered_procedures() {
+    spin_data retobj;
+    tree_entry_t* func = tree_first(rpcfunctree);
+
+    retobj = cJSON_CreateArray();
+    while (func != NULL) {
+        spin_data func_desc = cJSON_CreateObject();
+        cJSON_AddStringToObject(func_desc, "method", "foo");
+
+        cJSON_AddItemToArray(retobj, func_desc);
+        func = tree_next(func);
+    }
+
+    return retobj;
+}
+
+
 void rpc_cleanup() {
     cleanup_rpcs();
     tree_destroy(rpcfunctree);
