@@ -83,6 +83,8 @@ This package has an extra file in addition to the ones described in the
 previous section: a startup script /etc/init.d/spin; this script will
 load the kernel module and start the spin_mqtt.lua daemon.
 
+Please keep in mind that for the 'bubble-app' front-end, you will also need to install a webserver, and configure it to serve the pages installed by the package in /usr/lib/spin/web_ui/static.
+
 
 # Running SPIN
 
