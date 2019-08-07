@@ -31,8 +31,11 @@ static char * rpcatype(int t) {
     }
 }
 
+/*
+ * Lists the registered RPC procedures and their arguments
+ */
 static int
-rpclistfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+rpc_list_registered_procedures(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
     tree_t * rpctree;
     tree_entry_t* cur;
     cJSON *arobj, *argarobj, *argobj, *rpcfuncobj;
@@ -41,6 +44,7 @@ rpclistfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
     int i;
 
     rpctree = (tree_t *) cb;
+    printf("[XX] 2FUNCTREE AT %p\n", rpctree);
 
     arobj = cJSON_CreateArray();
     cur = tree_first(rpctree);
@@ -74,22 +78,12 @@ rpc_register(char *name, rpc_func_p func, void *cb, int nargs, rpc_arg_desc_t *a
     rpc_data_t rd;
 
     if (rpcfunctree == NULL) {
-        char *listname;
-        // First call, make tree
-
+        // First call, make tree, this is essentially a singleton pattern
         rpcfunctree = tree_create(cmp_strs);
 
-        // Now enter function to list rpc's
-        // This could be a recursive call, but not now
-
-        listname = "rpc.list";
-        rd.rpcd_func = rpclistfunc;
-        rd.rpcd_cb = (void *) rpcfunctree;
-        rd.rpcd_nargs = 0;
-        rd.rpcd_args = NULL;
-        rd.rpcd_result_type = RPCAT_COMPLEX;
-
-        tree_add(rpcfunctree, strlen(listname)+1, listname, sizeof(rd), &rd, 1);
+        // Immediately register one rpc method; the one that lists all
+        // registered methods
+        rpc_register("list_rpc_methods", rpc_list_registered_procedures, rpcfunctree, 0, 0, RPCAT_COMPLEX);
     }
 
     rd.rpcd_func = func;
@@ -178,31 +172,10 @@ rpc_call(char *name, int nargs, rpc_arg_t *args, rpc_arg_t *result) {
     return res;
 }
 
-/* Returns the entire tree of registered functions as a list
- * with the following format:
- * {
- *   "method": <string>,
- *   "params": [<param_desc>]
- *   "return type": [int|bool|string|complex]
- * }
- */
-spin_data
-rpc_list_registered_procedures() {
-    spin_data retobj;
-    tree_entry_t* func = tree_first(rpcfunctree);
-
-    retobj = cJSON_CreateArray();
-    while (func != NULL) {
-        spin_data func_desc = cJSON_CreateObject();
-        cJSON_AddStringToObject(func_desc, "method", "foo");
-
-        cJSON_AddItemToArray(retobj, func_desc);
-        func = tree_next(func);
-    }
-
-    return retobj;
+void
+register_internal_functions() {
+    //rpc_register("list_rpc_methods", rpc_list_registered_procedures, rpcfunctree, 0, 0, RPCAT_COMPLEX);
 }
-
 
 void rpc_cleanup() {
     cleanup_rpcs();

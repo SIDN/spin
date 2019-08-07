@@ -28,4 +28,5 @@ void rpc_register(char *name, rpc_func_p func, void *cb, int nargs, rpc_arg_desc
  */
 void rpc_cleanup();
 int rpc_call(char *name, int nargs, rpc_arg_t *args, rpc_arg_t *result);
-spin_data rpc_list_registered_procedures();
+//spin_data rpc_list_registered_procedures();
+void register_internal_functions();
