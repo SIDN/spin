@@ -72,10 +72,12 @@ function sendAPICommand(command, argument) {
 
 function sendRPCCommand(procedure, params, success_callback) {
     var xhttp = new XMLHttpRequest();
-    let rpc_endpoint = "http://" + server_host + "/spin_api/rpc";
+    let rpc_endpoint = "http://" + server_host + "/spin_api/jsonrpc";
     xhttp.open("POST", rpc_endpoint, true);
     xhttp.setRequestHeader("Content-Type", "application/json");
     let command = {
+        "jsonrpc": "2.0",
+        "id": Math.floor(Math.random() * 100000),
         "method": procedure,
         "params": params
     }
@@ -323,7 +325,7 @@ function moveTimeline(maxtime) {
         maxtime = Date.now()/1000;
     }
     var start = Date.parse(graph2d_1.options.start);
-    
+
     var options = {
         start: Date.now() - 700000 > start ? new Date(Date.now() - 600000) : graph2d_1.options.start,
         end: start > Date.now() - 600000 ? graph2d_1.options.end : new Date(maxtime*1000),

@@ -773,7 +773,7 @@ function handler:init(args)
         ["/spin_api/notifications"] = self.handle_notification_list,
         ["/spin_api/notifications/create"] = self.handle_notification_add,
         ["/spin_api/configuration"] = self.handle_configuration,
-        ["/spin_api/rpc"] = self.handle_rpc_call,
+        ["/spin_api/jsonrpc"] = self.handle_rpc_call,
         ["/spin_api/ws"] = self.handle_websocket
     }
 

@@ -1,12 +1,20 @@
 
 -- RPC abstraction
 --
--- If available, this module uses UBUS for RPC calls, with the namespace
--- 'spin' and the procedure 'rpc'; the arguments themselves contain
--- the final method and optional parameters, for which the caller
--- is responsible
+-- This module handles the RPC part of the WEB API
 --
--- If ubus is not available, this module uses JSON-RPC 2.0
+-- Externally, this is representated as an Web API endpoint that talks
+-- JSON-RPC
+--
+-- Internally, if available, this module uses UBUS for RPC calls,
+-- with the namespace 'spin' and the procedure 'rpc';
+-- the arguments themselves contain the final method and optional
+-- parameters, for which the caller is responsible.
+--
+-- If ubus is not available, this module uses JSON-RPC 2.0 internally
+-- as well (i.e. the actual RPC method call is passed through as-is,
+-- and so is the response), through a local unix domain socket.
+--
 
 
 local socket = require("socket")
@@ -53,8 +61,21 @@ local ubus_rpc_connect = function (opts)
         return None, "Failed to connect to UBUS"
     end
     conn.call = function(self, command)
-        print("[XX] ubus call()")
-        return self.ubus_conn:call("spin", "rpc", command)
+        if command['jsonrpc'] ~= '2.0' then
+            local error_response = {}
+            error_response['error'] = 'not JSON-RPC 2.0'
+            return error_response
+        end
+        if command['id'] == nil then
+            local error_response = {}
+            error_response['error'] = "missing 'id' in JSON-RPC 2.0 request"
+            return error_response
+        end
+        local ubus_response = self.ubus_conn:call("spin", "rpc", command)
+        -- transform it back to a correct JSON-RPC 2.0 response
+        ubus_response['jsonrpc'] = '2.0'
+        ubus_response['id'] = command['id']
+        return ubus_response
     end
     return conn
 end
