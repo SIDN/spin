@@ -376,7 +376,8 @@ function initGraphs() {
                     });
                 },
                 Reset: function() {
-                    sendCommand("reset_ignores", "");
+                    sendRPCCommand("reset_iplist_ignore");
+                    //sendCommand("reset_ignores", "");
                 },
                 Close: function() {
                     dialog.dialog("close");

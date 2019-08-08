@@ -89,14 +89,14 @@ function sendRPCCommand(procedure, params, success_callback) {
             console.log(xhttp.response);
         } else {
             let response = JSON.parse(xhttp.response)
-            if (response.result == 0) {
-                console.log("Success response from RPC server: " + xhttp.response);
-                if (success_callback) {
-                    success_callback(response);
-                }
-            } else {
+            if (response.error) {
                 alert("JSON-RPC error from SPIN RPC server: " + xhttp.response);
                 console.log(xhttp.response);
+            } else {
+                console.log("Success response from RPC server: " + xhttp.response);
+                if (success_callback && response.result) {
+                    success_callback(response.result);
+                }
             }
         }
     };
@@ -155,21 +155,24 @@ function onTrafficMessage(msg) {
                 break;
             case 'ignore':
                 //console.log("Got ignores command: " + msg);
-                ignoreList = result;
-                ignoreList.sort();
-                updateIgnoreList();
+                handle_getignore_response(result)
+                //ignoreList = result;
+                //ignoreList.sort();
+                //updateIgnoreList();
                 break;
             case 'block':
                 //console.log("Got blocks command: " + msg);
-                blockList = result;
-                blockList.sort();
-                updateBlockList();
+                handle_getblock_response(result)
+                //blockList = result;
+                //blockList.sort();
+                //updateBlockList();
                 break;
             case 'allow':
                 //console.log("Got alloweds command: " + msg);
-                allowedList = result;
-                allowedList.sort();
-                updateAllowedList();
+                handle_getallow_response(result)
+                //allowedList = result;
+                //allowedList.sort();
+                //updateAllowedList();
                 break;
             case 'peakinfo':
                 //console.log("Got peak information: " + msg);
@@ -210,14 +213,35 @@ function onTrafficMessage(msg) {
 }
 
 
+function handle_getignore_response(result) {
+    ignoreList = result;
+    ignoreList.sort();
+    updateIgnoreList();
+}
+
+function handle_getblock_response(result) {
+    blockList = result;
+    blockList.sort();
+    updateBlockList();
+}
+
+function handle_getallow_response(result) {
+    allowedList = result;
+    allowedList.sort();
+    updateAllowedList();
+}
+
 function onTrafficOpen(evt) {
     // Once a connection has been made, make a subscription and send a message..
     console.log("Connected");
     client.subscribe("SPIN/traffic/#");
 
-    sendCommand("get_ignores", {})//, "")
-    sendCommand("get_blocks", {})//, "")
-    sendCommand("get_alloweds", {})//, "")
+    sendRPCCommand("list_iplist", { "list": "ignore" }, handle_getignore_response);
+    sendRPCCommand("list_iplist", { "list": "block" }, handle_getblock_response);
+    sendRPCCommand("list_iplist", { "list": "allow" }, handle_getallow_response);
+    //sendCommand("get_ignores", {})//, "")
+    //sendCommand("get_blocks", {})//, "")
+    //sendCommand("get_alloweds", {})//, "")
     //show connected status somewhere
     $("#statustext").css("background-color", "#ccffcc").text("Connected");
     active = true;

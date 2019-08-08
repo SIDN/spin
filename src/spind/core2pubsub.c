@@ -13,6 +13,8 @@
 #include "statistics.h"
 
 #include "rpc_json.h"
+#include "spin_list.h"
+#include "ipl.h"
 
 static char *mqtt_channel_traffic;
 static char *mqtt_channel_commands;
@@ -154,12 +156,9 @@ char* getstr_cJSONobj(cJSON *cjarg, char *fieldname) {
     return f_json->valuestring;
 }
 
+// TODO: once this is empty, we should remove it, all commands from client(s) to server should go through RPC
 void handle_json_command_detail(int verb, int object, cJSON *argument_json) {
-    int node_id_arg = 0;
     ip_t ip_arg;
-    char *str_arg;
-    // in a few cases, we need to update the node cache
-    node_t* node;
 
     //
     // First some common argument handling
@@ -175,7 +174,6 @@ void handle_json_command_detail(int verb, int object, cJSON *argument_json) {
             spin_log(LOG_ERR, "Cannot parse node_id\n");
             return;
         }
-        node_id_arg = argument_json->valueint;
         break;
     case PSC_V_REM_IP:
         if (!cJSON_IsString(argument_json) || !spin_pton(&ip_arg, argument_json->valuestring)) {
@@ -183,13 +181,6 @@ void handle_json_command_detail(int verb, int object, cJSON *argument_json) {
             return;
         }
         break;
-    case PSC_V_RESET:
-        if (object != PSC_O_IGNORE) {
-            spin_log(LOG_ERR, "Reset of non-ignore\n");
-            return;
-        }
-        handle_command_reset_ignores();
-        return;
     }
 
     //
@@ -203,13 +194,6 @@ void handle_json_command_detail(int verb, int object, cJSON *argument_json) {
             // TODO
             // handle_command_get_names();
             break;
-        case PSC_V_ADD:
-            node_id_arg = getint_cJSONobj(argument_json, "node-id");
-            str_arg = getstr_cJSONobj(argument_json, "name");
-            if (node_id_arg != 0 && str_arg != NULL) {
-                handle_command_add_name(node_id_arg, str_arg);
-            }
-            break;
         }
         break;  //NAME
 
@@ -221,17 +205,8 @@ void handle_json_command_detail(int verb, int object, cJSON *argument_json) {
             break;
         case PSC_V_ADD:
         case PSC_V_REM:
-            handle_list_membership(object, verb, node_id_arg);
-            break;
-        case PSC_V_REM_IP:
-            handle_command_remove_ip_from_list(object, &ip_arg);
-            node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip_arg);
-            if (node) {
-                node->is_onlist[object] = 0;
-            }
             break;
         }
-        handle_command_get_iplist(object, getnames[object]);
         break;  //BLOCK IGNORE and ALLOW
     }
 }
@@ -347,6 +322,18 @@ void wf_mosquitto(void* arg, int data, int timeout) {
     }
 }
 
+void broadcast_iplist(int iplist, const char* list_name) {
+    spin_data ipt_sd, cmd_sd;
+
+    ipt_sd = spin_data_ipar(get_spin_iplist(iplist)->li_tree);
+    cmd_sd = spin_data_create_mqtt_command(list_name, NULL, ipt_sd);
+
+    core2pubsub_publish_chan(NULL, cmd_sd, 0);
+
+    spin_data_delete(cmd_sd);
+}
+
+
 void init_mosquitto(const char* host, int port) {
     int object;
 
@@ -365,7 +352,8 @@ void init_mosquitto(const char* host, int port) {
 
     send_command_restart();
     for (object = 0; object < N_IPLIST; object++) {
-        handle_command_get_iplist(object, getnames[object]);
+        printf("[XX] BROADCAST: %d %s\n", object, getnames[object]);
+        broadcast_iplist(object, getnames[object]);
     }
 }
 

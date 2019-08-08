@@ -333,11 +333,6 @@ call_kernel_for_node_ips(int listid, int addrem, node_t *node) {
 }
 
 /* TODO: remove this, replaced by RPC command */
-void handle_command_remove_ip_from_list(int iplist, ip_t* ip) {
-
-    list_inout_do_ip(iplist, SF_REM, ip);
-    remove_ip_from_li(ip, get_spin_iplist(iplist));
-}
 
 /* TODO: remove this, replaced by RPC command */
 void handle_command_remove_all_from_list(int iplist) {
@@ -371,70 +366,6 @@ void handle_list_membership(int listid, int addrem, int node_id) {
     } else {
         remove_ip_tree_from_li(node->ips, get_spin_iplist(listid));
     }
-}
-
-/* TODO: create an RPC call for this */
-void handle_command_reset_ignores() {
-
-    // clear the ignores; derive them from our own addresses again
-
-    // First remove all current ignores
-    handle_command_remove_all_from_list(IPLIST_IGNORE);
-
-    // Now generate new list
-    system("/usr/lib/spin/show_ips.lua -o /etc/spin/ignore.list -f");
-
-    // Load the ignores again
-    init_ipl(get_spin_iplist(IPLIST_IGNORE));
-    push_ips_from_list_to_kernel(IPLIST_IGNORE);
-}
-
-/* TODO: remove, replaced by RPC call */
-void handle_command_add_name(int node_id, char* name) {
-    // find the node
-    // node_t* node = node_cache_find_by_id(node_cache, node_id);
-    node_t *node;
-    tree_entry_t* ip_entry;
-
-    node = find_node_id(node_id);
-    if (node == NULL) {
-        return;
-    }
-    node_set_name(node, name);
-
-    // re-read node names, just in case someone has been editing it
-    // TODO: make filename configurable? right now it will silently fail
-    node_names_read_userconfig(node_cache->names, "/etc/spin/names.conf");
-
-    // if it has a mac address, use that, otherwise, add for all its ip
-    // addresses
-    if (node->mac != NULL) {
-        node_names_add_user_name_mac(node_cache->names, node->mac, name);
-    } else {
-        ip_entry = tree_first(node->ips);
-        while (ip_entry != NULL) {
-            node_names_add_user_name_ip(node_cache->names, (ip_t*)ip_entry->key, name);
-            ip_entry = tree_next(ip_entry);
-        }
-    }
-    // TODO: make filename configurable? right now it will silently fail
-    node_names_write_userconfig(node_cache->names, "/etc/spin/names.conf");
-}
-
-/* TODO: Remove, replaced by RPC call */
-/* NO, TODO2: rename to 'broadcast_iplist' or something */
-void handle_command_get_iplist(int iplist, const char* json_command) {
-    spin_data ipt_sd, cmd_sd;
-
-    printf("[XX] HANDLE COMMAND GET IPLIST %d\n", iplist);
-    printf("[XX] IP LIST TREE SIZE %d\n", tree_size(get_spin_iplist(iplist)->li_tree));
-
-    ipt_sd = spin_data_ipar(get_spin_iplist(iplist)->li_tree);
-    cmd_sd = spin_data_create_mqtt_command(json_command, NULL, ipt_sd);
-
-    core2pubsub_publish_chan(NULL, cmd_sd, 0);
-
-    spin_data_delete(cmd_sd);
 }
 
 /* TODO: remove, no longer necessary once all handle_commands are removed */

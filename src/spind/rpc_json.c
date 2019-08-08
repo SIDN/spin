@@ -17,23 +17,27 @@ make_answer(spin_data id) {
 }
 
 static spin_data
-json_error(spin_data call_info, int errorno) {
-    spin_data errorobj;
+json_error(spin_data call_info, int errorno, const char* error_message) {
+    spin_data error_msg, error_obj;
     spin_data idobj;
 
     idobj = cJSON_GetObjectItemCaseSensitive(call_info, "id");
-    errorobj = make_answer(idobj);
-    cJSON_AddNumberToObject(errorobj, "error", errorno);
-    return errorobj;
+    error_obj = make_answer(idobj);
+    error_msg = cJSON_AddObjectToObject(error_obj, "error");
+    
+    cJSON_AddNumberToObject(error_msg, "code", errorno);
+    cJSON_AddStringToObject(error_msg, "message", error_message);
+
+    return error_obj;
 }
 
 static rpc_arg_t callreg_args[100];
 static rpc_arg_t callreg_res;
 
 static
-spin_data rpc_json_callreg(char *method, spin_data jsonparams) {
+spin_data rpc_json_callreg(spin_data call_info, char *method, spin_data jsonparams) {
     int nargs;
-    spin_data jsonresult;
+    spin_data jsonresult, jsonanswer, jsonid;
     cJSON *param;
     int res;
 
@@ -61,26 +65,44 @@ spin_data rpc_json_callreg(char *method, spin_data jsonparams) {
     res = rpc_call(method, nargs, callreg_args, &callreg_res);
 
     // TODO: make a common status response;
-    // status: int
-    // result: <whatever, depends on function>
-    // error:? <error message if status not 0>?
-    // probably need to add something to all rpc callbacks too...
+    // responses have either 'result', 'error', or nothing apart from
+    // id and jsonrpc version
+    //
+    // If result is not zero, it was an error, we report the return
+    // value as the error code, and the rpc_val.rpca_svalue as the
+    // error message
     if (res != 0) {
+        jsonresult = json_error(call_info, res, callreg_res.rpc_val.rpca_svalue);
         spin_log(LOG_ERR, "RPC not zero\n");
-    }
+    } else {
 
-    switch(callreg_res.rpc_desc.rpca_type) {
-    case RPCAT_INT:
-        jsonresult = cJSON_CreateNumber(callreg_res.rpc_val.rpca_ivalue);
-        break;
-    case RPCAT_STRING:
-        jsonresult = cJSON_CreateString(callreg_res.rpc_val.rpca_svalue);
-        break;
-    case RPCAT_COMPLEX:
-        jsonresult = callreg_res.rpc_val.rpca_cvalue;
-        break;
-    default: // Cannot happen
-        jsonresult = NULL;
+        switch(callreg_res.rpc_desc.rpca_type) {
+        case RPCAT_INT:
+            jsonresult = cJSON_CreateNumber(callreg_res.rpc_val.rpca_ivalue);
+            break;
+        case RPCAT_STRING:
+            jsonresult = cJSON_CreateString(callreg_res.rpc_val.rpca_svalue);
+            break;
+        case RPCAT_COMPLEX:
+            jsonresult = callreg_res.rpc_val.rpca_cvalue;
+            break;
+        case RPCAT_NONE:
+            jsonresult = NULL;
+            break;
+        default: // Cannot happen
+            spin_log(LOG_ERR, "Unknown JSON RPC result type %s\n", callreg_res.rpc_desc.rpca_type);
+            jsonresult = NULL;
+        }
+
+        jsonid = cJSON_GetObjectItemCaseSensitive(call_info, "id");
+        if (jsonid != 0) {
+            jsonanswer = make_answer(jsonid);
+            if (jsonresult != NULL) {
+                cJSON_AddItemToObject(jsonanswer, "result", jsonresult);
+            }
+            return jsonanswer;
+        }
+
     }
 
     return jsonresult;
@@ -92,12 +114,12 @@ spin_data rpc_json(spin_data call_info) {
     spin_data jsonmethod;
     spin_data jsonparams;
     char *method;
-    spin_data jsonretval;
-    spin_data jsonanswer;
+    //spin_data jsonretval;
+    //spin_data jsonanswer;
 
     jsonrpc = cJSON_GetObjectItemCaseSensitive(call_info, "jsonrpc");
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0")) {
-        return json_error(call_info, 1);
+        return json_error(call_info, 1, "Wrong JSON-RPC version, expected 2.0");
     }
 
     // Get id, if not there it is a Notification
@@ -106,25 +128,17 @@ spin_data rpc_json(spin_data call_info) {
 
     jsonmethod = cJSON_GetObjectItemCaseSensitive(call_info, "method");
     if (!cJSON_IsString(jsonmethod)) {
-        return json_error(call_info, 2);
+        return json_error(call_info, 2, "'method' object must be a string");
     }
     method = jsonmethod->valuestring;
 
     jsonparams = cJSON_GetObjectItemCaseSensitive(call_info, "params");
 
     if (jsonparams != NULL && !cJSON_IsObject(jsonparams)) {
-        return json_error(call_info, 3);
+        return json_error(call_info, 3, "'params' object must be a dict");
     }
 
-    jsonretval = rpc_json_callreg(method, jsonparams);
-
-    if (jsonid != 0) {
-        jsonanswer = make_answer(jsonid);
-        cJSON_AddItemToObject(jsonanswer, "result", jsonretval);
-        return jsonanswer;
-    }
-
-    return NULL;
+    return rpc_json_callreg(call_info, method, jsonparams);
 }
 
 char *

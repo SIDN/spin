@@ -1,7 +1,8 @@
 typedef enum {
     RPCAT_INT,
     RPCAT_STRING,
-    RPCAT_COMPLEX
+    RPCAT_COMPLEX,
+    RPCAT_NONE
 } rpc_argtype;
 
 typedef struct {

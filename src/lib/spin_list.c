@@ -24,7 +24,7 @@ struct list_info* get_spin_iplist(int index) {
 // Returns -1 if list not found
 int get_spin_iplist_id_by_name(const char* name) {
     for (int i=0; i < N_IPLIST; i++) {
-        if (strncmp(name, ipl_list_ar[i].li_listname, strlen(ipl_list_ar[i].li_listname)) == 0) {
+        if (strncmp(name, ipl_list_ar[i].li_listname, strlen(name)) == 0) {
             return i;
         }
     }
