@@ -41,7 +41,7 @@
 #include "spinhook.h"
 #include "statistics.h"
 #include "version.h"
-
+#include "spindata.h"
 
 node_cache_t* node_cache;
 dns_cache_t* dns_cache;
@@ -221,21 +221,14 @@ report_block(int af, int proto, uint8_t *src_addr, uint8_t *dest_addr, unsigned 
     send_command_blocked(&pkt);
 }
 
-/*
- * The three lists of IP addresses are now kept in memory in spind, with
- * a copy written to file.
- * BLOCK, IGNORE, ALLOW
+/* Worker function to regularly synchronize the ip lists
+ * (see spin_list.h) to persistent storage
  */
-struct list_info ipl_list_ar[N_IPLIST] = {
-    { 0, "block",   0 },
-    { 0, "ignore",  0 },
-    { 0, "allow",   0 },
-};
-
 void wf_ipl(void *arg, int data, int timeout) {
     int i;
     struct list_info *lip;
     char *fname;
+    struct list_info* ipl_list_ar = get_spin_iplists();
 
     if (timeout) {
         // What else could it be ??
@@ -252,7 +245,7 @@ void wf_ipl(void *arg, int data, int timeout) {
 
 void
 init_ipl_list_ar() {
-    init_all_ipl(ipl_list_ar);
+    init_all_ipl(get_spin_iplists());
 
     // Sync trees to files every 2.5 seconds for now
     mainloop_register("IP list sync", wf_ipl, (void *) 0, 0, 2500);
@@ -282,6 +275,9 @@ void spin_register(char *name, spinfunc wf, void *arg, int list[N_IPLIST]) {
     n_sr++;
 }
 
+/*
+ * called when a list is modified, make sure the list is persisted
+ */
 static void
 list_inout_do_ip(int iplist, int addrem, ip_t *ip_addr) {
     int i;
@@ -314,7 +310,8 @@ push_ips_from_list_to_kernel(int iplist) {
     //
     // Make sure the kernel gets to know on init
     //
-    call_kernel_for_tree(iplist, SF_ADD, ipl_list_ar[iplist].li_tree);
+    // TODO: need this?
+    //call_kernel_for_tree(iplist, SF_ADD, ipl_list_ar[iplist].li_tree);
 }
 
 void push_all_ipl() {
@@ -335,25 +332,31 @@ call_kernel_for_node_ips(int listid, int addrem, node_t *node) {
     call_kernel_for_tree(listid, addrem, node->ips);
 }
 
+/* TODO: remove this, replaced by RPC command */
 void handle_command_remove_ip_from_list(int iplist, ip_t* ip) {
 
     list_inout_do_ip(iplist, SF_REM, ip);
-    remove_ip_from_li(ip, &ipl_list_ar[iplist]);
+    remove_ip_from_li(ip, get_spin_iplist(iplist));
 }
 
+/* TODO: remove this, replaced by RPC command */
 void handle_command_remove_all_from_list(int iplist) {
     tree_entry_t* ip_entry;
 
-    ip_entry = tree_first(ipl_list_ar[iplist].li_tree);
+    ip_entry = tree_first(get_spin_iplist(iplist)->li_tree);
     while (ip_entry != NULL) {
         list_inout_do_ip(iplist, SF_REM, ip_entry->key);
         ip_entry = tree_next(ip_entry);
     }
     // Remove whole tree, will be recreated
-    tree_destroy(ipl_list_ar[iplist].li_tree);
+    tree_destroy(get_spin_iplist(iplist)->li_tree);
 }
 
 // Switch code
+// For effiency, the nodes in node_cache have a data field specifying
+// on which list(s) the node is. When we update a list, we need
+// to make sure the corresponding nodes in the node cache are updated
+// as well. This function takes care of that
 void handle_list_membership(int listid, int addrem, int node_id) {
     node_t* node;
 
@@ -364,12 +367,13 @@ void handle_list_membership(int listid, int addrem, int node_id) {
 
     call_kernel_for_node_ips(listid, addrem, node);
     if (addrem == SF_ADD) {
-        add_ip_tree_to_li(node->ips, &ipl_list_ar[listid]);
+        add_ip_tree_to_li(node->ips, get_spin_iplist(listid));
     } else {
-        remove_ip_tree_from_li(node->ips, &ipl_list_ar[listid]);
+        remove_ip_tree_from_li(node->ips, get_spin_iplist(listid));
     }
 }
 
+/* TODO: create an RPC call for this */
 void handle_command_reset_ignores() {
 
     // clear the ignores; derive them from our own addresses again
@@ -381,10 +385,11 @@ void handle_command_reset_ignores() {
     system("/usr/lib/spin/show_ips.lua -o /etc/spin/ignore.list -f");
 
     // Load the ignores again
-    init_ipl(&ipl_list_ar[IPLIST_IGNORE]);
+    init_ipl(get_spin_iplist(IPLIST_IGNORE));
     push_ips_from_list_to_kernel(IPLIST_IGNORE);
 }
 
+/* TODO: remove, replaced by RPC call */
 void handle_command_add_name(int node_id, char* name) {
     // find the node
     // node_t* node = node_cache_find_by_id(node_cache, node_id);
@@ -416,10 +421,15 @@ void handle_command_add_name(int node_id, char* name) {
     node_names_write_userconfig(node_cache->names, "/etc/spin/names.conf");
 }
 
+/* TODO: Remove, replaced by RPC call */
+/* NO, TODO2: rename to 'broadcast_iplist' or something */
 void handle_command_get_iplist(int iplist, const char* json_command) {
     spin_data ipt_sd, cmd_sd;
 
-    ipt_sd = spin_data_ipar(ipl_list_ar[iplist].li_tree);
+    printf("[XX] HANDLE COMMAND GET IPLIST %d\n", iplist);
+    printf("[XX] IP LIST TREE SIZE %d\n", tree_size(get_spin_iplist(iplist)->li_tree));
+
+    ipt_sd = spin_data_ipar(get_spin_iplist(iplist)->li_tree);
     cmd_sd = spin_data_create_mqtt_command(json_command, NULL, ipt_sd);
 
     core2pubsub_publish_chan(NULL, cmd_sd, 0);
@@ -427,12 +437,14 @@ void handle_command_get_iplist(int iplist, const char* json_command) {
     spin_data_delete(cmd_sd);
 }
 
+/* TODO: remove, no longer necessary once all handle_commands are removed */
 rpc_arg_desc_t list_member_args[] = {
     { "list", RPCAT_INT },
     { "addrem", RPCAT_INT },
     { "node", RPCAT_INT },
 };
 
+/* TODO: remove, no longer necessary once all handle_commands are removed */
 static int spindlistfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
 
     handle_list_membership(args[0].rpca_ivalue, args[1].rpca_ivalue,args[2].rpca_ivalue);

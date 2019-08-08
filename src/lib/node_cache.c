@@ -1078,3 +1078,19 @@ int flow_list_empty(flow_list_t* flow_list) {
 
     return tree_empty(flow_list->flows);
 }
+
+// For effiency, the nodes in node_cache have a data field specifying
+// on which list(s) the node is. When we update a list, we need
+// to make sure the corresponding nodes in the node cache are updated
+// as well. This function takes care of that
+void node_cache_update_iplist_node(node_cache_t* node_cache, int listid, int addrem, int node_id) {
+    node_t* node;
+
+    node = node_cache_find_by_id(node_cache, node_id);
+    if (node == NULL) {
+        spin_log(LOG_WARNING, "Node-id %d not found!\n", node_id);
+        return;
+    }
+
+    node->is_onlist[listid] = addrem == SF_ADD ? 1 : 0;
+}

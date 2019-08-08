@@ -60,6 +60,11 @@ spin_data rpc_json_callreg(char *method, spin_data jsonparams) {
 
     res = rpc_call(method, nargs, callreg_args, &callreg_res);
 
+    // TODO: make a common status response;
+    // status: int
+    // result: <whatever, depends on function>
+    // error:? <error message if status not 0>?
+    // probably need to add something to all rpc callbacks too...
     if (res != 0) {
         spin_log(LOG_ERR, "RPC not zero\n");
     }

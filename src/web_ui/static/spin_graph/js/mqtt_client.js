@@ -153,19 +153,19 @@ function onTrafficMessage(msg) {
                 //console.log("Got DNS query message: " + msg);
                 handleDNSQueryMessage(result);
                 break;
-            case 'ignores':
+            case 'ignore':
                 //console.log("Got ignores command: " + msg);
                 ignoreList = result;
                 ignoreList.sort();
                 updateIgnoreList();
                 break;
-            case 'blocks':
+            case 'block':
                 //console.log("Got blocks command: " + msg);
                 blockList = result;
                 blockList.sort();
                 updateBlockList();
                 break;
-            case 'alloweds':
+            case 'allow':
                 //console.log("Got alloweds command: " + msg);
                 allowedList = result;
                 allowedList.sort();

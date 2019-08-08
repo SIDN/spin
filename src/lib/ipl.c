@@ -68,6 +68,12 @@ add_ip_tree_to_li(tree_t* tree, struct list_info *lip) {
     lip->li_modified++;
 }
 
+void add_ip_to_li(ip_t* ip, struct list_info *lip) {
+    tree_add(lip->li_tree, sizeof(ip_t), ip, 0, 0, 1);
+    lip->li_modified++;
+}
+
+
 void
 remove_ip_tree_from_li(tree_t *tree, struct list_info *lip) {
     tree_entry_t* cur;

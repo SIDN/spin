@@ -4,7 +4,12 @@
 #include "spin_log.h"
 #include "statistics.h"
 #include "core2block.h"
+#include "core2pubsub.h"
 #include "spinhook.h"
+#include "spin_list.h"
+#include "ipl.h"
+#include "node_cache.h"
+#include "tree.h"
 
 #include <dirent.h>
 #include <time.h>
@@ -534,11 +539,163 @@ rpc_arg_desc_t set_device_name_args[] = {
     { "name", RPCAT_STRING },
 };
 
+void broadcast_iplist(int iplist, const char* list_name) {
+    spin_data ipt_sd, cmd_sd;
+
+    printf("[XX] HANDLE COMMAND GET IPLIST %d\n", iplist);
+    printf("[XX] IP LIST TREE SIZE %d\n", tree_size(get_spin_iplist(iplist)->li_tree));
+
+    ipt_sd = spin_data_ipar(get_spin_iplist(iplist)->li_tree);
+    cmd_sd = spin_data_create_mqtt_command(list_name, NULL, ipt_sd);
+
+    core2pubsub_publish_chan(NULL, cmd_sd, 0);
+
+    spin_data_delete(cmd_sd);
+}
 
 
+rpc_arg_desc_t iplist_addremove_node_args[] = {
+    { "list", RPCAT_STRING },
+    { "node", RPCAT_INT },
+};
+int update_iplist_node(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result, int add_remove) {
+    // Four things to do:
+    // - check for valid data
+    // - add the ips of the node to the relevant list
+    // - update the corresponding node in the node_cache
+    // - call core2block to update the relevant firewall rules
+    // Should we persist the list too? It is currently done automatically every 2.5 seconds
+    int iplist_id, node_id;
+    char* iplist_name;
+    struct list_info* iplist;
+    node_t* node;
+    node_cache_t* node_cache = (node_cache_t*)cb;
+
+    iplist_name = args[0].rpca_svalue;
+    iplist_id = get_spin_iplist_id_by_name(iplist_name);
+    if (iplist_id < 0) {
+        printf("[XX] LIST NOT FOUND\n");
+        result->rpca_ivalue = -1;
+        return -1;
+    }
+    iplist = get_spin_iplist(iplist_id);
+
+    node_id = args[1].rpca_ivalue;
+    node = node_cache_find_by_id(node_cache, node_id);
+    if (node == NULL) {
+        printf("[XX] NODE %d NOT FOUND\n", node_id);
+        result->rpca_ivalue = -1;
+        return -2;
+    }
+
+    printf("[XX] ADDING NODE %d to LIST %d\n", node_id, iplist_id);
+    // There is an add_ip_tree_to_li, but we need to loop over
+    // the tree anyway to call c2b_changelist (no tree variant for
+    // that one)
+    tree_entry_t* entry = tree_first(node->ips);
+    while (entry != NULL) {
+        if (add_remove == SF_ADD) {
+            add_ip_to_li(entry->key, iplist);
+        } else {
+            remove_ip_from_li(entry->key, iplist);
+            //remove_ip_tree_from_li(node->ips, iplist);
+        }
+        c2b_changelist(NULL, iplist_id, add_remove, entry->key);
+        entry = tree_next(entry);
+    }
+    node_cache_update_iplist_node(node_cache, iplist_id, add_remove, node_id);
+
+    // Broadcast that the list was updated
+    broadcast_iplist(iplist_id, iplist_name);
+
+    return 0;
+}
+
+int add_iplist_node(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    return update_iplist_node(cb, args, result, SF_ADD);
+}
+
+int remove_iplist_node(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    return update_iplist_node(cb, args, result, SF_REM);
+}
 
 
+rpc_arg_desc_t iplist_addremove_ip_args[] = {
+    { "list", RPCAT_STRING },
+    { "ip", RPCAT_STRING },
+};
 
+
+int update_iplist_ip(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result, int add_remove) {
+    // When we update a single IP, we do NOT update the node cache!
+    // TODO: We may need to think about this. Choices:
+    // 1. Do not update node_cache->on_list (like now)
+    // 2. Update it (becomes inconsistent because it may have more ip addresses)
+    // 3. Silently add all other ip addresses of that node as well
+    
+    int iplist_id;
+    struct list_info* iplist;
+    ip_t ip;
+    char* iplist_name, * ip_str;
+
+    // Check the arguments
+    iplist_name = args[0].rpca_svalue;
+    iplist_id = get_spin_iplist_id_by_name(iplist_name);
+    if (iplist_id < 0) {
+        printf("[XX] LIST NOT FOUND: %s\n", iplist_name);
+        return 1;
+    }
+    iplist = get_spin_iplist(iplist_id);
+
+    ip_str = args[1].rpca_svalue;
+    if (!spin_pton(&ip, ip_str)) {
+        printf("[XX] Malformed ip address: %s\n", ip_str);
+        result->rpca_ivalue = -1;
+        return -1;
+    }
+
+    // Update the internal list
+    if (add_remove == SF_ADD) {
+        add_ip_to_li(&ip, iplist);
+    } else {
+        remove_ip_from_li(&ip, iplist);
+    }
+    // Update firewall rules
+    c2b_changelist(NULL, iplist_id, add_remove, &ip);
+
+    // Broadcast that the list was updated
+    broadcast_iplist(iplist_id, iplist_name);
+
+    return 0;
+}
+
+int add_iplist_ip(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    return update_iplist_ip(cb, args, result, SF_ADD);
+}
+
+int remove_iplist_ip(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    return update_iplist_ip(cb, args, result, SF_REM);
+}
+
+rpc_arg_desc_t iplist_list_args[] = {
+    { "list", RPCAT_STRING }
+};
+int list_iplist_ips(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    char* list_str;
+    int iplist_id;
+    struct list_info* iplist;
+
+    list_str = args[0].rpca_svalue;
+    iplist_id = get_spin_iplist_id_by_name(list_str);
+    if (iplist_id < 0) {
+        printf("[XX] LIST NOT FOUND: %s\n", list_str);
+        return 1;
+    }
+    iplist = get_spin_iplist(iplist_id);
+
+    result->rpca_cvalue = spin_data_ipar(iplist->li_tree);
+    return 0;
+}
 
 
 
@@ -594,7 +751,12 @@ init_rpcs(node_cache_t *node_cache) {
     rpc_register("list_devices", devlistfunc, (void *) node_cache, 0, NULL, RPCAT_COMPLEX);
     rpc_register("list_device_flows", devflowfunc, (void *) node_cache, 1, devflow_args, RPCAT_COMPLEX);
     rpc_register("set_device_name", set_device_name_func, (void *) node_cache, 2, set_device_name_args, RPCAT_INT);
-    //rpc_register("list_rpc_calls", list_rpc_calls_func, NULL, 0, 0, RPCAT_COMPLEX);
+    rpc_register("add_iplist_node", add_iplist_node, (void *) node_cache, 2, iplist_addremove_node_args, RPCAT_INT);
+    rpc_register("remove_iplist_node", remove_iplist_node, (void *) node_cache, 2, iplist_addremove_node_args, RPCAT_INT);
+    rpc_register("add_iplist_ip", add_iplist_ip,  (void *) node_cache, 2, iplist_addremove_ip_args, RPCAT_INT);
+    rpc_register("remove_iplist_ip", remove_iplist_ip,  (void *) node_cache, 2, iplist_addremove_ip_args, RPCAT_INT);
+    rpc_register("list_iplist", list_iplist_ips, 0, 1, iplist_list_args, RPCAT_COMPLEX);
+    
 
     register_internal_functions();
 }

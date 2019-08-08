@@ -181,6 +181,7 @@ unsigned int create_traffic_command(node_cache_t* node_cache, flow_list_t* flow_
 
 */
 
+void node_cache_update_iplist_node(node_cache_t* node_cache, int listid, int addrem, int node_id);
 
 
 #endif // SPIN_NODE_CACHE_H

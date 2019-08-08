@@ -115,9 +115,9 @@ static struct pubsub_commands {
 };
 
 static char *getnames[N_IPLIST] = {
-    "blocks",
-    "ignores",
-    "alloweds"
+    "block",
+    "ignore",
+    "allow"
 };
 
 static int find_command(const char *name_str, int *verb, int *object) {

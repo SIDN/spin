@@ -67,13 +67,15 @@ function updateZoomLock(newBool) {
 // code to add filters
 function sendAddIgnoreCommand(nodeId) {
     var node = nodes.get(nodeId);
+    // pre-emptively update the local list so we don't need to do or
+    // wait for another sync
     if ("ips" in node) {
         for (var i = 0; i < node.ips.length; i++) {
             ignoreList.push(node.ips[i]);
         }
     }
 
-    sendCommand("add_ignore_node", nodeId); // talk to websocket
+    sendRPCCommand("add_iplist_node", { "list": "ignore", "node": nodeId });
     deleteNodeAndConnectedNodes(node);
 }
 
@@ -364,9 +366,11 @@ function initGraphs() {
                         //alertWithObject("[XX] selected:", this);
                         var address;
                         if (this.innerText) {
-                            sendCommand("remove_ignore_ip", this.innerText);
+                            sendRPCCommand("remove_iplist_ip", { "list": "ignore", "ip": this.innerText });
+                            //sendCommand("remove_ignore_ip", this.innerText);
                         } else if (this.innerHTML) {
-                            sendCommand("remove_ignore_ip", this.innerHTML);
+                            sendRPCCommand("remove_iplist_ip", { "list": "ignore", "ip": this.innerHTML });
+                            //sendCommand("remove_ignore_ip", this.innerHTML);
                         }
                         $(".ui-dialog-buttonpane button:contains('Remove Ignores')").button("disable");
                     });
@@ -405,9 +409,11 @@ function initGraphs() {
                         //alertWithObject("[XX] selected:", this);
                         var address;
                         if (this.innerText) {
-                            sendCommand("remove_block_ip", this.innerText);
+                            sendRPCCommand("remove_iplist_ip", { "list": "block", "ip": this.innerText });
+                            //sendCommand("remove_block_ip", this.innerText);
                         } else if (this.innerHTML) {
-                            sendCommand("remove_block_ip", this.innerHTML);
+                            sendRPCCommand("remove_iplist_ip", { "list": "block", "ip": this.innerHTML });
+                            //sendCommand("remove_block_ip", this.innerHTML);
                         }
                         $(".ui-dialog-buttonpane button:contains('Remove Blocks')").button("disable");
                     });
@@ -443,9 +449,11 @@ function initGraphs() {
                         //alertWithObject("[XX] selected:", this);
                         var address;
                         if (this.innerText) {
-                            sendCommand("remove_allow_ip", this.innerText);
+                            sendRPCCommand("remove_iplist_ip", { "list": "allow", "ip": this.innerText });
+                            //sendCommand("remove_allow_ip", this.innerText);
                         } else if (this.innerHTML) {
-                            sendCommand("remove_allow_ip", this.innerHTML);
+                            sendRPCCommand("remove_iplist_ip", { "list": "allow", "ip": this.innerHTML });
+                            //sendCommand("remove_allow_ip", this.innerHTML);
                         }
                         $(".ui-dialog-buttonpane button:contains('Remove Allowed')").button("disable");
                     });
@@ -468,10 +476,12 @@ function initGraphs() {
         // hmm. misschien we should actually remove the node and
         // let the next occurrence take care of presentation?
         if (node.is_blocked) {
-            sendCommand("remove_block_node", selectedNodeId);
+            sendRPCCommand("remove_iplist_node", { "list": "block", "node": selectedNodeId });
+            //sendCommand("remove_block_node", selectedNodeId);
             node.is_blocked = false;
         } else {
-            sendCommand("add_block_node", selectedNodeId);
+            sendRPCCommand("add_iplist_node", { "list": "block", "node": selectedNodeId });
+            //sendCommand("add_block_node", selectedNodeId);
             node.is_blocked = true;
         }
         nodes.update(node);
@@ -483,10 +493,12 @@ function initGraphs() {
         // hmm. misschien we should actually remove the node and
         // let the next occurrence take care of presentation?
         if (node.is_excepted) {
-            sendCommand("remove_allow_node", selectedNodeId);
+            sendRPCCommand("remove_iplist_node", { "list": "allow", "node": selectedNodeId });
+            //sendCommand("remove_allow_node", selectedNodeId);
             node.is_excepted = false;
         } else {
-            sendCommand("add_allow_node", selectedNodeId);
+            sendRPCCommand("add_iplist_node", { "list": "allow", "node": selectedNodeId });
+            //sendCommand("add_allow_node", selectedNodeId);
             node.is_excepted = true;
         }
         nodes.update(node);
