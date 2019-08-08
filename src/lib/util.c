@@ -271,7 +271,8 @@ int store_ip_tree(tree_t* tree, const char* filename) {
     }
     cur = tree_first(tree);
     while (cur != NULL) {
-        spin_ntop(ip_str, cur->key, cur->key_size);
+        memset(ip_str, 0, INET6_ADDRSTRLEN);
+        spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
         fprintf(out, "%s\n", ip_str);
         cur = tree_next(cur);
     }
