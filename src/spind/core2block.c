@@ -7,7 +7,6 @@
 #include <fcntl.h>
 
 #include "util.h"
-#include "handle_command.h"
 #include "spin_log.h"
 #ifdef notdef
 #include "mainloop.h"

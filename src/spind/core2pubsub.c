@@ -9,7 +9,6 @@
 #include "spinconfig.h"
 #include "spin_log.h"
 #include "spin_list.h"
-#include "handle_command.h"
 #include "statistics.h"
 
 #include "rpc_json.h"
@@ -17,7 +16,6 @@
 #include "ipl.h"
 
 static char *mqtt_channel_traffic;
-static char *mqtt_channel_commands;
 static char mqtt_channel_jsonrpc_q[] = "SPIN/jsonrpc/q";
 static char mqtt_channel_jsonrpc_a[] = "SPIN/jsonrpc/a";
 static int mosquitto_keepalive_time;
@@ -93,48 +91,11 @@ void send_command_restart() {
 #define PSC_O_ALLOW             IPLIST_ALLOW
 #define PSC_O_NAME              N_IPLIST + 0
 
-static struct pubsub_commands {
-    char *      psc_commandstr;         // String of command
-    int         psc_verb;               // Verb
-    int         psc_object;             // Object
-} pubsub_commands[] = {
-    { "get_blocks",        PSC_V_GET,      PSC_O_BLOCK},
-    { "get_ignores",       PSC_V_GET,      PSC_O_IGNORE},
-    { "get_alloweds",      PSC_V_GET,      PSC_O_ALLOW},
-    { "get_names",         PSC_V_GET,      PSC_O_NAME },
-    { "add_block_node",    PSC_V_ADD,      PSC_O_BLOCK},
-    { "add_ignore_node",   PSC_V_ADD,      PSC_O_IGNORE},
-    { "add_allow_node",    PSC_V_ADD,      PSC_O_ALLOW},
-    { "add_name",          PSC_V_ADD,      PSC_O_NAME},
-    { "remove_block_node", PSC_V_REM,      PSC_O_BLOCK},
-    { "remove_ignore_node",PSC_V_REM,      PSC_O_IGNORE},
-    { "remove_allow_node", PSC_V_REM,      PSC_O_ALLOW},
-    { "remove_block_ip",   PSC_V_REM_IP,   PSC_O_BLOCK},
-    { "remove_ignore_ip",  PSC_V_REM_IP,   PSC_O_IGNORE},
-    { "remove_allow_ip",   PSC_V_REM_IP,   PSC_O_ALLOW},
-    { "reset_ignores",     PSC_V_RESET,    PSC_O_IGNORE},
-    { 0, 0, 0 }
-};
-
 static char *getnames[N_IPLIST] = {
     "block",
     "ignore",
     "allow"
 };
-
-static int find_command(const char *name_str, int *verb, int *object) {
-    struct pubsub_commands *p;
-
-    for (p=pubsub_commands; p->psc_commandstr; p++) {
-        if (strcmp(name_str, p->psc_commandstr)==0) {
-            // Match
-            *verb = p->psc_verb;
-            *object = p->psc_object;
-            return 1;
-        }
-    }
-    return 0;
-}
 
 int getint_cJSONobj(cJSON *cjarg, char *fieldname) {
     cJSON *f_json;
@@ -156,106 +117,11 @@ char* getstr_cJSONobj(cJSON *cjarg, char *fieldname) {
     return f_json->valuestring;
 }
 
-// TODO: once this is empty, we should remove it, all commands from client(s) to server should go through RPC
-void handle_json_command_detail(int verb, int object, cJSON *argument_json) {
-    ip_t ip_arg;
-
-    //
-    // First some common argument handling
-    //
-
-    switch(verb) {
-    case PSC_V_ADD:
-    case PSC_V_REM:
-        // Add names is different
-        if (object == PSC_O_NAME)
-            break;
-        if (!cJSON_IsNumber(argument_json)) {
-            spin_log(LOG_ERR, "Cannot parse node_id\n");
-            return;
-        }
-        break;
-    case PSC_V_REM_IP:
-        if (!cJSON_IsString(argument_json) || !spin_pton(&ip_arg, argument_json->valuestring)) {
-            spin_log(LOG_ERR, "Cannot parse ip-addr\n");
-            return;
-        }
-        break;
-    }
-
-    //
-    // Now handle objects
-    //
-
-    switch(object) {
-    case PSC_O_NAME:
-        switch(verb) {
-        case PSC_V_GET:
-            // TODO
-            // handle_command_get_names();
-            break;
-        }
-        break;  //NAME
-
-    case PSC_O_BLOCK:
-    case PSC_O_IGNORE:
-    case PSC_O_ALLOW:
-        switch(verb) {
-        case PSC_V_GET:
-            break;
-        case PSC_V_ADD:
-        case PSC_V_REM:
-            break;
-        }
-        break;  //BLOCK IGNORE and ALLOW
-    }
-}
-
-void
-handle_json_command(char *data) {
-    cJSON *command_json;
-    cJSON *method_json;
-    cJSON *argument_json;
-    char *method;
-    int verb, object;
-
-    command_json = cJSON_Parse(data);
-    if (command_json == NULL) {
-        spin_log(LOG_ERR, "Unable to parse command\n");
-        goto end;
-    }
-
-    method_json = cJSON_GetObjectItemCaseSensitive (command_json, "command");
-    if (!cJSON_IsString(method_json)) {
-        spin_log(LOG_ERR, "No command found\n");
-        goto end;
-    }
-    method = method_json->valuestring;
-
-    argument_json = cJSON_GetObjectItemCaseSensitive (command_json, "argument");
-    if (argument_json == NULL) {
-        spin_log(LOG_ERR, "No argument found\n");
-        goto end;
-    }
-
-    if (find_command(method, &verb, &object)) {
-        handle_json_command_detail(verb, object, argument_json);
-    }
-
-end:
-    cJSON_Delete(command_json);
-}
-
-
 // Hook from Mosquitto code called with incoming messages
 
 void do_mosq_message(struct mosquitto* mosq, void* user_data, const struct mosquitto_message* msg) {
     char *result;
 
-    if (strcmp(msg->topic, mqtt_channel_commands) == 0) {
-        handle_json_command(msg->payload);
-        return;
-    }
     if (strcmp(msg->topic, mqtt_channel_jsonrpc_q) == 0) {
         spin_log(LOG_DEBUG, "Rpc channel: %s\n", msg->payload);
         result = call_string_jsonrpc(msg->payload);
@@ -290,12 +156,6 @@ void connect_mosquitto(const char* host, int port) {
         exit(1);
     }
     spin_log(LOG_INFO, "Connected to mqtt server on %s:%d with keepalive value %d\n", host, port, mosquitto_keepalive_time);
-
-    result = mosquitto_subscribe(mosq, NULL, mqtt_channel_commands, 0);
-    if (result != 0) {
-        spin_log(LOG_ERR, "Error subscribing to topic %s: %s\n", mqtt_channel_commands, mosquitto_strerror(result));
-        exit(1);
-    }
 
     result = mosquitto_subscribe(mosq, NULL, mqtt_channel_jsonrpc_q, 0);
     if (result != 0) {
@@ -340,9 +200,8 @@ void init_mosquitto(const char* host, int port) {
     mosquitto_lib_init();
 
     mqtt_channel_traffic = spinconfig_pubsub_channel_traffic();
-    mqtt_channel_commands = spinconfig_pubsub_channel_commands();
     mosquitto_keepalive_time = spinconfig_pubsub_timeout();
-    spin_log(LOG_DEBUG, "Mosquitto traffic on %s, commands on %s, timeout %d\n", mqtt_channel_traffic, mqtt_channel_commands, mosquitto_keepalive_time);
+    spin_log(LOG_DEBUG, "Mosquitto traffic on %s, timeout %d\n", mqtt_channel_traffic, mosquitto_keepalive_time);
 
     connect_mosquitto(host, port);
 

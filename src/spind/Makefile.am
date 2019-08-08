@@ -14,7 +14,6 @@ spind_SOURCES = spind.c \
                 core2nflog_dns.c \
                 core2pubsub.c \
                 dnshooks.c \
-                handle_command.h \
                 mainloop.c \
                 mainloop.h \
                 nflogroutines.c \

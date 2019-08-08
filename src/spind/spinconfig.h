@@ -14,7 +14,6 @@ int spinconfig_log_usesyslog();
 int spinconfig_log_loglevel();
 char *spinconfig_pubsub_host();
 int spinconfig_pubsub_port();
-char *spinconfig_pubsub_channel_commands();
 char *spinconfig_pubsub_channel_traffic();
 int spinconfig_pubsub_timeout();
 int spinconfig_pubsub_omitnode();

@@ -36,7 +36,6 @@
 #include "rpc_json.h"
 #include "rpc_calls.h"
 
-#include "handle_command.h"
 #include "mainloop.h"
 #include "spinhook.h"
 #include "statistics.h"
@@ -134,22 +133,6 @@ publish_nodes() {
 
     node_callback_new(node_cache, node_is_updated);
 }
-
-static node_t *
-find_node_id(int node_id) {
-    node_t *node;
-
-    /*
-     * Find it and give warning if non-existent. This should not happen.
-     */
-    node = node_cache_find_by_id(node_cache, node_id);
-    if (node == NULL) {
-        spin_log(LOG_WARNING, "Node-id %d not found!\n", node_id);
-        return NULL;
-    }
-    return node;
-}
-
 
 void send_command_blocked(pkt_info_t* pkt_info) {
     spin_data pkt_sd, cmd_sd;
@@ -274,116 +257,6 @@ void spin_register(char *name, spinfunc wf, void *arg, int list[N_IPLIST]) {
     }
     n_sr++;
 }
-
-/*
- * called when a list is modified, make sure the list is persisted
- */
-static void
-list_inout_do_ip(int iplist, int addrem, ip_t *ip_addr) {
-    int i;
-
-    for (i = 0; i < n_sr; i++) {
-        if (sr[i].sr_list[iplist]) {
-            // This one is interested
-            spin_log(LOG_DEBUG, "Called spin list func %s(%d,%d)\n",
-                                sr[i].sr_name, iplist, addrem);
-            (*sr[i].sr_wf)(sr[i].sr_wfarg, iplist, addrem, ip_addr);
-        }
-    }
-}
-
-static void
-call_kernel_for_tree(int iplist, int addrem, tree_t *tree) {
-    tree_entry_t* ip_entry;
-
-    ip_entry = tree_first(tree);
-    while (ip_entry != NULL) {
-        // spin_log(LOG_DEBUG, "ckft: %d %x\n", cmd, tree);
-        list_inout_do_ip(iplist, addrem, ip_entry->key);
-        ip_entry = tree_next(ip_entry);
-    }
-}
-
-static void
-push_ips_from_list_to_kernel(int iplist) {
-
-    //
-    // Make sure the kernel gets to know on init
-    //
-    // TODO: need this?
-    //call_kernel_for_tree(iplist, SF_ADD, ipl_list_ar[iplist].li_tree);
-}
-
-void push_all_ipl() {
-    int i;
-
-    for (i=0; i<N_IPLIST; i++) {
-        // Push into kernel
-        push_ips_from_list_to_kernel(i);
-    }
-}
-
-static void
-call_kernel_for_node_ips(int listid, int addrem, node_t *node) {
-
-    if (node == NULL) {
-        return;
-    }
-    call_kernel_for_tree(listid, addrem, node->ips);
-}
-
-/* TODO: remove this, replaced by RPC command */
-
-/* TODO: remove this, replaced by RPC command */
-void handle_command_remove_all_from_list(int iplist) {
-    tree_entry_t* ip_entry;
-
-    ip_entry = tree_first(get_spin_iplist(iplist)->li_tree);
-    while (ip_entry != NULL) {
-        list_inout_do_ip(iplist, SF_REM, ip_entry->key);
-        ip_entry = tree_next(ip_entry);
-    }
-    // Remove whole tree, will be recreated
-    tree_destroy(get_spin_iplist(iplist)->li_tree);
-}
-
-// Switch code
-// For effiency, the nodes in node_cache have a data field specifying
-// on which list(s) the node is. When we update a list, we need
-// to make sure the corresponding nodes in the node cache are updated
-// as well. This function takes care of that
-void handle_list_membership(int listid, int addrem, int node_id) {
-    node_t* node;
-
-    if ((node = find_node_id(node_id)) == NULL)
-        return;
-
-    node->is_onlist[listid] = addrem == SF_ADD ? 1 : 0;
-
-    call_kernel_for_node_ips(listid, addrem, node);
-    if (addrem == SF_ADD) {
-        add_ip_tree_to_li(node->ips, get_spin_iplist(listid));
-    } else {
-        remove_ip_tree_from_li(node->ips, get_spin_iplist(listid));
-    }
-}
-
-/* TODO: remove, no longer necessary once all handle_commands are removed */
-rpc_arg_desc_t list_member_args[] = {
-    { "list", RPCAT_INT },
-    { "addrem", RPCAT_INT },
-    { "node", RPCAT_INT },
-};
-
-/* TODO: remove, no longer necessary once all handle_commands are removed */
-static int spindlistfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
-
-    handle_list_membership(args[0].rpca_ivalue, args[1].rpca_ivalue,args[2].rpca_ivalue);
-    result->rpca_ivalue = 0;
-    return 0;
-}
-
-
 
 void int_handler(int signal) {
     mainloop_end();
@@ -514,12 +387,9 @@ int main(int argc, char** argv) {
     init_ipl_list_ar();
 
     init_rpcs(node_cache);
-    rpc_register("spindlist", spindlistfunc, (void *) 0, 3, list_member_args, RPCAT_INT);
 
     init_mosquitto(mosq_host, mosq_port);
     signal(SIGINT, int_handler);
-
-    push_all_ipl();
 
 #if USE_UBUS
     ubus_main();

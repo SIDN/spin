@@ -10,7 +10,6 @@ enum configs {
     LOG_LOGLEVEL,
     PUBSUB_HOST,
     PUBSUB_PORT,
-    PUBSUB_CHANNEL_COMMANDS,
     PUBSUB_CHANNEL_TRAFFIC,
     PUBSUB_TIMEOUT,
     IPTABLE_QUEUE_DNS,
@@ -34,8 +33,6 @@ struct conf_item {
             { "pubsub_host",                "127.0.0.1",        0   },
     [PUBSUB_PORT] =
             { "pubsub_port",                "1883",             0   },
-    [PUBSUB_CHANNEL_COMMANDS] =
-            { "pubsub_channel_commands",    "SPIN/commands",    0   },
     [PUBSUB_CHANNEL_TRAFFIC] =
             { "pubsub_channel_traffic",     "SPIN/traffic",     0   },
     [PUBSUB_TIMEOUT] =
@@ -134,11 +131,6 @@ char *spinconfig_pubsub_host() {
 int spinconfig_pubsub_port() {
 
     return(spi_int(PUBSUB_PORT));
-}
-
-char *spinconfig_pubsub_channel_commands() {
-
-    return(spi_str(PUBSUB_CHANNEL_COMMANDS));
 }
 
 char *spinconfig_pubsub_channel_traffic() {
