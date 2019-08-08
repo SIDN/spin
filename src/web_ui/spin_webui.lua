@@ -386,9 +386,12 @@ end
 
 function handler:handle_device_list(request, response)
     print("Calling RPC")
-    local conn = rpc.connect()
+    local conn, err = rpc.connect()
     if not conn then
-        error("failed to connect to RPC mechanism")
+        -- We return an HTTP 200, but with the content set to
+        -- an error
+        response.content = json.encode({error = err})
+        return response
     end
     result, err = conn:call({ method = "list_devices" })
     -- TODO: error handling
@@ -413,9 +416,12 @@ function handler:handle_rpc_call(request, response)
     self:set_api_headers(response)
     if request.method == "POST" then
         if request.post_data then
-            local conn = rpc.connect()
+            local conn, err = rpc.connect()
             if not conn then
-                error("failed to connect to RPC mechanism")
+                -- We return an HTTP 200, but with the content set to
+                -- an error
+                response.content = json.encode({error = err})
+                return response
             end
             print("[XX] GOT RPC COMMAND: " .. json.encode(request.post_data))
             result, err = conn:call(request.post_data)

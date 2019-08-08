@@ -28,7 +28,9 @@ local json_rpc_connect = function (opts)
     print("[XX] connect")
     local s = assert( socket.unix() )
     -- TODO: configuration, error handling
-    assert( s:connect("/tmp/spin.sock") )
+    if not s:connect("/tmp/spin.sock") then
+        return nil, "Cannot connect to JSON-RPC domain socket, is spind running?"
+    end
     local conn = {}
     conn.s = s
     -- TODO: we have this compatibility the wrong way around! we need to add these arguments if
@@ -49,7 +51,7 @@ local json_rpc_connect = function (opts)
             response_json = json.decode(response)
             return response_json
         end
-        return None, "error"
+        return nil, "No response from JSON-RPC socket"
     end
     return conn
 end
