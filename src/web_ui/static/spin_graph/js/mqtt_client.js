@@ -60,16 +60,12 @@ function sendCommand(command, argument) {
     console.log("Sent to SPIN/commands: " + json_cmd)
 }
 
-// send a command directly to the Web API of spin (spin_webui)
-// this is essentially a web API layer to the RPC mechanism (currently
-// implemented locally through ubus and exposed by spin_webui)
-// TODO: remove this again, and call RPC directly (next function)
-function sendAPICommand(command, argument) {
-    // server host is the same as mqtt host
-    let api_base = server_host + "/spin_api";
-    alert(api_base);
-}
-
+/*
+ * Send an RPC command to the SPIN web API
+ * This also checks whether the result has, well, a result, or an
+ * error. For now, we simply alert if there is an error, with the
+ * full error response.
+ */
 function sendRPCCommand(procedure, params, success_callback) {
     var xhttp = new XMLHttpRequest();
     let rpc_endpoint = "http://" + server_host + "/spin_api/jsonrpc";
@@ -239,9 +235,6 @@ function onTrafficOpen(evt) {
     sendRPCCommand("list_iplist", { "list": "ignore" }, handle_getignore_response);
     sendRPCCommand("list_iplist", { "list": "block" }, handle_getblock_response);
     sendRPCCommand("list_iplist", { "list": "allow" }, handle_getallow_response);
-    //sendCommand("get_ignores", {})//, "")
-    //sendCommand("get_blocks", {})//, "")
-    //sendCommand("get_alloweds", {})//, "")
     //show connected status somewhere
     $("#statustext").css("background-color", "#ccffcc").text("Connected");
     active = true;

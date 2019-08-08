@@ -177,7 +177,6 @@ function initGraphs() {
             var newname = name.val();
             argument['node_id'] = selectedNodeId;
             argument['name'] = newname;
-            //sendCommand("add_name", argument); // talk to Websocket
             sendRPCCommand("set_device_name", { 'node': node.id, 'name': newname });
 
             node.label = newname;
@@ -367,17 +366,14 @@ function initGraphs() {
                         var address;
                         if (this.innerText) {
                             sendRPCCommand("remove_iplist_ip", { "list": "ignore", "ip": this.innerText });
-                            //sendCommand("remove_ignore_ip", this.innerText);
                         } else if (this.innerHTML) {
                             sendRPCCommand("remove_iplist_ip", { "list": "ignore", "ip": this.innerHTML });
-                            //sendCommand("remove_ignore_ip", this.innerHTML);
                         }
                         $(".ui-dialog-buttonpane button:contains('Remove Ignores')").button("disable");
                     });
                 },
                 Reset: function() {
                     sendRPCCommand("reset_iplist_ignore");
-                    //sendCommand("reset_ignores", "");
                 },
                 Close: function() {
                     dialog.dialog("close");
@@ -411,10 +407,8 @@ function initGraphs() {
                         var address;
                         if (this.innerText) {
                             sendRPCCommand("remove_iplist_ip", { "list": "block", "ip": this.innerText });
-                            //sendCommand("remove_block_ip", this.innerText);
                         } else if (this.innerHTML) {
                             sendRPCCommand("remove_iplist_ip", { "list": "block", "ip": this.innerHTML });
-                            //sendCommand("remove_block_ip", this.innerHTML);
                         }
                         $(".ui-dialog-buttonpane button:contains('Remove Blocks')").button("disable");
                     });
@@ -451,10 +445,8 @@ function initGraphs() {
                         var address;
                         if (this.innerText) {
                             sendRPCCommand("remove_iplist_ip", { "list": "allow", "ip": this.innerText });
-                            //sendCommand("remove_allow_ip", this.innerText);
                         } else if (this.innerHTML) {
                             sendRPCCommand("remove_iplist_ip", { "list": "allow", "ip": this.innerHTML });
-                            //sendCommand("remove_allow_ip", this.innerHTML);
                         }
                         $(".ui-dialog-buttonpane button:contains('Remove Allowed')").button("disable");
                     });
@@ -478,11 +470,9 @@ function initGraphs() {
         // let the next occurrence take care of presentation?
         if (node.is_blocked) {
             sendRPCCommand("remove_iplist_node", { "list": "block", "node": selectedNodeId });
-            //sendCommand("remove_block_node", selectedNodeId);
             node.is_blocked = false;
         } else {
             sendRPCCommand("add_iplist_node", { "list": "block", "node": selectedNodeId });
-            //sendCommand("add_block_node", selectedNodeId);
             node.is_blocked = true;
         }
         nodes.update(node);
@@ -495,11 +485,9 @@ function initGraphs() {
         // let the next occurrence take care of presentation?
         if (node.is_excepted) {
             sendRPCCommand("remove_iplist_node", { "list": "allow", "node": selectedNodeId });
-            //sendCommand("remove_allow_node", selectedNodeId);
             node.is_excepted = false;
         } else {
             sendRPCCommand("add_iplist_node", { "list": "allow", "node": selectedNodeId });
-            //sendCommand("add_allow_node", selectedNodeId);
             node.is_excepted = true;
         }
         nodes.update(node);
@@ -689,7 +677,6 @@ function updateNodeInfo(nodeId) {
     writeToScreen("lastseen", "<b>Last seen</b>: " + d.toLocaleDateString() + " " + d.toLocaleTimeString() + " (" + node.lastseen + ")");
 
     writeToScreen("nodeid", "<b>Node</b>: " + nodeId);
-    //sendCommand("arp2ip", node.address); // talk to Websocket
     if (node.mac) {
         writeToScreen("mac", "<b>HW Addr</b>: " + node.mac);
     } else {
@@ -767,9 +754,7 @@ function nodeSelected(event) {
             getPeakInformation();
         }
 
-        //sendCommand("ip2hostname", node.address);
         //writeToScreen("netowner", "Network owner: &lt;searching&gt;");
-        //sendCommand("ip2netowner", node.address); // talk to Websocket
         $("#nodeinfo").dialog('option', 'title', node.label);
         $("#flowinfo").dialog('close');
         $("#nodeinfo").dialog('open');
