@@ -183,7 +183,7 @@ static node_t *lookup_ip(node_cache_t *node_cache, ip_t *ip, pkt_info_t *pkt_inf
     result = node_cache_find_by_ip(node_cache, sizeof(ip_t), ip);
     if (result == NULL) {
         char pkt_str[1024];
-        spin_log(LOG_ERR, "[XX] ERROR! %s node not found in cache!\n");
+        spin_log(LOG_ERR, "[XX] ERROR! %s node not found in cache!\n", sd);
         pktinfo2str(pkt_str, pkt_info, 1024);
         spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
         spin_log(LOG_DEBUG, "[XX] node cache:\n");
