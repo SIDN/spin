@@ -22,18 +22,24 @@ static int fd;
  * to:
  * (1) verify that the payload has the expected size. This is done in
  * wf_extsrc().
- * (2) verify input validation. For instance, in the case of a string, make
- * sure it is NUL-terminated. This is done in each of the process_*() functions.
+ * (2) sanitize input. For instance, in the case of a string, make sure it is
+ * NUL-terminated. This is done in each of the process_*() functions.
  */
 
 static void
 process_pkt_info(pkt_info_t *pkt_info)
 {
+    time_t now;
+
+    /*
+     * Sanitize input: not necessary.
+     */
+
     /*
      * We could potentially send a timestamp through the socket and use
      * that here, too.
      */
-    time_t now = time(NULL);
+    now = time(NULL);
 
     /*
      * Here we mirror what conntrack_cb() is doing with the flow_list and
@@ -52,12 +58,20 @@ process_pkt_info(pkt_info_t *pkt_info)
 static void
 process_dns_query(struct extsrc_dns_query_hdr *hdr, dns_pkt_info_t *dns_pkt)
 {
+    /*
+     * Sanitize input: XXX what about the dname field?
+     */
+
     dns_query_hook(dns_pkt, hdr->family, hdr->src_addr);
 }
 
 static void
 process_dns_answer(dns_pkt_info_t *dns_pkt)
 {
+    /*
+     * Sanitize input: XXX what about the dname field?
+     */
+
     dns_answer_hook(dns_pkt);
 }
 
