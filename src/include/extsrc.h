@@ -8,6 +8,12 @@
 
 #define EXTSRC_SOCKET_PATH "/var/run/spin-extsrc.sock"
 
+/******************************************************************************/
+
+/*
+ * MESSAGE TYPE-SPECIFIC #define'S AND STRUCTURES
+ */
+
 /*
  * Message types
  */
@@ -19,19 +25,25 @@
 #define EXTSRC_MSG_TYPE_DNS_ANSWER 3
 
 /*
- * Header that will be prepended to the payload.
- */
-struct extsrc_msg_hdr {
-    uint32_t type; /* Message type (see above) */
-    uint32_t length; /* Length of the payload (i.e. without this header) */
-};
-
-/*
  * Additional information for the MSG_TYPE_DNS_QUERY message type.
  */
 struct extsrc_dns_query_hdr {
     int family;
     uint8_t src_addr[16];
+};
+
+/*
+ * END OF MESSAGE TYPE-SPECIFIC #define'S AND STRUCTURES
+ */
+
+/******************************************************************************/
+
+/*
+ * Header that will be prepended to the payload.
+ */
+struct extsrc_msg_hdr {
+    uint32_t type; /* Message type (see above) */
+    uint32_t length; /* Length of the payload (i.e. without this header) */
 };
 
 /*
