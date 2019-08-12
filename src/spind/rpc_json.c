@@ -256,7 +256,7 @@ wf_jsonrpc(void *arg, int data, int timeout) {
 void
 init_json_rpc() {
     spin_log(LOG_INFO, "No ubus; setting up JSON RPC handling\n");
-    const char* socket_path = "/tmp/spin.sock";
+    const char* socket_path = "/var/run/spin_rpc.sock";
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
