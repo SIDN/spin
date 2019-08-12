@@ -1,18 +1,14 @@
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/un.h>
 
+#include <sys/stat.h>
+#include <sys/un.h>
 #include <time.h>
 
-#include "dns_cache.h"
 #include "dnshooks.h"
 #include "extsrc.h"
 #include "mainloop.h"
-#include "node_cache.h"
-#include "spin_log.h"
 #include "spind.h"
+#include "spin_log.h"
 
-#include "core2extsrc.h"
 
 static node_cache_t *node_cache;
 static dns_cache_t *dns_cache;

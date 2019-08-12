@@ -35,7 +35,6 @@ spin_stat_val(stat_p sp, int val) {
 }
 
 #if DO_SPIN_STATS == 2
-#include <stdio.h>
 
 spin_stat_start() {
 

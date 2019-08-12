@@ -1,19 +1,11 @@
-#include <stdlib.h>
 #include <mosquitto.h>
 
-#include "spindata.h"
-
-#include "node_cache.h"
-#include "util.h"
+#include "ipl.h"
 #include "mainloop.h"
+#include "rpc_json.h"
 #include "spinconfig.h"
 #include "spin_log.h"
-#include "spin_list.h"
 #include "statistics.h"
-
-#include "rpc_json.h"
-#include "spin_list.h"
-#include "ipl.h"
 
 static char *mqtt_channel_traffic;
 static char mqtt_channel_jsonrpc_q[] = "SPIN/jsonrpc/q";

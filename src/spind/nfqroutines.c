@@ -1,23 +1,21 @@
-#include <stdio.h>
+
+#include <stdint.h>
+#include <assert.h>
+#include <fcntl.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
+#include <stdint.h>
+#include <libnetfilter_queue/libnetfilter_queue.h>
 #include <netinet/in.h>
-#include <linux/types.h>
-#include <linux/netfilter.h>
-#include <linux/udp.h>
-#include <linux/tcp.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
-#include <libnetfilter_queue/libnetfilter_queue.h>
-#include <fcntl.h>
+#include <linux/netfilter.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
 
-#include <assert.h>
-
-#include "spin_log.h"
-//#include "pkt_info.h"
 #include "mainloop.h"
 #include "nfqroutines.h"
+#include "spin_log.h"
 #include "statistics.h"
 
 STAT_MODULE(nfq)

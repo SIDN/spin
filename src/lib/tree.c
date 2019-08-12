@@ -1,9 +1,8 @@
 
-#include "tree.h"
-#include "spin_log.h"
-
-#include <stdio.h>
 #include <assert.h>
+
+#include "spin_log.h"
+#include "tree.h"
 
 tree_entry_t*
 tree_entry_create(size_t key_size, void* key, size_t data_size, void* data, int copy) {

@@ -1,4 +1,3 @@
-#include "spin_list.h"
 #include "ipl.h"
 #include "node_cache.h"
 

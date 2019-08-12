@@ -1,10 +1,6 @@
-#include <stdlib.h>
-#include "spindata.h"
-
-#include <string.h>
-#include <stdio.h>
-
+ 
 #include "mainloop.h"
+#include "spindata.h"
 #include "statistics.h"
 
 #if DO_SPIN_STATS

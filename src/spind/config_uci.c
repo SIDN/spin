@@ -1,13 +1,10 @@
 #include <string.h>
-#include <stdlib.h>
 
-#include "config.h"
-#include "spin_log.h"
 #include "spinconfig.h"
+#include "spin_log.h"
 
 
 #if USE_UCI
-#include <uci.h>
 
 /*
  * WARNING!!

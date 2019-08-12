@@ -1,10 +1,7 @@
-#include "spindata.h"
-#include "rpc_json.h"
-#include "spinhook.h"
-
-#include "spin_log.h"
 
 #include "rpc_common.h"
+#include "spinhook.h"
+#include "spin_log.h"
 
 static spin_data
 make_answer(spin_data id) {
@@ -249,7 +246,6 @@ wf_jsonrpc(void *arg, int data, int timeout) {
     }
 }
 
-#include <sys/socket.h>
 #include <sys/un.h>
 #include "mainloop.h"
 

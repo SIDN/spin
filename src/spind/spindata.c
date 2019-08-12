@@ -1,12 +1,6 @@
-#include <assert.h>
 
-#include "tree.h"
-#include "node_cache.h"
-#include "spin_log.h"
-
-#include "spinhook.h"
 #include "spindata.h"
-
+#include "spin_log.h"
 #include "statistics.h"
 
 STAT_MODULE(spindata)

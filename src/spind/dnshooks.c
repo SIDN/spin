@@ -1,9 +1,7 @@
 #include <time.h>
 
-#include "dns_cache.h"
-#include "ipl.h"
-#include "node_cache.h"
 #include "dnshooks.h"
+#include "ipl.h"
 #include "spind.h"
 #include "statistics.h"
 

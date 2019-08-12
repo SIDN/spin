@@ -3,12 +3,10 @@
 #include <time.h>
 
 #include "core2conntrack.h"
-#include "spin_log.h"
+#include "ipl.h"
 #include "mainloop.h"
 #include "spind.h"
-#include "pkt_info.h"
-#include "ipl.h"
-
+#include "spin_log.h"
 #include "statistics.h"
 
 STAT_MODULE(conntrack)

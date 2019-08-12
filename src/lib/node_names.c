@@ -1,10 +1,8 @@
 
+#include <errno.h>
+
 #include "node_names.h"
 #include "spin_log.h"
-
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
 
 node_names_t* node_names_create(void) {
     node_names_t* node_names = (node_names_t*) malloc(sizeof(node_names_t));

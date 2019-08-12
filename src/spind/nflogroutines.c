@@ -1,10 +1,6 @@
-#include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
 #include <netinet/in.h>
-#include <linux/types.h>
-#include <linux/netfilter.h>
 #include <linux/udp.h>
 #include <linux/tcp.h>
 #include <linux/ip.h>
@@ -14,10 +10,9 @@
 
 #include <assert.h>
 
-#include "spin_log.h"
-//#include "pkt_info.h"
 #include "mainloop.h"
 #include "nflogroutines.h"
+#include "spin_log.h"
 
 static int
 fd_set_blocking(int fd, int blocking) {

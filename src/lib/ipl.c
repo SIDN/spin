@@ -1,10 +1,4 @@
-#include "pkt_info.h"
-#include "util.h"
 #include "ipl.h"
-#include "spin_list.h"
-#include "node_cache.h"
-#include "dns_cache.h"
-#include "tree.h"
 #include "spin_log.h"
 
 static struct list_info* ipl_list_ar;

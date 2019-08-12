@@ -1,3 +1,8 @@
+#ifndef SPIN_RPC_COMMON_H
+#define SPIN_RPC_COMMON_H 1
+
+#include "spindata.h"
+
 typedef enum {
     RPCAT_INT,
     RPCAT_STRING,
@@ -31,3 +36,5 @@ void rpc_cleanup();
 int rpc_call(char *name, int nargs, rpc_arg_t *args, rpc_arg_t *result);
 //spin_data rpc_list_registered_procedures();
 void register_internal_functions();
+
+#endif // SPIN_RPC_COMMON_H

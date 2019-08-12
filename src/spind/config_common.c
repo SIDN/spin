@@ -1,9 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #include "spin_log.h"
-#include "spinconfig.h"
 
 enum configs {
     LOG_USESYSLOG,

@@ -39,13 +39,11 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <math.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <ctype.h>
 
 #ifdef ENABLE_LOCALES
-#include <locale.h>
 #endif
 
 #if defined(_MSC_VER)

@@ -1,13 +1,9 @@
-#include "util.h"
-
-#include "spin_log.h"
-
-#include <sys/socket.h>
 
 #include <assert.h>
-
 #include <errno.h>
-#include <stdio.h>
+
+#include "spin_log.h"
+#include "util.h"
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)

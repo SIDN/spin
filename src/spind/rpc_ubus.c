@@ -11,23 +11,20 @@
  * GNU General Public License for more details.
  */
 
-#include "mainloop.h"
-#include "spin_log.h"
-#include "spind.h"
-
-#include <unistd.h>
-#include <signal.h>
-
-#include <libubox/blobmsg_json.h>
-#include "libubus.h"
-
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
 
 #include <fcntl.h>
+#include <libubox/blobmsg_json.h>
+#include <signal.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
+#include "libubus.h"
+#include "mainloop.h"
 #include "rpc_json.h"
+#include "spind.h"
+#include "spin_log.h"
 
 static struct ubus_context *ctx;
 static struct ubus_subscriber spin_event;

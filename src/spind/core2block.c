@@ -1,26 +1,9 @@
-#include <stdlib.h>
-#include <stdio.h>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <fcntl.h>
-
-#include "util.h"
-#include "spin_log.h"
-#ifdef notdef
-#include "mainloop.h"
-#endif
 #include "nfqroutines.h"
-
-#include "spin_list.h"
-#include "spind.h"
 #include "spinconfig.h"
-
+#include "spind.h"
+#include "spin_log.h"
 #include "statistics.h"
-// needed for the CORE2NFLOG_DNS_GROUP_NUMBER value
-// (we will probably make this configurable)
-#include "core2nflog_dns.h"
 
 #define MAXSTR 1024
 

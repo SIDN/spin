@@ -1,6 +1,9 @@
 #ifndef SPIND_RPC_CALLS_H
 #define SPIND_RPC_CALLS_H 1
 
+#include "node_cache.h"
+#include "rpc_common.h"
+
 /*
  * Manually add an IP address to an existing node
  * RPC name: node_ad_ip

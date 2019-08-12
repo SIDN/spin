@@ -1,14 +1,8 @@
-#include "spin_log.h"
 
 #include <assert.h>
-#include <stdlib.h>
-#include <arpa/inet.h>
-#include "util.h"
-#include "spin_list.h"
-#include "node_cache.h"
-#include "netlink_commands.h"
-#include "spin_cfg.h"
+
 #include "spinhook.h"
+#include "spin_log.h"
 #include "statistics.h"
 
 STAT_MODULE(node_cache)

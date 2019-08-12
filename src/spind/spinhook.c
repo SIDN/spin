@@ -1,12 +1,8 @@
 #include <assert.h>
 
-#include "spind.h"
-#include "node_cache.h"
-#include "spinhook.h"
-#include "spindata.h"
 #include "core2pubsub.h"
+#include "spind.h"
 #include "spin_log.h"
-
 #include "statistics.h"
 
 STAT_MODULE(spinhook)

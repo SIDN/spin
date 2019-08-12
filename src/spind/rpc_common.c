@@ -1,8 +1,6 @@
-#include "spindata.h"
-#include "tree.h"
-#include "rpc_common.h"
-#include "rpc_calls.h"
 
+#include "rpc_calls.h"
+#include "spindata.h"
 #include "spin_log.h"
 
 /*

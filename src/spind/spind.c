@@ -1,46 +1,24 @@
-#include <sys/socket.h>
 #include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <dirent.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
 #include <signal.h>
 #include <time.h>
 #include <assert.h>
 
-#include "config.h"
-
-#include "spindata.h"
-
-#include "spinconfig.h"
-#include "pkt_info.h"
-#include "util.h"
-#include "ipl.h"
-#include "spin_list.h"
-#include "node_cache.h"
-#include "dns_cache.h"
-#include "tree.h"
-#include "spin_log.h"
-#include "core2pubsub.h"
 #include "core2block.h"
+#include "core2conntrack.h"
 #include "core2extsrc.h"
 #include "core2nflog_dns.h"
-#include "core2conntrack.h"
-#include "nfqroutines.h"
-#include "nflogroutines.h"
-
-#include "rpc_common.h"
-#include "rpc_json.h"
-#include "rpc_calls.h"
-
+#include "core2pubsub.h"
+#include "ipl.h"
 #include "mainloop.h"
+#include "nflogroutines.h"
+#include "nfqroutines.h"
+#include "rpc_calls.h"
+#include "rpc_json.h"
+#include "spinconfig.h"
 #include "spinhook.h"
+#include "spin_log.h"
 #include "statistics.h"
 #include "version.h"
-#include "spindata.h"
 
 node_cache_t* node_cache;
 dns_cache_t* dns_cache;

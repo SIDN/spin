@@ -1,14 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <netinet/in.h>
-#include <string.h>
-#include <errno.h>
 #include <ldns/ldns.h>
 
-#include "dns.h"
-#include "pkt_info.h"
-#include "dns_cache.h"
 #include "node_cache.h"
 #include "spin_log.h"
 

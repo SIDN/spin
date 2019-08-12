@@ -1,6 +1,4 @@
 
-#include "pkt_info.h"
-
 #ifdef __KERNEL__
 # include <linux/types.h>
 # define be64toh(x) be64_to_cpu(x)
@@ -8,7 +6,9 @@
 #else
 # include <endian.h>
 #endif
-#include <stdarg.h>
+
+#include "pkt_info.h"
+
 
 size_t pktinfo_msg_size() {
     // version (1 octet), msg size (2 octets), message type (1 octet), data

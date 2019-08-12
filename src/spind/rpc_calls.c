@@ -1,22 +1,16 @@
-#include "rpc_json.h"
-#include "rpc_common.h"
-#include "node_cache.h"
-#include "spin_log.h"
-#include "statistics.h"
-#include "core2block.h"
-#include "core2pubsub.h"
-#include "spinhook.h"
-#include "spin_list.h"
-#include "ipl.h"
-#include "node_cache.h"
-#include "tree.h"
-
 #include <dirent.h>
 #include <time.h>
 #include <assert.h>
-#include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/types.h>
+
+#include "core2block.h"
+#include "core2pubsub.h"
+#include "ipl.h"
+#include "rpc_json.h"
+#include "spinhook.h"
+#include "spin_log.h"
+#include "statistics.h"
+
 
 STAT_MODULE(spind)
 

@@ -1,23 +1,9 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <netinet/in.h>
-#include <linux/types.h>
-#include <linux/netfilter.h>
-#include <libnetfilter_queue/libnetfilter_queue.h>
-#include <string.h>
-#include <errno.h>
 
 #include "dns.h"
 #include "dnshooks.h"
-#include "pkt_info.h"
-#include "util.h"
-#include "dns_cache.h"
-#include "node_cache.h"
-#include "core2nflog_dns.h"
-#include "spin_log.h"
-#include "spinconfig.h"
 #include "nflogroutines.h"
+#include "spinconfig.h"
+#include "spin_log.h"
 
 static struct handle_dns_ctx *handle_dns_ctx = NULL;
 
