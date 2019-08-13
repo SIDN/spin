@@ -236,6 +236,8 @@ wf_jsonrpc(void *arg, int data, int timeout) {
         if (response != NULL) {
             write(msgsock, response, strlen(response));
             write(msgsock, "\n", 1);
+            free(response);
+            response = NULL;
         }
         spin_log(LOG_DEBUG, "Closing domain msg socket\n");
         close(msgsock);
