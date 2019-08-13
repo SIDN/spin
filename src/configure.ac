@@ -35,9 +35,6 @@ AC_PROG_RANLIB
 regular_CFLAGS="-Wall -Wextra -Wno-unused-parameter -Werror -O0"
 AC_SUBST([regular_CFLAGS])
 
-dnl Check for the right nfnetlink version
-PKG_CHECK_MODULES([libnfnetlink], [libnfnetlink >= 1.0.1])
-
 AC_CHECK_LIB([mosquitto], [mosquitto_lib_version], [], [AC_MSG_ERROR([libmosquitto not found])])
 
 #AC_CHECK_LIB([netfilter-log], [XXXXXXXX], [], [AC_MSG_ERROR([libXXXXXXX not found])])

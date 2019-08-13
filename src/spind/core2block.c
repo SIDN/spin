@@ -303,21 +303,8 @@ c2b_catch(void *arg, int af, int proto, uint8_t* data, int size, uint8_t *src_ad
 
 static void
 setup_catch(int queue) {
-
-    // Here we set up the catching of kernel messages for LOGed packets
     nfqroutine_register("core2block", c2b_catch, (void *) 0, queue);
 }
-
-#ifdef notdef
-static void
-wf_core2block(void *arg, int data, int timeout) {
-
-    if (timeout) {
-        spin_log(LOG_DEBUG, "wf_core2block called\n");
-        // TODO Do something with kernel messages
-    }
-}
-#endif
 
 void init_core2block() {
     static int all_lists[N_IPLIST] = { 1, 1, 1 };
@@ -339,9 +326,6 @@ void init_core2block() {
     setup_debug();
     setup_tables(nflog_dns_group, queue_block, place_block);
 
-#ifdef notdef
-    mainloop_register("core2block", wf_core2block, (void *) 0, 0, 10000);
-#endif
     spin_register("core2block", c2b_changelist, (void *) 0, all_lists);
 }
 

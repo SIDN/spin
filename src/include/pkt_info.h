@@ -1,6 +1,5 @@
 /**
- * Shared functions and structures for communication between
- * kernel module and client(s)
+ * Shared functions and structures for information about packets
  */
 #ifndef SPIN_PKT_INFO_H
 #define SPIN_PKT_INFO_H 1
@@ -9,7 +8,6 @@
 #include <linux/kernel.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
-#include <linux/netlink.h>
 
 #include <linux/ctype.h>
 #include <linux/udp.h>
@@ -30,8 +28,6 @@
 #include <netinet/in.h>
 #include <ctype.h>
 #endif // __KERNEL
-
-#define SPIN_NETLINK_PROTOCOL_VERSION 1
 
 typedef enum {
 	SPIN_TRAFFIC_DATA = 1,
@@ -67,16 +63,6 @@ typedef struct dns_packet_info {
 	char dname[256];
 } dns_pkt_info_t;
 
-// Size of the full pktinfo wire message (header + content)
-size_t pktinfo_msg_size(void);
-
-size_t dns_pktinfo_msg_size(void);
-
-// Size of the pktinfo wire data itself (without header)
-size_t pktinfo_wire_size(void);
-
-size_t dns_pktinfo_wire_size(void);
-
 // Writes a string representation of the given IP address (in
 // wire format) to the given destination address.
 void ntop(int fam, char* dest, const uint8_t* src, size_t max);
@@ -85,27 +71,12 @@ void ntop(int fam, char* dest, const uint8_t* src, size_t max);
 // writes until max_len is reached
 void pktinfo2str(char* dest, pkt_info_t* pkt_info, size_t max_len);
 
-// writes packet info data to target in wire format
-// target must have pktinfo_wire_size() bytes available
-void pktinfo2wire(uint8_t* dest, pkt_info_t* pkt_info);
-
 // returns true if the packets are considered equal
 // (same family, protocol, addresses and ports)
 int pkt_info_equal(pkt_info_t* a, pkt_info_t* b);
 
-// writes full packet info message (header + pktinfo)
-// target must have pktinfo_msg_size() bytes available
-void pktinfo_msg2wire(message_type_t type, uint8_t* dest, pkt_info_t* pkt_info);
-
-// Reads pkt_info data from memory at src
-// Returns the message type. If the type is BLOCKED or TRAFFIC,
-// pkt_info will be filled with info about the blocked or traffic data
-message_type_t wire2pktinfo(pkt_info_t* pkt_info, uint8_t* src);
-
-void dns_pktinfo_msg2wire(message_type_t type, uint8_t* dest, dns_pkt_info_t* pkt_info);
 void dns_pktinfo2str(char* dest, dns_pkt_info_t* dns_pkt_info, size_t max_len);
-void dns_pktinfo2wire(uint8_t* dest, dns_pkt_info_t* dns_pkt_info);
 void dns_dname2str(char* dest, char* src, size_t max_len);
-message_type_t wire2dns_pktinfo(dns_pkt_info_t* dns_pkt_info, uint8_t* src);
+
 
 #endif // SPIN_PKT_INFO

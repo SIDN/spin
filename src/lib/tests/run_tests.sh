@@ -21,5 +21,4 @@ gcov node_names_test-node_names.c
 gcov arp_test-arp.c
 gcov util_test-util.c
 gcov dns_cache_test-dns_cache.c
-gcov netlink_commands_test-netlink_commands.c
 rm *.gcda *.gcno
