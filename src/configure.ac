@@ -98,7 +98,5 @@ AC_CONFIG_FILES(
     Makefile
     lib/Makefile
     spind/Makefile
-    tools/spin_print/Makefile
-    tools/spin_config/Makefile
 )
 AC_OUTPUT
