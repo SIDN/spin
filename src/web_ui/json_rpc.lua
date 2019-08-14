@@ -74,7 +74,15 @@ local ubus_rpc_connect = function (opts)
             error_response['error'] = "missing 'id' in JSON-RPC 2.0 request"
             return error_response
         end
-        local ubus_response = self.ubus_conn:call("spin", "rpc", command)
+        command['id'] = nil
+        command['jsonrpc'] = nil
+        print("[XX] SENDING TO UBUS:")
+        print(json.encode(command))
+        local ubus_response, err, e2, e3 = self.ubus_conn:call("spin", "rpc", command)
+        if ubus_response == nil then
+            ubus_response = {}
+            ubus_response['error'] = { message='Error calling ubus spin. SPIN function may have not been registered.', code=err }
+        end
         -- transform it back to a correct JSON-RPC 2.0 response
         ubus_response['jsonrpc'] = '2.0'
         ubus_response['id'] = command['id']

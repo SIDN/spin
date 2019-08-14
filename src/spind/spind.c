@@ -19,6 +19,7 @@
 #include "spin_log.h"
 #include "statistics.h"
 #include "version.h"
+#include "config.h"
 
 node_cache_t* node_cache;
 dns_cache_t* dns_cache;
@@ -369,11 +370,10 @@ int main(int argc, char** argv) {
     init_mosquitto(mosq_host, mosq_port);
     signal(SIGINT, int_handler);
 
-#if USE_UBUS
+#ifdef USE_UBUS 
     ubus_main();
 #else
     init_json_rpc();
-    //json_rpc_main()?
 #endif
 
     mainloop_run();
