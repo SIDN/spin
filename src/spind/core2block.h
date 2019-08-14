@@ -4,7 +4,7 @@
 #include "util.h"
 #include "node_cache.h"
 
-void init_core2block();
+void init_core2block(int passive_mode);
 void cleanup_core2block();
 
 void c2b_changelist(void* arg, int iplist, int add, ip_t *ip_addr);

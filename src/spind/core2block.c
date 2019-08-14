@@ -1,4 +1,5 @@
 
+#include "config.h"
 #include "nfqroutines.h"
 #include "spinconfig.h"
 #include "spind.h"
@@ -13,6 +14,7 @@ STAT_MODULE(core2block)
 
 static int dolog;
 static FILE *logfile = NULL;
+static int g_passive_mode;
 
 static void
 setup_debug() {
@@ -296,6 +298,7 @@ void c2b_blockflow_end(int nodenum1, int nodenum2) {
     ipset_blockflow(1, IAJ_DEL, nodenum1, nodenum2);
 }
 
+#ifndef PASSIVE_MODE_ONLY
 static int
 c2b_catch(void *arg, int af, int proto, uint8_t* data, int size, uint8_t *src_addr, uint8_t *dest_addr, unsigned src_port, unsigned dest_port) {
     STAT_COUNTER(ctr, catch-block, STAT_TOTAL);
@@ -305,16 +308,23 @@ c2b_catch(void *arg, int af, int proto, uint8_t* data, int size, uint8_t *src_ad
     report_block(af, proto, src_addr, dest_addr, src_port, dest_port, size);
     return 0;           // DROP
 }
+#endif
 
 static void
 setup_catch(int queue) {
-    nfqroutine_register("core2block", c2b_catch, (void *) 0, queue);
+#ifndef PASSIVE_MODE_ONLY
+    if (!g_passive_mode) {
+        nfqroutine_register("core2block", c2b_catch, (void *) 0, queue);
+    }
+#endif
 }
 
-void init_core2block() {
+void init_core2block(int passive_mode) {
     static int all_lists[N_IPLIST] = { 1, 1, 1 };
     int nflog_dns_group, queue_block;
     int place_dns, place_block;
+
+    g_passive_mode = passive_mode;
 
     nflog_dns_group = spinconfig_iptable_nflog_dns_group();
     queue_block = spinconfig_iptable_queue_block();
@@ -338,5 +348,9 @@ void cleanup_core2block() {
     if (logfile != NULL) {
         fclose(logfile);
     }
-    nfqroutine_close("core2block");
+#ifndef PASSIVE_MODE_ONLY
+    if (!g_passive_mode) {
+        nfqroutine_close("core2block");
+    }
+#endif
 }

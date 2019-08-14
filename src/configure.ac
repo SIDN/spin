@@ -49,34 +49,55 @@ AC_SUBST([regular_CFLAGS])
 
 AC_CHECK_LIB([mosquitto], [mosquitto_lib_version], [], [AC_MSG_ERROR([libmosquitto not found])])
 
+passivemodeonly=0
+AC_ARG_ENABLE([passive-mode-only],
+              AC_HELP_STRING([--enable-passive-mode-only], [only allow spind to run in passive mode (i.e. do not rely on the Netlink and Netfilter APIs)]),
+              [
+                if test "x$enableval" = "xyes" ; then
+                  passivemodeonly=1
+                fi
+              ])
+AM_CONDITIONAL([PASSIVE_MODE_ONLY],  [test "x$passivemodeonly" = "x1"])
+if test "x$passivemodeonly" = "x1" ; then
+    AC_DEFINE([PASSIVE_MODE_ONLY], [1], [Enable passive mode only])
+fi
+
 #AC_CHECK_LIB([netfilter-log], [XXXXXXXX], [], [AC_MSG_ERROR([libXXXXXXX not found])])
 AC_CHECK_LIB([mnl], [mnl_socket_open],
     [
         LDFLAGS="$LDFLAGS -lmnl"
     ],
     [
-        AC_MSG_ERROR([libmnl not found])
+        if test "x$passivemodeonly" != "x1" ; then
+            AC_MSG_ERROR([libmnl not found])
+        fi
     ])
 AC_CHECK_LIB([netfilter_log], [nflog_open],
     [
         LDFLAGS="$LDFLAGS -lnetfilter_log"
     ],
     [
-        AC_MSG_ERROR([libnetfilter-log not found])
+        if test "x$passivemodeonly" != "x1" ; then
+            AC_MSG_ERROR([libnetfilter-log not found])
+        fi
     ])
 AC_CHECK_LIB([netfilter_queue], [nfq_open],
     [
         LDFLAGS="$LDFLAGS -lnetfilter_queue"
     ],
     [
-        AC_MSG_ERROR([libnetfilter-queue not found])
+        if test "x$passivemodeonly" != "x1" ; then
+            AC_MSG_ERROR([libnetfilter-queue not found])
+        fi
     ])
 AC_CHECK_LIB([netfilter_conntrack], [nfct_new],
     [
         LDFLAGS="$LDFLAGS -lnetfilter_conntrack"
     ],
     [
-        AC_MSG_ERROR([libnetfilter-conntrack not found])
+        if test "x$passivemodeonly" != "x1" ; then
+            AC_MSG_ERROR([libnetfilter-conntrack not found])
+        fi
     ])
 
 AC_CHECK_LIB([ldns], [ldns_wire2pkt], [LDFLAGS="$LDFLAGS -lldns"], [AC_MSG_ERROR([ldns not found])])

@@ -9,17 +9,13 @@ spind_SOURCES = spind.c \
                 config_common.c \
                 config_uci.c \
                 core2block.c \
-                core2conntrack.c \
                 core2extsrc.c \
-                core2nflog_dns.c \
                 core2pubsub.c \
                 dots.c \
                 dots.h \
                 dnshooks.c \
                 mainloop.c \
                 mainloop.h \
-                nflogroutines.c \
-                nfqroutines.c \
                 rpc_calls.c \
                 rpc_calls.h \
                 rpc_common.c \
@@ -27,6 +23,12 @@ spind_SOURCES = spind.c \
                 spindata.c \
                 spinhook.c \
                 statistics.c
+if !PASSIVE_MODE_ONLY
+spind_SOURCES += core2conntrack.c \
+                 core2nflog_dns.c \
+                 nflogroutines.c \
+                 nfqroutines.c
+endif
 
 
 #spind_CFLAGS =
