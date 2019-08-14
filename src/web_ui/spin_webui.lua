@@ -26,9 +26,6 @@ local tcpdumper = require 'tcpdumper'
 local TRAFFIC_CHANNEL = "SPIN/traffic"
 local HISTORY_SIZE = 600
 
--- The managers implement the main functionality
-local profile_manager_m = require 'profile_manager'
-
 local TEMPLATE_PATH = "templates/"
 
 -- Some functionality requires RPC calls to the spin daemon.
@@ -366,31 +363,9 @@ local function send_websocket_initialdata(client, name, arguments)
     client:send(msg)
 end
 
-function handler:get_filtered_profile_list()
-    local profile_list = {}
-    -- we'll make a selective deep copy of the data, since for now we
-    -- want to leave out some of the fields
-    -- we may need to find a construct similar to the
-    -- serializer from DRF
-    for i,v in pairs(self.profile_manager.profiles) do
-        local profile = {}
-        profile.id = v.id
-        profile.name = v.name
-        profile.type = v.type
-        profile.description = v.description
-        table.insert(profile_list, profile)
-    end
-    for i,v in pairs(profile_list) do
-      v.rules_v4 = nil
-      v.rules_v6 = nil
-    end
-    return profile_list
-end
-
 function handler:handle_profile_list(request, response)
-    self:set_api_headers(response)
-    response.content = json.encode(self:get_filtered_profile_list())
-    response:set_header("Last-Modified", self.profile_manager.profiles_updated)
+    response:set_status(403, "Not Found")
+    response.content = json.encode({status = 403, error = "Device profiles have been removed"})
     return response
 end
 
@@ -536,22 +511,16 @@ function handler:handle_websocket(request, response)
     --end
     --print("[XX] END OF FLAT HEADERS OF TYPE " .. type(flat_headers))
     request.raw_sock:settimeout(1)
-    print("[XX] AAAAAA")
     client, err = self.ws_handler.add_client(flat_headers, request.raw_sock, request.connection, self)
-    print("[XX] BBBBBB")
     if not client then
-        print("[XX] CCCCCC")
         response:set_status(400, "Bad request")
         response.content = err
         return response
     else
-        print("[XX] DDDDDD")
         table.insert(self.websocket_clients, status)
         -- send any initial client information here
         client:send('{"message": "hello, world"}')
-        -- Send the overview of profiles
-        --send_websocket_initialdata(client, "profiles", self:get_filtered_profile_list())
-        -- Send the overview of known devices so far, which includes their profiles
+        -- Send the overview of known devices so far
         send_websocket_initialdata(client, "devices", self:retrieve_device_list())
         -- Send all notifications
         send_websocket_initialdata(client, "notifications", self.notifications)
@@ -596,10 +565,6 @@ function handler:init(args)
 
     self:read_config(args)
     self:load_templates()
-
-    self.profile_manager = profile_manager_m.create_profile_manager()
-    self.profile_manager:load_all_profiles()
-    self.profile_manager:load_device_profiles()
 
     self.notifications = {}
     self.notifications_updated = spin_util.get_time_string()
