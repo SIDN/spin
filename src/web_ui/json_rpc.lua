@@ -28,8 +28,9 @@ local json_rpc_connect = function (opts)
     print("[XX] connect")
     local s = assert( socket.unix() )
     -- TODO: configuration, error handling
-    if not s:connect("/var/run/spin_rpc.sock") then
-        return nil, "Cannot connect to JSON-RPC domain socket, is spind running?"
+    local result, err = s:connect("/var/run/spin_rpc.sock")
+    if not result then
+        return nil, "Cannot connect to JSON-RPC domain socket, is spind running? error: " .. err
     end
     local conn = {}
     conn.s = s

@@ -105,7 +105,7 @@ function arg_parse(args)
     if args == nil then return config_file, mqtt_host, mqtt_port end
 
     skip = false
-    for i = 1,table.getn(args) do
+    for i = 1,#args do
         if skip then
             skip = false
         elseif args[i] == "-h" then
@@ -181,7 +181,7 @@ function handler:handle_traffic_message(data, orig_data)
         if mac ~= nil then
             -- If we don't have a name yet, use an IP address
             if name == nil then
-              if ips ~= nil and table.getn(ips) > 0 then
+              if ips ~= nil and #ips > 0 then
                   name = ips[1]
               -- to be sure we have *something* , fall back to mac
               else
@@ -221,7 +221,7 @@ end
 function handler:mqtt_queue_looper()
     self.mqtt_queue_msgs = {}
     while true do
-        while table.getn(self.mqtt_queue_msgs) > 0 do
+        while #self.mqtt_queue_msgs > 0 do
           local msg = table.remove(self.mqtt_queue_msgs, 1)
           self:handle_mqtt_queue_msg(msg)
         end
@@ -442,7 +442,7 @@ end
 
 -- this *queues* a message to send to all active clients
 function handler:send_websocket_update(name, arguments)
-    if table.getn(self.websocket_clients) == 0 then return end
+    if #self.websocket_clients == 0 then return end
     local msg = ""
     if arguments == nil then
         msg = '{"type": "update", "name": "' .. name .. '"}'
@@ -704,7 +704,7 @@ function handler:handle_websocket(request, response)
         send_websocket_initialdata(client, "devices", self.device_manager:get_devices_seen())
         -- Send all notifications
         send_websocket_initialdata(client, "notifications", self.notifications)
-        print("[XX] NEW CONNECT NOW COUNT: " .. table.getn(self.websocket_clients))
+        print("[XX] NEW CONNECT NOW COUNT: " .. #self.websocket_clients)
         while client.state ~= 'CLOSED' do
           print("[XX] NOTCLOSED")
           --if client:has_queued_messages() then
@@ -728,7 +728,7 @@ function handler:handle_websocket(request, response)
 end
 
 function handler:have_websocket_messages()
-  return table.getn(self.websocket_messages) > 0
+  return #self.websocket_messages > 0
 end
 
 function handler:do_add_ws_c(client)
@@ -858,6 +858,7 @@ end
 
 function handler:handle_request(request, response)
     local result = nil
+
     -- handle OPTIONS separately for now
     if request.method == "OPTIONS" then
         self:set_cors_headers(response)

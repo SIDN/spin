@@ -135,7 +135,7 @@ function profile_manager:load_device_profiles()
         local tokens = {}
         print("[XX] line: '" .. line .. "'")
         for token in line:gmatch("%S+") do table.insert(tokens, token) end
-        if table.getn(tokens) >= 2 then
+        if #tokens >= 2 then
             local device = table.remove(tokens, 1)
             -- apply it immediately
             self:remove_device_profile(device)
@@ -166,7 +166,7 @@ function profile_manager:apply_device_profile_v4(device_mac, rules)
     -- iptables -I FORWARD -m mac --mac-source <mac> -m comment --comment "SPIN-<mac>"
     local base_rule = "iptables -I FORWARD -m mac --mac-source " .. device_mac .. " -m comment --comment \"SPIN-" .. device_mac .. "\" "
     print("[XX] apply device profile: ")
-    print(table.getn(rules))
+    print(#rules)
     -- hmmz, this is not atomic...
     for i,r in pairs(rules) do
         local cmd, args = shlex_split(base_rule .. r)
@@ -183,7 +183,7 @@ function profile_manager:apply_device_profile_v6(device_mac, rules)
     -- iptables -I FORWARD -m mac --mac-source <mac> -m comment --comment "SPIN-<mac>"
     local base_rule = "ip6tables -I FORWARD -m mac --mac-source " .. device_mac .. " -m comment --comment \"SPIN-" .. device_mac .. "\" "
     print("[XX] apply device profile: ")
-    print(table.getn(rules))
+    print(#rules)
     -- hmmz, this is not atomic...
     for i,r in pairs(rules) do
         local cmd, args = shlex_split(base_rule .. r)
@@ -208,7 +208,7 @@ function profile_manager:remove_device_profile_helper(device_mac, save_command, 
     end
     local lines = s:read_lines(false, 5000)
     s:close()
-    print("[XX] GOT " .. table.getn(lines) .. " original lines")
+    print("[XX] GOT " .. #lines .. " original lines")
     local newlines = {}
     for i,l in pairs(lines) do
         if not l:find(to_remove) then
@@ -220,8 +220,8 @@ function profile_manager:remove_device_profile_helper(device_mac, save_command, 
 
     -- small sanity check; if something went wrong and we have
     -- no rules left, do not reload the firewall rules
-    print("[XX] Becomes " .. table.getn(lines) .. " new lines")
-    if table.getn(newlines) > 0 then
+    print("[XX] Becomes " .. #lines .. " new lines")
+    if #newlines > 0 then
         local sr, err = mt_io.subprocess(restore_command, {}, 0, false, false, true)
         if sr == nil then
             return nil, err
