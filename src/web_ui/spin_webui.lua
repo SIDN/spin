@@ -27,7 +27,6 @@ local TRAFFIC_CHANNEL = "SPIN/traffic"
 local HISTORY_SIZE = 600
 
 -- The managers implement the main functionality
-local device_manager_m = require 'device_manager'
 local profile_manager_m = require 'profile_manager'
 
 local TEMPLATE_PATH = "templates/"
@@ -125,51 +124,6 @@ function handler:read_config(args)
         if config == nil then return nil, err end
     end
     self.config = config
-end
-
-function handler:add_device_seen(mac, name, timestamp)
-    -- add_device_seen returns True if the device is 'new' (i.e. wasn't seen
-    -- before)
-    if (self.device_manager:add_device_seen(mac, name, timestamp)) then
-        local notification_txt = "New device on network! Please set a profile"
-        self:create_notification("new_device", {}, notification_txt, mac, name)
-        self:send_websocket_update("newDevice", self.device_manager:get_device_seen(mac))
-    else
-        self:send_websocket_update("deviceUpdate", self.device_manager:get_device_seen(mac))
-    end
-end
-
--- TODO: should the device manager do this part too?
-function handler:handle_traffic_message(data, orig_data)
-    if data.flows == nil then return end
-    for i, d in ipairs(data.flows) do
-        local mac = nil
-        local ips = nil
-        local name = nil
-        if d.from ~= nil and d.from.mac ~= nil then
-            name = d.from.name
-            mac = d.from.mac
-            ips = d.from.ips
-        elseif d.to ~= nil and d.to.mac ~= nil then
-            name = d.to.name
-            mac = d.to.mac
-            ips = d.to.ips
-        end
-
-        if mac ~= nil then
-            -- If we don't have a name yet, use an IP address
-            if name == nil then
-              if ips ~= nil and #ips > 0 then
-                  name = ips[1]
-              -- to be sure we have *something* , fall back to mac
-              else
-                  d.name = mac
-              end
-            end
-            -- gather additional info, if available
-            self:add_device_seen(mac, name, os.time())
-        end
-    end
 end
 
 function handler:handle_index(request, response)
@@ -321,8 +275,10 @@ function dump(o)
    end
 end
 
-function handler:handle_device_list(request, response)
-    print("Calling RPC")
+-- Retrieve the device list through an RPC call,
+-- and return it as a JSON string in the old format
+-- of /spin_api/devices
+function handler:retrieve_device_list()
     local conn, err = rpc.connect()
     if not conn then
         -- We return an HTTP 200, but with the content set to
@@ -343,9 +299,14 @@ function handler:handle_device_list(request, response)
         rdata["lastSeen"] = rdata["lastseen"]
         webresult[rdata["mac"]] = rdata
     end
+    return webresult
+end
+
+function handler:handle_device_list(request, response)
+    print("Calling RPC")
     self:set_api_headers(response)
-    response.content = json.encode(webresult)
-    response:set_header("Last-Modified", self.device_manager.last_update)
+    response.content = json.encode(self:retrieve_device_list())
+    response:set_header("Last-Modified", spin_util.get_time_string())
     return response
 end
 
@@ -434,61 +395,14 @@ function handler:handle_profile_list(request, response)
 end
 
 function handler:handle_device_profiles(request, response, device_mac)
-    self:set_api_headers(response)
-    if request.method == "GET" or request.method == "HEAD" then
-        local content_json, updated = self.profile_manager:get_device_profiles(device_mac)
-        response.content = json.encode(content_json)
-        response:set_header("Last-Modified", updated)
-    else
-        if request.post_data ~= nil and request.post_data.profile_id ~= nil then
-            local profile_id = request.post_data.profile_id
-            local status = nil
-            local err = ""
-            if self.device_manager:get_device_seen(device_mac) ~= nil then
-                status, err = self.profile_manager:set_device_profile(device_mac, request.post_data.profile_id)
-                local device_name = self.device_manager:get_device_seen(device_mac).name
-                local profile_name = self.profile_manager.profiles[profile_id].name
-                if status then
-                  local notification_txt = "Profile set to " .. profile_name
-                  self:create_notification("profile_set_to", { profile_name }, notification_txt, device_mac, device_name)
-                  self:send_websocket_update("deviceProfileUpdate", { deviceName=device_name, profileName=profile_name })
-                else
-                  local notification_txt = "Error setting device profile: " .. err
-                  self:create_notification("profile_set_error", { err }, notification_txt, device_mac, device_name)
-                end
-            else
-                status = nil
-                err = "Error: unknown device: " .. device_mac
-            end
-            -- persist the new state
-            if status ~= nil then
-                -- all ok, basic 200 response good
-                self.profile_manager:save_device_profiles()
-                return response
-            else
-                -- todo: how to convey error?
-                response:set_status(400, "Bad request")
-                response.content = json.encode({status = 400, error = err})
-            end
-        else
-            response:set_status(400, "Bad request")
-            response.content = json.encode({status = 400, error = "Parameter missing in POST data: profile_id"})
-        end
-    end
+    response:set_status(403, "Not Found")
+    response.content = json.encode({status = 403, error = "Device profiles have been removed"})
     return response
 end
 
 function handler:handle_toggle_new(request, response, device_mac)
-    self:set_api_headers(response)
-    if request.method == "POST" then
-        local seen = self.device_manager:device_is_new(device_mac)
-        if seen == nil then
-            response:set_status(400, "Bad request")
-            response.content = json.encode({status = 400, error = "Unknown device: " .. device_mac})
-        else
-            self.device_manager:set_device_is_new(device_mac, not seen)
-        end
-    end
+    response:set_status(403, "Not Found")
+    response.content = json.encode({status = 403, error = "The 'new' status has been removed"})
     return response
 end
 
@@ -636,9 +550,9 @@ function handler:handle_websocket(request, response)
         -- send any initial client information here
         client:send('{"message": "hello, world"}')
         -- Send the overview of profiles
-        send_websocket_initialdata(client, "profiles", self:get_filtered_profile_list())
+        --send_websocket_initialdata(client, "profiles", self:get_filtered_profile_list())
         -- Send the overview of known devices so far, which includes their profiles
-        send_websocket_initialdata(client, "devices", self.device_manager:get_devices_seen())
+        send_websocket_initialdata(client, "devices", self:retrieve_device_list())
         -- Send all notifications
         send_websocket_initialdata(client, "notifications", self.notifications)
         print("[XX] NEW CONNECT NOW COUNT: " .. #self.websocket_clients)
@@ -686,8 +600,6 @@ function handler:init(args)
     self.profile_manager = profile_manager_m.create_profile_manager()
     self.profile_manager:load_all_profiles()
     self.profile_manager:load_device_profiles()
-
-    self.device_manager = device_manager_m.create(self.profile_manager)
 
     self.notifications = {}
     self.notifications_updated = spin_util.get_time_string()
