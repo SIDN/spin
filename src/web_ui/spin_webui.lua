@@ -17,7 +17,6 @@ local spin_util = require 'spin_util'
 local copas = require 'copas'
 local liluat = require 'liluat'
 
-local mqtt = require 'mosquitto'
 local json = require 'json'
 
 -- Additional supporting tools
@@ -91,18 +90,14 @@ function help(rcode, msg)
     print("Usage: lua spin_webui.lua [options]")
     print("Options:")
     print("-c <configfile> Read settings from configfile")
-    print("-m <mqtt_host>  Connect to MQTT at host (defaults to 127.0.0.1)")
-    print("-p <mqtt_port>  Connect to MQTT at port (defaults to 1883)")
     print("-h              Show this help")
     os.exit(rcode)
 end
 
 function arg_parse(args)
     config_file = nil
-    mqtt_host = nil
-    mqtt_port = nil
 
-    if args == nil then return config_file, mqtt_host, mqtt_port end
+    if args == nil then return config_file end
 
     skip = false
     for i = 1,#args do
@@ -114,37 +109,20 @@ function arg_parse(args)
             config_file = args[i+1]
             if config_file == nil then help(1, "missing argument for -c") end
             skip = true
-        elseif args[i] == "-m" then
-            mqtt_host = args[i+1]
-            if port == nil then help(1, "missing argument for -m") end
-            skip = true
-        elseif args[i] == "-p" then
-            mqtt_port = tonumber(args[i+1])
-            if port == nil then help(1, "missing or bad argument for -p") end
-            skip = true
         else
             help(1, "Too many arguments at '" .. args[i] .. "'")
         end
     end
 
-    return config_file, mqtt_host, mqtt_port
+    return config_file
 end
 
 function handler:read_config(args)
-    local config_file, mqtt_host, mqtt_port = arg_parse(args)
+    local config_file = arg_parse(args)
     local config = {}
-    config['mqtt'] = {}
-    config['mqtt']['host'] = "127.0.0.1"
-    config['mqtt']['port'] = 1883
     if config_file ~= nil then
         config, err = spin_util.config_parse(config_file)
         if config == nil then return nil, err end
-    end
-    if mqtt_host ~= nil then
-        config['mqtt']['host'] = mqtt_host
-    end
-    if mqtt_port ~= nil then
-        config['mqtt']['port'] = mqtt_port
     end
     self.config = config
 end
@@ -194,49 +172,8 @@ function handler:handle_traffic_message(data, orig_data)
     end
 end
 
-function handler:mqtt_looper()
-    while true do
-        self.client:loop()
-        copas.sleep(0.1)
-    end
-end
-
-function handler:handle_mqtt_queue_msg(msg)
-    -- TODO: pass topic? (traffic/incident)
-    local success, pd = coxpcall.pcall(json.decode, msg)
-    if success and pd then
-        --print("[XX] msg: " .. msg)
-        if pd["command"] and pd["command"] == "traffic" then
-            self:handle_traffic_message(pd["result"], payload)
-        elseif pd["incident"] ~= nil then
-            local incident = pd["incident"]
-            local ts = incident["incident_timestamp"]
-            for i=ts-5,ts+5 do
-                if self:handle_incident_report(incident, i) then break end
-            end
-        end
-    end
-end
-
-function handler:mqtt_queue_looper()
-    self.mqtt_queue_msgs = {}
-    while true do
-        while #self.mqtt_queue_msgs > 0 do
-          local msg = table.remove(self.mqtt_queue_msgs, 1)
-          self:handle_mqtt_queue_msg(msg)
-        end
-        copas.sleep(0.1)
-        for i,c in pairs(self.websocket_clients) do
-          if c:has_queued_messages() then
-            c:send_queued_messages()
-            print("[XX] still queueud msgs")
-          end
-        end
-    end
-end
-
 function handler:handle_index(request, response)
-    html, err = self:render("index.html", {mqtt_host = self.config['mqtt']['host']})
+    html, err = self:render("index.html")
     response:set_header("Last-Modified", spin_util.get_file_timestamp(TEMPLATE_PATH .. "index.html"))
     if html == nil then
         response:set_status(500, "Internal Server Error")
@@ -760,8 +697,6 @@ function handler:init(args)
     self.websocket_messages = {}
     self.ws_handler = ws_ext.ws_server_create(ws_opts)
 
-    self.mqtt_queue_msgs = {}
-
     -- We will use this list for the fixed url mappings
     -- Fixed handlers are interpreted as they are; they are
     -- ONLY valid for the EXACT path identified in this list
@@ -800,58 +735,7 @@ function handler:init(args)
         }
     }
 
-    local client = mqtt.new()
-    client.ON_CONNECT = function()
-        vprint("Connected to MQTT broker")
-        client:subscribe(TRAFFIC_CHANNEL)
-        vprint("Subscribed to " .. TRAFFIC_CHANNEL)
-        if handle_incidents then
-            client:subscribe(INCIDENT_CHANNEL)
-            vprint("Subscribed to " .. INCIDENT_CHANNEL)
-        end
-    end
-
     local h = self
-
-    client.ON_MESSAGE = function(mid, topic, payload)
-      table.insert(h.mqtt_queue_msgs, payload)
-    end
-
---    client.ORIG_ON_MESSAGE = function(mid, topic, payload)
---        --print("[XX] message for you, sir!")
---        local success, pd = coxpcall.pcall(json.decode, payload)
---        if success and pd then
---            if topic == TRAFFIC_CHANNEL then
---                if pd["command"] and pd["command"] == "traffic" then
---                    h:handle_traffic_message(pd["result"], payload)
---                end
---            elseif handle_incidents and topic == INCIDENT_CHANNEL then
---                if pd["incident"] == nil then
---                    print("Error: no incident data found in " .. payload)
---                    print("Incident report ignored")
---                else
---                    local incident = pd["incident"]
---                    local ts = incident["incident_timestamp"]
---                    for i=ts-5,ts+5 do
---                        if handle_incident_report(incident, i) then break end
---                    end
---                end
---            end
---        end
---    end
-
-    print("[XX] connecting to " .. self.config.mqtt.host .. ":" .. self.config.mqtt.port)
-    a,b,c,d = client:connect(self.config.mqtt.host, self.config.mqtt.port)
-    --print(client:socket)
-    --client.socket = copas.wrap(client.socket)
-    --if a ~= nil then print("a: " .. a) end
-    if b ~= nil then print("b: " .. b) end
-    if c ~= nil then print("c: " .. c) end
-    if d ~= nil then print("d: " .. d) end
-
-    self.client = client
-    copas.addthread(self.mqtt_looper, self)
-    copas.addthread(self.mqtt_queue_looper, self)
 
     return true
 end
