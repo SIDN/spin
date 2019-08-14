@@ -1,3 +1,5 @@
+#include <sys/param.h>
+
 #include <dirent.h>
 #include <time.h>
 #include <assert.h>
