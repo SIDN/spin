@@ -3,6 +3,7 @@
 #include <time.h>
 #include <assert.h>
 
+#include "config.h"
 #include "core2block.h"
 #include "core2conntrack.h"
 #include "core2extsrc.h"
@@ -266,6 +267,7 @@ void print_help() {
     printf("-l\t\t\trun in local mode (do not check for ARP cache entries)\n");
     printf("-m <address>\t\tHostname or IP address of the MQTT server\n");
     printf("-o\t\t\tlog to stdout instead of syslog\n");
+    printf("-P\t\t\tenable passive mode\n");
     printf("-p <port number>\tPort number of the MQTT server\n");
     printf("-v\t\t\tprint the version of spind and exit\n");
 }
@@ -311,8 +313,9 @@ int main(int argc, char** argv) {
 #ifndef USE_UBUS
     char *json_rpc_socket_path = JSON_RPC_SOCKET_PATH;
 #endif
+    int passive_mode = 0;
 
-    while ((c = getopt (argc, argv, "c:de:hj:lm:op:v")) != -1) {
+    while ((c = getopt (argc, argv, "c:de:hj:lm:oPp:v")) != -1) {
         switch (c) {
         case 'c':
             config_file = optarg;
@@ -357,6 +360,12 @@ int main(int argc, char** argv) {
             }
             spin_log_init(0, log_verbosity, "spind");
             break;
+        case 'P':
+            // XXX: call to spin_log() before calling spin_log_init(), see
+            // issue 70.
+            spin_log(LOG_INFO, "Passive mode enabled\n");
+            passive_mode = 1;
+            break;
         case 'p':
             mosq_port = strtol(optarg, NULL, 10);
             if (mosq_port <= 0 || mosq_port > 65535) {
@@ -391,6 +400,14 @@ int main(int argc, char** argv) {
     mosq_host = spinconfig_pubsub_host();
     mosq_port = spinconfig_pubsub_port();
 
+#ifdef PASSIVE_MODE_ONLY
+    if (!passive_mode) {
+        fprintf(stderr, "Error: this build of SPIN only supports passive mode.\n");
+        fprintf(stderr, "Specify -P to enable passive mode.\n");
+        exit(1);
+    }
+#endif
+
     log_version();
 
     SPIN_STAT_START();
@@ -398,10 +415,14 @@ int main(int argc, char** argv) {
     init_cache();
 
     dns_hooks_init(node_cache, dns_cache);
-    init_core2conntrack(node_cache, local_mode, spinhook_traffic);
-    init_core2nflog_dns(node_cache, dns_cache);
+#ifndef PASSIVE_MODE_ONLY
+    if (!passive_mode) {
+        init_core2conntrack(node_cache, local_mode, spinhook_traffic);
+        init_core2nflog_dns(node_cache, dns_cache);
+    }
+#endif
 
-    init_core2block();
+    init_core2block(passive_mode);
 
     init_core2extsrc(node_cache, dns_cache, extsrc_socket_path);
 
@@ -422,12 +443,20 @@ int main(int argc, char** argv) {
 
     cleanup_cache();
     cleanup_core2block();
-    cleanup_core2conntrack();
-    cleanup_core2nflog_dns();
+#ifndef PASSIVE_MODE_ONLY
+    if (!passive_mode) {
+        cleanup_core2conntrack();
+        cleanup_core2nflog_dns();
+    }
+#endif
     cleanup_core2extsrc();
 
-    nfq_close_handle();
-    nflog_close_handle();
+#ifndef PASSIVE_MODE_ONLY
+    if (!passive_mode) {
+        nfq_close_handle();
+        nflog_close_handle();
+    }
+#endif
     rpc_cleanup();
 
     finish_mosquitto();
