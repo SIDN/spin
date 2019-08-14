@@ -45,10 +45,34 @@ AC_SUBST([regular_CFLAGS])
 AC_CHECK_LIB([mosquitto], [mosquitto_lib_version], [], [AC_MSG_ERROR([libmosquitto not found])])
 
 #AC_CHECK_LIB([netfilter-log], [XXXXXXXX], [], [AC_MSG_ERROR([libXXXXXXX not found])])
-AC_CHECK_LIB([mnl], [mnl_socket_open], [LDFLAGS="$LDFLAGS -lmnl"], [AC_MSG_ERROR([libmnl not found])])
-AC_CHECK_LIB([netfilter_log], [nflog_open], [LDFLAGS="$LDFLAGS -lnetfilter_log"], [AC_MSG_ERROR([libnetfilter-log not found])])
-AC_CHECK_LIB([netfilter_queue], [nfq_open], [LDFLAGS="$LDFLAGS -lnetfilter_queue"], [AC_MSG_ERROR([libnetfilter-queue not found])])
-AC_CHECK_LIB([netfilter_conntrack], [nfct_new], [LDFLAGS="$LDFLAGS -lnetfilter_conntrack"], [AC_MSG_ERROR([libnetfilter-conntrack not found])])
+AC_CHECK_LIB([mnl], [mnl_socket_open],
+    [
+        LDFLAGS="$LDFLAGS -lmnl"
+    ],
+    [
+        AC_MSG_ERROR([libmnl not found])
+    ])
+AC_CHECK_LIB([netfilter_log], [nflog_open],
+    [
+        LDFLAGS="$LDFLAGS -lnetfilter_log"
+    ],
+    [
+        AC_MSG_ERROR([libnetfilter-log not found])
+    ])
+AC_CHECK_LIB([netfilter_queue], [nfq_open],
+    [
+        LDFLAGS="$LDFLAGS -lnetfilter_queue"
+    ],
+    [
+        AC_MSG_ERROR([libnetfilter-queue not found])
+    ])
+AC_CHECK_LIB([netfilter_conntrack], [nfct_new],
+    [
+        LDFLAGS="$LDFLAGS -lnetfilter_conntrack"
+    ],
+    [
+        AC_MSG_ERROR([libnetfilter-conntrack not found])
+    ])
 
 AC_CHECK_LIB([ldns], [ldns_wire2pkt], [LDFLAGS="$LDFLAGS -lldns"], [AC_MSG_ERROR([ldns not found])])
 
