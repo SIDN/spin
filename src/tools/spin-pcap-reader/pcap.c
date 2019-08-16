@@ -162,11 +162,11 @@ dns_answer_hook(dns_pkt_info_t *dns_pkt)
 
 static void
 #ifdef __OpenBSD__ /* XXX */
-handle_ip(const u_char *p, u_int length, const struct ether_header *ep,
-    const struct bpf_timeval *ts)
+handle_ip(const u_char *p, u_int wirelen, u_int caplen,
+    const struct ether_header *ep, const struct bpf_timeval *ts)
 #else
-handle_ip(const u_char *p, u_int length, const struct ether_header *ep,
-    const struct timeval *ts)
+handle_ip(const u_char *p, u_int wirelen, u_int caplen,
+    const struct ether_header *ep, const struct timeval *ts)
 #endif
 {
 	const struct ip *ip;
@@ -200,8 +200,8 @@ handle_ip(const u_char *p, u_int length, const struct ether_header *ep,
 	pkt_info.family = ip6 ? AF_INET6 : AF_INET;
 
 	if (ip6) {
-		if (length < sizeof(struct ip6_hdr)) {
-			warnx("Truncated IPv6 packet: %d", length);
+		if (caplen < sizeof(struct ip6_hdr)) {
+			warnx("Truncated IPv6 packet: %d", caplen);
 			goto out;
 		}
 		if ((ip6->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
@@ -211,17 +211,17 @@ handle_ip(const u_char *p, u_int length, const struct ether_header *ep,
 		hlen = sizeof(struct ip6_hdr);
 
 		len = ntohs(ip6->ip6_plen);
-		if (length < len + hlen) {
+		if (caplen < len + hlen) {
 			warnx("Truncated IP6 packet: %d bytes missing",
-			    len + hlen - length);
+			    len + hlen - caplen);
 		}
 	} else {
 		TCHECK(*ip);
 		len = ntohs(ip->ip_len);
-		if (length < len) {
+		if (caplen < len) {
 			warnx("Truncated IP packet: %d bytes missing",
-			    len - length);
-			len = length; // XXX
+			    len - caplen);
+			len = caplen; // XXX
 		}
 		hlen = ip->ip_hl * 4;
 		if (hlen < sizeof(struct ip) || hlen > len) {
@@ -307,18 +307,22 @@ handle_ip(const u_char *p, u_int length, const struct ether_header *ep,
 	write_pkt_info_to_socket(&pkt_info);
 
 	if (port_from == 53 || port_to == 53) {
-		if (up) {
-			cp = (const u_char *)(up + 1);
+		if (caplen != wirelen) {
+			warnx("not attempting to parse DNS packet");
 		} else {
-			cp = (const u_char *)(tp + 1);
-		}
-		TCHECK(*cp);
-		if (port_from == 53) {
-			handle_dns_answer(handle_dns_ctx, cp, len,
-			    pkt_info.family);
-		} else if (port_to == 53) {
-			handle_dns_query(handle_dns_ctx, cp, len,
-			    pkt_info.src_addr, pkt_info.family);
+			if (up) {
+				cp = (const u_char *)(up + 1);
+			} else {
+				cp = (const u_char *)(tp + 1);
+			}
+			TCHECK(*cp);
+			if (port_from == 53) {
+				handle_dns_answer(handle_dns_ctx, cp, len,
+				    pkt_info.family);
+			} else if (port_to == 53) {
+				handle_dns_query(handle_dns_ctx, cp, len,
+				    pkt_info.src_addr, pkt_info.family);
+			}
 		}
 	}
 
@@ -414,7 +418,7 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 			maybe_sleep(&h->ts);
 		}
 
-		handle_ip(p, caplen, ep, &h->ts);
+		handle_ip(p, h->len, caplen, ep, &h->ts);
 		break;
 
 #if 0
