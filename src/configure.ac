@@ -80,7 +80,7 @@ AC_ARG_ENABLE(spin-pcap-reader,
               [
                 MAKEFILES="$MAKEFILES tools/spin-pcap-reader/Makefile";
                 AC_CONFIG_FILES(tools/spin-pcap-reader/Makefile)
-                CFLAGS="-g -O0"
+                CFLAGS="$CFLAGS -g -O0"
                 AC_CHECK_LIB([pcap], [pcap_create], [LDFLAGS="$LDFLAGS -lpcap"], [AC_MSG_ERROR([pcap not found])])
               ], [])
 
@@ -90,7 +90,7 @@ AC_ARG_ENABLE(tests,
                 MAKEFILES="$MAKEFILES lib/tests/Makefile";
                 AC_SUBST(TESTDIR, "tests")
                 AC_CONFIG_FILES(lib/tests/Makefile)
-                CFLAGS="-g -O0"
+                CFLAGS="$CFLAGS -g -O0"
               ], [])
 
 
