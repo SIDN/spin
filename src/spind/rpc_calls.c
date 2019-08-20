@@ -473,7 +473,8 @@ int devflowfunc(void *cb_data, rpc_arg_val_t *args, rpc_arg_val_t *result) {
 
     node = node_cache_find_by_mac(node_cache, args[0].rpca_svalue);
     if (node == NULL) {
-        return 0;
+        result->rpca_svalue = "Device not found";
+        return -1;
     }
     result->rpca_cvalue = spin_data_flowlist(node);
     return 0;
