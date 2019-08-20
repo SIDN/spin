@@ -367,7 +367,6 @@ node_merge(node_cache_t *node_cache, node_t* dest, node_t* src) {
     }
 }
 
-#ifdef notdef
 node_t* node_clone(node_t* node) {
     int i;
 
@@ -395,7 +394,6 @@ node_t* node_clone(node_t* node) {
     }
     return new;
 }
-#endif
 
 static void
 node_print(node_t* node) {
@@ -833,14 +831,14 @@ oldnode(tree_t *reftree, size_t size, void *data) {
     tree_entry_t *oldleaf;
 
     oldleaf = tree_find(reftree, size, data);
-   
+
     if (oldleaf != NULL) {
         assert(oldleaf->data_size == sizeof(node));
 
         node = * ((node_t**) oldleaf->data);
         return node;
     }
-    
+
     return NULL;
 }
 
@@ -929,7 +927,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
         if (existing_node != NULL) {
             add_node_to_ar(existing_node, nodes_to_merge, &nnodes_to_merge);
         }
-        
+
         newleaf = tree_next(newleaf);
     }
 
@@ -940,7 +938,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
         if (existing_node != NULL) {
             add_node_to_ar(existing_node, nodes_to_merge, &nnodes_to_merge);
         }
-        
+
         newleaf = tree_next(newleaf);
     }
 
