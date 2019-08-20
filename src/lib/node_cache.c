@@ -368,7 +368,6 @@ node_merge(node_cache_t *node_cache, node_t* dest, node_t* src) {
     }
 }
 
-#ifdef notdef
 node_t* node_clone(node_t* node) {
     int i;
 
@@ -396,7 +395,6 @@ node_t* node_clone(node_t* node) {
     }
     return new;
 }
-#endif
 
 static void
 node_print(node_t* node) {

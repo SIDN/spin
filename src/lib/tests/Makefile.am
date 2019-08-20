@@ -1,5 +1,5 @@
 AM_CPPFLAGS = -I$(top_srcdir)/include -Wall -Werror -DTESTDATA_PATH='"$(abs_srcdir)/testdata"'
-AM_CFLAGS = ${regular_CFLAGS} -g 
+AM_CFLAGS = ${regular_CFLAGS} -g
 
 CLEANFILES = *.gcda *.gcno *.gcov
 
@@ -9,9 +9,10 @@ tree_test_SOURCES = tree_test.c ../tree.c ../util.c ../spin_log.c
 tree_test_CFLAGS = -I../ -fprofile-arcs -ftest-coverage
 tree_test_LDFLAGS = -L../
 
-node_cache_test_SOURCES = ../node_names.c ../util.c ../tree.c ../pkt_info.c ../arp.c ../spin_log.c  node_cache_test.c
+node_cache_test_SOURCES = node_cache_test.c
 node_cache_test_CFLAGS = -I../ -fprofile-arcs -ftest-coverage
 node_cache_test_LDFLAGS = -L../
+#node_cache_test_LDADD = $(top_builddir)/lib/libspin.a
 
 dns_cache_test_SOURCES = dns_cache_test.c ../dns_cache.c ../util.c ../tree.c ../pkt_info.c ../spin_log.c
 dns_cache_test_CFLAGS = -I../ -fprofile-arcs -ftest-coverage
