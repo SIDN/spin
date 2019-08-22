@@ -193,6 +193,17 @@ handle_icmp6(const u_char *bp, const struct ether_header *ep)
 }
 
 static void
+handle_dns(const u_char *cp, u_int len, int family, uint8_t *src_addr,
+    u_int src_port, u_int dest_port)
+{
+	if (src_port == 53) {
+		handle_dns_answer(handle_dns_ctx, cp, len, family);
+	} else if (dest_port == 53) {
+		handle_dns_query(handle_dns_ctx, cp, len, src_addr, family);
+	}
+}
+
+static void
 #ifdef __OpenBSD__ /* XXX */
 handle_ip(const u_char *p, u_int wirelen, u_int caplen,
     const struct ether_header *ep, const struct bpf_timeval *ts)
@@ -342,13 +353,8 @@ handle_ip(const u_char *p, u_int wirelen, u_int caplen,
 				cp = (const u_char *)(tp + 1);
 			}
 			TCHECK(*cp);
-			if (pkt_info.src_port == 53) {
-				handle_dns_answer(handle_dns_ctx, cp, len,
-				    pkt_info.family);
-			} else if (pkt_info.dest_port == 53) {
-				handle_dns_query(handle_dns_ctx, cp, len,
-				    pkt_info.src_addr, pkt_info.family);
-			}
+			handle_dns(cp, len, pkt_info.family, pkt_info.src_addr,
+			    pkt_info.src_port, pkt_info.dest_port);
 		}
 	}
 
