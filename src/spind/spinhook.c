@@ -7,18 +7,6 @@
 
 STAT_MODULE(spinhook)
 
-void
-spinhook_makedevice(node_t *node) {
-    device_t *dev;
-
-    spin_log(LOG_DEBUG, "Promote node %d to device", node->id);
-    assert(node->device == 0);
-    dev = (device_t *) malloc(sizeof(device_t));
-    dev->dv_flowtree = tree_create(cmp_ints);
-    dev->dv_nflows = 0;
-    node->device = dev;
-}
-
 devflow_t *spinhook_get_devflow(device_t *dev, node_t *node) {
     tree_entry_t *leaf;
     int nodeid = node->id;

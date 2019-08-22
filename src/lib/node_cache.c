@@ -891,6 +891,18 @@ nodecompar(const void *a, const void *b) {
     return (na->id - nb->id);
 }
 
+static void
+makedevice(node_t *node) {
+    device_t *dev;
+
+    spin_log(LOG_DEBUG, "Promote node %d to device", node->id);
+    assert(node->device == 0);
+    dev = (device_t *) malloc(sizeof(device_t));
+    dev->dv_flowtree = tree_create(cmp_ints);
+    dev->dv_nflows = 0;
+    node->device = dev;
+}
+
 int
 node_cache_add_node(node_cache_t *node_cache, node_t *node) {
     node_t *nodes_to_merge[MAXOLD];
@@ -982,7 +994,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
         }
         if (dest_node->mac && dest_node->device==NULL) {
             // Remaining node must be promoted to device
-            spinhook_makedevice(dest_node);
+            makedevice(dest_node);
         }
         return 0;
     }
@@ -1004,7 +1016,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
     if (node->mac) {
         cache_tree_add_mac(node_cache, node, node->mac);
         if (node->device == NULL) {
-            spinhook_makedevice(node);
+            makedevice(node);
         }
     }
 
