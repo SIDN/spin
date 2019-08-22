@@ -11,6 +11,19 @@ local _M = {}
 local tcpdumper = {}
 tcpdumper.__index = tcpdumper
 
+-- Tries to find the given mac 
+function find_interface_name(mac_address)
+    local proc = mt_io.subprocess("ip", { "neigh" }, 0, true)
+    for line in proc:read_line_iterator() do
+        tokens = line:split(" ")
+        -- <ip> dev <iface> lladdr <mac> <status>
+        if tokens[5] == mac_address then
+            return tokens[3]
+        end
+    end
+    return nil, "mac address not found in ip neighbours"
+end
+
 function _M.create(device)
     local td = {}
     setmetatable(td, tcpdumper)
@@ -38,12 +51,18 @@ function _M.create(device)
     td.mqtt_channel = mqtt_channel
     td.mqtt_client = mqtt_client
 
+    -- We need to figure out which interface to capture on
+    
+
     -- can we simply leave out the device? we filter on mac anyway;
     -- how does tcpdump determine where to listen?
-    local subp, err = mt_io.subprocess("tcpdump", {"-U", "-i", "enp0s8", "-s", "1600", "-w", "-", "ether", "host", device}, 0, true, false, false)
-    --local subp, err = mt_io.subprocess("tcpdump", {"-U", "-s", "1600", "-w", "-", "ether", "host", device}, 0, true, false, false)
+    local iface, err = find_interface_name(device)
+    if iface == nil then
+        return nil, err
+    end
+    local subp, err = mt_io.subprocess("tcpdump", {"-U", "-i", iface, "-s", "1600", "-w", "-", "ether", "host", device}, 0, true, false, false)
     if subp == nil then
-        return nil
+        return nil, "Unable to start tcpdump process"
     end
     td.subp = subp
 

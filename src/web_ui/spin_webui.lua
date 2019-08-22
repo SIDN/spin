@@ -213,9 +213,13 @@ function handler:handle_tcpdump_manage2(request, response)
     end
     device_name = "unknown"
     device_ips = ""
-    result, err = conn:call({ method = "list_devices" })
+    result, err = conn:call({ method = "list_devices", jsonrpc = "2.0", id = 1 })
     -- TODO: error handling
-    ubdata = json.encode(result)
+    if result == nil then
+        print("error: " .. err)
+    end
+    print("[XX] RESULT:")
+    print(json.encode(result))
     for i=1, #result["result"] do
         local rdata = result["result"][i]
         if rdata["mac"] == device_mac then
@@ -360,7 +364,7 @@ function handler:retrieve_device_list()
         response.content = json.encode({error = err})
         return response
     end
-    result, err = conn:call({ method = "list_devices" })
+    result, err = conn:call({ method = "list_devices", jsonrpc = "2.0", id = 1 })
     -- TODO: error handling
 
     ubdata = json.encode(result)

@@ -24,7 +24,7 @@
                 &nbsp;
             </td>
             <td nowrap="nowrap">
-                <button>Close window</button>
+                <button id="$close">Close window</button>
             </td>
         </tr></table>
         <table>
@@ -47,10 +47,26 @@
         <div align="right">
         <button id="$startstop">Start capture</button>
         </div>
-        <p>Capture status: <span id="$statusRunningField">not running</span></p>
-        <p>Bytes received: <span id="$statusByteCountField">0</span></p>
-        <p>Capture start time: <span id="$statusStartedAtField"></span></p>
-        <p>Last data seen at: <span id="$statusLastSeenField"></span></p>
+        <table>
+            <tr>
+                <td>Capture status: </td>
+                <td align="right" class="datatable">
+                    <span id="$statusRunningField" class="status status-inactive">Not running</span>
+                </td>
+            </tr>
+            <tr>
+                <td>Bytes received:</td>
+                <td id="$statusByteCountField" align="right">0</td>
+            </tr>
+            <tr>
+                <td>Capture start time: </td>
+                <td id="$statusStartedAtField" align="right">capture not started</td>
+            </tr>
+            <tr>
+                <td>Last data seen at:</td>
+                <td id="$statusLastSeenField" align="right"></td>
+            </tr>
+        </table>
         <div align="right">
             <button disabled id="$save">Download captured data</button>
         </div>
@@ -65,30 +81,15 @@
     </div>
     <div class="section2 section2">
         <center>
-                <button disabled id="$upload">Upload captured data to SIDN</button>
-</center>
+            <button disabled id="$upload">Upload captured data to SIDN</button>
+        </center>
     </div>
     <div class="section2 section2-bottom">
-<center>
-                Not working? Try the <a target="_blank" href="/spin_api/tcpdump?device={{= device_mac}}">old download method</a>.
-</center>
+        <center>
+            Not working? Try the <a target="_blank" href="/spin_api/tcpdump?device={{= device_mac}}">old download method</a>.
+        </center>
     </div>
 
-
-
-<!--
-    <input type="text" id="$filename" value="{{= device }}.pcap">
-    <button id="$start">Connect and download</button>
-
-    <button disabled id="$abort">Abort</button>
-    <button disabled id="$close">Stop</button>
-    <button disabled id="$save">Save or open the dara</button>
-    <div>
-        <p>
-            Not working? Try the <a target="_blank" href="/spin_api/tcpdump?device={{= device}}">old download method</a>.
-        </p>
-    </div>
--->
 <script>
 var statusRunning = false;
 var statusDownloaded = false;
@@ -105,7 +106,6 @@ updateUIAll();
 // *Stop* the download stream
 window.isSecureContext && window.addEventListener('beforeunload', evt => {
     mqttClient.disconnect()
-    fileStream = null
 })
 
 //$abort.onclick = () => {
@@ -114,7 +114,9 @@ window.isSecureContext && window.addEventListener('beforeunload', evt => {
 //    //document.body.innerHTML = '<a href="./mqtt.html">Start again</a>'
 //}
 
-//$close.onclick = () => {
+$close.onclick = () => {
+    window.close()
+}
 //    mqttClient.disconnect()
 //    fileStream = null
 //    //document.body.innerHTML = '<a href="./mqtt.html">Start again</a>'
@@ -195,12 +197,11 @@ function updateUIAll() {
         //$("$startstop").attr('value', 'Save');
         $startstop.firstChild.data = "Stop capture"
         $statusRunningField.innerHTML = "Running"
+        $statusRunningField.className = "status status-active"
     } else {
         $startstop.firstChild.data = "Start capture"
         $statusRunningField.innerHTML = "Not running"
-        
-        //$("$startstop").attr('value', 'SaveA');
-        //$startstop.attr('value', 'Start capture');
+        $statusRunningField.className = "status status-inactive"
     }
     updateUIData();
 }
@@ -272,6 +273,7 @@ function onMQTTClientStop(evt) {
     if (evt.errorCode !== 0) {
         console.error('Websocket has disappeared');
         console.error(evt.errorMessage)
+        $statusRunningField.className = "status status-error"
     }
     stopTCPDump()
     updateUIAll()
@@ -335,6 +337,7 @@ function connectToMQTT() {
 .section-top {
   border-width: 2px 2px 2px 2px;
   border-radius: 10px 10px 0px 0px;
+  background-color: lightblue;
 }
 
 .section-bottom {
@@ -351,6 +354,7 @@ function connectToMQTT() {
 }
 
 .section2-top {
+  background-color: lightblue;
   border-width: 1px 1px 1px 1px;
   border-radius: 10px 10px 0px 0px;
 }
@@ -360,6 +364,28 @@ function connectToMQTT() {
   border-radius: 0px 0px 10px 10px;
 }
 
+.status-active {
+    background-color: lightgreen;
+}
+
+.status-error {
+    background:rgb(255,120,120);
+}
+
+.status-inactive {
+    background-color: lightgrey;
+}
+
+.status {
+    border-radius:5px;
+    display: inline-block;
+    padding: 2px 10px 2px 10px;
+}
+
+.datatable {
+    width: 200px;
+    padding-top: 10px;
+}
 
 </style>
   
