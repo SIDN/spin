@@ -423,14 +423,13 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 	p = sp + 14; /* Move past Ethernet header */
 	caplen -= 14;
 
+	// XXX find a better place for this piece of code
+	if (!Rflag)
+		maybe_sleep(&h->ts);
+
 	switch (ether_type) {
 	case ETHERTYPE_IP:
 	case ETHERTYPE_IPV6:
-		// XXX find a better place for this piece of code
-		if (!Rflag) {
-			maybe_sleep(&h->ts);
-		}
-
 		handle_ip(p, h->len, caplen, ep, &h->ts);
 		break;
 
