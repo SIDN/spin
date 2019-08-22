@@ -204,111 +204,24 @@ handle_dns(const u_char *cp, u_int len, int family, uint8_t *src_addr,
 }
 
 static void
-#ifdef __OpenBSD__ /* XXX */
-handle_ip(const u_char *p, u_int wirelen, u_int caplen,
-    const struct ether_header *ep, const struct bpf_timeval *ts)
-#else
-handle_ip(const u_char *p, u_int wirelen, u_int caplen,
-    const struct ether_header *ep, const struct timeval *ts)
-#endif
+handle_l4(const struct ether_header *ep, const u_char *l4, u_int wirelen,
+    u_int caplen, u_int len, uint8_t ip_proto, pkt_info_t *pkt_info)
 {
-	const struct ip *ip;
-	const struct ip6_hdr *ip6;
 	const struct tcphdr *tp;
 	const struct udphdr *up;
 	const u_char *cp;
-	u_int hlen, len;
-	uint8_t ip_proto;
 #ifdef unusedfornow
 	int tcp_initiated = 0;
 #endif
-	pkt_info_t pkt_info;
-
-	switch (((struct ip *)p)->ip_v) {
-	case 4:
-		ip = (struct ip *)p;
-		ip6 = NULL;
-		break;
-	case 6:
-		ip = NULL;
-		ip6 = (struct ip6_hdr *)p;
-		break;
-	default:
-		DPRINTF("not an IP packet");
-		return;
-	}
-
-	pkt_info.family = ip6 ? AF_INET6 : AF_INET;
-
-	if (ip6) {
-		if (caplen < sizeof(struct ip6_hdr)) {
-			warnx("Truncated IPv6 packet: %d", caplen);
-			goto out;
-		}
-		if ((ip6->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
-			warnx("Bad IPv6 version: %u", ip6->ip6_vfc >> 4);
-			goto out;
-		}
-		hlen = sizeof(struct ip6_hdr);
-
-		len = ntohs(ip6->ip6_plen);
-		if (caplen < len + hlen) {
-			warnx("Truncated IP6 packet: %d bytes missing",
-			    len + hlen - caplen);
-		}
-	} else {
-		TCHECK(*ip);
-		len = ntohs(ip->ip_len);
-		if (caplen < len) {
-			warnx("Truncated IP packet: %d bytes missing",
-			    len - caplen);
-			len = caplen; // XXX
-		}
-		hlen = ip->ip_hl * 4;
-		if (hlen < sizeof(struct ip) || hlen > len) {
-			warnx("Bad header length: %d", hlen);
-			goto out;
-		}
-		len -= hlen;
-	}
-
-	if (ip6) {
-		// XXX extension headers
-		ip_proto = ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
-
-		pkt_info.protocol = ip_proto;
-		memcpy(pkt_info.src_addr, &ip6->ip6_src,
-		    sizeof(ip6->ip6_src));
-		memcpy(pkt_info.dest_addr, &ip6->ip6_dst,
-		    sizeof(ip6->ip6_dst));
-	} else {
-		ip_proto = ip->ip_p;
-
-		pkt_info.protocol = ip_proto;
-		memset(pkt_info.src_addr, 0, 12);
-		memcpy(pkt_info.src_addr + 12, &ip->ip_src,
-		    sizeof(ip->ip_src));
-		memset(pkt_info.dest_addr, 0, 12);
-		memcpy(pkt_info.dest_addr + 12, &ip->ip_dst,
-		    sizeof(ip->ip_dst));
-	}
 
 	switch (ip_proto) {
 	case IPPROTO_ICMPV6:
-		if (ip6) {
-			handle_icmp6((const u_char *)(ip6 + 1), ep);
-		} else {
-			warnx("ICMPv6 in IPv4 packet");
-		}
+		if (pkt_info->family == AF_INET6)
+			handle_icmp6(l4, ep);
 		break;
 
 	case IPPROTO_TCP:
-		if (ip6) {
-			tp = (const struct tcphdr *)((const u_char *)ip6 +
-			    hlen);
-		} else {
-			tp = (const struct tcphdr *)((const u_char *)ip + hlen);
-		}
+		tp = (const struct tcphdr *)l4;
 		TCHECK(*tp);
 
 #ifdef unusedfornow
@@ -316,21 +229,16 @@ handle_ip(const u_char *p, u_int wirelen, u_int caplen,
 			tcp_initiated = 1;
 #endif
 
-		pkt_info.src_port = ntohs(tp->th_sport);
-		pkt_info.dest_port = ntohs(tp->th_dport);
+		pkt_info->src_port = ntohs(tp->th_sport);
+		pkt_info->dest_port = ntohs(tp->th_dport);
 		break;
 
 	case IPPROTO_UDP:
-		if (ip6) {
-			up = (const struct udphdr *)((const u_char *)ip6 +
-			    hlen);
-		} else {
-			up = (const struct udphdr *)((const u_char *)ip + hlen);
-		}
+		up = (const struct udphdr *)l4;
 		TCHECK(*up);
 
-		pkt_info.src_port = ntohs(up->uh_sport);
-		pkt_info.dest_port = ntohs(up->uh_dport);
+		pkt_info->src_port = ntohs(up->uh_sport);
+		pkt_info->dest_port = ntohs(up->uh_dport);
 		break;
 
 	default:
@@ -338,12 +246,9 @@ handle_ip(const u_char *p, u_int wirelen, u_int caplen,
 		break;
 	}
 
-	pkt_info.payload_size = len; // XXX verify
-	pkt_info.packet_count = 1;
+	write_pkt_info_to_socket(pkt_info);
 
-	write_pkt_info_to_socket(&pkt_info);
-
-	if (pkt_info.src_port == 53 || pkt_info.dest_port == 53) {
+	if (pkt_info->src_port == 53 || pkt_info->dest_port == 53) {
 		if (caplen != wirelen) {
 			warnx("not attempting to parse DNS packet");
 		} else {
@@ -353,10 +258,130 @@ handle_ip(const u_char *p, u_int wirelen, u_int caplen,
 				cp = (const u_char *)(tp + 1);
 			}
 			TCHECK(*cp);
-			handle_dns(cp, len, pkt_info.family, pkt_info.src_addr,
-			    pkt_info.src_port, pkt_info.dest_port);
+			handle_dns(cp, len, pkt_info->family,
+			    pkt_info->src_addr, pkt_info->src_port,
+			    pkt_info->dest_port);
 		}
 	}
+
+	return;
+
+trunc:
+	warnx("TRUNCATED\n");
+}
+
+static void
+#ifdef __OpenBSD__ /* XXX */
+handle_ip(const u_char *p, u_int wirelen, u_int caplen,
+    const struct ether_header *ep, const struct bpf_timeval *ts)
+#else
+handle_ip(const u_char *p, u_int wirelen, u_int caplen,
+    const struct ether_header *ep, const struct timeval *ts)
+#endif
+{
+	const struct ip *ip;
+	u_int hlen, len;
+	uint8_t ip_proto;
+	pkt_info_t pkt_info;
+
+	if (((struct ip *)p)->ip_v != 4) {
+		DPRINTF("not an IP packet");
+		return;
+	}
+
+	ip = (struct ip *)p;
+
+	pkt_info.family = AF_INET;
+
+	TCHECK(*ip);
+	len = ntohs(ip->ip_len);
+	if (caplen < len) {
+		warnx("Truncated IP packet: %d bytes missing", len - caplen);
+		len = caplen; // XXX
+	}
+	hlen = ip->ip_hl * 4;
+	if (hlen < sizeof(struct ip) || hlen > len) {
+		warnx("Bad header length: %d", hlen);
+		goto out;
+	}
+	len -= hlen;
+
+	ip_proto = ip->ip_p;
+
+	pkt_info.protocol = ip_proto;
+	memset(pkt_info.src_addr, 0, 12);
+	memcpy(pkt_info.src_addr + 12, &ip->ip_src, sizeof(ip->ip_src));
+	memset(pkt_info.dest_addr, 0, 12);
+	memcpy(pkt_info.dest_addr + 12, &ip->ip_dst, sizeof(ip->ip_dst));
+
+	pkt_info.payload_size = len; // XXX verify
+	pkt_info.packet_count = 1;
+
+	handle_l4(ep, (const u_char *)ip + hlen, wirelen, caplen, len, ip_proto,
+	    &pkt_info);
+
+	return;
+
+ trunc:
+	warnx("TRUNCATED\n");
+	return;
+
+ out:
+	return; // XXX
+
+}
+
+static void
+#ifdef __OpenBSD__ /* XXX */
+handle_ip6(const u_char *p, u_int wirelen, u_int caplen,
+    const struct ether_header *ep, const struct bpf_timeval *ts)
+#else
+handle_ip6(const u_char *p, u_int wirelen, u_int caplen,
+    const struct ether_header *ep, const struct timeval *ts)
+#endif
+{
+	const struct ip6_hdr *ip6;
+	u_int hlen, len;
+	uint8_t ip_proto;
+	pkt_info_t pkt_info;
+
+	if (((struct ip *)p)->ip_v != 6) {
+		DPRINTF("not an IP packet");
+		return;
+	}
+
+	ip6 = (struct ip6_hdr *)p;
+
+	pkt_info.family = AF_INET6;
+
+	if (caplen < sizeof(struct ip6_hdr)) {
+		warnx("Truncated IPv6 packet: %d", caplen);
+		goto out;
+	}
+	if ((ip6->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
+		warnx("Bad IPv6 version: %u", ip6->ip6_vfc >> 4);
+		goto out;
+	}
+	hlen = sizeof(struct ip6_hdr);
+
+	len = ntohs(ip6->ip6_plen);
+	if (caplen < len + hlen) {
+		warnx("Truncated IP6 packet: %d bytes missing",
+		    len + hlen - caplen);
+	}
+
+	// XXX extension headers
+	ip_proto = ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+
+	pkt_info.protocol = ip_proto;
+	memcpy(pkt_info.src_addr, &ip6->ip6_src, sizeof(ip6->ip6_src));
+	memcpy(pkt_info.dest_addr, &ip6->ip6_dst, sizeof(ip6->ip6_dst));
+
+	pkt_info.payload_size = len; // XXX verify
+	pkt_info.packet_count = 1;
+
+	handle_l4(ep, (const u_char *)ip6 + hlen, wirelen, caplen, len,
+	    ip_proto, &pkt_info);
 
 	return;
 
@@ -435,8 +460,11 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 
 	switch (ether_type) {
 	case ETHERTYPE_IP:
-	case ETHERTYPE_IPV6:
 		handle_ip(p, h->len, caplen, ep, &h->ts);
+		break;
+
+	case ETHERTYPE_IPV6:
+		handle_ip6(p, h->len, caplen, ep, &h->ts);
 		break;
 
 	case ETHERTYPE_ARP:
