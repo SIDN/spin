@@ -214,8 +214,6 @@ handle_ip(const u_char *p, u_int wirelen, u_int caplen,
 #ifdef unusedfornow
 	int tcp_initiated = 0;
 #endif
-	int port_from = 0;
-	int port_to = 0;
 	pkt_info_t pkt_info;
 
 	switch (((struct ip *)p)->ip_v) {
@@ -310,8 +308,8 @@ handle_ip(const u_char *p, u_int wirelen, u_int caplen,
 			tcp_initiated = 1;
 #endif
 
-		port_from = ntohs(tp->th_sport);
-		port_to = ntohs(tp->th_dport);
+		pkt_info.src_port = ntohs(tp->th_sport);
+		pkt_info.dest_port = ntohs(tp->th_dport);
 		break;
 
 	case IPPROTO_UDP:
@@ -323,8 +321,8 @@ handle_ip(const u_char *p, u_int wirelen, u_int caplen,
 		}
 		TCHECK(*up);
 
-		port_from = ntohs(up->uh_sport);
-		port_to = ntohs(up->uh_dport);
+		pkt_info.src_port = ntohs(up->uh_sport);
+		pkt_info.dest_port = ntohs(up->uh_dport);
 		break;
 
 	default:
@@ -332,14 +330,12 @@ handle_ip(const u_char *p, u_int wirelen, u_int caplen,
 		break;
 	}
 
-	pkt_info.src_port = port_from;
-	pkt_info.dest_port = port_to;
 	pkt_info.payload_size = len; // XXX verify
 	pkt_info.packet_count = 1;
 
 	write_pkt_info_to_socket(&pkt_info);
 
-	if (port_from == 53 || port_to == 53) {
+	if (pkt_info.src_port == 53 || pkt_info.dest_port == 53) {
 		if (caplen != wirelen) {
 			warnx("not attempting to parse DNS packet");
 		} else {
@@ -349,10 +345,10 @@ handle_ip(const u_char *p, u_int wirelen, u_int caplen,
 				cp = (const u_char *)(tp + 1);
 			}
 			TCHECK(*cp);
-			if (port_from == 53) {
+			if (pkt_info.src_port == 53) {
 				handle_dns_answer(handle_dns_ctx, cp, len,
 				    pkt_info.family);
-			} else if (port_to == 53) {
+			} else if (pkt_info.dest_port == 53) {
 				handle_dns_query(handle_dns_ctx, cp, len,
 				    pkt_info.src_addr, pkt_info.family);
 			}
