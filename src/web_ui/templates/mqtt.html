@@ -103,27 +103,18 @@ var receivedBytes = []
 updateUIAll();
 
 // Abort the download stream when leaving the page
-// *Stop* the download stream
-window.isSecureContext && window.addEventListener('beforeunload', evt => {
-    mqttClient.disconnect()
+window.addEventListener('beforeunload', evt => {
+    if (statusRunning) {
+        mqttClient.disconnect()
+    }
 })
-
-//$abort.onclick = () => {
-//    mqttClient.disconnect()
-//    fileStream = null
-//    //document.body.innerHTML = '<a href="./mqtt.html">Start again</a>'
-//}
 
 $close.onclick = () => {
     window.close()
 }
-//    mqttClient.disconnect()
-//    fileStream = null
-//    //document.body.innerHTML = '<a href="./mqtt.html">Start again</a>'
-//}
 
 function createAndDownloadBlobFile(body, filename, extension = 'pcap') {
-  const blob = new Blob([body]);
+  const blob = new Blob([body], { type: 'application/vnd.tcpdump.pcap'});
   const fileName = `${filename}.${extension}`;
   if (navigator.msSaveBlob) {
     // IE 10+
@@ -145,8 +136,7 @@ function createAndDownloadBlobFile(body, filename, extension = 'pcap') {
 
 function download(filename) {
   var element = document.createElement('a');
-  alert(receivedBytes);
-  element.setAttribute('href', 'data:application/binary,' + encodeURIComponent(receivedBytes));
+  element.setAttribute('href', 'data:application/vnd.tcpdump.pcap,' + encodeURIComponent(receivedBytes));
   element.setAttribute('download', filename);
 
   element.style.display = 'none';
@@ -163,8 +153,6 @@ function download(filename) {
             let filename = "{{=device_name}}_" + statusStartedAt
             filename = filename.replace(/:/g, "-")
             filename = filename.replace(/\s/g, "_")
-            alert(statusStartedAt)
-            alert(filename)
             createAndDownloadBlobFile(getBytesAsUint8(), filename)
             statusDownloaded = true;
         }
@@ -246,10 +234,10 @@ function stopCapture() {
 }
 
 function startTCPDump() {
-    $.get("/spin_api/tcpdump2_start?device={{=device_mac}}");
+    $.get("/spin_api/capture_start?device={{=device_mac}}");
 }
 function stopTCPDump() {
-    $.get("/spin_api/tcpdump2_stop?device={{=device_mac}}").done(function() {
+    $.get("/spin_api/capture_stop?device={{=device_mac}}").done(function() {
         // do we want to do anything else?
     });
 }
@@ -257,8 +245,7 @@ function stopTCPDump() {
 function onMQTTClientOpen(evt) {
     // Once a connection has been made, make a subscription and send a message..
     console.log("Connected");
-    let channel = "SPIN/tcpdump/{{= device_mac }}"
-    //alert("[XX] subscribing to " + channel)
+    let channel = "SPIN/capture/{{= device_mac }}"
     mqttClient.subscribe(channel);
     console.log("Subscribed");
 
@@ -277,11 +264,6 @@ function onMQTTClientStop(evt) {
     }
     stopTCPDump()
     updateUIAll()
-    //$("#statustext").css("background-color", "#ffcccc").text("Not connected");
-    //active = false;
-}
-// Convert a hex string to a byte array
-function hexToBytes(hex) {
 }
 
 function getBytesAsUint8() {
@@ -289,9 +271,6 @@ function getBytesAsUint8() {
 }
 
 function onMQTTClientMessage(message) {
-    //console.log("Got mqtt message!");
-    //console.log(message.payloadString);
-    //console.log("Send it to file!")
     let hex = message.payloadString
     for (var bytes = [], c = 0; c < hex.length; c += 2) {
         receivedBytes.push(parseInt(hex.substr(c, 2), 16));

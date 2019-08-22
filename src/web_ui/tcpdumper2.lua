@@ -35,7 +35,7 @@ function _M.create(device)
 
     local mqtt_host = "localhost"
     local mqtt_port = 1883
-    local mqtt_channel = "SPIN/tcpdump/" .. device
+    local mqtt_channel = "SPIN/capture/" .. device
 
     local mqtt_client, err = mqtt.new()
     mqtt_client.ON_CONNECT = function()

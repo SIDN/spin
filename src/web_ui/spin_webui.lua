@@ -194,7 +194,10 @@ function handler:handle_tcpdump_stop(request, response)
     return response
 end
 
-function handler:handle_tcpdump_manage2(request, response)
+-- this is the 'new style' traffic capture API;
+-- rather than sending pcap over a http chunked session,
+-- we send it to mqtt and a client-side script handles the data
+function handler:handle_capture_manage(request, response)
     local device_mac = request.params["device"]
     local running = false
     local bytes_sent = 0
@@ -225,9 +228,7 @@ function handler:handle_tcpdump_manage2(request, response)
         if rdata["mac"] == device_mac then
             if rdata["name"] then
                 device_name = rdata["name"]
-                device_name="AAA"
             end
-            device_name="BBB"
             device_ips=table.concat(rdata["ips"], ", ")
         end
     end
@@ -244,7 +245,7 @@ function handler:handle_tcpdump_manage2(request, response)
     return response
 end
 
-function handler:handle_tcpdump_start2(request, response)
+function handler:handle_capture_start(request, response)
     local device = request.params["device"]
     local dname = get_tcpdump_pname(request, device)
 
@@ -261,7 +262,7 @@ function handler:handle_tcpdump_start2(request, response)
     return response
 end
 
-function handler:handle_tcpdump_stop2(request, response)
+function handler:handle_capture_stop(request, response)
     local device = request.params["device"]
     local dname = get_tcpdump_pname(request, device)
 
@@ -663,9 +664,9 @@ function handler:init(args)
         ["/"] = handler.handle_index,
         ["/spin_api"] = self.handle_index,
         ["/spin_api/"] = self.handle_index,
-        ["/spin_api/tcpdump2"] = self.handle_tcpdump_manage2,
-        ["/spin_api/tcpdump2_start"] = self.handle_tcpdump_start2,
-        ["/spin_api/tcpdump2_stop"] = self.handle_tcpdump_stop2,
+        ["/spin_api/capture"] = self.handle_capture_manage,
+        ["/spin_api/capture_start"] = self.handle_capture_start,
+        ["/spin_api/capture_stop"] = self.handle_capture_stop,
         ["/spin_api/tcpdump"] = self.handle_tcpdump_manage,
         ["/spin_api/tcpdump_status"] = self.handle_tcpdump_status,
         ["/spin_api/tcpdump_start"] = self.handle_tcpdump_start,
