@@ -81,6 +81,7 @@ spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, 
             if (updated_mac) {
                 node_set_mac(src_node, updated_mac);
                 // note: do we need to check whether this now requires a merge?
+                node_cache_add_node(node_cache, src_node);
             }
             node_ip = tree_next(node_ip);
         }
@@ -90,6 +91,7 @@ spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, 
             if (updated_mac) {
                 node_set_mac(dest_node, updated_mac);
                 // note: do we need to check whether this now requires a merge?
+                node_cache_add_node(node_cache, dest_node);
             }
             node_ip = tree_next(node_ip);
         }
