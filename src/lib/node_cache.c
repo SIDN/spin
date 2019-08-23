@@ -677,10 +677,10 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
         // todo: incorporate this in standard lookup?
         arp_table_read(node_cache->arp_table);
         mac = arp_table_find_by_ip(node_cache->arp_table, ip);
-        spin_log(LOG_DEBUG, "[ARP] mac for ip %s: %s\n", ip_str, mac);
         STAT_VALUE(macctr, mac != NULL);
     }
     if (mac) {
+        spin_log(LOG_DEBUG, "[ARP] mac for ip %s: %s\n", ip_str, mac);
         // spin_log(LOG_DEBUG, "[XX] mac found: %s\n", mac);
         node_set_mac(node, mac);
         name = node_names_find_mac(node_cache->names, mac);
@@ -688,6 +688,7 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
             node_set_name(node, name);
         }
     } else {
+        spin_log(LOG_DEBUG, "[ARP] no mac found for ip %s\n", ip_str);
         // spin_log(LOG_DEBUG, "[XX] mac not found\n");
         name = node_names_find_ip(node_cache->names, ip);
         if (name != NULL) {

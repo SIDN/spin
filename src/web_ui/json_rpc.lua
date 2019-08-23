@@ -25,7 +25,6 @@ local json = require 'json'
 -- connect to a rpc server, returns an connection object with
 -- a 'call' method
 local json_rpc_connect = function (opts)
-    print("[XX] connect")
     local s = assert( socket.unix() )
     -- TODO: configuration, error handling
     local result, err = s:connect("/var/run/spin_rpc.sock")
@@ -37,22 +36,21 @@ local json_rpc_connect = function (opts)
     -- TODO: we have this compatibility the wrong way around! we need to add these arguments if
     -- it is ubus, rather than ignore them if it is not
     conn.call = function(self, command)
-        print("[XX] json-rpc called.")
         -- add or override json-rpc version
         command['jsonrpc'] = "2.0"
         command['id'] = math.random(0,1000000)
         -- convert to string
         local command_str = json.encode(command)
         result, err = s:send(command_str)
-        print("[XX] command sent")
         if result then
-            print("[XX] receiving response")
             response, err = s:receive("*a")
-            print("[XX] GOT RESPONSE: " .. response)
             response_json = json.decode(response)
             return response_json
         end
         return nil, "No response from JSON-RPC socket"
+    end
+    conn.close = function()
+        s:close()
     end
     return conn
 end
@@ -76,7 +74,6 @@ local ubus_rpc_connect = function (opts)
         end
         command['id'] = nil
         command['jsonrpc'] = nil
-        print("[XX] SENDING TO UBUS:")
         print(json.encode(command))
         local ubus_response, err, e2, e3 = self.ubus_conn:call("spin", "rpc", command)
         if ubus_response == nil then
@@ -87,6 +84,9 @@ local ubus_rpc_connect = function (opts)
         ubus_response['jsonrpc'] = '2.0'
         ubus_response['id'] = command['id']
         return ubus_response
+    end
+    conn.close = function()
+        self.ubus_conn:close()
     end
     return conn
 end

@@ -227,7 +227,6 @@ function handler:handle_capture_manage(request, response)
     if result == nil then
         print("error: " .. err)
     end
-    print("[XX] RESULT:")
     print(json.encode(result))
     for i=1, #result["result"] do
         local rdata = result["result"][i]
@@ -246,9 +245,11 @@ function handler:handle_capture_manage(request, response)
     if html == nil then
         response:set_status(500, "Internal Server Error")
         response.content = "Template error: " .. err
+        conn:close()
         return response
     end
     response.content = html
+    conn:close()
     return response
 end
 
@@ -389,6 +390,7 @@ function handler:retrieve_device_list()
         rdata["lastSeen"] = rdata["lastseen"]
         webresult[rdata["mac"]] = rdata
     end
+    conn:close()
     return webresult
 end
 
@@ -405,19 +407,20 @@ function handler:handle_rpc_call(request, response)
     if request.method == "POST" then
         if request.post_data then
             local conn, err = rpc.connect()
-            if not conn then
+            if conn == nil then
                 -- We return an HTTP 200, but with the content set to
                 -- an error
                 response.content = json.encode({error = err})
+                conn:close()
                 return response
             end
-            print("[XX] GOT RPC COMMAND: " .. json.encode(request.post_data))
             result, err = conn:call(request.post_data)
             if result then
                 response.content = json.encode(result)
             else
                 response:set_status(500, err)
             end
+            conn:close()
         else
             response:set_status(400, "Bad request")
             response.content = json.encode({status = 400, error = "Missing value: 'config' in POST data"})
@@ -438,7 +441,6 @@ function handler:send_websocket_update(name, arguments)
         msg = '{"type": "update", "name": "' .. name .. '", "args": ' .. json.encode(arguments) .. '}'
     end
     for i,c in pairs(self.websocket_clients) do
-        print("[XX] send msg to client")
         --c:send(msg)
         c:queue_message(msg)
     end
@@ -633,7 +635,6 @@ function handler:handle_websocket(request, response)
           copas.send(dummy)
         end
     end
-    print("[XX] yoyo yoyo")
 
     -- websocket took over the connection, return nil so minittp
     -- does not send a response
@@ -645,7 +646,6 @@ function handler:have_websocket_messages()
 end
 
 function handler:do_add_ws_c(client)
-  print("[XX] FOO ADDING CLINET")
   table.insert(self.websocket_clients, client)
 end
 
