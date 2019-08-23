@@ -62,11 +62,39 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes, uint32_t timestamp) 
 void
 spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, int packetcnt, int packetbytes, uint32_t timestamp) {
     int found = 0;
+    char *updated_mac = NULL;
+    tree_entry_t* node_ip = NULL;
 
     if (src_node == dest_node) {
         // Probably internal stuff
         return;
     }
+    if (!src_node->device && !dest_node->device) {
+        // neither are known to be a device;
+        // this may indicate we have outdated ARP information
+        // Update it, and check again for both nodes
+        spin_log(LOG_DEBUG, "No device in %d to %d traffic\n", src_node->id, dest_node->id);
+        node_cache_update_arp(node_cache, timestamp);
+        node_ip = tree_first(src_node->ips);
+        while (node_ip) {
+            updated_mac = arp_table_find_by_ip(node_cache->arp_table, node_ip->key);
+            if (updated_mac) {
+                node_set_mac(src_node, updated_mac);
+                // note: do we need to check whether this now requires a merge?
+            }
+            node_ip = tree_next(node_ip);
+        }
+        node_ip = tree_first(dest_node->ips);
+        while (node_ip) {
+            updated_mac = arp_table_find_by_ip(node_cache->arp_table, node_ip->key);
+            if (updated_mac) {
+                node_set_mac(dest_node, updated_mac);
+                // note: do we need to check whether this now requires a merge?
+            }
+            node_ip = tree_next(node_ip);
+        }
+    }
+
     if (src_node->device) {
         do_traffic(src_node->device, dest_node, packetcnt, packetbytes, timestamp);
         found++;
@@ -75,8 +103,9 @@ spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, 
         do_traffic(dest_node->device, src_node, packetcnt, packetbytes, timestamp);
         found++;
     }
+    // TODO: do we need to check yet again?
     if (!found) {
-        spin_log(LOG_DEBUG, "No device in %d to %d traffic\n", src_node->id, dest_node->id);
+        spin_log(LOG_DEBUG, "STILL No device in %d to %d traffic\n", src_node->id, dest_node->id);
 
         // Probably ARP cache must be reread and acted upon here
         node_cache_update_arp(node_cache, timestamp);

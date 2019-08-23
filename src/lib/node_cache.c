@@ -933,7 +933,6 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
      *
      * We look at Mac, Ip-addresses and Domains
      */
-
     if (node->mac) {
         existing_node = oldnode(node_cache->mac_refs, strlen(node->mac) + 1, node->mac);
         if (existing_node != NULL) {
