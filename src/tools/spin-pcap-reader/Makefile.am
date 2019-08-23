@@ -7,6 +7,7 @@ spin_pcap_reader_SOURCES = ipt.c \
                            macstr.c \
                            nodes.c \
                            pcap.c \
+                           sleep.c \
                            socket.c \
                            spinhook.c
 spin_pcap_reader_CFLAGS =
