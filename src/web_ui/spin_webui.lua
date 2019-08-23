@@ -413,14 +413,15 @@ function handler:handle_rpc_call(request, response)
                 response.content = json.encode({error = err})
                 conn:close()
                 return response
-            end
-            result, err = conn:call(request.post_data)
-            if result then
-                response.content = json.encode(result)
             else
-                response:set_status(500, err)
+                result, err = conn:call(request.post_data)
+                if result then
+                    response.content = json.encode(result)
+                else
+                    response:set_status(500, err)
+                end
+                conn:close()
             end
-            conn:close()
         else
             response:set_status(400, "Bad request")
             response.content = json.encode({status = 400, error = "Missing value: 'config' in POST data"})

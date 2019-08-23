@@ -86,7 +86,9 @@ local ubus_rpc_connect = function (opts)
         return ubus_response
     end
     conn.close = function()
-        self.ubus_conn:close()
+        if self~= nil and self.ubus_conn ~= nil then
+            self.ubus_conn:close()
+        end
     end
     return conn
 end
