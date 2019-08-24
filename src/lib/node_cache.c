@@ -299,6 +299,8 @@ node_set_modified(node_t* node, uint32_t last_seen) {
     node->last_seen = last_seen;
 }
 
+// Performs the merging of the node data itself (not any other related
+// structures, there is merge_nodes() for that)
 static void
 node_merge(node_cache_t *node_cache, node_t* dest, node_t* src) {
     tree_entry_t* cur;
@@ -840,14 +842,14 @@ oldnode(tree_t *reftree, size_t size, void *data) {
     tree_entry_t *oldleaf;
 
     oldleaf = tree_find(reftree, size, data);
-   
+
     if (oldleaf != NULL) {
         assert(oldleaf->data_size == sizeof(node));
 
         node = * ((node_t**) oldleaf->data);
         return node;
     }
-    
+
     return NULL;
 }
 
@@ -898,7 +900,7 @@ nodecompar(const void *a, const void *b) {
     return (na->id - nb->id);
 }
 
-static void
+void
 makedevice(node_t *node) {
     device_t *dev;
 
@@ -910,12 +912,38 @@ makedevice(node_t *node) {
     node->device = dev;
 }
 
+void
+merge_nodes(node_cache_t *node_cache, node_t* src_node, node_t* dest_node) {
+    int thisid;
+    tree_entry_t *thisleaf;
+
+    if (src_node->device && dest_node->device) {
+        spin_log(LOG_ERR, "Merge two devices!!!\n");
+    }
+
+    thisid = src_node->id;
+
+    // spin_log(LOG_DEBUG, "Go and merge node %d into %d\n", thisid, dest_node->id);
+    node_merge(node_cache, dest_node, src_node);
+    if (thisid != 0) {
+        spinhook_nodesmerged(node_cache, dest_node, src_node);
+    }
+    node_destroy(src_node);
+    if (thisid != 0) {
+        // Existing nodes must be taken out of tree
+        thisleaf = tree_find(node_cache->nodes, sizeof(thisid), &thisid);
+        // set data to 0, else it will be freed again
+        thisleaf->data = NULL;
+        tree_remove_entry(node_cache->nodes, thisleaf);
+    }
+}
+
 int
 node_cache_add_node(node_cache_t *node_cache, node_t *node) {
     node_t *nodes_to_merge[MAXOLD];
     int i, nnodes_to_merge;
     tree_entry_t *leaf, *newleaf;
-    node_t *existing_node, *src_node, *dest_node;
+    node_t *existing_node, *dest_node;
     int new_id, *new_id_mem;
     STAT_COUNTER(ctr, nodes-to-merge, STAT_MAX);
 
@@ -947,7 +975,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
         if (existing_node != NULL) {
             add_node_to_ar(existing_node, nodes_to_merge, &nnodes_to_merge);
         }
-        
+
         newleaf = tree_next(newleaf);
     }
 
@@ -958,7 +986,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
         if (existing_node != NULL) {
             add_node_to_ar(existing_node, nodes_to_merge, &nnodes_to_merge);
         }
-        
+
         newleaf = tree_next(newleaf);
     }
 
@@ -970,33 +998,10 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
 
         qsort(nodes_to_merge, nnodes_to_merge, sizeof(node), nodecompar);
 
-        // Actually go merge
+        // Merge them all into the first
         dest_node = nodes_to_merge[0];
         for (i=1; i<nnodes_to_merge; i++) {
-            int thisid;
-            tree_entry_t *thisleaf;
-
-            src_node = nodes_to_merge[i];
-
-            if (src_node->device && dest_node->device) {
-                spin_log(LOG_ERR, "Merge two devices!!!\n");
-            }
-
-            thisid = src_node->id;
-
-            // spin_log(LOG_DEBUG, "Go and merge node %d into %d\n", thisid, dest_node->id);
-            node_merge(node_cache, dest_node, src_node);
-            if (thisid != 0) {
-                spinhook_nodesmerged(node_cache, dest_node, src_node);
-            }
-            node_destroy(src_node);
-            if (thisid != 0) {
-                // Existing nodes must be taken out of tree
-                thisleaf = tree_find(node_cache->nodes, sizeof(thisid), &thisid);
-                // set data to 0, else it will be freed again
-                thisleaf->data = NULL;
-                tree_remove_entry(node_cache->nodes, thisleaf);
-            }
+            merge_nodes(node_cache, nodes_to_merge[i], nodes_to_merge[0]);
         }
         if (dest_node->mac && dest_node->device==NULL) {
             // Remaining node must be promoted to device

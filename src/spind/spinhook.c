@@ -59,6 +59,29 @@ do_traffic(device_t *dev, node_t *node, int cnt, int bytes, uint32_t timestamp) 
     dfp->dvf_activelastperiod = 1;
 }
 
+// Checks if there is a node with the given mac already, and if so,
+// merge the two nodes, and return the pointer of the existing node
+// If not, set the mac, and return the node pointer itself
+static node_t*
+check_for_existing_node_with_mac(node_cache_t* node_cache, node_t* node, char* mac) {
+    node_t* result_node, * existing_node;
+    // If there is a node with this mac already, merge this one into it,
+    existing_node = node_cache_find_by_mac(node_cache, mac);
+    if (existing_node != NULL) {
+        merge_nodes(node_cache, node, existing_node);
+        // use the existing node now in this function
+        result_node = existing_node;
+    } else {
+        node_set_mac(node, mac);
+        result_node = node;
+    }
+    // If it is not considered a device yet, make it one now
+    if (result_node->device == NULL) {
+        makedevice(result_node);
+    }
+    return result_node;
+}
+
 void
 spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, int packetcnt, int packetbytes, uint32_t timestamp) {
     int found = 0;
@@ -79,9 +102,7 @@ spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, 
         while (node_ip) {
             updated_mac = arp_table_find_by_ip(node_cache->arp_table, node_ip->key);
             if (updated_mac) {
-                node_set_mac(src_node, updated_mac);
-                // note: do we need to check whether this now requires a merge?
-                node_cache_add_node(node_cache, src_node);
+                src_node = check_for_existing_node_with_mac(node_cache, src_node, updated_mac);
             }
             node_ip = tree_next(node_ip);
         }
@@ -89,9 +110,7 @@ spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, 
         while (node_ip) {
             updated_mac = arp_table_find_by_ip(node_cache->arp_table, node_ip->key);
             if (updated_mac) {
-                node_set_mac(dest_node, updated_mac);
-                // note: do we need to check whether this now requires a merge?
-                node_cache_add_node(node_cache, dest_node);
+                src_node = check_for_existing_node_with_mac(node_cache, dest_node, updated_mac);
             }
             node_ip = tree_next(node_ip);
         }
@@ -202,7 +221,7 @@ node_merge_flow(node_cache_t *node_cache, node_t *node, void *ap) {
     spin_log(LOG_DEBUG, "Renumber %d->%d in flows(%d) of node %d:\n", srcnodenum, dstnodenum, dev->dv_nflows, node->id);
 
     srcleaf = tree_find(dev->dv_flowtree, sizeof(srcnodenum), &srcnodenum);
-     
+
     STAT_VALUE(ctr, srcleaf!= NULL);
 
     if (srcleaf == NULL) {

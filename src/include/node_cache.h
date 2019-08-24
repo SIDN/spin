@@ -183,5 +183,14 @@ unsigned int create_traffic_command(node_cache_t* node_cache, flow_list_t* flow_
 
 void node_cache_update_iplist_node(node_cache_t* node_cache, int listid, int addrem, int node_id);
 
+/*
+ * 'Upgrades' the node to a device, and update/add the corresponding datastructures
+ *
+ * The node must not have the device status yet (e.g. the device field must be null)
+ */
+void makedevice(node_t *node);
+void merge_nodes(node_cache_t *node_cache, node_t* src_node, node_t* dest_node);
+
+
 
 #endif // SPIN_NODE_CACHE_H
