@@ -22,6 +22,7 @@ local json = require 'json'
 -- Additional supporting tools
 local ws_ext = require 'ws_ext'
 local tcpdumper = require 'tcpdumper'
+local tcpdumper2 = require 'tcpdumper2'
 
 local TRAFFIC_CHANNEL = "SPIN/traffic"
 local HISTORY_SIZE = 600
@@ -192,6 +193,82 @@ function handler:handle_tcpdump_stop(request, response)
     response:set_status(302, "Found")
     return response
 end
+
+function handler:handle_tcpdump_manage2(request, response)
+    local device_mac = request.params["device"]
+    local running = false
+    local bytes_sent = 0
+    if self.active_dumps[dname] ~= nil then
+        running = true
+        bytes_sent = self.active_dumps[dname].bytes_sent
+    end
+
+    -- retrieve additional info about the device
+    local conn, err = rpc.connect()
+    if not conn then
+        -- We return an HTTP 200, but with the content set to
+        -- an error
+        response.content = json.encode({error = err})
+        return response
+    end
+    device_name = "unknown"
+    device_ips = ""
+    result, err = conn:call({ method = "list_devices" })
+    -- TODO: error handling
+    ubdata = json.encode(result)
+    for i=1, #result["result"] do
+        local rdata = result["result"][i]
+        if rdata["mac"] == device_mac then
+            if rdata["name"] then
+                device_name = rdata["name"]
+                device_name="AAA"
+            end
+            device_name="BBB"
+            device_ips=table.concat(rdata["ips"], ", ")
+        end
+    end
+
+    html, err = self:render_raw("mqtt.html", { device_name=device_name, device_mac=device_mac, device_ips=device_ips})
+    response:set_header("Last-Modified", spin_util.get_time_string())
+
+    if html == nil then
+        response:set_status(500, "Internal Server Error")
+        response.content = "Template error: " .. err
+        return response
+    end
+    response.content = html
+    return response
+end
+
+function handler:handle_tcpdump_start2(request, response)
+    local device = request.params["device"]
+    local dname = get_tcpdump_pname(request, device)
+
+    if self.active_dumps[dname] ~= nil then return nil, "already running" end
+    local dumper, err = tcpdumper2.create(device)
+    -- todo: 500 internal server error?
+    if dumper == nil then return nil, err end
+    self.active_dumps[dname] = dumper
+
+    dumper:run()
+    -- remove it again
+    self.active_dumps[dname] = nil
+    response.content = "{}"
+    return response
+end
+
+function handler:handle_tcpdump_stop2(request, response)
+    local device = request.params["device"]
+    local dname = get_tcpdump_pname(request, device)
+
+    if self.active_dumps[dname] ~= nil then
+        self.active_dumps[dname]:stop()
+    end
+    response:set_header("Location", "/spin_api/tcpdump?device=" .. device)
+    response:set_status(302, "Found")
+    return response
+end
+
 
 function handler:handle_tcpdump_manage(request, response)
     local device = request.params["device"]
@@ -582,6 +659,9 @@ function handler:init(args)
         ["/"] = handler.handle_index,
         ["/spin_api"] = self.handle_index,
         ["/spin_api/"] = self.handle_index,
+        ["/spin_api/tcpdump2"] = self.handle_tcpdump_manage2,
+        ["/spin_api/tcpdump2_start"] = self.handle_tcpdump_start2,
+        ["/spin_api/tcpdump2_stop"] = self.handle_tcpdump_stop2,
         ["/spin_api/tcpdump"] = self.handle_tcpdump_manage,
         ["/spin_api/tcpdump_status"] = self.handle_tcpdump_status,
         ["/spin_api/tcpdump_start"] = self.handle_tcpdump_start,

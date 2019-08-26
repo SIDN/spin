@@ -1,0 +1,366 @@
+{{ --$def with (device_name, device_mac, device_ips) }}
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+  </head>
+  <body>
+    <script type="text/javascript" src="/spin_graph/js/jquery-3.1.1.min.js" ></script>
+    <script type="text/javascript" src="/spin_graph/js/jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
+    <script src="/spin_graph/js/mqttws31.js"></script>
+
+    <div class="section section-top">
+        <center>
+        <b>Device Traffic Capture</b>
+        </center>
+    </div>
+    <div class="section">
+        <table><tr>
+            <td nowrap="nowrap">
+                Device information
+            </td>
+            <td style="width: 100%">
+                &nbsp;
+            </td>
+            <td nowrap="nowrap">
+                <button>Close window</button>
+            </td>
+        </tr></table>
+        <table>
+            <tr>
+                <td>Name:</td>
+                <td>{{= device_name}}</td>
+            </tr>
+            <tr>
+                <td>Mac:</td>
+                <td>{{= device_mac}}</td>
+            </tr>
+            <tr>
+                <td>IP(s):</td>
+                <td>{{= device_ips}}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section section-bottom">
+        <div align="right">
+        <button id="$startstop">Start capture</button>
+        </div>
+        <p>Capture status: <span id="$statusRunningField">not running</span></p>
+        <p>Bytes received: <span id="$statusByteCountField">0</span></p>
+        <p>Capture start time: <span id="$statusStartedAtField"></span></p>
+        <p>Last data seen at: <span id="$statusLastSeenField"></span></p>
+        <div align="right">
+            <button disabled id="$save">Download captured data</button>
+        </div>
+    </div>
+
+    <br />
+
+    <div class="section2 section2-top">
+        <center>
+            Additional functions
+        </center>
+    </div>
+    <div class="section2 section2">
+        <center>
+                <button disabled id="$upload">Upload captured data to SIDN</button>
+</center>
+    </div>
+    <div class="section2 section2-bottom">
+<center>
+                Not working? Try the <a target="_blank" href="/spin_api/tcpdump?device={{= device_mac}}">old download method</a>.
+</center>
+    </div>
+
+
+
+<!--
+    <input type="text" id="$filename" value="{{= device }}.pcap">
+    <button id="$start">Connect and download</button>
+
+    <button disabled id="$abort">Abort</button>
+    <button disabled id="$close">Stop</button>
+    <button disabled id="$save">Save or open the dara</button>
+    <div>
+        <p>
+            Not working? Try the <a target="_blank" href="/spin_api/tcpdump?device={{= device}}">old download method</a>.
+        </p>
+    </div>
+-->
+<script>
+var statusRunning = false;
+var statusDownloaded = false;
+var statusStartedAt = "not started";
+var statusByteCount = 0;
+
+var fileStream
+var mqttClient
+var encode = TextEncoder.prototype.encode.bind(new TextEncoder)
+var receivedBytes = []
+updateUIAll();
+
+// Abort the download stream when leaving the page
+// *Stop* the download stream
+window.isSecureContext && window.addEventListener('beforeunload', evt => {
+    mqttClient.disconnect()
+    fileStream = null
+})
+
+//$abort.onclick = () => {
+//    mqttClient.disconnect()
+//    fileStream = null
+//    //document.body.innerHTML = '<a href="./mqtt.html">Start again</a>'
+//}
+
+//$close.onclick = () => {
+//    mqttClient.disconnect()
+//    fileStream = null
+//    //document.body.innerHTML = '<a href="./mqtt.html">Start again</a>'
+//}
+
+function createAndDownloadBlobFile(body, filename, extension = 'pcap') {
+  const blob = new Blob([body]);
+  const fileName = `${filename}.${extension}`;
+  if (navigator.msSaveBlob) {
+    // IE 10+
+    navigator.msSaveBlob(blob, fileName);
+  } else {
+    const link = document.createElement('a');
+    // Browsers that support HTML5 download attribute
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', fileName);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  }
+}
+
+function download(filename) {
+  var element = document.createElement('a');
+  alert(receivedBytes);
+  element.setAttribute('href', 'data:application/binary,' + encodeURIComponent(receivedBytes));
+  element.setAttribute('download', filename);
+
+  element.style.display = 'none';
+  document.body.appendChild(element);
+
+  element.click();
+
+  document.body.removeChild(element);
+}
+
+      $save.onclick = () => {
+        if (receivedBytes.length > 0) {
+            //download('test.pcap');
+            let filename = "{{=device_name}}_" + statusStartedAt
+            filename = filename.replace(/:/g, "-")
+            filename = filename.replace(/\s/g, "_")
+            alert(statusStartedAt)
+            alert(filename)
+            createAndDownloadBlobFile(getBytesAsUint8(), filename)
+            statusDownloaded = true;
+        }
+      }
+
+      $startstop.onclick = evt => {
+        try {
+            if (!statusRunning) {
+                if (statusByteCount == 0 || statusDownloaded || confirm("This will start a new capture and current data will be lost. Press Ok to continue")) {
+                    statusRunning = true
+                    statusDownloaded = false
+                    statusByteCount = 0;
+                    receivedBytes = [];
+                    startCapture();
+                }
+            } else {
+                statusRunning = false
+                stopCapture();
+            }
+            updateUIAll();
+        } catch (exc) {
+            stopTCPDump()
+            alert(exc)
+        }
+
+      }
+
+function updateUIAll() {
+    if (statusRunning) {
+        //$("$startstop").attr('value', 'Save');
+        $startstop.firstChild.data = "Stop capture"
+        $statusRunningField.innerHTML = "Running"
+    } else {
+        $startstop.firstChild.data = "Start capture"
+        $statusRunningField.innerHTML = "Not running"
+        
+        //$("$startstop").attr('value', 'SaveA');
+        //$startstop.attr('value', 'Start capture');
+    }
+    updateUIData();
+}
+
+function getCurrentTimeString() {
+    var dt = new Date();
+
+    // ensure date comes as 01, 09 etc
+    var DD = ("0" + dt.getDate()).slice(-2);
+    // getMonth returns month from 0
+    var MM = ("0" + (dt.getMonth() + 1)).slice(-2);
+    var YYYY = dt.getFullYear();
+    var hh = ("0" + dt.getHours()).slice(-2);
+    var mm = ("0" + dt.getMinutes()).slice(-2);
+    var ss = ("0" + dt.getSeconds()).slice(-2);
+    var date_string = YYYY + "-" + MM + "-" + DD + " " + hh + ":" + mm + ":" + ss;
+
+    return date_string;
+}
+
+function updateUIData() {
+    if (statusByteCount > 0) {
+        $save.disabled = false
+        $upload.disabled = false
+    } else {
+        $upload.disabled = true
+    }
+    $statusByteCountField.innerHTML=statusByteCount
+    var dt = new Date();
+}
+
+function startCapture() {
+    // onconnect triggers the tcpdump
+    connectToMQTT()
+    statusStartedAt = getCurrentTimeString()
+    $statusStartedAtField.innerHTML = statusStartedAt
+}
+
+function stopCapture() {
+    // ondisconnect triggers tcpdump stop
+    mqttClient.disconnect();
+}
+
+function startTCPDump() {
+    $.get("/spin_api/tcpdump2_start?device={{=device_mac}}");
+}
+function stopTCPDump() {
+    $.get("/spin_api/tcpdump2_stop?device={{=device_mac}}").done(function() {
+        // do we want to do anything else?
+    });
+}
+
+function onMQTTClientOpen(evt) {
+    // Once a connection has been made, make a subscription and send a message..
+    console.log("Connected");
+    let channel = "SPIN/tcpdump/{{= device_mac }}"
+    //alert("[XX] subscribing to " + channel)
+    mqttClient.subscribe(channel);
+    console.log("Subscribed");
+
+    // we are connected, start the dump on the server
+    startTCPDump()
+}
+function onMQTTClientStop(evt) {
+    // Once a connection has been made, make a subscription and send a message..
+    console.log("Connected");
+
+    // TODO: what to do?
+    if (evt.errorCode !== 0) {
+        console.error('Websocket has disappeared');
+        console.error(evt.errorMessage)
+    }
+    stopTCPDump()
+    updateUIAll()
+    //$("#statustext").css("background-color", "#ffcccc").text("Not connected");
+    //active = false;
+}
+// Convert a hex string to a byte array
+function hexToBytes(hex) {
+}
+
+function getBytesAsUint8() {
+    return new Uint8Array(receivedBytes);
+}
+
+function onMQTTClientMessage(message) {
+    //console.log("Got mqtt message!");
+    //console.log(message.payloadString);
+    //console.log("Send it to file!")
+    let hex = message.payloadString
+    for (var bytes = [], c = 0; c < hex.length; c += 2) {
+        receivedBytes.push(parseInt(hex.substr(c, 2), 16));
+    }
+    statusByteCount = receivedBytes.length
+
+    $statusLastSeenField.innerHTML = getCurrentTimeString();
+    updateUIData()
+}
+
+function connectToMQTT() {
+    var url = new URL(window.location);
+    var mqtt_port = url.searchParams.get("mqtt_port");
+    var server_host = window.location.hostname
+    if (!server_host) {
+        server_host = "localhost"
+    }
+    if (mqtt_port) {
+        mqtt_port = parseInt(mqtt_port);
+    } else {
+        mqtt_port = 1884;
+    }
+    var identifier = "Web-" + Math.random().toString(16).slice(-5)
+
+    mqttClient = new Paho.MQTT.Client(server_host, mqtt_port, identifier);
+    mqttClient.onConnectionLost = onMQTTClientStop;
+    mqttClient.onMessageArrived = onMQTTClientMessage;
+    mqttClient.connect({onSuccess:onMQTTClientOpen});
+}
+
+    </script>
+  </body>
+
+<style>
+.section {
+  width: 400px;
+  border-style: solid;
+  border-width: 0px 2px 2px 2px;
+  padding: 10px;
+  spacing: 4px;
+}
+
+.section-top {
+  border-width: 2px 2px 2px 2px;
+  border-radius: 10px 10px 0px 0px;
+}
+
+.section-bottom {
+  border-width: 0px 2px 2px 2px;
+  border-radius: 0px 0px 10px 10px;
+}
+
+.section2 {
+  width: 360px;
+  border-style: solid;
+  border-width: 0px 1px 1px 1px;
+  padding: 10px;
+  spacing: 4px;
+}
+
+.section2-top {
+  border-width: 1px 1px 1px 1px;
+  border-radius: 10px 10px 0px 0px;
+}
+
+.section2-bottom {
+  border-width: 0px 1px 1px 1px;
+  border-radius: 0px 0px 10px 10px;
+}
+
+
+</style>
+  
+</html>
