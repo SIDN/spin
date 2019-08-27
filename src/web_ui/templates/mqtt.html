@@ -10,86 +10,136 @@
     <script type="text/javascript" src="/spin_graph/js/jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
     <script src="/spin_graph/js/mqttws31.js"></script>
 
-    <div class="section section-top">
-        <center>
-        <b>Device Traffic Capture</b>
-        </center>
-    </div>
-    <div class="section">
-        <table><tr>
-            <td nowrap="nowrap">
-                Device information
-            </td>
-            <td style="width: 100%">
-                &nbsp;
-            </td>
-            <td nowrap="nowrap">
-                <button id="$close">Close window</button>
-            </td>
-        </tr></table>
-        <table>
-            <tr>
-                <td>Name:</td>
-                <td>{{= device_name}}</td>
-            </tr>
-            <tr>
-                <td>Mac:</td>
-                <td>{{= device_mac}}</td>
-            </tr>
-            <tr>
-                <td>IP(s):</td>
-                <td>{{= device_ips}}</td>
-            </tr>
-        </table>
-    </div>
-
-    <div class="section section-bottom">
-        <div align="right">
-        <button id="$startstop">Start capture</button>
+    <div id="capture">
+        <div class="section section-top">
+            <table>
+                <tr>
+                    <td nowrap="nowrap">
+                        <b>Device traffic capture</b>
+                    </td>
+                    <td style="width: 100%">
+                        &nbsp;
+                    </td>
+                    <td nowrap="nowrap" style="spacing:0px 0px 0px 0px;;padding:0px 0px 0px 0px;">
+                        <button id="$capture_close" style="spacing:0px 0px 0px 0px;;padding:0px 0px 0px 0px;">Close window</button>
+                    </td>
+                </tr>
+            </table>
         </div>
-        <table>
-            <tr>
-                <td>Capture status: </td>
-                <td align="right" class="datatable">
-                    <span id="$statusRunningField" class="status status-inactive">Not running</span>
-                </td>
-            </tr>
-            <tr>
-                <td>Bytes received:</td>
-                <td id="$statusByteCountField" align="right">0</td>
-            </tr>
-            <tr>
-                <td>Capture start time: </td>
-                <td id="$statusStartedAtField" align="right">capture not started</td>
-            </tr>
-            <tr>
-                <td>Last data seen at:</td>
-                <td id="$statusLastSeenField" align="right"></td>
-            </tr>
-        </table>
-        <div align="right">
-            <button disabled id="$save">Download captured data</button>
+        <div class="section">
+            <table>
+                <tr>
+                    <td colspan="2">Device information</td>
+                </tr>
+                <tr>
+                    <td>Name:</td>
+                    <td>{{= device_name}}</td>
+                </tr>
+                <tr>
+                    <td>Mac:</td>
+                    <td>{{= device_mac}}</td>
+                </tr>
+                <tr>
+                    <td>IP(s):</td>
+                    <td>{{= device_ips}}</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="section section-bottom">
+            <div align="right">
+            <button id="$capture_startstop">Start capture</button>
+            </div>
+            <table>
+                <tr>
+                    <td>Capture status: </td>
+                    <td align="right" class="datatable">
+                        <span id="$statusRunningField" class="status status-inactive">Not running</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Bytes received:</td>
+                    <td id="$statusByteCountField" align="right">0</td>
+                </tr>
+                <tr>
+                    <td>Capture start time: </td>
+                    <td id="$statusStartedAtField" align="right">capture not started</td>
+                </tr>
+                <tr>
+                    <td>Last data seen at:</td>
+                    <td id="$statusLastSeenField" align="right"></td>
+                </tr>
+            </table>
+            <div align="right">
+                <button disabled id="$capture_save">Download captured data</button>
+            </div>
+        </div>
+
+        <br />
+
+        <div class="section2 section2-top">
+            <center>
+                Additional functions
+            </center>
+        </div>
+        <div class="section2 section2">
+            <center>
+                <button disabled id="$capture_upload">Upload captured data to SIDN</button>
+            </center>
+        </div>
+        <div class="section2 section2-bottom">
+            <center>
+                Not working? Try the <a target="_blank" href="/spin_api/tcpdump?device={{= device_mac}}">old download method</a>.
+            </center>
         </div>
     </div>
-
-    <br />
-
-    <div class="section2 section2-top">
-        <center>
-            Additional functions
-        </center>
+    <div id="upload" style="display: none;">
+        <div class="section section-top">
+            <table>
+                <tr>
+                    <td nowrap="nowrap">
+                        <b>Upload to SIDN</b>
+                    </td>
+                    <td style="width: 100%">
+                        &nbsp;
+                    </td>
+                    <td nowrap="nowrap">
+                        <button id="$upload_back">Back to capture</button>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div class="section">
+            <input id="$upload_consent" type="checkbox">
+                I declare that this is my data, that, to the best of my knowledge, it does not contain any personal data about other individuals, and that I allow SIDN to make the file available to the public for download and analysis.
+            </input>
+        </div>
+        <div class="section">
+            <table>
+                <tr>
+                    <td>Device type</td>
+                    <td><input id="$upload_device_type" type="textfield" name="text1" value="" /></td>
+                </tr>
+                <tr>
+                    <td>Device brand</td>
+                    <td><input id="$upload_device_brand" type="textfield" name="text1" value="" /></td>
+                </tr>
+                <tr>
+                    <td>Device name</td>
+                    <td><input id="$upload_device_name" type="textfield" name="text1" value="" /></td>
+                </tr>
+            </table>
+        </div>
+        <div class="section">
+            Please provide any additional information, such as times at which you performed any actions, if known. For example '13:45 turned on light.', '13:48 changed color of light.', etc.
+            <textarea id="$upload_additional_info" style="width: 100%; height: 5em;"></textarea>
+        </div>
+        <div class="section section-bottom">
+            <div align="right">
+                <button id="$upload_upload">Upload captured data</button>
+            </div>
+        </div>
     </div>
-    <div class="section2 section2">
-        <center>
-            <button disabled id="$upload">Upload captured data to SIDN</button>
-        </center>
-    </div>
-    <div class="section2 section2-bottom">
-        <center>
-            Not working? Try the <a target="_blank" href="/spin_api/tcpdump?device={{= device_mac}}">old download method</a>.
-        </center>
-    </div>
-
 <script>
 var statusRunning = false;
 var statusDownloaded = false;
@@ -109,85 +159,141 @@ window.addEventListener('beforeunload', evt => {
     }
 })
 
-$close.onclick = () => {
-    window.close()
+$capture_close.onclick = () => {
+    if (statusRunning) {
+        if (confirm("You have an active capture, closing this window will remove the captured data, are you sure?")) {
+            window.close()
+        }
+    } else if (statusByteCount > 0 && !statusDownloaded) {
+        if (confirm("You have captured data that has not been downloaded yet, closing this window will remove the captured data. Are you sure?")) {
+            window.close()
+        }
+    } else {
+        window.close()
+    }
+        
 }
 
 function createAndDownloadBlobFile(body, filename, extension = 'pcap') {
-  const blob = new Blob([body], { type: 'application/vnd.tcpdump.pcap'});
-  const fileName = `${filename}.${extension}`;
-  if (navigator.msSaveBlob) {
-    // IE 10+
-    navigator.msSaveBlob(blob, fileName);
-  } else {
-    const link = document.createElement('a');
-    // Browsers that support HTML5 download attribute
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', fileName);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    const blob = new Blob([body], { type: 'application/vnd.tcpdump.pcap'});
+    const fileName = `${filename}.${extension}`;
+    if (navigator.msSaveBlob) {
+        // IE 10+
+        navigator.msSaveBlob(blob, fileName);
+    } else {
+        const link = document.createElement('a');
+        // Browsers that support HTML5 download attribute
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     }
-  }
 }
 
 function download(filename) {
-  var element = document.createElement('a');
-  element.setAttribute('href', 'data:application/vnd.tcpdump.pcap,' + encodeURIComponent(receivedBytes));
-  element.setAttribute('download', filename);
+    var element = document.createElement('a');
+    element.setAttribute('href', 'data:application/vnd.tcpdump.pcap,' + encodeURIComponent(receivedBytes));
+    element.setAttribute('download', filename);
 
-  element.style.display = 'none';
-  document.body.appendChild(element);
+    element.style.display = 'none';
+    document.body.appendChild(element);
 
-  element.click();
+    element.click();
 
-  document.body.removeChild(element);
+    document.body.removeChild(element);
 }
 
-      $save.onclick = () => {
-        if (receivedBytes.length > 0) {
-            //download('test.pcap');
-            let filename = "{{=device_name}}_" + statusStartedAt
-            filename = filename.replace(/:/g, "-")
-            filename = filename.replace(/\s/g, "_")
-            createAndDownloadBlobFile(getBytesAsUint8(), filename)
-            statusDownloaded = true;
-        }
-      }
+$capture_save.onclick = () => {
+    if (receivedBytes.length > 0) {
+        //download('test.pcap');
+        let filename = "{{=device_name}}_" + statusStartedAt
+        filename = filename.replace(/:/g, "-")
+        filename = filename.replace(/\s/g, "_")
+        createAndDownloadBlobFile(getBytesAsUint8(), filename)
+        statusDownloaded = true;
+    }
+}
 
-      $startstop.onclick = evt => {
-        try {
-            if (!statusRunning) {
-                if (statusByteCount == 0 || statusDownloaded || confirm("This will start a new capture and current data will be lost. Press Ok to continue")) {
-                    statusRunning = true
-                    statusDownloaded = false
-                    statusByteCount = 0;
-                    receivedBytes = [];
-                    startCapture();
-                }
-            } else {
-                statusRunning = false
-                stopCapture();
+$capture_startstop.onclick = evt => {
+    try {
+        if (!statusRunning) {
+            if (statusByteCount == 0 || statusDownloaded || confirm("This will start a new capture and current data will be lost. Press Ok to continue")) {
+                statusRunning = true
+                statusDownloaded = false
+                statusByteCount = 0;
+                receivedBytes = [];
+                startCapture();
             }
-            updateUIAll();
-        } catch (exc) {
-            stopTCPDump()
-            alert(exc)
+        } else {
+            statusRunning = false
+            stopCapture();
         }
+        updateUIAll();
+    } catch (exc) {
+        stopTCPDump()
+        alert(exc)
+    }
+}
 
-      }
+$capture_upload.onclick = evt => {
+    $( "#capture" ).toggle();
+    $( "#upload" ).toggle();
+    resizeWindow("upload");
+}
+
+$upload_back.onclick = evt => {
+    $( "#capture" ).toggle();
+    $( "#upload" ).toggle();
+    resizeWindow("capture");
+}
+
+$upload_upload.onclick = evt => {
+    uploadData();
+}
+
+function uploadData() {
+    post_data = {
+        device_type: $upload_device_type.value,
+        device_brand: $upload_device_brand.value,
+        device_name: $upload_device_name.value,
+        user_consent: $upload_consent.value,
+        additional_information: $upload_additional_info.value,
+        pcap_data: btoa(String.fromCharCode.apply(null, receivedBytes))
+    }
+    $.ajax({
+        type: 'POST',
+        url: 'https://spin.sidnlabs.nl/api/v1/pcap/upload/',
+        data: JSON.stringify(post_data),
+        success: function(data) {
+            alert('Data uploaded!\n\nThank you for your contribution.');
+            $( "#capture" ).toggle();
+            $( "#upload" ).toggle();
+            resizeWindow("capture");
+        },
+        contentType: "application/json",
+        dataType: 'json'
+    }).fail(function(err) {
+        if (err['responseJSON']) {
+            alert( "error: " + JSON.stringify(err['responseJSON'], null, 4) );
+        } else {
+            alert( "error: " + JSON.stringify(err, null, 4) );
+        }
+    });
+
+}
 
 function updateUIAll() {
     if (statusRunning) {
-        //$("$startstop").attr('value', 'Save');
-        $startstop.firstChild.data = "Stop capture"
+        $capture_startstop.firstChild.data = "Stop capture"
         $statusRunningField.innerHTML = "Running"
         $statusRunningField.className = "status status-active"
     } else {
-        $startstop.firstChild.data = "Start capture"
+        $capture_startstop.firstChild.data = "Start capture"
         $statusRunningField.innerHTML = "Not running"
         $statusRunningField.className = "status status-inactive"
     }
@@ -210,12 +316,18 @@ function getCurrentTimeString() {
     return date_string;
 }
 
+function resizeWindow(element_id) {
+   var contentWidth = document.getElementById(element_id).offsetWidth;
+   var contentHeight = document.getElementById(element_id).offsetHeight;
+   window.resizeTo(contentWidth,contentHeight);
+}
+
 function updateUIData() {
     if (statusByteCount > 0) {
-        $save.disabled = false
-        $upload.disabled = false
+        $capture_save.disabled = false
+        $capture_upload.disabled = false
     } else {
-        $upload.disabled = true
+        $capture_upload.disabled = true
     }
     $statusByteCountField.innerHTML=statusByteCount
     var dt = new Date();

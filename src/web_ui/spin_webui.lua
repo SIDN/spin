@@ -235,6 +235,7 @@ function handler:handle_capture_manage(request, response)
 
     html, err = self:render_raw("mqtt.html", { device_name=device_name, device_mac=device_mac, device_ips=device_ips})
     response:set_header("Last-Modified", spin_util.get_time_string())
+    response:set_header("Access-Control-Allow-Origin", "spin.sidnlabs.nl")
 
     if html == nil then
         response:set_status(500, "Internal Server Error")
