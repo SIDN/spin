@@ -94,7 +94,7 @@ int tree_add(tree_t* tree, size_t key_size, void* key, size_t data_size, void* d
                 while (current->parent != NULL) {
                     if (current->parent->left == current) {
                         current->parent->left = tree_entry_balance(current);
-                    } else {
+                    } else if (current->parent->right == current) {
                         current->parent->right = tree_entry_balance(current);
                     }
                     current = current->parent;
@@ -112,7 +112,7 @@ int tree_add(tree_t* tree, size_t key_size, void* key, size_t data_size, void* d
                 while (current->parent != NULL) {
                     if (current->parent->left == current) {
                         current->parent->left = tree_entry_balance(current);
-                    } else {
+                    } else if (current->parent->right == current) {
                         current->parent->right = tree_entry_balance(current);
                     }
                     current = current->parent;
