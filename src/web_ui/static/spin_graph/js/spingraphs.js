@@ -502,9 +502,15 @@ function initGraphs() {
             alert("Sorry, for now we can only dump pcap for devices, not remote nodes");
             return;
         }
-        // Much TODO here; port, etc. currently spin_webui.lua must
-        // be started and lua-minittp installed
-        var url = window.location.protocol + "//" + window.location.hostname +
+        // Spin_webui.lua must be started and lua-minittp installed for the capture
+        // to work
+        let portstr = "";
+        if ((window.location.protocol === "http:" && window.location.port !== 80) ||
+            (window.location.protocol === "https:" && window.location.port !== 443)
+        ) {
+            portstr = ":" + window.location.port;
+        }
+        var url = window.location.protocol + "//" + window.location.hostname + portstr +
         "/spin_api/capture?device="+name;
         var w = window.open(url, name, "width=440,  height=520, scrollbars=yes");
     });
@@ -727,6 +733,11 @@ function nodeDeselected(event) {
     $("#nodeinfo").dialog('close');
 }
 
+function updateNodeData(data) {
+    handleNodeInfo(data);
+    console.log("[XX] " + JSON.stringify(data));
+}
+
 function nodeSelected(event) {
     console.log("[XX] nodeSelected event");
     var nodeId = event.nodes[0];
@@ -760,6 +771,10 @@ function nodeSelected(event) {
         $("#nodeinfo").dialog('open');
 
     }
+
+    // Just to be sure we have the latest data, let's do an RPC request
+    // to update it
+    sendRPCCommand("get_device_data", { "node": nodeId }, updateNodeData);
 }
 
 function updateBlockedButton() {

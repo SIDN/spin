@@ -37,18 +37,21 @@ void arp_table_read(arp_table_t* arp_table) {
     int result = 4;
     char line[1024];
     STAT_COUNTER(ctr, arp-table-read, STAT_TOTAL);
-
+    spin_log(LOG_DEBUG, "[ARP] Reading ARP table\n");
     fp = popen("ip neigh", "r");
     STAT_VALUE(ctr, fp != NULL);
     if (fp == NULL) {
-        spin_log(LOG_ERR, "error running ip neigh: %s\n", strerror(errno));
+        spin_log(LOG_ERR, "[ARP] error running ip neigh: %s\n", strerror(errno));
         return;
     }
     /* Read the output a line at a time - output it. */
     while (fgets(line, 1024, fp) != NULL) {
         result = sscanf(line, "%s dev %s lladdr %s %s\n", ip, ignore, mac, ignore);
         if (result == 4) {
+            spin_log(LOG_DEBUG, "[ARP] Adding mac %s IP %s to arp cache\n", mac, ip);
             arp_table_add(arp_table, ip, mac);
+        } else {
+            spin_log(LOG_DEBUG, "[ARP] Warning: unrecognized line in arp results (%d)\n", result);
         }
     }
 

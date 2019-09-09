@@ -482,6 +482,25 @@ int devflowfunc(void *cb_data, rpc_arg_val_t *args, rpc_arg_val_t *result) {
     return 0;
 }
 
+rpc_arg_desc_t get_dev_data_args[] = {
+    { "node", RPCAT_INT },
+};
+
+int
+get_dev_data_func(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    node_t* node;
+    int node_id = args[0].rpca_ivalue;
+    node_cache_t* node_cache = (node_cache_t*)cb;
+
+    node = node_cache_find_by_id(node_cache, node_id);
+    if (node == NULL) {
+        spin_log(LOG_DEBUG, "[XX] NODE %d NOT FOUND\n", node_id);
+        result->rpca_svalue = "Unknown node id";
+        return -1;
+    }
+    result->rpca_cvalue = spin_data_node(node);
+    return 0;
+}
 
 int
 devlistfunc(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
@@ -758,6 +777,7 @@ init_rpcs(node_cache_t *node_cache) {
     rpc_register("set_flow_block", blockflowfunc, (void *) node_cache, 3, blockflow_args, RPCAT_NONE);
     rpc_register("set_device_flow_block", devblockflowfunc, (void *) node_cache, 3, devblockflow_args, RPCAT_NONE);
     rpc_register("get_flow_block", getblockflowfunc, (void *) 0, 0, 0, RPCAT_COMPLEX);
+    rpc_register("get_device_data", get_dev_data_func, (void *) node_cache, 1, get_dev_data_args, RPCAT_COMPLEX);
     rpc_register("list_devices", devlistfunc, (void *) node_cache, 0, NULL, RPCAT_COMPLEX);
     rpc_register("list_device_flows", devflowfunc, (void *) node_cache, 1, devflow_args, RPCAT_COMPLEX);
     rpc_register("set_device_name", set_device_name_func, (void *) node_cache, 2, set_device_name_args, RPCAT_NONE);
@@ -767,7 +787,6 @@ init_rpcs(node_cache_t *node_cache) {
     rpc_register("remove_iplist_ip", remove_iplist_ip,  (void *) node_cache, 2, iplist_addremove_ip_args, RPCAT_NONE);
     rpc_register("list_iplist", list_iplist_ips, 0, 1, iplist_list_args, RPCAT_COMPLEX);
     rpc_register("reset_iplist_ignore", reset_iplist_ignore, 0, 0, 0, RPCAT_NONE);
-    
 
     register_internal_functions();
 }

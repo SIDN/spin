@@ -1,4 +1,3 @@
-var server_host = null;
 var client = 0;// = new Paho.MQTT.Client("valibox.", 1884, "Web-" + Math.random().toString(16).slice(-5));
 //var client = new Paho.MQTT.Client("127.0.0.1", 1884, "clientId");
 var last_traffic = 0 // Last received traffic trace
@@ -8,12 +7,48 @@ var active = false; // Determines whether we are active or not
 var datacache = []; // array of all data items to be added on the next iteration.
 var nodeinfo = []; // caching array with all node information
 
-function init() {
-    var url = new URL(window.location);
-    server_host = url.searchParams.get("mqtt_host");
-    if (!server_host) {
-        server_host = window.location.hostname
+// We create and maintain connections to two servers;
+// the MQTT server and the web API / RPC server.
+// Connection details can in most cases be derived, but they can be
+// overridden
+var server_data = null;
+
+function setServerData() {
+    // Default to values derived from current host/port
+    // Parse query parameters to override
+    let protocol = window.location.protocol
+    let hostname = window.location.hostname
+    let port = window.location.port
+    let url = new URL(document.location)
+
+    let portstr = "";
+    if ((protocol === "http:" && port !== 80) ||
+        (protocol === "https:" && port !== 443)
+    ) {
+        portstr = ":" + window.location.port;
     }
+
+    server_data = {}
+    let qp_mqtt_host = url.searchParams.get("mqtt_host")
+    if (qp_mqtt_host) {
+        server_data.mqtt_host = qp_mqtt_host
+    } else {
+        server_data.mqtt_host = hostname
+    }
+    let qp_mqtt_port = url.searchParams.get("mqtt_port")
+    if (qp_mqtt_port) {
+        server_data.mqtt_port = qp_mqtt_port
+    } else {
+        server_data.mqtt_port = 1884
+    }
+
+    // TODO: do we want to add query params for api url/port too?
+    server_data.api_base_url = protocol + "//" + hostname + portstr
+    //alert("API HOST: " + server_data.api_base_url);
+}
+
+function init() {
+    setServerData();
 
     connectToMQTT();
     initGraphs();
@@ -30,6 +65,7 @@ function init() {
 }
 
 function connectToMQTT() {
+    /*
     var url = new URL(window.location);
     var mqtt_port = url.searchParams.get("mqtt_port");
     if (mqtt_port) {
@@ -37,7 +73,8 @@ function connectToMQTT() {
     } else {
         mqtt_port = 1884;
     }
-    client = new Paho.MQTT.Client(server_host, mqtt_port, "Web-" + Math.random().toString(16).slice(-5));
+    */
+    client = new Paho.MQTT.Client(server_data.mqtt_host, server_data.mqtt_port, "Web-" + Math.random().toString(16).slice(-5));
 }
 
 // called when a message arrives
@@ -68,7 +105,7 @@ function sendCommand(command, argument) {
  */
 function sendRPCCommand(procedure, params, success_callback) {
     var xhttp = new XMLHttpRequest();
-    let rpc_endpoint = "http://" + server_host + "/spin_api/jsonrpc";
+    let rpc_endpoint = server_data.api_base_url + "/spin_api/jsonrpc";
     xhttp.open("POST", rpc_endpoint, true);
     xhttp.setRequestHeader("Content-Type", "application/json");
     let command = {
