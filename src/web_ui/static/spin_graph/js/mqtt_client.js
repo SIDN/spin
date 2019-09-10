@@ -118,7 +118,7 @@ function sendRPCCommand(procedure, params, success_callback) {
     xhttp.onload = function () {
         //alert("[XX] status: " + xhttp.status);
         if (xhttp.status !== 200) {
-            alert("HTTP error " + xhttp.status + " from SPIN RPC server");
+            alert("HTTP error " + xhttp.status + " from SPIN RPC server!");
             console.log(xhttp.response);
         } else {
             let response = JSON.parse(xhttp.response)

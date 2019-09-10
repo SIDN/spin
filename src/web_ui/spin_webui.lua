@@ -194,6 +194,12 @@ function handler:handle_tcpdump_stop(request, response)
     return response
 end
 
+function handler:error_400(message, response)
+    response.content = json.encode({error = message})
+    response:set_status(400, "Bad request")
+    return response
+end
+
 -- this is the 'new style' traffic capture API;
 -- rather than sending pcap over a http chunked session,
 -- we send it to mqtt and a client-side script handles the data
@@ -250,10 +256,14 @@ function handler:handle_capture_start(request, response)
     local device = request.params["device"]
     local dname = get_tcpdump_pname(request, device)
 
-    if self.active_dumps[dname] ~= nil then return nil, "already running" end
+    if self.active_dumps[dname] ~= nil then
+        return self:error_400("Capture already running", response)
+    end
     local dumper, err = tcpdumper2.create(device)
     -- todo: 500 internal server error?
-    if dumper == nil then return nil, err end
+    if dumper == nil then
+        return self:error_400("Unable to start capture: " .. err, response)
+    end
     self.active_dumps[dname] = dumper
 
     dumper:run()

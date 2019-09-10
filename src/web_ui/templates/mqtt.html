@@ -9,7 +9,7 @@
     <script type="text/javascript" src="/spin_graph/js/jquery-3.1.1.min.js" ></script>
     <script type="text/javascript" src="/spin_graph/js/jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
     <script src="/spin_graph/js/mqttws31.js"></script>
-
+<div>
     <div id="capture">
         <div class="section section-top">
             <table>
@@ -140,6 +140,15 @@
             </div>
         </div>
     </div>
+    <div class="notice"
+        <center>
+            <div id="notice">
+            Uploading, please wait.
+            </div>
+        </center>
+    </div>
+    <div id="greyOut" class="darkClass"></div>
+</div>
 <script>
 var statusRunning = false;
 var statusDownloaded = false;
@@ -265,6 +274,8 @@ function uploadData() {
         additional_information: $upload_additional_info.value,
         pcap_data: btoa(String.fromCharCode.apply(null, receivedBytes))
     }
+    $("#greyOut").toggle();
+    $("#notice").toggle();
     $.ajax({
         type: 'POST',
         url: 'https://spin.sidnlabs.nl/api/v1/pcap/upload/',
@@ -278,11 +289,19 @@ function uploadData() {
         contentType: "application/json",
         dataType: 'json'
     }).fail(function(err) {
-        if (err['responseJSON']) {
-            alert( "error: " + JSON.stringify(err['responseJSON'], null, 4) );
+        if (err['responseJSON'] && err['responseJSON'].constructor == Object) {
+            let err_msg = "";
+            Object.keys(err['responseJSON']).forEach(function(key) {
+                console.log(key, err['responseJSON'][key]);
+                err_msg = err_msg + key + ": " + err['responseJSON'][key] + "\n";
+            });
+            alert(err_msg);
         } else {
-            alert( "error: " + JSON.stringify(err, null, 4) );
+            alert( "error!: " + JSON.stringify(err, null, 4) );
         }
+    }).always(function() {
+        $("#greyOut").toggle();
+        $("#notice").toggle();
     });
 
 }
@@ -317,9 +336,9 @@ function getCurrentTimeString() {
 }
 
 function resizeWindow(element_id) {
-   var contentWidth = document.getElementById(element_id).offsetWidth;
-   var contentHeight = document.getElementById(element_id).offsetHeight;
-   window.resizeTo(contentWidth,contentHeight);
+   var contentWidth = 440;
+   var contentHeight = document.getElementById(element_id).offsetHeight + 60;
+   window.resizeTo(contentWidth, contentHeight);
 }
 
 function updateUIData() {
@@ -346,7 +365,18 @@ function stopCapture() {
 }
 
 function startTCPDump() {
-    $.get("/spin_api/capture_start?device={{=device_mac}}");
+    $.get("/spin_api/capture_start?device={{=device_mac}}").fail(function(msg) {
+        let error = JSON.stringify(msg)
+        if (msg['responseText']) {
+            if (msg['responseText']['error']) {
+                error = msg['responseText']['error']
+            } else {
+                error = JSON.stringify(msg['responseText'])
+            }
+        }
+        alert("Error starting capture: " + error);
+        mqttClient.disconnect();
+    });
 }
 function stopTCPDump() {
     $.get("/spin_api/capture_stop?device={{=device_mac}}").done(function() {
@@ -476,6 +506,39 @@ function connectToMQTT() {
 .datatable {
     width: 200px;
     padding-top: 10px;
+}
+
+.cnotice {
+}
+#notice {
+    border: 1px solid;
+    border-radius:5px;
+    padding: 10px;
+    box-shadow: 3px 6px #888888;
+    position: absolute;
+    top: 40%;
+    left: 20px;
+    background: #ffffff;
+    width: 392px;
+    z-index: 15;
+    display: none;
+}
+
+.darkClass
+{
+    background-color: white;
+    filter:alpha(opacity=50); /* IE */
+    opacity: 0.5; /* Safari, Opera */
+    -moz-opacity:0.50; /* FireFox */
+    z-index: 10;
+    height: 100%;
+    width: 100%;
+    background-repeat:no-repeat;
+    background-position:center;
+    position:absolute;
+    top: 0px;
+    left: 0px;
+    display: none;
 }
 
 </style>
