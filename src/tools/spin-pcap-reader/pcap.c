@@ -204,8 +204,8 @@ handle_dns(const u_char *cp, u_int len, int family, uint8_t *src_addr,
 }
 
 static void
-handle_l4(const struct ether_header *ep, const u_char *l4, u_int wirelen,
-    u_int caplen, u_int len, uint8_t ip_proto, pkt_info_t *pkt_info)
+handle_l4(const struct ether_header *ep, const u_char *l4, u_int len,
+    uint8_t ip_proto, pkt_info_t *pkt_info, int truncated)
 {
 	const struct tcphdr *tp;
 	const struct udphdr *up;
@@ -249,7 +249,7 @@ handle_l4(const struct ether_header *ep, const u_char *l4, u_int wirelen,
 	write_pkt_info_to_socket(pkt_info);
 
 	if (pkt_info->src_port == 53 || pkt_info->dest_port == 53) {
-		if (caplen != wirelen) {
+		if (truncated) {
 			warnx("not attempting to parse DNS packet");
 		} else {
 			if (up) {
@@ -272,17 +272,18 @@ trunc:
 
 static void
 #ifdef __OpenBSD__ /* XXX */
-handle_ip(const u_char *p, u_int wirelen, u_int caplen,
-    const struct ether_header *ep, const struct bpf_timeval *ts)
+handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
+    const struct bpf_timeval *ts)
 #else
-handle_ip(const u_char *p, u_int wirelen, u_int caplen,
-    const struct ether_header *ep, const struct timeval *ts)
+handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
+    const struct timeval *ts)
 #endif
 {
 	const struct ip *ip;
 	u_int hlen, len;
 	uint8_t ip_proto;
 	pkt_info_t pkt_info;
+	int truncated = 0;
 
 	if (((struct ip *)p)->ip_v != 4) {
 		DPRINTF("not an IP packet");
@@ -298,6 +299,7 @@ handle_ip(const u_char *p, u_int wirelen, u_int caplen,
 	if (caplen < len) {
 		warnx("Truncated IP packet: %d bytes missing", len - caplen);
 		len = caplen; // XXX
+		truncated = 1;
 	}
 	hlen = ip->ip_hl * 4;
 	if (hlen < sizeof(struct ip) || hlen > len) {
@@ -317,8 +319,8 @@ handle_ip(const u_char *p, u_int wirelen, u_int caplen,
 	pkt_info.payload_size = len; // XXX verify
 	pkt_info.packet_count = 1;
 
-	handle_l4(ep, (const u_char *)ip + hlen, wirelen, caplen, len, ip_proto,
-	    &pkt_info);
+	handle_l4(ep, (const u_char *)ip + hlen, len, ip_proto, &pkt_info,
+	    truncated);
 
 	return;
 
@@ -333,17 +335,18 @@ handle_ip(const u_char *p, u_int wirelen, u_int caplen,
 
 static void
 #ifdef __OpenBSD__ /* XXX */
-handle_ip6(const u_char *p, u_int wirelen, u_int caplen,
-    const struct ether_header *ep, const struct bpf_timeval *ts)
+handle_ip6(const u_char *p, u_int caplen, const struct ether_header *ep,
+    const struct bpf_timeval *ts)
 #else
-handle_ip6(const u_char *p, u_int wirelen, u_int caplen,
-    const struct ether_header *ep, const struct timeval *ts)
+handle_ip6(const u_char *p, u_int caplen, const struct ether_header *ep,
+    const struct timeval *ts)
 #endif
 {
 	const struct ip6_hdr *ip6;
 	u_int hlen, len;
 	uint8_t ip_proto;
 	pkt_info_t pkt_info;
+	int truncated = 0;
 
 	if (((struct ip *)p)->ip_v != 6) {
 		DPRINTF("not an IP packet");
@@ -368,6 +371,7 @@ handle_ip6(const u_char *p, u_int wirelen, u_int caplen,
 	if (caplen < len + hlen) {
 		warnx("Truncated IP6 packet: %d bytes missing",
 		    len + hlen - caplen);
+		truncated = 1;
 	}
 
 	// XXX extension headers
@@ -380,8 +384,8 @@ handle_ip6(const u_char *p, u_int wirelen, u_int caplen,
 	pkt_info.payload_size = len; // XXX verify
 	pkt_info.packet_count = 1;
 
-	handle_l4(ep, (const u_char *)ip6 + hlen, wirelen, caplen, len,
-	    ip_proto, &pkt_info);
+	handle_l4(ep, (const u_char *)ip6 + hlen, len, ip_proto, &pkt_info,
+	    truncated);
 
 	return;
 
@@ -460,11 +464,11 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 
 	switch (ether_type) {
 	case ETHERTYPE_IP:
-		handle_ip(p, h->len, caplen, ep, &h->ts);
+		handle_ip(p, caplen, ep, &h->ts);
 		break;
 
 	case ETHERTYPE_IPV6:
-		handle_ip6(p, h->len, caplen, ep, &h->ts);
+		handle_ip6(p, caplen, ep, &h->ts);
 		break;
 
 	case ETHERTYPE_ARP:
