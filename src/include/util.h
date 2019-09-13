@@ -47,7 +47,7 @@ void buffer_reset(buffer_t* buffer);
 size_t buffer_size(buffer_t* buffer);
 char* buffer_str(buffer_t* buffer);
 
-int buffer_write(buffer_t* buffer, const char* format, ...);
+int buffer_write(buffer_t* buffer, const char* format, ...) __attribute__((__format__ (printf, 2, 3)));
 
 int buffer_ok(buffer_t* buffer);
 
