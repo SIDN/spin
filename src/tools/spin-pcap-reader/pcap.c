@@ -210,6 +210,7 @@ handle_l4(const struct ether_header *ep, const u_char *l4, u_int len,
 	const struct tcphdr *tp;
 	const struct udphdr *up;
 	const u_char *cp;
+	u_int cplen;
 #ifdef unusedfornow
 	int tcp_initiated = 0;
 #endif
@@ -254,11 +255,13 @@ handle_l4(const struct ether_header *ep, const u_char *l4, u_int len,
 		} else {
 			if (up) {
 				cp = (const u_char *)(up + 1);
+				cplen = len - sizeof(struct udphdr);
 			} else {
 				cp = (const u_char *)(tp + 1);
+				cplen = len - sizeof(struct tcphdr);
 			}
 			TCHECK(*cp);
-			handle_dns(cp, len, pkt_info->family,
+			handle_dns(cp, cplen, pkt_info->family,
 			    pkt_info->src_addr, pkt_info->src_port,
 			    pkt_info->dest_port);
 		}
