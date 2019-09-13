@@ -205,7 +205,7 @@ handle_dns(const u_char *cp, u_int len, int family, uint8_t *src_addr,
 
 static void
 handle_l4(const struct ether_header *ep, const u_char *l4, u_int len,
-    uint8_t ip_proto, pkt_info_t *pkt_info, int truncated)
+    pkt_info_t *pkt_info, int truncated)
 {
 	const struct tcphdr *tp;
 	const struct udphdr *up;
@@ -215,7 +215,7 @@ handle_l4(const struct ether_header *ep, const u_char *l4, u_int len,
 	int tcp_initiated = 0;
 #endif
 
-	switch (ip_proto) {
+	switch (pkt_info->protocol) {
 	case IPPROTO_ICMPV6:
 		if (pkt_info->family == AF_INET6)
 			handle_icmp6(l4, ep);
@@ -243,7 +243,7 @@ handle_l4(const struct ether_header *ep, const u_char *l4, u_int len,
 		break;
 
 	default:
-		DPRINTF("Unknown protocol: %d", ip_proto);
+		DPRINTF("Unknown protocol: %d", pkt_info->protocol);
 		break;
 	}
 
@@ -284,7 +284,6 @@ handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
 {
 	const struct ip *ip;
 	u_int hlen, len;
-	uint8_t ip_proto;
 	pkt_info_t pkt_info;
 	int truncated = 0;
 
@@ -313,9 +312,7 @@ handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
 	}
 	len -= hlen;
 
-	ip_proto = ip->ip_p;
-
-	pkt_info.protocol = ip_proto;
+	pkt_info.protocol = ip->ip_p;
 	memset(pkt_info.src_addr, 0, 12);
 	memcpy(pkt_info.src_addr + 12, &ip->ip_src, sizeof(ip->ip_src));
 	memset(pkt_info.dest_addr, 0, 12);
@@ -324,8 +321,7 @@ handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
 	pkt_info.payload_size = len; // XXX verify
 	pkt_info.packet_count = 1;
 
-	handle_l4(ep, (const u_char *)ip + hlen, len, ip_proto, &pkt_info,
-	    truncated);
+	handle_l4(ep, (const u_char *)ip + hlen, len, &pkt_info, truncated);
 
 	return;
 
@@ -349,7 +345,6 @@ handle_ip6(const u_char *p, u_int caplen, const struct ether_header *ep,
 {
 	const struct ip6_hdr *ip6;
 	u_int hlen, len;
-	uint8_t ip_proto;
 	pkt_info_t pkt_info;
 	int truncated = 0;
 
@@ -382,17 +377,14 @@ handle_ip6(const u_char *p, u_int caplen, const struct ether_header *ep,
 	}
 
 	// XXX extension headers
-	ip_proto = ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
-
-	pkt_info.protocol = ip_proto;
+	pkt_info.protocol = ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
 	memcpy(pkt_info.src_addr, &ip6->ip6_src, sizeof(ip6->ip6_src));
 	memcpy(pkt_info.dest_addr, &ip6->ip6_dst, sizeof(ip6->ip6_dst));
 
 	pkt_info.payload_size = len; // XXX verify
 	pkt_info.packet_count = 1;
 
-	handle_l4(ep, (const u_char *)ip6 + hlen, len, ip_proto, &pkt_info,
-	    truncated);
+	handle_l4(ep, (const u_char *)ip6 + hlen, len, &pkt_info, truncated);
 
 	return;
 
