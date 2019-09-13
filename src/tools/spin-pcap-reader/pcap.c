@@ -270,7 +270,7 @@ handle_l4(const struct ether_header *ep, const u_char *l4, u_int len,
 	return;
 
 trunc:
-	warnx("TRUNCATED\n");
+	warnx("TRUNCATED");
 }
 
 static void
@@ -308,7 +308,7 @@ handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
 	hlen = ip->ip_hl * 4;
 	if (hlen < sizeof(struct ip) || hlen > len) {
 		warnx("Bad header length: %d", hlen);
-		goto out;
+		return;
 	}
 	len -= hlen;
 
@@ -326,12 +326,7 @@ handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
 	return;
 
  trunc:
-	warnx("TRUNCATED\n");
-	return;
-
- out:
-	return; // XXX
-
+	warnx("TRUNCATED");
 }
 
 static void
@@ -361,11 +356,11 @@ handle_ip6(const u_char *p, u_int caplen, const struct ether_header *ep,
 
 	if (caplen < sizeof(struct ip6_hdr)) {
 		warnx("Truncated IPv6 packet: %d", caplen);
-		goto out;
+		return;
 	}
 	if ((ip6->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
 		warnx("Bad IPv6 version: %u", ip6->ip6_vfc >> 4);
-		goto out;
+		return;
 	}
 	hlen = sizeof(struct ip6_hdr);
 
@@ -385,16 +380,6 @@ handle_ip6(const u_char *p, u_int caplen, const struct ether_header *ep,
 	pkt_info.packet_count = 1;
 
 	handle_l4(ep, (const u_char *)ip6 + hlen, len, &pkt_info, truncated);
-
-	return;
-
- trunc:
-	warnx("TRUNCATED\n");
-	return;
-
- out:
-	return; // XXX
-
 }
 
 static void
@@ -448,7 +433,7 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 
 	if ((snapend - p) < sizeof(struct ether_header)) {
 		warnx("[|ether]");
-		goto out;
+		return;
 	}
 
 	ep = (const struct ether_header *)p;
@@ -478,9 +463,6 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 		DPRINTF("unknown ether type");
 		break;
 	}
-
- out:
-	return; // XXX
 }
 
 int
