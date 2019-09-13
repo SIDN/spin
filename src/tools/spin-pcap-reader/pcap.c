@@ -292,6 +292,8 @@ handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
 
 	ip = (struct ip *)p;
 
+	memset(&pkt_info, 0, sizeof(pkt_info_t));
+
 	pkt_info.family = AF_INET;
 
 	TCHECK(*ip);
@@ -354,6 +356,8 @@ handle_ip6(const u_char *p, u_int caplen, const struct ether_header *ep,
 	}
 
 	ip6 = (struct ip6_hdr *)p;
+
+	memset(&pkt_info, 0, sizeof(pkt_info_t));
 
 	pkt_info.family = AF_INET6;
 
