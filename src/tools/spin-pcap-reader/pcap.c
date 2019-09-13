@@ -318,7 +318,7 @@ handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
 	memset(pkt_info.dest_addr, 0, 12);
 	memcpy(pkt_info.dest_addr + 12, &ip->ip_dst, sizeof(ip->ip_dst));
 
-	pkt_info.payload_size = len; // XXX verify
+	pkt_info.payload_size = len;
 	pkt_info.packet_count = 1;
 
 	handle_l4(ep, (const u_char *)ip + hlen, len, &pkt_info, truncated);
@@ -381,7 +381,7 @@ handle_ip6(const u_char *p, u_int caplen, const struct ether_header *ep,
 	memcpy(pkt_info.src_addr, &ip6->ip6_src, sizeof(ip6->ip6_src));
 	memcpy(pkt_info.dest_addr, &ip6->ip6_dst, sizeof(ip6->ip6_dst));
 
-	pkt_info.payload_size = len; // XXX verify
+	pkt_info.payload_size = len;
 	pkt_info.packet_count = 1;
 
 	handle_l4(ep, (const u_char *)ip6 + hlen, len, &pkt_info, truncated);
