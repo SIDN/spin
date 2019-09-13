@@ -115,7 +115,7 @@ void do_mosq_message(struct mosquitto* mosq, void* user_data, const struct mosqu
     char *result;
 
     if (strcmp(msg->topic, mqtt_channel_jsonrpc_q) == 0) {
-        spin_log(LOG_DEBUG, "Rpc channel: %s\n", msg->payload);
+        spin_log(LOG_DEBUG, "Rpc channel: %s\n", (char *)msg->payload);
         result = call_string_jsonrpc(msg->payload);
         if (result != NULL) {
             pubsub_publish(mqtt_channel_jsonrpc_a, strlen(result), result, 0);

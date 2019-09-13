@@ -129,7 +129,7 @@ wf_mainloop(void *arg, int data, int timeout) {
 
     spin_log(LOG_DEBUG, "Mainloop table\n");
     for (i=0; i<n_mnr; i++) {
-        spin_log(LOG_DEBUG, "MLE: %s %d(%d) %d\n", mnr[i].mnr_name, mnr[i].mnr_pollnumber, mnr[i].mnr_fd, mnr[i].mnr_nxttime.tv_usec);
+        spin_log(LOG_DEBUG, "MLE: %s %d(%d) %ld\n", mnr[i].mnr_name, mnr[i].mnr_pollnumber, mnr[i].mnr_fd, mnr[i].mnr_nxttime.tv_usec);
     }
 }
 

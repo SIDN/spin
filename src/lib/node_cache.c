@@ -644,7 +644,7 @@ void node_cache_clean(node_cache_t* node_cache, uint32_t older_than) {
         }
         cur = next;
     }
-    spin_log(LOG_DEBUG, "[node_cache] Removed %u entries older than %u, size now %u\n", deleted, older_than, tree_size(node_cache->nodes));
+    spin_log(LOG_DEBUG, "[node_cache] Removed %lu entries older than %u, size now %u\n", deleted, older_than, tree_size(node_cache->nodes));
 
     cache_tree_print(node_cache);
 }

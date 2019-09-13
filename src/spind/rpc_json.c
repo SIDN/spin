@@ -87,7 +87,7 @@ spin_data rpc_json_callreg(spin_data call_info, char *method, spin_data jsonpara
             jsonresult = NULL;
             break;
         default: // Cannot happen
-            spin_log(LOG_ERR, "Unknown JSON RPC result type %s\n", callreg_res.rpc_desc.rpca_type);
+            spin_log(LOG_ERR, "Unknown JSON RPC result type %d\n", callreg_res.rpc_desc.rpca_type);
             jsonresult = NULL;
         }
 
