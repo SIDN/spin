@@ -1086,10 +1086,9 @@ function addBlocked(from, to) {
     if (contains(ignoreList, from) || contains(ignoreList, to)) {
         return;
     }
-
-    // from["lastseen"] is the existing lastseen value, so we update
-    // the from node with the lastseen value of packet too
-    var timestamp = to["lastseen"];
+    // Calculate the 'lastseen' timestamp from our own clock
+    var timestamp = Math.floor(Date.now() / 1000);
+    console.log("[XX] ADDBLOCKED FROM: " + from.id + " ts: " + timestamp)
     addNode(timestamp, from, false, 1, 1, "to " + to, "source");
     addNode(timestamp, to, false, 1, 1, "from " + from, "blocked");
     addEdge(from, to, colour_blocked, true);

@@ -61,6 +61,8 @@ class JsonRPCClient(object):
             print("Error from server!")
             print("Error code: %d" % result['error']['code'])
             print("Error message: %s" % result['error']['message'])
+        elif 'result' in result:
+            print(json.dumps(result['result'], indent=2))
         else:
             print(json.dumps(result, indent=2))
 
