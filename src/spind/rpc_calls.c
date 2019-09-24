@@ -197,6 +197,10 @@ handle_node_info(node_cache_t* node_cache, char *buf, int size) {
 #define NODE_FILENAME_DIR "/etc/spin/nodestore"
 #define NODEPAIRFILE "/etc/spin/nodepair.list"
 
+#ifndef PATH_MAX
+#define PATH_MAX 256
+#endif
+
 static char node_filename[PATH_MAX];
 
 static char *

@@ -339,7 +339,8 @@ void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
 }
 
 void nfqroutine_close(char* name) {
-    for (int i=0; i < n_nfr; i++) {
+    int i;
+    for (i=0; i < n_nfr; i++) {
         if (strcmp(nfr[i].nfr_name, name) == 0) {
             nfq_destroy_queue(nfr[i].nfr_qh);
         }

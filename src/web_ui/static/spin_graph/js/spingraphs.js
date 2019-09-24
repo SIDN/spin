@@ -512,7 +512,7 @@ function initGraphs() {
         }
         var url = window.location.protocol + "//" + window.location.hostname + portstr +
         "/spin_api/capture?device="+name;
-        var w = window.open(url, name, "width=440,  height=520, scrollbars=yes");
+        var w = window.open(url, name, "width=444,  height=534, scrollbars=yes");
     });
 
     $("#block-flow-button").button().on("click", function (evt) {

@@ -246,7 +246,8 @@ void nflogroutine_register(char *name, nflogfunc wf, void *arg, int group_number
 }
 
 void nflogroutine_close(char* name) {
-    for (int i=0; i < n_nfr; i++) {
+    int i;
+    for (i=0; i < n_nfr; i++) {
         if (strcmp(nfr[i].nfr_name, name) == 0) {
             nflog_unbind_group(nfr[i].nfr_qh);
         }
