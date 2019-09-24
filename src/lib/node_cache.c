@@ -666,14 +666,18 @@ static void
 add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
     char* mac;
     char* name;
+    char ip_str[INET6_ADDRSTRLEN];
+
     STAT_COUNTER(macctr, mac-found-by-read, STAT_TOTAL);
 
+    memset(ip_str, 0, INET6_ADDRSTRLEN);
+    spin_ntop(ip_str, ip, INET6_ADDRSTRLEN);
     mac = arp_table_find_by_ip(node_cache->arp_table, ip);
     if (!mac) {
         // todo: incorporate this in standard lookup?
         arp_table_read(node_cache->arp_table);
         mac = arp_table_find_by_ip(node_cache->arp_table, ip);
-        spin_log(LOG_DEBUG, "[ARP] mac for ip %s: %s\n", ip, mac);
+        spin_log(LOG_DEBUG, "[ARP] mac for ip %s: %s\n", ip_str, mac);
         STAT_VALUE(macctr, mac != NULL);
     }
     if (mac) {
@@ -690,7 +694,7 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
             node_set_name(node, name);
         }
     }
-    // spin_log(LOG_DEBUG, "[XX] mac at %p\n", node->mac);
+    // spin_log(LOG_DEBUG, "[XX] mac at %p: %s\n", node->mac, node->mac);
 }
 
 void
@@ -824,6 +828,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
         node = node_create(0);
         node_set_modified(node, timestamp);
         node_add_ip(node, &ip);
+        add_mac_and_name(node_cache, node, &ip);
         node_cache_add_node(node_cache, node);
     }
 }
