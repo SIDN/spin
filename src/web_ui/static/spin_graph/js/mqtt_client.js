@@ -102,11 +102,14 @@ function sendCommand(command, argument) {
  * This also checks whether the result has, well, a result, or an
  * error. For now, we simply alert if there is an error, with the
  * full error response.
+ * retry_count is used internally to keep track of the number of retries
+ * attempted in case of a 502 error
  */
-function sendRPCCommand(procedure, params, success_callback) {
+function sendRPCCommand(procedure, params, success_callback, retry_count=0) {
     var xhttp = new XMLHttpRequest();
     let rpc_endpoint = server_data.api_base_url + "/spin_api/jsonrpc";
     xhttp.open("POST", rpc_endpoint, true);
+    xhttp.timeout = 5000; // Start with a timeout of 5 seconds
     xhttp.setRequestHeader("Content-Type", "application/json");
     let command = {
         "jsonrpc": "2.0",
@@ -117,7 +120,11 @@ function sendRPCCommand(procedure, params, success_callback) {
     //xhttp.onerror = sendRPCCommandError;
     xhttp.onload = function () {
         //alert("[XX] status: " + xhttp.status);
-        if (xhttp.status !== 200) {
+	if (xhttp.status === 502 && retry_count < 10) {
+	    // This may be just a timeout or a proxy short read
+	    // let's simply try again
+	    sendRPCCommand(procedure, params, success_callback, retry_count+1);
+        } else if (xhttp.status !== 200) {
             alert("HTTP error " + xhttp.status + " from SPIN RPC server!");
             console.log(xhttp.response);
         } else {
@@ -131,6 +138,14 @@ function sendRPCCommand(procedure, params, success_callback) {
                     success_callback(response.result);
                 }
             }
+        }
+    };
+    xhttp.ontimeout = function() {
+        // client-side timeout, lets try it again, but increase the retry counter
+        if (retry_count < 10) {
+            sendRPCCommand(procedure, params, success_callback, retry_count+1);
+        } else {
+            alert("Too many timeouts on trying to contact SPIN RPC server");
         }
     };
     xhttp.send(JSON.stringify(command));
