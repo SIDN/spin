@@ -84,8 +84,8 @@ int cmp_strs(size_t size_a, const void* key_a, size_t size_b, const void* key_b)
 int cmp_ips(size_t size_a, const void* key_a, size_t size_b, const void* key_b) {
     ip_t* ip_a = (ip_t*) key_a;
     ip_t* ip_b = (ip_t*) key_b;
-    assertf((size_a == sizeof(ip_t)), "key_a is not of size of ip_t but %lu", size_a);
-    assertf((size_b == sizeof(ip_t)), "key_b is not of size of ip_t but %lu", size_b);
+    assertf((size_a == sizeof(ip_t)), "key_a is not of size of ip_t but %zu", size_a);
+    assertf((size_b == sizeof(ip_t)), "key_b is not of size of ip_t but %zu", size_b);
     if (ip_a->family < ip_b->family) {
         return -1;
     } else if (ip_a->family > ip_b->family) {

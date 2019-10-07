@@ -20,6 +20,9 @@ For a screenshot, see [here](/doc/images/prototype-20170103.png?raw=true).
 
 The SPIN prototype is meant to be run on an OpenWRT device, but can also be compiled and run on a Linux system.
 
+We have been running it sucessfully on a Debian system, and are working on instructions for Debian and/or Raspbian.
+
+
 ## On (Linux) PC
 
 Build dependencies:
@@ -28,7 +31,12 @@ Build dependencies:
 - make
 - autoconf
 - libnfnetlink-dev
-- linux-headers-&lt;version&gt;
+- libnetfilter-conntrack-dev
+- libnetfilter-queue-dev
+- libnetfilter-log-dev
+- libldns-dev
+
+(TODO is this still needed?) - linux-headers-&lt;version&gt;
 
     `apt-get install gcc make autoconf libnfnetlink-dev libmnl-dev libnetfilter-queue-dev`
 
@@ -39,17 +47,18 @@ Library dependencies:
 
     `apt-get install libnfnetlink0 libmnl0`
 
-Lua dependencies (for client tooling and message broker):
+Lua dependencies (for client tooling, and web API):
 
 - libmosquitto-dev
 - lua 5.1 (and luarocks for easy install of libs below)
 - lua-mosquitto
-- lua-posix
+- lua-minittp
+- lua-websockets
 - luabitop
 - luaposix
 
     `apt-get install libmosquitto-dev`
-    `luarocks install lua-mosquitto luabitop luaposix`
+    `luarocks install lua-mosquitto luabitop luaposix lua-minittp`
 
 
 Runtime dependencies:

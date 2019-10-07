@@ -411,7 +411,6 @@ function handler:handle_rpc_call(request, response)
                 -- We return an HTTP 200, but with the content set to
                 -- an error
                 response.content = json.encode({error = err})
-                conn:close()
                 return response
             else
                 result, err = conn:call(request.post_data)
