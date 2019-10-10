@@ -18,14 +18,15 @@ For a screenshot, see [here](/doc/images/prototype-20170103.png?raw=true).
 
 # Building the source code
 
-The SPIN prototype is meant to be run on an OpenWRT device, but can also be compiled and run on a Linux system.
+The SPIN prototype is tested on OpenWRT, Debian and Raspbian systems.
 
-We have been running it sucessfully on a Debian system, and are working on instructions for Debian and/or Raspbian.
-
+It also comes bundled with the Valibox router image software, available
+as pre-built images for GL-Inet AR-150, VirtualBox, and the Raspberry
+Pi 3. See the [Valibox website](https://valibox.sidnlabs.nl)
 
 ## On (Linux) PC
 
-Build dependencies:
+### Dependencies
 
 - gcc
 - make
@@ -60,24 +61,41 @@ Lua dependencies (for client tooling, and web API):
     `apt-get install libmosquitto-dev`
     `luarocks install lua-mosquitto luabitop luaposix lua-minittp`
 
-
 Runtime dependencies:
 - mosquitto (or any MQTT software that supports websockets as well)
+- kernel modules for conntrack and netfilter
 
+### Building
 
 Run in the source dir:
 
 ```
     autoreconf --install
-    ./configure
-    make
+    mkdir build
+    (cd build; ../configure && make)
 ```
+
+
+### Running from source tree
+
+To run SPIN, you need to run two daemons; spind to collect data, and spin_webui for the traffic monitor to talk to. You'll also need an MQTT server, such as mosquitto, wich websockets support on port 1884 (as well as plain MQTT on port 1883).
+
+The SPIN system is most useful when run on a gateway; there are several instructions on the web on how to set up a Debian system as a gateway. One example is [https://gridscale.io/en/community/tutorials/debian-router-gateway/](https://gridscale.io/en/community/tutorials/debian-router-gateway/).
+
+To run spind from the source tree, with stdout output and debug logging, use:
+    `(sudo) (cd ./src/build/spind/; spind -o -d)`
+
+To run the webserver, use:
+    `(sudo) (cd ./src/web_ui/; minittp-server -a 127.0.0.1 -p 8080 ./spin_webui.lua`
+
+
+### System
 
 After this step is complete, you can find the spin daemon in the spind directory. The tools/spin_print and tools/spin_config tools are supporting tools for older versions and deprectaed in the latest release.
 
 SPIN sends its data to MQTT, which any MQTT client can then read. A web-based client ('the bubble app') can be found in `src/web_ui/static/spin_api/`, the main HTML file is `graph.html`, and depending on where you host it, you can access it from a browser with the URL `file://<path>/graph.html?mqtt_host=<ip address of MQTT server>`.
 
-src/web_ui also contains a small web API server that uses lua-minithttp, with currently a limited subset of the intended functionality; we are working on RPC calls that will then be exposed to the web API.
+Commands and other data requests are sent to spin through a Web API, which is run using lua-minittp. All RPC calls are exposed through this as well.
 
 ## For OpenWRT
 
@@ -106,13 +124,14 @@ http://192.168.8.1/www/spin/graph.html to see it in action.
 
 When installed locally, a few manual steps are required:
 
+(0. Configure your system to be a gateway, example instructions: [https://gridscale.io/en/community/tutorials/debian-router-gateway/](https://gridscale.io/en/community/tutorials/debian-router-gateway/))
 1. Configure and start an MQTT service; this needs to listen to port 1883 (mqtt) and 1884 (websockets protocol).
 2. Load the relevant kernel modules: `modprobe nf_conntrack_ipv4 nf_conntrack_ipv6 nfnetlink_log nfnetlink_queue`
 3. Enable conntrack accounting: `sysctl net.netfilter.nf_conntrack_acct=1`
-4. Start the spin daemon `spind/spind -l -o -m <mqtt_host>`
-5. Load the spin bubble app by visiting `file::///<path>/web_ui/static/spin_api/graph.html?mqtt_host=<mqtt host>`
+4. Start the spin daemon `(sudo) (cd ./src/build/spind/; spind -o -d)`
+5. Start the spin Web daemon `(sudo) (cd ./src/web_ui/; minittp-server -a 127.0.0.1 -p 8080 ./spin_webui.lua`
+5. Load the spin bubble app by visiting `http://127.0.0.1:8080/spin_graph/graph.html?mqtt_host=127.0.0.1`
 
-mqtt host defaults to 127.0.0.1 for the daemon, and to 192.168.8.1 for graph.html
 
 # High-level technical overview
 
