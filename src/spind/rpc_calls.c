@@ -8,7 +8,8 @@
 #include "core2block.h"
 #include "core2pubsub.h"
 #include "ipl.h"
-#include "rpc_json.h"
+#include "dots.h"
+#include "spinhook.h"
 #include "spinhook.h"
 #include "spin_log.h"
 #include "statistics.h"
@@ -756,6 +757,29 @@ list_rpc_calls_func(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
 }
 */
 
+rpc_arg_desc_t dots_signal_args[] = {
+    { "dots_signal", RPCAT_COMPLEX },
+};
+
+int
+rpc_dots_signal(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
+    node_cache_t* node_cache = (node_cache_t*)cb;
+    spin_data message = args[0].rpca_cvalue;
+    char* strxx = args[0].rpca_svalue;
+    int ixx = args[0].rpca_ivalue;
+    spin_log(LOG_DEBUG, "[XX] other vals: s %s i %i\n", strxx, ixx);
+
+    int rcode;
+    char* error = NULL;
+    // TODO: prepare response message and pass it along
+
+    rcode = process_dots_signal(node_cache, message, &error);
+    if (error != NULL) {
+        result->rpca_svalue = error;
+    }
+    return rcode;
+}
+
 
 /*
  * Please note: make sure you specify the return value of the RPC method well;
@@ -791,6 +815,7 @@ init_rpcs(node_cache_t *node_cache) {
     rpc_register("remove_iplist_ip", remove_iplist_ip,  (void *) node_cache, 2, iplist_addremove_ip_args, RPCAT_NONE);
     rpc_register("list_iplist", list_iplist_ips, 0, 1, iplist_list_args, RPCAT_COMPLEX);
     rpc_register("reset_iplist_ignore", reset_iplist_ignore, 0, 0, 0, RPCAT_NONE);
+    rpc_register("dots_signal", rpc_dots_signal, (void *) node_cache, 1, dots_signal_args, RPCAT_NONE);
 
     register_internal_functions();
 }

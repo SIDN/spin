@@ -13,6 +13,8 @@ spind_SOURCES = spind.c \
                 core2extsrc.c \
                 core2nflog_dns.c \
                 core2pubsub.c \
+                dots.c \
+                dots.h \
                 dnshooks.c \
                 mainloop.c \
                 mainloop.h \

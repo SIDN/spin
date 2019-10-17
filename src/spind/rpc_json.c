@@ -39,6 +39,9 @@ spin_data rpc_json_callreg(spin_data call_info, char *method, spin_data jsonpara
     int res;
 
     nargs = 0;
+    char* tmp = cJSON_Print(jsonparams);
+    printf("[XX] JSON REQUEST: %s\n", tmp);
+    free(tmp);
 
     if (jsonparams != NULL && cJSON_IsObject(jsonparams)) {
         // Iterate over Object
@@ -52,8 +55,9 @@ spin_data rpc_json_callreg(spin_data call_info, char *method, spin_data jsonpara
                 callreg_args[nargs].rpc_val.rpca_svalue = param->valuestring;
             } else {
                 callreg_args[nargs].rpc_desc.rpca_type = RPCAT_COMPLEX;
-                // This must be checked !! TODO
-                callreg_args[nargs].rpc_val.rpca_cvalue = param->child;
+                // In the case of a 'complex' type, put the param *itself*
+                // in rpc_val; (it will be the JSON object)
+                callreg_args[nargs].rpc_val.rpca_cvalue = param;
             }
             nargs++;
         }
