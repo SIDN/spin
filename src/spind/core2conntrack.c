@@ -73,10 +73,9 @@ static int check_ignore_local(pkt_info_t* pkt, node_cache_t* node_cache) {
     STAT_COUNTER(ctr, ignore-local, STAT_TOTAL);
     int result;
 
-    ip.family = pkt->family;
-    memcpy(ip.addr, pkt->src_addr, 16);
+    copy_ip_data(&ip, pkt->family, 0, pkt->src_addr);
     src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
-    memcpy(ip.addr, pkt->dest_addr, 16);
+    copy_ip_data(&ip, pkt->family, 0, pkt->dest_addr);
     dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
     result = (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL));
     STAT_VALUE(ctr, result);
@@ -116,10 +115,9 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
     if (pkt_info.packet_count > 0 || pkt_info.payload_size > 0) {
         node_cache_add_pkt_info(cb_data->node_cache, &pkt_info, now);
 
-        ip.family = pkt_info.family;
-        memcpy(ip.addr, pkt_info.src_addr, 16);
+        copy_ip_data(&ip, pkt_info.family, 0, pkt_info.src_addr);
         src_node = node_cache_find_by_ip(cb_data->node_cache, sizeof(ip_t), &ip);
-        memcpy(ip.addr, pkt_info.dest_addr, 16);
+        copy_ip_data(&ip, pkt_info.family, 0, pkt_info.dest_addr);
         dest_node = node_cache_find_by_ip(cb_data->node_cache, sizeof(ip_t), &ip);
 
         if (src_node != NULL && dest_node != NULL) {

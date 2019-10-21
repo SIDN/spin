@@ -104,7 +104,6 @@ int ip_in_ignore_list(ip_t* ip) {
 int addr_in_ignore_list(int family, uint8_t* addr) {
     ip_t ip;
 
-    ip.family = family;
-    memcpy(ip.addr, addr, 16);
+    copy_ip_data(&ip, family, 0, addr);
     return ip_in_ignore_list(&ip);
 }
