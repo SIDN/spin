@@ -83,6 +83,10 @@ int get_config_entries() {
         }
 
         equalsptr = strchr(line, '=');
+        if (equalsptr == NULL) {
+            spin_log(LOG_ERR, "Bad config line, no = character\n");
+            continue;
+        }
 
         beginofkeyw = line;
 
@@ -91,6 +95,7 @@ int get_config_entries() {
         }
 
         endofkeyw = equalsptr -1;
+        printf("[XX] endofkeyw: %p, equalsptr: %p\n", endofkeyw, equalsptr);
         if (endofkeyw < line) {
             spin_log(LOG_ERR, "Conf line starts with =\n");
             continue;

@@ -307,6 +307,8 @@ int main(int argc, char** argv) {
 
     mosq_host = spinconfig_pubsub_host();
     mosq_port = spinconfig_pubsub_port();
+
+    printf("[XX] mosq host: %s\n", mosq_host);
     stop_on_error = 0;
 
     while ((c = getopt (argc, argv, "dehlm:op:v")) != -1) {
