@@ -86,15 +86,60 @@ int cmp_ips(size_t size_a, const void* key_a, size_t size_b, const void* key_b) 
     ip_t* ip_b = (ip_t*) key_b;
     assertf((size_a == sizeof(ip_t)), "key_a is not of size of ip_t but %zu", size_a);
     assertf((size_b == sizeof(ip_t)), "key_b is not of size of ip_t but %zu", size_b);
+    int result;
     if (ip_a->family < ip_b->family) {
         return -1;
     } else if (ip_a->family > ip_b->family) {
         return 1;
     } else {
-        return memcmp(ip_a->addr, ip_b->addr, 16);
+        result = memcmp(ip_a->addr, ip_b->addr, 16);
     }
+    if (result == 0) {
+        if (ip_a->netmask < ip_b->netmask) {
+            return -1;
+        } else if (ip_a->netmask > ip_b->netmask) {
+            return 1;
+        }
+    }
+    return result;
 }
 
+// returns 1 if the ip address falls under the network
+// as marked by the networks netmask (ip addr's netmask is ignored)
+// returns 0 if not
+int ip_in_net(ip_t* ip, ip_t* net) {
+    // write out the prefix, and use is as a bitmask;
+    // note the way we store ipv4-addresses, making the bitmask essentially
+    // bitmask+96
+    // potential optimization: we can do this without copies
+    int i = 0;
+    uint8_t addr_ip[16];
+    uint8_t addr_net[16];
+    uint8_t netmask = net->netmask;
+    if (ip->family != net->family) {
+        return -1;
+    }
+    if (ip->family == AF_INET) {
+        netmask += 96;
+    }
+    for (i=0; i<16; i++) {
+        if (netmask >= 8) {
+            addr_ip[i] = ip->addr[i];
+            addr_net[i] = net->addr[i];
+            netmask -= 8;
+        } else if (netmask > 0) {
+            uint8_t bitmask = ~(0xff >> netmask);
+            addr_ip[i] = ip->addr[i] & bitmask;
+            addr_net[i] = net->addr[i] & bitmask;
+            netmask = 0;
+        } else {
+            addr_ip[i] = 0;
+            addr_net[i] = 0;
+        }
+    }
+
+    return (memcmp(addr_ip, addr_net, 16) == 0);
+}
 
 // see above
 // note, this does not take label order into account, it is just on pure bytes
@@ -124,19 +169,37 @@ int cmp_pktinfos(size_t size_a, const void* a, size_t size_b, const void* b) {
 }
 
 int
-spin_pton(ip_t* ip, const char* ip_str) {
+spin_pton(ip_t* ip, const char* ip_str_arg) {
+    char ip_str[140];
+    char* netmask_str;
+
     if (ip == NULL) {
         return 0;
+    }
+
+    strncpy(ip_str, ip_str_arg, 139);
+    netmask_str = index(ip_str, '/');
+    if (netmask_str != NULL) {
+        *netmask_str++ = '\0';
+        ip->netmask = atoi(netmask_str);
+    } else {
+        ip->netmask = 0;
     }
 
     int result = inet_pton(AF_INET6, ip_str, &ip->addr);
     if (result == 1) {
         ip->family = (uint8_t)AF_INET6;
+        if (ip->netmask == 0) {
+            ip->netmask = 128;
+        }
     } else {
         result = inet_pton(AF_INET, ip_str, &ip->addr[12]);
         if (result == 1) {
             ip->family = AF_INET;
             memset(ip->addr, 0, 12);
+            if (ip->netmask == 0) {
+                ip->netmask = 32;
+            }
         } else {
             return 0;
         }
@@ -333,4 +396,16 @@ void hexdump(uint8_t* data, unsigned int size) {
         spin_log(LOG_DEBUG, "%02x ", data[i]);
     }
     spin_log(LOG_DEBUG, "\n");
+}
+
+void copy_ip_data(ip_t* dest, int family, int netmask, void* ip_data) {
+    dest->family = family;
+    memcpy(dest->addr, ip_data, 16);
+    if (netmask > 0) {
+        dest->netmask = netmask;
+    } else if (family == AF_INET6) {
+        dest->netmask = 128;
+    } else {
+        dest->netmask = 32;
+    }
 }

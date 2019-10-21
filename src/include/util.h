@@ -20,6 +20,7 @@ int cmp_pktinfos(size_t size_a, const void* a, size_t size_b, const void* b);
 
 typedef struct {
     uint8_t family;
+    uint8_t netmask;
     uint8_t addr[16];
 } ip_t;
 
@@ -76,6 +77,18 @@ int read_ip_tree(tree_t* dest, const char* filename);
 
 void hexdump(uint8_t* data, unsigned int size);
 
+int ip_in_net(ip_t* ip, ip_t* net);
 
+/*
+ * Set IP address data in an ip_t structure
+ * The dest MUST be allocated with sizeof(ip_t) bytes of memory
+ * 
+ * If netmask is not 0, it is set too
+ * If netmask is 0, it is set to either 32 (ipv4) or 128 (ipv6)
+ * ip_data should point to a memory structure that has the ip address
+ * in ip_t format; e.g. 16 octets of data for ipv6, or 12 zero bytes
+ * followed by 4 octets of data for ipv4
+ */
+void copy_ip_data(ip_t* dest, int family, int netmask, void* ip_data);
 
 #endif // SPIN_UTIL_H

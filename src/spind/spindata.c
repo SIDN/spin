@@ -197,10 +197,14 @@ spin_data_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info) {
 
     STAT_VALUE(ctr, 1);
 
-    ip.family = pkt_info->family;
-    memcpy(ip.addr, pkt_info->src_addr, 16);
+    copy_ip_data(&ip, pkt_info->family, 0, pkt_info->src_addr);
+    if (ip.family == AF_INET) {
+        ip.netmask = 32;
+    } else {
+        ip.netmask = 128;
+    }
     src_node = lookup_ip(node_cache, &ip, pkt_info, "src");
-    memcpy(ip.addr, pkt_info->dest_addr, 16);
+    copy_ip_data(&ip, pkt_info->family, 0, pkt_info->dest_addr);
     dest_node = lookup_ip(node_cache, &ip, pkt_info, "dst");
     if (src_node == NULL || dest_node == NULL) {
         return 0;
@@ -237,8 +241,7 @@ spin_data_dns_query_pkt_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_i
 
     dns_dname2str(dname_str, dns_pkt_info->dname, DNAME_SIZE);
 
-    ip.family = dns_pkt_info->family;
-    memcpy(ip.addr, dns_pkt_info->ip, 16);
+    copy_ip_data(&ip, dns_pkt_info->family, 0, dns_pkt_info->ip);
 
     spin_log(LOG_DEBUG, "[XX] creating dns query command\n");
 

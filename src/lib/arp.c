@@ -20,9 +20,8 @@ void arp_table_destroy(arp_table_t* arp_table) {
 static
 void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
     ip_t ip;
-
     if (!spin_pton(&ip, ip_str)) {
-        //spin_log(LOG_ERR, "[XX] error, bad address, ignoring\n");
+        spin_log(LOG_ERR, "bad address, ignoring\n");
         return;
     }
 

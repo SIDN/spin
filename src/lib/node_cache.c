@@ -804,10 +804,9 @@ void node_cache_add_pkt_info(node_cache_t* node_cache, pkt_info_t* pkt_info, uin
 
     STAT_VALUE(ctr, 1);
 
-    ip.family = pkt_info->family;
-    memcpy(ip.addr, pkt_info->src_addr, 16);
+    copy_ip_data(&ip, pkt_info->family, 0, pkt_info->src_addr);
     node_cache_add_ip_info(node_cache, &ip, timestamp);
-    memcpy(ip.addr, pkt_info->dest_addr, 16);
+    copy_ip_data(&ip, pkt_info->family, 0, pkt_info->dest_addr);
     node_cache_add_ip_info(node_cache, &ip, timestamp);
 }
 
@@ -818,8 +817,7 @@ void node_cache_add_dns_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt, 
     STAT_COUNTER(ctr, add-dns-info, STAT_TOTAL);
 
     STAT_VALUE(ctr, 1);
-    ip.family = dns_pkt->family;
-    memcpy(ip.addr, dns_pkt->ip, 16);
+    copy_ip_data(&ip, dns_pkt->family, 0, dns_pkt->ip);
     dns_dname2str(dname_str, dns_pkt->dname, 512);
 
     node_t* node = node_create(0);
@@ -836,8 +834,7 @@ void node_cache_add_dns_query_info(node_cache_t* node_cache, dns_pkt_info_t* dns
     ip_t ip;
     STAT_COUNTER(ctr, add-dns-query, STAT_TOTAL);
 
-    ip.family = dns_pkt->family;
-    memcpy(ip.addr, dns_pkt->ip, 16);
+    copy_ip_data(&ip, dns_pkt->family, 0, dns_pkt->ip);
     dns_dname2str(dname_str, dns_pkt->dname, 512);
 
     // add the node with the domain name; if it is not known
