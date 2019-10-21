@@ -77,9 +77,46 @@ int process_dots_signal(node_cache_t* node_cache, spin_data dots_message, char**
         }
         // TODO: What to do with lifetime? (if anything)
         for (int j = 0; j < cJSON_GetArraySize(target_prefix); j++) {
+            // Before we refactor this into something else,
+            // perhaps we should consider a different approach:
+            // first see in the cache whether we have any
+            // node that falls under the prefixes,
+            // and then go through the flows of all devices;
+            // not the other way around.
             //spin_data c_prefix = cJSON_GetArrayItem(target_prefix, j);
-            const char* prefix = cJSON_GetArrayItem(target_prefix, j)->valuestring;
-            spin_log(LOG_DEBUG, "Checking prefix: %s\n", prefix);
+            const char* prefix_str = cJSON_GetArrayItem(target_prefix, j)->valuestring;
+            spin_log(LOG_DEBUG, "Checking prefix: %s\n", prefix_str);
+            ip_t prefix_ip;
+            if (spin_pton(&prefix_ip, prefix_str)) {
+                tree_entry_t* cur = tree_first(node_cache->mac_refs);
+                while (cur != NULL) {
+                    node_t* node = (node_t*)cur->data;
+                    if (node->device) {
+                        printf("[XX] CHECKING DEVICE\n");
+                        tree_entry_t* flow_entry = tree_first(node->device->dv_flowtree);
+                        while (flow_entry != NULL) {
+                            // id is the id of the node this device had contact with
+                            // check its addresses for a potential match
+                            int* node_id = (int*)flow_entry->key;
+                            node_t* dest_node = node_cache_find_by_id(node_cache, *node_id);
+                            tree_entry_t* ip_entry = tree_first(dest_node->ips);
+                            while (ip_entry != NULL) {
+                                ip_entry = tree_next(ip_entry);
+                                ip_t* dest_ip = (ip_t*)ip_entry->key;
+                                char dest_ip_str[140];
+                                spin_ntop(dest_ip_str, dest_ip, 140);
+                                printf("[XX] Checking dest node ip address: %s\n", dest_ip_str);
+                                if (ip_in_net(dest_ip, &prefix_ip)) {
+                                    printf("[XX] WE HAVE A MATCH\n");
+                                }
+                            }
+                            flow_entry = tree_next(flow_entry);
+                        }
+                    }
+                    cur = tree_next(cur);
+                }
+                //ip_in_net(&ip_a, &prefix_ip);
+            }
             // Loop over all devices' recent history entries
         }
     }
