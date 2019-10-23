@@ -145,8 +145,9 @@ device_flow_remove(node_cache_t *node_cache, tree_t *ftree, tree_entry_t* leaf) 
     spin_log(LOG_DEBUG, "Remove flow to %d\n", remnodenum);
 
     remnode = node_cache_find_by_id(node_cache, remnodenum);
-    assert(remnode != 0);
-    remnode->references--;
+    if (remnode != NULL) {
+        remnode->references--;
+    }
 
     // This also frees key and data
     tree_remove_entry(ftree, leaf);

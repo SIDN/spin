@@ -985,7 +985,10 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
     if (node->mac) {
         existing_node = oldnode(node_cache->mac_refs, strlen(node->mac) + 1, node->mac);
         if (existing_node != NULL) {
+	    printf("[XX] A NODE WITH MAC %s ALREADY EXISTS. WILL MERGE\n", node->mac);
             add_node_to_ar(existing_node, nodes_to_merge, &nnodes_to_merge);
+        } else {
+            printf("[XX] A NODE WITH MAC %s DOES NOT EXIST YET\n", node->mac);
         }
     }
 
@@ -1046,6 +1049,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
     spin_log(LOG_DEBUG, "Just created node %d\n", node->id);
 
     if (node->mac) {
+        printf("[XX] THIS NODE HAS A MAC, ADD TO TREE: %s\n", node->mac);
         cache_tree_add_mac(node_cache, node, node->mac);
         if (node->device == NULL) {
             makedevice(node);
