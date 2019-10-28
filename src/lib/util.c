@@ -117,7 +117,7 @@ int ip_in_net(ip_t* ip, ip_t* net) {
     uint8_t addr_net[16];
     uint8_t netmask = net->netmask;
     if (ip->family != net->family) {
-        return -1;
+        return 0;
     }
     if (ip->family == AF_INET) {
         netmask += 96;

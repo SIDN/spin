@@ -90,18 +90,27 @@ int process_dots_signal(node_cache_t* node_cache, spin_data dots_message, char**
             if (spin_pton(&prefix_ip, prefix_str)) {
                 tree_entry_t* cur = tree_first(node_cache->mac_refs);
                 while (cur != NULL) {
-                    node_t* node = (node_t*)cur->data;
+                    //node_t* node = (node_t*)cur->data;
+                    node_t* node = * ((node_t**) cur->data);
+
                     if (node->device) {
                         printf("[XX] CHECKING DEVICE\n");
+                        printf("[XX] node at %p\n", node);
+                        printf("[XX] device at %p\n", node->device);
+                        printf("[XX] mac is at %s\n", node->mac);
+                        printf("[XX] dv_flowtree at %p\n", node->device->dv_flowtree);
+                        
                         tree_entry_t* flow_entry = tree_first(node->device->dv_flowtree);
                         while (flow_entry != NULL) {
+                            printf("[XX] flow entry at %p\n", flow_entry);
                             // id is the id of the node this device had contact with
                             // check its addresses for a potential match
                             int* node_id = (int*)flow_entry->key;
+                            printf("[XX] dest node id %u\n", *node_id);
                             node_t* dest_node = node_cache_find_by_id(node_cache, *node_id);
                             tree_entry_t* ip_entry = tree_first(dest_node->ips);
                             while (ip_entry != NULL) {
-                                ip_entry = tree_next(ip_entry);
+                                printf("[XX] Checking dest node IP\n");
                                 ip_t* dest_ip = (ip_t*)ip_entry->key;
                                 char dest_ip_str[140];
                                 spin_ntop(dest_ip_str, dest_ip, 140);
@@ -109,6 +118,7 @@ int process_dots_signal(node_cache_t* node_cache, spin_data dots_message, char**
                                 if (ip_in_net(dest_ip, &prefix_ip)) {
                                     printf("[XX] WE HAVE A MATCH\n");
                                 }
+                                ip_entry = tree_next(ip_entry);
                             }
                             flow_entry = tree_next(flow_entry);
                         }
