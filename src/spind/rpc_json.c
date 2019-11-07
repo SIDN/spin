@@ -21,7 +21,7 @@ json_error(spin_data call_info, int errorno, const char* error_message) {
     idobj = cJSON_GetObjectItemCaseSensitive(call_info, "id");
     error_obj = make_answer(idobj);
     error_msg = cJSON_AddObjectToObject(error_obj, "error");
-    
+
     cJSON_AddNumberToObject(error_msg, "code", errorno);
     cJSON_AddStringToObject(error_msg, "message", error_message);
 
@@ -121,7 +121,6 @@ spin_data rpc_json(spin_data call_info) {
 
     // Get id, if not there it is a Notification
     jsonid = cJSON_GetObjectItemCaseSensitive(call_info, "id");
-    printf("[XX] JSON ID OF REQUEST: %p\n", jsonid);
 
     jsonmethod = cJSON_GetObjectItemCaseSensitive(call_info, "method");
     if (!cJSON_IsString(jsonmethod)) {
@@ -198,12 +197,9 @@ call_string_jsonrpc(char *args) {
 
     rpc = cJSON_Parse(args);
 
-    printf("[XX] call rpc method\n");
     json_res = rpc_json(rpc);
-    printf("[XX] done calling rpc method\n");
 
     resultstr = cJSON_PrintUnformatted(json_res);
-    printf("[XX] unformatted response: %s\n", resultstr);
 
     cJSON_Delete(rpc);
     cJSON_Delete(json_res);

@@ -73,6 +73,8 @@ check_for_existing_node_with_mac(node_cache_t* node_cache, node_t* node, char* m
         result_node = existing_node;
     } else {
         node_set_mac(node, mac);
+        cache_tree_remove_mac(node_cache, mac);
+        cache_tree_add_mac(node_cache, node, mac);
         result_node = node;
     }
     // If it is not considered a device yet, make it one now

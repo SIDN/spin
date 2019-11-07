@@ -262,7 +262,6 @@ cache_tree_remove_mac(node_cache_t *node_cache, char* mac) {
 void
 node_set_mac(node_t* node, char* mac) {
     STAT_COUNTER(ctr, set-mac, STAT_TOTAL);
-
     STAT_VALUE(ctr, mac != NULL);
     if (mac == NULL) {
         return;
@@ -549,6 +548,26 @@ node_t* node_cache_find_by_mac(node_cache_t* node_cache, char* macaddr) {
     return NULL;
 }
 
+// This loops over entire tree so don't call too often
+int node_cache_find_all_by_mac(node_t* result[10], node_cache_t* node_cache, char* macaddr) {
+    int count = 0;
+    node_t *node;
+    tree_entry_t *leaf;
+
+    leaf = tree_first(node_cache->nodes);
+    while (leaf != NULL) {
+        //node = * ((node_t**) leaf->data);
+        node = (node_t*) leaf->data;
+        if (node->mac != NULL && strcmp(macaddr, node->mac) == 0) {
+            result[count++] = node;
+        }
+        leaf = tree_next(leaf);
+    }
+
+    spin_log(LOG_DEBUG, "Found %d nodes with mac %s\n", count, macaddr);
+    return count;
+}
+
 node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* ip) {
     node_t *node;
     tree_entry_t *leaf;
@@ -683,7 +702,6 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
     }
     if (mac) {
         spin_log(LOG_DEBUG, "[ARP] mac for ip %s: %s\n", ip_str, mac);
-        // spin_log(LOG_DEBUG, "[XX] mac found: %s\n", mac);
         node_set_mac(node, mac);
         name = node_names_find_mac(node_cache->names, mac);
         if (name != NULL) {
@@ -691,7 +709,6 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
         }
     } else {
         spin_log(LOG_DEBUG, "[ARP] no mac found for ip %s\n", ip_str);
-        // spin_log(LOG_DEBUG, "[XX] mac not found\n");
         name = node_names_find_ip(node_cache->names, ip);
         if (name != NULL) {
             node_set_name(node, name);
@@ -730,6 +747,7 @@ node_cache_update_arp(node_cache_t *node_cache, uint32_t timestamp) {
             // New MAC address
             node = node_create(0);
             node_set_modified(node, timestamp);
+
             add_mac_and_name(node_cache, node, ip);
             node_add_ip(node, ip);
             (void) node_cache_add_node(node_cache, node);
@@ -762,14 +780,22 @@ node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
     add_mac_and_name(node_cache, node, ip);
     node_add_ip(node, ip);
     new = node_cache_add_node(node_cache, node);
-    assert(new);
 
-    // It was new; reread the DHCP leases table, and set the name if it wasn't set yet
-    node_names_read_dhcpleases(node_cache->names, "/var/dhcp.leases");
-    if (node->mac && !node->name) {
-        name = node_names_find_mac(node_cache->names, node->mac);
-        if (name != NULL) {
-            node_set_name(node, name);
+    if (new) {
+        // It was new; reread the DHCP leases table, and set the name if it wasn't set yet
+        node_names_read_dhcpleases(node_cache->names, "/var/dhcp.leases");
+        if (node->mac && !node->name) {
+            name = node_names_find_mac(node_cache->names, node->mac);
+            if (name != NULL) {
+                node_set_name(node, name);
+            }
+
+            // we may discover at this point that now we have two nodes with the same
+            // mac address in our cache
+            // the mac_cache fix should have made this unnecessary
+            //node_t* result[10];
+            //int count = node_cache_find_all_by_mac(result, node_cache, node->mac);
+            //spin_log(LOG_INFO, "[XX] DONE LOOKING FOR DUPES OF MAC, FOUND %d\n", count);
         }
     }
 }
@@ -918,7 +944,7 @@ merge_nodes(node_cache_t *node_cache, node_t* src_node, node_t* dest_node) {
     tree_entry_t *thisleaf;
 
     if (src_node->device && dest_node->device) {
-        spin_log(LOG_ERR, "Merge two devices!!!\n");
+        spin_log(LOG_ERR, "Merge two devices!!! %p to %p\n", src_node, dest_node);
     }
 
     thisid = src_node->id;

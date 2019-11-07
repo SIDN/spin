@@ -191,6 +191,8 @@ void node_cache_update_iplist_node(node_cache_t* node_cache, int listid, int add
 void makedevice(node_t *node);
 void merge_nodes(node_cache_t *node_cache, node_t* src_node, node_t* dest_node);
 
+void cache_tree_add_mac(node_cache_t *node_cache, node_t* node, char* mac);
+void cache_tree_remove_mac(node_cache_t *node_cache, char* mac);
 
 
 #endif // SPIN_NODE_CACHE_H

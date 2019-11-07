@@ -122,6 +122,7 @@ decode_node_info(char *data, int datalen) {
     if (!cJSON_IsString(mac_json)) {
         spin_log(LOG_DEBUG, "No mac in node\n");
     } else {
+        spin_log(LOG_INFO, "[XX] NODE_SET_MAC 5\n");
         node_set_mac(newnode, mac_json->valuestring);
     }
 
@@ -498,7 +499,6 @@ get_dev_data_func(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
 
     node = node_cache_find_by_id(node_cache, node_id);
     if (node == NULL) {
-        spin_log(LOG_DEBUG, "[XX] NODE %d NOT FOUND\n", node_id);
         result->rpca_svalue = "Unknown node id";
         return -1;
     }
@@ -645,7 +645,7 @@ int update_iplist_ip(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result, int a
     // 1. Do not update node_cache->on_list (like now)
     // 2. Update it (becomes inconsistent because it may have more ip addresses)
     // 3. Silently add all other ip addresses of that node as well
-    
+
     int iplist_id;
     struct list_info* iplist;
     ip_t ip;
@@ -725,7 +725,7 @@ int reset_iplist_ignore(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
 
     // Load the ignores again
     init_ipl(iplist);
-    
+
     // Broadcast that the list was updated
     broadcast_iplist(IPLIST_IGNORE, iplist->li_listname);
     return 0;
