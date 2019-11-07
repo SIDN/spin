@@ -107,7 +107,6 @@ spin_data rpc_json_callreg(spin_data call_info, char *method, spin_data jsonpara
 
 spin_data rpc_json(spin_data call_info) {
     spin_data jsonrpc;
-    spin_data jsonid;
     spin_data jsonmethod;
     spin_data jsonparams;
     char *method;
@@ -118,9 +117,6 @@ spin_data rpc_json(spin_data call_info) {
     if (!cJSON_IsString(jsonrpc) || strcmp(jsonrpc->valuestring, "2.0")) {
         return json_error(call_info, 1, "Wrong JSON-RPC version, expected 2.0");
     }
-
-    // Get id, if not there it is a Notification
-    jsonid = cJSON_GetObjectItemCaseSensitive(call_info, "id");
 
     jsonmethod = cJSON_GetObjectItemCaseSensitive(call_info, "method");
     if (!cJSON_IsString(jsonmethod)) {
