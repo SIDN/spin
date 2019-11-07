@@ -1,68 +1,64 @@
-#include <stdio.h>
-#include <string.h>
-
+ 
 #include "mainloop.h"
+#include "spindata.h"
 #include "statistics.h"
 
 #if DO_SPIN_STATS
 
-static spin_stat_t end = { 0 };
-static stat_p stat_chain = &end;
+void core2pubsub_publish_chan(char *, spin_data, int);
 
-static char buf[512];
+static void
+statpub(stat_p sp) {
+    char tpbuf[100];
+    cJSON *statobj, *membobj;
 
-void pubsub_publish(char *, int, char *);
+    statobj = cJSON_CreateObject();
+    if (statobj == 0) {
+        return;
+    }
 
-void wf_stat(void * arg, int data, int timeout) {
+    membobj = cJSON_CreateStringReference(sp->stat_module);
+    cJSON_AddItemToObject(statobj, "module", membobj);
+
+    membobj = cJSON_CreateStringReference(sp->stat_name);
+    cJSON_AddItemToObject(statobj, "name", membobj);
+
+    cJSON_AddNumberToObject(statobj, "type", sp->stat_type);
+    cJSON_AddNumberToObject(statobj, "value", sp->stat_value);
+    cJSON_AddNumberToObject(statobj, "count", sp->stat_count);
+
+    sprintf(tpbuf, "SPIN/stat/%s/%s", sp->stat_module, sp->stat_name);
+
+    core2pubsub_publish_chan(tpbuf, statobj, 1);
+
+    cJSON_Delete(statobj);
+}
+
+static void
+wf_stat(void * arg, int data, int timeout) {
     stat_p sp;
 
     if (timeout) {
         // What else
-        for (sp = stat_chain; sp->stat_module; sp = sp->stat_next) {
-            sprintf(buf, "{ \"module\": \"%s\", \"name\": \"%s\", \"type\": %d, \"value\": %d, \"count\": %d }",
-                sp->stat_module, sp->stat_name,
-                sp->stat_type, sp->stat_value, sp->stat_count);
-            pubsub_publish("SPIN/stat", strlen(buf), buf);
+        for (sp = spin_stat_chain; sp->stat_module; sp = sp->stat_next) {
+            if (sp->stat_lastpubcount != sp->stat_count) {
+                statpub(sp);
+                sp->stat_lastpubcount = sp->stat_count;
+            }
         }
     }
 }
 
-static void
-firstuse() {
+void
+spin_stat_start() {
 
     mainloop_register("Statistics", wf_stat, (void *) 0, 0, 30000);
 }
 
 void
-spin_stat_val(stat_p sp, int val) {
-    static int inited=0;
+spin_stat_finish() {
 
-    if (sp->stat_next == 0) {
-        // First time use
-
-        // Prepend to list, currently in reverse chronological order
-        // Perhaps TODO, although UI should solve this
-        sp->stat_next = stat_chain;
-        stat_chain = sp;
-        if (!inited) {
-            firstuse();
-            inited = 1;
-        }
-    }
-    sp->stat_count++;
-    switch (sp->stat_type) {
-    case STAT_TOTAL:
-        sp->stat_value += val;
-        break;
-    case STAT_MAX:
-        if (val > sp->stat_value) {
-            sp->stat_value = val;
-        }
-        break;
-    case N_STAT:
-        // should not happen.
-        break;
-    }
 }
+
 
 #endif // DO_SPIN_STATS

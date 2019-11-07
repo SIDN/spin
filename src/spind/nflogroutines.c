@@ -1,10 +1,6 @@
-#include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
 #include <netinet/in.h>
-#include <linux/types.h>
-#include <linux/netfilter.h>
 #include <linux/udp.h>
 #include <linux/tcp.h>
 #include <linux/ip.h>
@@ -14,10 +10,9 @@
 
 #include <assert.h>
 
-#include "spin_log.h"
-//#include "pkt_info.h"
 #include "mainloop.h"
 #include "nflogroutines.h"
+#include "spin_log.h"
 
 static int
 fd_set_blocking(int fd, int blocking) {
@@ -178,7 +173,7 @@ nflog_cb(struct nflog_g_handle *qh, struct nfgenmsg *nfmsg, struct nflog_data *n
             spin_log(LOG_DEBUG, "Unknown protocol %x\n", proto);
         }
         nfr[fr_n].nfr_packets++;
-        if (nfr[fr_n].nfr_packets % 100 == 0) {
+        if (nfr[fr_n].nfr_packets % 1000 == 0) {
             spin_log(LOG_INFO, "nflog module %s handled %d packets\n", 
                 nfr[fr_n].nfr_name,
                 nfr[fr_n].nfr_packets);
@@ -186,7 +181,7 @@ nflog_cb(struct nflog_g_handle *qh, struct nfgenmsg *nfmsg, struct nflog_data *n
         return 0;
 }
 
-static struct nflog_handle *library_handle;
+static struct nflog_handle *library_handle = NULL;
 static int library_fd;
 
 static void
@@ -248,4 +243,19 @@ void nflogroutine_register(char *name, nflogfunc wf, void *arg, int group_number
     nfr[n_nfr].nfr_wfarg = arg;
     nfr[n_nfr].nfr_qh = qh;
     n_nfr++;
+}
+
+void nflogroutine_close(char* name) {
+    int i;
+    for (i=0; i < n_nfr; i++) {
+        if (strcmp(nfr[i].nfr_name, name) == 0) {
+            nflog_unbind_group(nfr[i].nfr_qh);
+        }
+    }
+}
+
+void nflog_close_handle() {
+    if (library_handle != NULL) {
+        nflog_close(library_handle);
+    }
 }

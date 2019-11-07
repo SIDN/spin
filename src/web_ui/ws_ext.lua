@@ -68,11 +68,11 @@ local client = function(sock,protocol)
   end
 
   self.has_queued_messages = function(self)
-    return table.getn(self.queued_messages) > 0
+    return #self.queued_messages > 0
   end
 
   self.send_queued_messages = function(self)
-    while table.getn(self.queued_messages) > 0 do
+    while #self.queued_messages > 0 do
       local msg = json.encode(table.remove(self.queued_messages, 1))
       print("[XX] SENDING MESSAGE: " .. msg)
       self:send(msg)

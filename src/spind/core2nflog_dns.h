@@ -1,7 +1,7 @@
 #ifndef CORE2NFLOG_DNS
 #define CORE2NGLOG_DNS 1
-#include "node_cache.h"
 #include "dns_cache.h"
+#include "node_cache.h"
 
 // Initialize the core2nflog_dns module
 // Arguments:

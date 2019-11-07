@@ -12,6 +12,7 @@
 #include "tree.h"
 
 int cmp_ints(size_t size_a, const void* key_a, size_t size_b, const void* key_b);
+int cmp_2ints(size_t size_a, const void* key_a, size_t size_b, const void* key_b);
 int cmp_strs(size_t size_a, const void* key_a, size_t size_b, const void* key_b);
 int cmp_ips(size_t size_a, const void* key_a, size_t size_b, const void* key_b);
 int cmp_domains(size_t size_a, const void* a, size_t size_b, const void* b);
@@ -46,7 +47,7 @@ void buffer_reset(buffer_t* buffer);
 size_t buffer_size(buffer_t* buffer);
 char* buffer_str(buffer_t* buffer);
 
-int buffer_write(buffer_t* buffer, const char* format, ...);
+int buffer_write(buffer_t* buffer, const char* format, ...) __attribute__((__format__ (printf, 2, 3)));
 
 int buffer_ok(buffer_t* buffer);
 
@@ -58,6 +59,10 @@ int buffer_ok(buffer_t* buffer);
  * Returns 1 on success, 0 on failure.
  */
 int store_ip_tree(tree_t* tree, const char* filename);
+/*
+ * Same for nodepair
+ */
+int store_nodepair_tree(tree_t* tree, const char* filename);
 
 /*
  * Read the given filename, which should consist of one IP string

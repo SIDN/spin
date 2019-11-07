@@ -35,7 +35,7 @@ function _M.file_tokenize_iterator(filename)
         if not self.done then
             local value = self.data[self.index]
             self.index = self.index + 1
-            if self.index > table.getn(self.data) then self.done = true end
+            if self.index > #self.data then self.done = true end
             return value
         else
             return nil

@@ -1,4 +1,4 @@
-{{ --$def with (mqtt_host, mqtt_port) }}
+{{ --$def with () }}
     
   <script type="javascript">
       function modal(href) {
@@ -16,9 +16,9 @@
   
 <div>
   <p>
-   <a href="/spin_api/graph.html?mqtt_host={{=mqtt_host}}">graph test (MQTT at {{= mqtt_host }} )</a>
+   <a href="/spin_graph/graph.html">graph test</a>
    <br />
-   <a href="/spin_api/debug.html">debug mode</a>
+   <a href="/spin_graph/debug.html">debug mode</a>
    <br />
    <a id="OpenDialog" href="/spin_api/tcpdump?device=aa:bb:cc:dd:ee:ff">Dump test device</a>
   </p>

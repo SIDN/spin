@@ -1,0 +1,43 @@
+
+	spin-pcap-reader:
+	Parse a pcap file and communicate results to spind
+
+
+==> Introduction
+
+The program in this repository parses a PCAP file and communicates its findings
+to spind through a socket.
+
+
+==> Dependencies
+
+ * libpcap
+
+
+==> Compiling the program
+
+Make sure you passed --enable-spin-pcap-reader to the SPIN configure script.
+Once you've done that, you can run make in this directory to build
+spin-pcap-reader.
+
+  $ cd spin/src/
+  $ autoreconf --install
+  $ ./configure --enable-spin-pcap-reader
+  $ make
+  $ cd tools/spin-pcap-reader/
+  $ make
+
+
+==> Usage
+
+Parse file.pcap.
+
+  $ sudo ./spin-pcap-reader -r file.pcap
+
+Listen on eth0.
+
+  $ sudo ./spin-pcap-reader -i eth0
+
+Note: for now, it is necessary to run spin-pcap-reader as root. This is because
+the socket created by spind can only be written to by the root user.
+

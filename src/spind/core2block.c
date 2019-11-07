@@ -1,27 +1,9 @@
-#include <stdlib.h>
-#include <stdio.h>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <fcntl.h>
-
-#include "util.h"
-#include "handle_command.h"
-#include "spin_log.h"
-#ifdef notdef
-#include "mainloop.h"
-#endif
 #include "nfqroutines.h"
-
-#include "spin_list.h"
-#include "spind.h"
 #include "spinconfig.h"
-
+#include "spind.h"
+#include "spin_log.h"
 #include "statistics.h"
-// needed for the CORE2NFLOG_DNS_GROUP_NUMBER value
-// (we will probably make this configurable)
-#include "core2nflog_dns.h"
 
 #define MAXSTR 1024
 
@@ -29,7 +11,7 @@ STAT_MODULE(core2block)
 // static const char stat_modname[]="core2block";
 
 static int dolog;
-static FILE *logfile;
+static FILE *logfile = NULL;
 
 static void
 setup_debug() {
@@ -85,11 +67,11 @@ iptab_do_table(char *name, int delete) {
 #define IAJ_ADD 0
 #define IAJ_INS 1
 #define IAJ_DEL 2
+static char *iaj_option[3] = { "-A", "-I", "-D" };
 
 static void
 iptab_add_jump(char *table, int option, char *cond, char *dest) {
     char str[MAXSTR];
-    static char *iaj_option[3] = { "-A", "-I", "-D" };
 
     sprintf(str, "iptables %s %s%s%s -j %s", iaj_option[option], table,
                         cond ? " " : "", cond ? cond : "", dest);
@@ -107,6 +89,9 @@ static char SpinCheck[] = "SpinCheck";
 static char SpinBlock[] = "SpinBlock";
 static char SpinLog[] = "SpinLog";
 static char Return[] = "RETURN";
+
+static char *iptables_command[2] = { "iptables", "ip6tables" };
+static char *srcdst[2] = { "-s", "-d" };
 
 // TODO: rename nflog_dns_group to nflog_dns_group
 static void
@@ -129,6 +114,68 @@ clean_old_tables(int nflog_dns_group) {
     iptab_do_table(SpinCheck, IDT_DEL);
     iptab_do_table(SpinLog, IDT_DEL);
     iptab_do_table(SpinBlock, IDT_DEL);
+}
+
+static char *ipset_name(int nodenum, int v6) {
+    static char namebuf[2][100];
+    static int which;
+
+    // Be prepared for two "simultaneous" calls
+    // Hack...
+    which = (which+1)%2;
+    sprintf(namebuf[which], "N%dV%d", nodenum, v6 ? 6 : 4);
+    return namebuf[which];
+}
+
+static void
+ipset_create(int nodenum, int v6) {
+    char str[MAXSTR];
+    STAT_COUNTER(ctr, set-create, STAT_TOTAL);
+
+    sprintf(str, "ipset create %s hash:ip family %s", ipset_name(nodenum, v6), v6? "inet6" : "inet");
+    iptab_system(str);
+    STAT_VALUE(ctr, 1);
+}
+
+static void
+ipset_destroy(int nodenum, int v6) {
+    char str[MAXSTR];
+    STAT_COUNTER(ctr, set-destroy, STAT_TOTAL);
+
+    sprintf(str, "ipset destroy %s", ipset_name(nodenum, v6));
+    iptab_system(str);
+    STAT_VALUE(ctr, 1);
+}
+
+static void
+ipset_add_addr(int nodenum, int v6, char *addr) {
+    char str[MAXSTR];
+    STAT_COUNTER(ctr, set-add-addr, STAT_TOTAL);
+
+    sprintf(str, "ipset add -exist %s %s", ipset_name(nodenum, v6), addr);
+    iptab_system(str);
+    STAT_VALUE(ctr, 1);
+}
+
+static void
+ipset_blockflow(int v6, int option, int nodenum1, int nodenum2) {
+    char str[MAXSTR];
+    int i;
+    static char *sd[] = { "src", "dst", "src" };
+    static char matchset[] = "-m set --match-set";
+    STAT_COUNTER(ctr, set-block-flow, STAT_TOTAL);
+
+    for (i=0; i<2; i++) {
+        // Both directions
+        sprintf(str, "%s %s %s %s %s %s %s %s %s -j %s",
+            iptables_command[v6],
+            iaj_option[option], SpinCheck, 
+            matchset, ipset_name(nodenum1, v6), sd[i],
+            matchset, ipset_name(nodenum2, v6), sd[i+1],
+            SpinBlock);
+        iptab_system(str);
+    }
+    STAT_VALUE(ctr, 1);
 }
 
 static void
@@ -163,10 +210,8 @@ setup_tables(int nflog_dns_group, int queue_block, int place) {
     iptab_add_jump(SpinBlock, IAJ_ADD, 0, SpinLog);
     sprintf(str, "NFQUEUE --queue-num %d", queue_block);
     iptab_add_jump(SpinBlock, IAJ_ADD, 0, str);
+    iptab_system("ipset destroy");
 }
-
-static char *iptables_command[2] = { "iptables", "ip6tables" };
-static char *srcdst[2] = { "-s", "-d" };
 
 static void
 c2b_do_rule(char *table, int ipv6, int addrem, char *ip_str, char *target) {
@@ -202,6 +247,50 @@ void c2b_changelist(void* arg, int iplist, int addrem, ip_t *ip_addr) {
     c2b_do_rule(tables[iplist], ipv6, addrem, ip_str, targets[iplist]);
 }
 
+void c2b_node_persistent_start(int nodenum) {
+
+    // Make the Ipv4 and Ipv6 ipsets for this node
+    ipset_create(nodenum, 0);
+    ipset_create(nodenum, 1);
+}
+
+void c2b_node_persistent_end(int nodenum) {
+
+    // Remove the ipsets
+    ipset_destroy(nodenum, 0);
+    ipset_destroy(nodenum, 1);
+}
+
+void c2b_node_ipaddress(int nodenum, ip_t *ip_addr) {
+    int ipv6 = 0;
+    char ip_str[INET6_ADDRSTRLEN];
+
+    // Add or re-add ip-addr to nodenum's set
+
+    // IP v4 or 6, decode address
+    if (ip_addr->family != AF_INET) {
+        ipv6 = 1;
+    }
+    spin_ntop(ip_str, ip_addr, INET6_ADDRSTRLEN);
+    spin_log(LOG_DEBUG, "c2b_node_ipaddress %d %d %s\n", nodenum, ipv6, ip_str);
+
+    ipset_add_addr(nodenum, ipv6, ip_str);
+}
+
+void c2b_blockflow_start(int nodenum1, int nodenum2) {
+
+    // Block this flow
+    ipset_blockflow(0, IAJ_INS, nodenum1, nodenum2);
+    ipset_blockflow(1, IAJ_INS, nodenum1, nodenum2);
+}
+
+void c2b_blockflow_end(int nodenum1, int nodenum2) {
+
+    // Unblock this flow
+    ipset_blockflow(0, IAJ_DEL, nodenum1, nodenum2);
+    ipset_blockflow(1, IAJ_DEL, nodenum1, nodenum2);
+}
+
 static int
 c2b_catch(void *arg, int af, int proto, uint8_t* data, int size, uint8_t *src_addr, uint8_t *dest_addr, unsigned src_port, unsigned dest_port) {
     STAT_COUNTER(ctr, catch-block, STAT_TOTAL);
@@ -214,21 +303,8 @@ c2b_catch(void *arg, int af, int proto, uint8_t* data, int size, uint8_t *src_ad
 
 static void
 setup_catch(int queue) {
-
-    // Here we set up the catching of kernel messages for LOGed packets
     nfqroutine_register("core2block", c2b_catch, (void *) 0, queue);
 }
-
-#ifdef notdef
-static void
-wf_core2block(void *arg, int data, int timeout) {
-
-    if (timeout) {
-        spin_log(LOG_DEBUG, "wf_core2block called\n");
-        // TODO Do something with kernel messages
-    }
-}
-#endif
 
 void init_core2block() {
     static int all_lists[N_IPLIST] = { 1, 1, 1 };
@@ -250,13 +326,12 @@ void init_core2block() {
     setup_debug();
     setup_tables(nflog_dns_group, queue_block, place_block);
 
-#ifdef notdef
-    mainloop_register("core2block", wf_core2block, (void *) 0, 0, 10000);
-#endif
     spin_register("core2block", c2b_changelist, (void *) 0, all_lists);
 }
 
 void cleanup_core2block() {
-
-    // Add freeing of malloced memory for memory-leak detection
+    if (logfile != NULL) {
+        fclose(logfile);
+    }
+    nfqroutine_close("core2block");
 }

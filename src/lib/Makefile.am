@@ -9,8 +9,11 @@ noinst_LIBRARIES = libspin.a
 libspin_a_SOURCES = pkt_info.c \
 					spin_log.h \
 					spin_log.c \
+					dns.c \
+					dns.h \
 					dns_cache.h \
 					dns_cache.c \
+					extsrc.c \
 					tree.h \
 					tree.c \
 					node_cache.h \
@@ -19,10 +22,14 @@ libspin_a_SOURCES = pkt_info.c \
 					util.c \
 					arp.h \
 					arp.c \
+					ipl.c \
+					ipl.h \
 					node_names.h \
 					node_names.c \
 					jsmn.h \
 					jsmn.c \
+					statistics.c \
+					spin_list.c \
 					version.c
 
 #libspin_a_CFLAGS =

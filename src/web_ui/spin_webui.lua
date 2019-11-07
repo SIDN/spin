@@ -17,21 +17,22 @@ local spin_util = require 'spin_util'
 local copas = require 'copas'
 local liluat = require 'liluat'
 
-local mqtt = require 'mosquitto'
 local json = require 'json'
 
 -- Additional supporting tools
 local ws_ext = require 'ws_ext'
 local tcpdumper = require 'tcpdumper'
+local tcpdumper2 = require 'tcpdumper2'
 
 local TRAFFIC_CHANNEL = "SPIN/traffic"
 local HISTORY_SIZE = 600
 
--- The managers implement the main functionality
-local device_manager_m = require 'device_manager'
-local profile_manager_m = require 'profile_manager'
-
 local TEMPLATE_PATH = "templates/"
+
+-- Some functionality requires RPC calls to the spin daemon.
+-- This module automatically uses UBUS if available, and JSON-RPC
+-- otherwise
+local rpc = require('json_rpc')
 
 posix = require 'posix'
 
@@ -86,21 +87,17 @@ function help(rcode, msg)
     print("Usage: lua spin_webui.lua [options]")
     print("Options:")
     print("-c <configfile> Read settings from configfile")
-    print("-m <mqtt_host>  Connect to MQTT at host (defaults to 127.0.0.1)")
-    print("-p <mqtt_port>  Connect to MQTT at port (defaults to 1883)")
     print("-h              Show this help")
     os.exit(rcode)
 end
 
 function arg_parse(args)
     config_file = nil
-    mqtt_host = nil
-    mqtt_port = nil
 
-    if args == nil then return config_file, mqtt_host, mqtt_port end
+    if args == nil then return config_file end
 
     skip = false
-    for i = 1,table.getn(args) do
+    for i = 1,#args do
         if skip then
             skip = false
         elseif args[i] == "-h" then
@@ -109,129 +106,26 @@ function arg_parse(args)
             config_file = args[i+1]
             if config_file == nil then help(1, "missing argument for -c") end
             skip = true
-        elseif args[i] == "-m" then
-            mqtt_host = args[i+1]
-            if port == nil then help(1, "missing argument for -m") end
-            skip = true
-        elseif args[i] == "-p" then
-            mqtt_port = tonumber(args[i+1])
-            if port == nil then help(1, "missing or bad argument for -p") end
-            skip = true
         else
             help(1, "Too many arguments at '" .. args[i] .. "'")
         end
     end
 
-    return config_file, mqtt_host, mqtt_port
+    return config_file
 end
 
 function handler:read_config(args)
-    local config_file, mqtt_host, mqtt_port = arg_parse(args)
+    local config_file = arg_parse(args)
     local config = {}
-    config['mqtt'] = {}
-    config['mqtt']['host'] = "127.0.0.1"
-    config['mqtt']['port'] = 1883
     if config_file ~= nil then
         config, err = spin_util.config_parse(config_file)
         if config == nil then return nil, err end
     end
-    if mqtt_host ~= nil then
-        config['mqtt']['host'] = mqtt_host
-    end
-    if mqtt_port ~= nil then
-        config['mqtt']['port'] = mqtt_port
-    end
     self.config = config
 end
 
-function handler:add_device_seen(mac, name, timestamp)
-    -- add_device_seen returns True if the device is 'new' (i.e. wasn't seen
-    -- before)
-    if (self.device_manager:add_device_seen(mac, name, timestamp)) then
-        local notification_txt = "New device on network! Please set a profile"
-        self:create_notification("new_device", {}, notification_txt, mac, name)
-        self:send_websocket_update("newDevice", self.device_manager:get_device_seen(mac))
-    else
-        self:send_websocket_update("deviceUpdate", self.device_manager:get_device_seen(mac))
-    end
-end
-
--- TODO: should the device manager do this part too?
-function handler:handle_traffic_message(data, orig_data)
-    if data.flows == nil then return end
-    for i, d in ipairs(data.flows) do
-        local mac = nil
-        local ips = nil
-        local name = nil
-        if d.from ~= nil and d.from.mac ~= nil then
-            name = d.from.name
-            mac = d.from.mac
-            ips = d.from.ips
-        elseif d.to ~= nil and d.to.mac ~= nil then
-            name = d.to.name
-            mac = d.to.mac
-            ips = d.to.ips
-        end
-
-        if mac ~= nil then
-            -- If we don't have a name yet, use an IP address
-            if name == nil then
-              if ips ~= nil and table.getn(ips) > 0 then
-                  name = ips[1]
-              -- to be sure we have *something* , fall back to mac
-              else
-                  d.name = mac
-              end
-            end
-            -- gather additional info, if available
-            self:add_device_seen(mac, name, os.time())
-        end
-    end
-end
-
-function handler:mqtt_looper()
-    while true do
-        self.client:loop()
-        copas.sleep(0.1)
-    end
-end
-
-function handler:handle_mqtt_queue_msg(msg)
-    -- TODO: pass topic? (traffic/incident)
-    local success, pd = coxpcall.pcall(json.decode, msg)
-    if success and pd then
-        --print("[XX] msg: " .. msg)
-        if pd["command"] and pd["command"] == "traffic" then
-            self:handle_traffic_message(pd["result"], payload)
-        elseif pd["incident"] ~= nil then
-            local incident = pd["incident"]
-            local ts = incident["incident_timestamp"]
-            for i=ts-5,ts+5 do
-                if self:handle_incident_report(incident, i) then break end
-            end
-        end
-    end
-end
-
-function handler:mqtt_queue_looper()
-    self.mqtt_queue_msgs = {}
-    while true do
-        while table.getn(self.mqtt_queue_msgs) > 0 do
-          local msg = table.remove(self.mqtt_queue_msgs, 1)
-          self:handle_mqtt_queue_msg(msg)
-        end
-        copas.sleep(0.1)
-        for i,c in pairs(self.websocket_clients) do
-          if c:has_queued_messages() then
-            c:send_queued_messages()
-            print("[XX] still queueud msgs")
-          end
-        end
-    end
-end
-
 function handler:handle_index(request, response)
-    html, err = self:render("index.html", {mqtt_host = self.config['mqtt']['host']})
+    html, err = self:render("index.html")
     response:set_header("Last-Modified", spin_util.get_file_timestamp(TEMPLATE_PATH .. "index.html"))
     if html == nil then
         response:set_status(500, "Internal Server Error")
@@ -295,10 +189,103 @@ function handler:handle_tcpdump_stop(request, response)
     if self.active_dumps[dname] ~= nil then
         self.active_dumps[dname]:stop()
     end
-    response:set_header("Location", "/spin/tcpdump?device=" .. device)
+    response:set_header("Location", "/spin_api/tcpdump?device=" .. device)
     response:set_status(302, "Found")
     return response
 end
+
+function handler:error_400(message, response)
+    response.content = json.encode({error = message})
+    response:set_status(400, "Bad request")
+    return response
+end
+
+-- this is the 'new style' traffic capture API;
+-- rather than sending pcap over a http chunked session,
+-- we send it to mqtt and a client-side script handles the data
+function handler:handle_capture_manage(request, response)
+    local device_mac = request.params["device"]
+    local running = false
+    local bytes_sent = 0
+    if self.active_dumps[dname] ~= nil then
+        running = true
+        bytes_sent = self.active_dumps[dname].bytes_sent
+    end
+
+    -- retrieve additional info about the device
+    local conn, err = rpc.connect()
+    if not conn then
+        -- We return an HTTP 200, but with the content set to
+        -- an error
+        response.content = json.encode({error = err})
+        return response
+    end
+    device_name = "unknown"
+    device_ips = ""
+    result, err = conn:call({ method = "list_devices", jsonrpc = "2.0", id = 1 })
+    -- TODO: error handling
+    if result == nil then
+        print("error: " .. err)
+    end
+    print(json.encode(result))
+    for i=1, #result["result"] do
+        local rdata = result["result"][i]
+        if rdata["mac"] == device_mac then
+            if rdata["name"] then
+                device_name = rdata["name"]
+            end
+            device_ips=table.concat(rdata["ips"], ", ")
+        end
+    end
+
+    html, err = self:render_raw("capture.html", { device_name=device_name, device_mac=device_mac, device_ips=device_ips})
+    response:set_header("Last-Modified", spin_util.get_time_string())
+    response:set_header("Access-Control-Allow-Origin", "spin.sidnlabs.nl")
+
+    if html == nil then
+        response:set_status(500, "Internal Server Error")
+        response.content = "Template error: " .. err
+        conn:close()
+        return response
+    end
+    response.content = html
+    conn:close()
+    return response
+end
+
+function handler:handle_capture_start(request, response)
+    local device = request.params["device"]
+    local dname = get_tcpdump_pname(request, device)
+
+    if self.active_dumps[dname] ~= nil then
+        return self:error_400("Capture already running", response)
+    end
+    local dumper, err = tcpdumper2.create(device)
+    -- todo: 500 internal server error?
+    if dumper == nil then
+        return self:error_400("Unable to start capture: " .. err, response)
+    end
+    self.active_dumps[dname] = dumper
+
+    dumper:run()
+    -- remove it again
+    self.active_dumps[dname] = nil
+    response.content = "{}"
+    return response
+end
+
+function handler:handle_capture_stop(request, response)
+    local device = request.params["device"]
+    local dname = get_tcpdump_pname(request, device)
+
+    if self.active_dumps[dname] ~= nil then
+        self.active_dumps[dname]:stop()
+    end
+    response:set_header("Location", "/spin_api/tcpdump?device=" .. device)
+    response:set_status(302, "Found")
+    return response
+end
+
 
 function handler:handle_tcpdump_manage(request, response)
     local device = request.params["device"]
@@ -366,16 +353,87 @@ function handler:handle_configuration(request, response)
     return response
 end
 
+function dump(o)
+   if type(o) == 'table' then
+      local s = '{ '
+      for k,v in pairs(o) do
+         if type(k) ~= 'number' then k = '"'..k..'"' end
+         s = s .. '['..k..'] = ' .. dump(v) .. ','
+      end
+      return s .. '} '
+   else
+      return tostring(o)
+   end
+end
+
+-- Retrieve the device list through an RPC call,
+-- and return it as a JSON string in the old format
+-- of /spin_api/devices
+function handler:retrieve_device_list()
+    local conn, err = rpc.connect()
+    if not conn then
+        -- We return an HTTP 200, but with the content set to
+        -- an error
+        response.content = json.encode({error = err})
+        return response
+    end
+    result, err = conn:call({ method = "list_devices", jsonrpc = "2.0", id = 1 })
+    -- TODO: error handling
+
+    ubdata = json.encode(result)
+    local webresult = {}
+    for i=1, #result["result"] do
+        local rdata = result["result"][i]
+        if not rdata["name"] then
+            rdata["name"] = rdata["mac"]
+        end
+        rdata["lastSeen"] = rdata["lastseen"]
+        webresult[rdata["mac"]] = rdata
+    end
+    conn:close()
+    return webresult
+end
+
 function handler:handle_device_list(request, response)
+    print("Calling RPC")
     self:set_api_headers(response)
-    response.content = json.encode(self.device_manager:get_devices_seen())
-    response:set_header("Last-Modified", self.device_manager.last_update)
+    response.content = json.encode(self:retrieve_device_list())
+    response:set_header("Last-Modified", spin_util.get_time_string())
+    return response
+end
+
+function handler:handle_rpc_call(request, response)
+    self:set_api_headers(response)
+    if request.method == "POST" then
+        if request.post_data then
+            local conn, err = rpc.connect()
+            if conn == nil then
+                -- We return an HTTP 200, but with the content set to
+                -- an error
+                response.content = json.encode({error = err})
+                return response
+            else
+                result, err = conn:call(request.post_data)
+                if result then
+                    response.content = json.encode(result)
+                else
+                    response:set_status(500, err)
+                end
+                conn:close()
+            end
+        else
+            response:set_status(400, "Bad request")
+            response.content = json.encode({status = 400, error = "Missing value: 'config' in POST data"})
+        end
+    else
+        response:set_status(405, "Method not allowed")
+    end
     return response
 end
 
 -- this *queues* a message to send to all active clients
 function handler:send_websocket_update(name, arguments)
-    if table.getn(self.websocket_clients) == 0 then return end
+    if #self.websocket_clients == 0 then return end
     local msg = ""
     if arguments == nil then
         msg = '{"type": "update", "name": "' .. name .. '"}'
@@ -383,7 +441,6 @@ function handler:send_websocket_update(name, arguments)
         msg = '{"type": "update", "name": "' .. name .. '", "args": ' .. json.encode(arguments) .. '}'
     end
     for i,c in pairs(self.websocket_clients) do
-        print("[XX] send msg to client")
         --c:send(msg)
         c:queue_message(msg)
     end
@@ -401,90 +458,21 @@ local function send_websocket_initialdata(client, name, arguments)
     client:send(msg)
 end
 
-function handler:get_filtered_profile_list()
-    local profile_list = {}
-    -- we'll make a selective deep copy of the data, since for now we
-    -- want to leave out some of the fields
-    -- we may need to find a construct similar to the
-    -- serializer from DRF
-    for i,v in pairs(self.profile_manager.profiles) do
-        local profile = {}
-        profile.id = v.id
-        profile.name = v.name
-        profile.type = v.type
-        profile.description = v.description
-        table.insert(profile_list, profile)
-    end
-    for i,v in pairs(profile_list) do
-      v.rules_v4 = nil
-      v.rules_v6 = nil
-    end
-    return profile_list
-end
-
 function handler:handle_profile_list(request, response)
-    self:set_api_headers(response)
-    response.content = json.encode(self:get_filtered_profile_list())
-    response:set_header("Last-Modified", self.profile_manager.profiles_updated)
+    response:set_status(403, "Not Found")
+    response.content = json.encode({status = 403, error = "Device profiles have been removed"})
     return response
 end
 
 function handler:handle_device_profiles(request, response, device_mac)
-    self:set_api_headers(response)
-    if request.method == "GET" or request.method == "HEAD" then
-        local content_json, updated = self.profile_manager:get_device_profiles(device_mac)
-        response.content = json.encode(content_json)
-        response:set_header("Last-Modified", updated)
-    else
-        if request.post_data ~= nil and request.post_data.profile_id ~= nil then
-            local profile_id = request.post_data.profile_id
-            local status = nil
-            local err = ""
-            if self.device_manager:get_device_seen(device_mac) ~= nil then
-                status, err = self.profile_manager:set_device_profile(device_mac, request.post_data.profile_id)
-                local device_name = self.device_manager:get_device_seen(device_mac).name
-                local profile_name = self.profile_manager.profiles[profile_id].name
-                if status then
-                  local notification_txt = "Profile set to " .. profile_name
-                  self:create_notification("profile_set_to", { profile_name }, notification_txt, device_mac, device_name)
-                  self:send_websocket_update("deviceProfileUpdate", { deviceName=device_name, profileName=profile_name })
-                else
-                  local notification_txt = "Error setting device profile: " .. err
-                  self:create_notification("profile_set_error", { err }, notification_txt, device_mac, device_name)
-                end
-            else
-                status = nil
-                err = "Error: unknown device: " .. device_mac
-            end
-            -- persist the new state
-            if status ~= nil then
-                -- all ok, basic 200 response good
-                self.profile_manager:save_device_profiles()
-                return response
-            else
-                -- todo: how to convey error?
-                response:set_status(400, "Bad request")
-                response.content = json.encode({status = 400, error = err})
-            end
-        else
-            response:set_status(400, "Bad request")
-            response.content = json.encode({status = 400, error = "Parameter missing in POST data: profile_id"})
-        end
-    end
+    response:set_status(403, "Not Found")
+    response.content = json.encode({status = 403, error = "Device profiles have been removed"})
     return response
 end
 
 function handler:handle_toggle_new(request, response, device_mac)
-    self:set_api_headers(response)
-    if request.method == "POST" then
-        local seen = self.device_manager:device_is_new(device_mac)
-        if seen == nil then
-            response:set_status(400, "Bad request")
-            response.content = json.encode({status = 400, error = "Unknown device: " .. device_mac})
-        else
-            self.device_manager:set_device_is_new(device_mac, not seen)
-        end
-    end
+    response:set_status(403, "Not Found")
+    response.content = json.encode({status = 403, error = "The 'new' status has been removed"})
     return response
 end
 
@@ -618,26 +606,20 @@ function handler:handle_websocket(request, response)
     --end
     --print("[XX] END OF FLAT HEADERS OF TYPE " .. type(flat_headers))
     request.raw_sock:settimeout(1)
-    print("[XX] AAAAAA")
     client, err = self.ws_handler.add_client(flat_headers, request.raw_sock, request.connection, self)
-    print("[XX] BBBBBB")
     if not client then
-        print("[XX] CCCCCC")
         response:set_status(400, "Bad request")
         response.content = err
         return response
     else
-        print("[XX] DDDDDD")
         table.insert(self.websocket_clients, status)
         -- send any initial client information here
         client:send('{"message": "hello, world"}')
-        -- Send the overview of profiles
-        send_websocket_initialdata(client, "profiles", self:get_filtered_profile_list())
-        -- Send the overview of known devices so far, which includes their profiles
-        send_websocket_initialdata(client, "devices", self.device_manager:get_devices_seen())
+        -- Send the overview of known devices so far
+        send_websocket_initialdata(client, "devices", self:retrieve_device_list())
         -- Send all notifications
         send_websocket_initialdata(client, "notifications", self.notifications)
-        print("[XX] NEW CONNECT NOW COUNT: " .. table.getn(self.websocket_clients))
+        print("[XX] NEW CONNECT NOW COUNT: " .. #self.websocket_clients)
         while client.state ~= 'CLOSED' do
           print("[XX] NOTCLOSED")
           --if client:has_queued_messages() then
@@ -653,7 +635,6 @@ function handler:handle_websocket(request, response)
           copas.send(dummy)
         end
     end
-    print("[XX] yoyo yoyo")
 
     -- websocket took over the connection, return nil so minittp
     -- does not send a response
@@ -661,11 +642,10 @@ function handler:handle_websocket(request, response)
 end
 
 function handler:have_websocket_messages()
-  return table.getn(self.websocket_messages) > 0
+  return #self.websocket_messages > 0
 end
 
 function handler:do_add_ws_c(client)
-  print("[XX] FOO ADDING CLINET")
   table.insert(self.websocket_clients, client)
 end
 
@@ -679,12 +659,6 @@ function handler:init(args)
     self:read_config(args)
     self:load_templates()
 
-    self.profile_manager = profile_manager_m.create_profile_manager()
-    self.profile_manager:load_all_profiles()
-    self.profile_manager:load_device_profiles()
-
-    self.device_manager = device_manager_m.create(self.profile_manager)
-
     self.notifications = {}
     self.notifications_updated = spin_util.get_time_string()
     self.notification_counter = 1
@@ -692,8 +666,6 @@ function handler:init(args)
     self.websocket_clients = {}
     self.websocket_messages = {}
     self.ws_handler = ws_ext.ws_server_create(ws_opts)
-
-    self.mqtt_queue_msgs = {}
 
     -- We will use this list for the fixed url mappings
     -- Fixed handlers are interpreted as they are; they are
@@ -703,6 +675,9 @@ function handler:init(args)
         ["/"] = handler.handle_index,
         ["/spin_api"] = self.handle_index,
         ["/spin_api/"] = self.handle_index,
+        ["/spin_api/capture"] = self.handle_capture_manage,
+        ["/spin_api/capture_start"] = self.handle_capture_start,
+        ["/spin_api/capture_stop"] = self.handle_capture_stop,
         ["/spin_api/tcpdump"] = self.handle_tcpdump_manage,
         ["/spin_api/tcpdump_status"] = self.handle_tcpdump_status,
         ["/spin_api/tcpdump_start"] = self.handle_tcpdump_start,
@@ -712,6 +687,7 @@ function handler:init(args)
         ["/spin_api/notifications"] = self.handle_notification_list,
         ["/spin_api/notifications/create"] = self.handle_notification_add,
         ["/spin_api/configuration"] = self.handle_configuration,
+        ["/spin_api/jsonrpc"] = self.handle_rpc_call,
         ["/spin_api/ws"] = self.handle_websocket
     }
 
@@ -732,64 +708,14 @@ function handler:init(args)
         }
     }
 
-    local client = mqtt.new()
-    client.ON_CONNECT = function()
-        vprint("Connected to MQTT broker")
-        client:subscribe(TRAFFIC_CHANNEL)
-        vprint("Subscribed to " .. TRAFFIC_CHANNEL)
-        if handle_incidents then
-            client:subscribe(INCIDENT_CHANNEL)
-            vprint("Subscribed to " .. INCIDENT_CHANNEL)
-        end
-    end
-
     local h = self
-
-    client.ON_MESSAGE = function(mid, topic, payload)
-      table.insert(h.mqtt_queue_msgs, payload)
-    end
-
---    client.ORIG_ON_MESSAGE = function(mid, topic, payload)
---        --print("[XX] message for you, sir!")
---        local success, pd = coxpcall.pcall(json.decode, payload)
---        if success and pd then
---            if topic == TRAFFIC_CHANNEL then
---                if pd["command"] and pd["command"] == "traffic" then
---                    h:handle_traffic_message(pd["result"], payload)
---                end
---            elseif handle_incidents and topic == INCIDENT_CHANNEL then
---                if pd["incident"] == nil then
---                    print("Error: no incident data found in " .. payload)
---                    print("Incident report ignored")
---                else
---                    local incident = pd["incident"]
---                    local ts = incident["incident_timestamp"]
---                    for i=ts-5,ts+5 do
---                        if handle_incident_report(incident, i) then break end
---                    end
---                end
---            end
---        end
---    end
-
-    print("[XX] connecting to " .. self.config.mqtt.host .. ":" .. self.config.mqtt.port)
-    a,b,c,d = client:connect(self.config.mqtt.host, self.config.mqtt.port)
-    --print(client:socket)
-    --client.socket = copas.wrap(client.socket)
-    --if a ~= nil then print("a: " .. a) end
-    if b ~= nil then print("b: " .. b) end
-    if c ~= nil then print("c: " .. c) end
-    if d ~= nil then print("d: " .. d) end
-
-    self.client = client
-    copas.addthread(self.mqtt_looper, self)
-    copas.addthread(self.mqtt_queue_looper, self)
 
     return true
 end
 
 function handler:handle_request(request, response)
     local result = nil
+
     -- handle OPTIONS separately for now
     if request.method == "OPTIONS" then
         self:set_cors_headers(response)

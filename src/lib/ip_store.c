@@ -1,6 +1,7 @@
-#include "ip_store.h"
 
 #include <stdarg.h>
+
+#include "ip_store.h"
 
 char* ipv4_val = "4";
 char* ipv6_val = "6";

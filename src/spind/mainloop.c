@@ -1,9 +1,9 @@
-#include <sys/time.h>
+
+#include <errno.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <string.h>
-#include <poll.h>
-#include <errno.h>
-
+#include <sys/time.h>
 #include <unistd.h>
 
 #include "mainloop.h"
@@ -43,13 +43,13 @@ static void panic(char *s) {
 
 // Register work function:  timeout in millisec
 void mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval) {
-    int i;
 
     spin_log(LOG_DEBUG, "Mainloop registered %s(..., %d, %d)\n", name, fd, toval);
     if (n_mnr >= MAXMNR) {
         panic("Ran out of MNR structs");
     }
     if (fd  != 0) {
+        int i;
         /* File descriptors if non-zero must be unique */
         for (i=0; i<n_mnr; i++) {
             if (mnr[i].mnr_fd == fd) {
@@ -129,7 +129,7 @@ wf_mainloop(void *arg, int data, int timeout) {
 
     spin_log(LOG_DEBUG, "Mainloop table\n");
     for (i=0; i<n_mnr; i++) {
-        spin_log(LOG_DEBUG, "MLE: %s %d(%d) %d\n", mnr[i].mnr_name, mnr[i].mnr_pollnumber, mnr[i].mnr_fd, mnr[i].mnr_nxttime.tv_usec);
+        spin_log(LOG_DEBUG, "MLE: %s %d(%d) %ld\n", mnr[i].mnr_name, mnr[i].mnr_pollnumber, mnr[i].mnr_fd, mnr[i].mnr_nxttime.tv_usec);
     }
 }
 
@@ -145,7 +145,7 @@ void mainloop_run() {
     STAT_COUNTER(polltime, polltime, STAT_TOTAL);
     STAT_COUNTER(mem, memextra, STAT_MAX);
 
-    mainloop_register("mainloop", wf_mainloop, (void *) 0, 0, 10000);
+    mainloop_register("mainloop", wf_mainloop, (void *) 0, 0, 60000);
     init_mltime();
     for (i=0; i<n_mnr; i++) {
         if (mnr[i].mnr_fd) {
@@ -196,12 +196,13 @@ void mainloop_run() {
                     // Who knows what is right
                     fds[pollnum].fd *= -1;
                 }
+
                 if (fds[pollnum].revents & POLLIN) {
                     argdata = 1;
                 }
             }
             if (argdata || argtmout) {
-                spin_log(LOG_DEBUG, "Mainloop calling %s (%d, %d)\n", mnr[i].mnr_name, argdata, argtmout);
+                //spin_log(LOG_DEBUG, "Mainloop calling %s (%d, %d)\n", mnr[i].mnr_name, argdata, argtmout);
                 (*mnr[i].mnr_wf)(mnr[i].mnr_wfarg, argdata, argtmout);
             }
         }

@@ -1,3 +1,5 @@
+#ifndef SPIN_CONFIG_H
+#define SPIN_CONFIG_H
 // if USE_UCI is defined we use UCI with section spin.spind
 // if not we use a file /etc/spin/spind.conf
 
@@ -14,9 +16,9 @@ int spinconfig_log_usesyslog();
 int spinconfig_log_loglevel();
 char *spinconfig_pubsub_host();
 int spinconfig_pubsub_port();
-char *spinconfig_pubsub_channel_commands();
 char *spinconfig_pubsub_channel_traffic();
 int spinconfig_pubsub_timeout();
+int spinconfig_pubsub_omitnode();
 int spinconfig_iptable_nflog_dns_group();
 int spinconfig_iptable_queue_block();
 int spinconfig_iptable_place_dns();
@@ -26,3 +28,4 @@ char *spinconfig_iptable_debug();
 // are kept after they have last been seen
 int spinconfig_node_cache_retain_time();
 
+#endif // SPIN_CONFIG_H

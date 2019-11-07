@@ -1,13 +1,10 @@
 #include <string.h>
-#include <stdlib.h>
 
-#include "config.h"
-#include "spin_log.h"
 #include "spinconfig.h"
+#include "spin_log.h"
 
 
 #if USE_UCI
-#include <uci.h>
 
 /*
  * WARNING!!
@@ -42,7 +39,6 @@ int get_config_entries() {
     struct uci_element *e;
     char buf[100];
 
-    // fprintf(stderr, "Reading configuration from UCI section %s\n", UCI_SECTION_NAME);
 
     c = uci_alloc_context();
 
@@ -74,8 +70,6 @@ int get_config_entries() {
     char *beginofkeyw, *endofkeyw;
     char *beginofvalue, *endofvalue;
     char *equalsptr;
-
-    fprintf(stderr, "Read configuration from %s\n", CONFIG_FILE);
 
     conf_file = fopen(CONFIG_FILE, "r");
     if (conf_file == 0) {

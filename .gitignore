@@ -28,12 +28,5 @@ src/tests/*_test
 src/lib/version.c
 src/lib/.deps
 src/m4/
-src/kernelmod/.deps
-src/kernelmod/.dirstamp
-src/kernelmod/pkt_info.h
-src/kernelmod/spin_cfg.h
-src/kernelmod/Module.symvers
-src/kernelmod/modules.order
-src/kernelmod/.tmp_versions/
 .idea/
 tags
