@@ -3,8 +3,10 @@ This is a prototype of the SPIN platform.
 
 # What is SPIN?
 
+This software is part of the [SPIN project](https://spin.sidnlabs.nl).
+
 SPIN stands for Security and Privacy for In-home Networks, it is a
-traffic visualization tool (and in the future analyzer) intended to
+traffic visualization tool and analysis tool intended to
 help protect the home network with an eye on the Internet of Things
 devices and the security problems they might bring.
 
@@ -14,7 +16,6 @@ network activity in a graphical interface, and has the option to block
 traffic on top of existing firewall functionality.
 
 For a screenshot, see [here](/doc/images/prototype-20170103.png?raw=true).
-
 
 # Building the source code
 
@@ -37,12 +38,12 @@ Pi 3. See the [Valibox website](https://valibox.sidnlabs.nl)
 - libnetfilter-log-dev
 - libldns-dev
 
-(TODO is this still needed?) - linux-headers-&lt;version&gt;
-
     `apt-get install gcc make autoconf libnfnetlink-dev libmnl-dev libnetfilter-queue-dev`
 
 Library dependencies:
 
+- libnetfilter-log1
+- libnetfilter-queue1
 - libnfnetlink0
 - libmnl
 
@@ -59,11 +60,15 @@ Lua dependencies (for client tooling, and web API):
 - luaposix
 
     `apt-get install libmosquitto-dev`
+
     `luarocks install lua-mosquitto luabitop luaposix lua-minittp`
 
 Runtime dependencies:
 - mosquitto (or any MQTT software that supports websockets as well)
 - kernel modules for conntrack and netfilter
+
+For the traffic capture functionality you'll also need:
+- tcpdump
 
 ### Building
 
@@ -113,20 +118,16 @@ load the kernel module and start the spin_mqtt.lua daemon.
 
 # Running SPIN
 
-(NOTE: in the current version, the IP address of the router/server is
-hardcoded to be 192.168.8.1; this is also the address used in this
-example. We are working on deriving this address automatically, or at
-the very least make it a configuration option).
-
 When the OpenWRT package is installed, SPIN should start automatically
 after a reboot. Simply use a browser to go to
-http://192.168.8.1/www/spin/graph.html to see it in action.
+http://192.168.8.1/www/spin/graph.html to see it in action (assuming that
+the router that is running SPIN has the internal IP 192.168.8.1).
 
 When installed locally, a few manual steps are required:
 
 (0. Configure your system to be a gateway, example instructions: [https://gridscale.io/en/community/tutorials/debian-router-gateway/](https://gridscale.io/en/community/tutorials/debian-router-gateway/))
 1. Configure and start an MQTT service; this needs to listen to port 1883 (mqtt) and 1884 (websockets protocol).
-2. Load the relevant kernel modules: `modprobe nf_conntrack_ipv4 nf_conntrack_ipv6 nfnetlink_log nfnetlink_queue`
+2. Load the relevant kernel modules: `modprobe nf_conntrack nfnetlink_log nfnetlink_queue`. On some systems, the conntrack modules are split into several separate modules, in which case you'll need to run modprobe on `nf_conntrack_ipv4` and `nf_conntrack_ipv6` as well.
 3. Enable conntrack accounting: `sysctl net.netfilter.nf_conntrack_acct=1`
 4. Start the spin daemon `(sudo) (cd ./src/build/spind/; spind -o -d)`
 5. Start the spin Web daemon `(sudo) (cd ./src/web_ui/; minittp-server -a 127.0.0.1 -p 8080 ./spin_webui.lua`
@@ -138,8 +139,8 @@ When installed locally, a few manual steps are required:
 The software contains three parts:
 
 - a daemon that aggregates traffic and DNS information (with nf_conntract and nflog) and sends it to MQTT
+- a web API
 - a html/javascript front-end for the user
-- a RESTful API (currently only a subset of the intended funcitonality)
 
 The information that is sent to MQTT contains the following types:
 * Traffic: information about traffic itself, source address, destination address, ports, and payload sizes

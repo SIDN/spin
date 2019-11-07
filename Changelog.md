@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.10] (2019-11-07)
 * The MQTT Traffic channel protocol has changed; node information is now sent in a separate subchannel,
 and flow information uses node id's instead of the full node data
 * Added RPC functionality: some information and functionality can now directly be accessed. If UBUS is
