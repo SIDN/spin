@@ -1,0 +1,7 @@
+# Todo SPIN Juli
+- Ubus/JSONRPC samen voegen
+- Alle bestaande RPC's migreren
+- Mosquitto pseudo RPC's (command channel) laten zitten
+- Code in spinhook.c op logischer plek
+- Nieuwe RPC voor Sira maken
+- block flow veranderen naar device->node?

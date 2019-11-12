@@ -1,15 +1,9 @@
 
+#include <time.h>
+
 #include "dns_cache.h"
 #include "spin_log.h"
 
-#include <stdlib.h>
-
-#include <assert.h>
-
-#include <time.h>
-
-#include "tree.h"
-#include "util.h"
 
 dns_cache_entry_t*
 dns_cache_entry_create() {

@@ -1,6 +1,7 @@
-#include "spin_log.h"
 
 #include <stdio.h>
+
+#include "spin_log.h"
 
 int use_syslog_ = 1;
 int log_verbosity = 6;

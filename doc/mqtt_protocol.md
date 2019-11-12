@@ -168,18 +168,18 @@ After the proposed changes:
           "total_count":2
        }
     }
-### Node update
+### Node information
 
 A node update contains the same information as a node element from the
 previous section; it contains (additional) information about a node
 that has been seen earlier.
 
-** Proposed change is to re-add this, perhaps with different name. nodeDescr iso nodeUpdate?? **
+** Proposed change is to re-add this, with different name. nodeInfo**
 
 ### Node update example
 
     {
-       "command":"nodeUpdate",
+       "command":"nodeInfo",
        "argument":"",
        "result":{
           "id":11,
@@ -194,6 +194,29 @@ that has been seen earlier.
        }
     }
 
+Nodes can disappear for two reasons:
+- They are merged into another node, effectively joining the information about the two nodes
+- They can disappear because of a timeout
+
+These disappearances have to published:
+
+    {
+       "command":"nodeMerge",
+       "argument":"",
+       "result":{
+          "id":11,
+          "merged-to":173
+       }
+    }
+    
+    {
+       "command":"nodeDeleted",
+       "argument":"",
+       "result":{
+          "id":11,
+       }
+    }
+    
 ### Configuration commands
 
 The client can send commands to the SPIN daemon on the 'SPIN/commands' topic. These usually have no "result" value, but often do contain an "argument" section.

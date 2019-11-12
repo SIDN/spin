@@ -1,30 +1,25 @@
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
+#include <sys/stat.h>
 #include <signal.h>
 #include <time.h>
 #include <assert.h>
 
-#include "spinconfig.h"
-#include "pkt_info.h"
-#include "util.h"
-#include "spin_list.h"
-#include "node_cache.h"
-#include "dns_cache.h"
-#include "tree.h"
-#include "spin_log.h"
-#include "core2pubsub.h"
 #include "core2block.h"
-#include "core2nflog_dns.h"
 #include "core2conntrack.h"
-
-#include "handle_command.h"
+#include "core2extsrc.h"
+#include "core2nflog_dns.h"
+#include "core2pubsub.h"
+#include "ipl.h"
 #include "mainloop.h"
+#include "nflogroutines.h"
+#include "nfqroutines.h"
+#include "rpc_calls.h"
+#include "rpc_json.h"
+#include "spinconfig.h"
+#include "spinhook.h"
+#include "spin_log.h"
 #include "statistics.h"
 #include "version.h"
+#include "config.h"
 
 node_cache_t* node_cache;
 dns_cache_t* dns_cache;
@@ -37,92 +32,139 @@ int stop_on_error;
 
 STAT_MODULE(spind)
 
-#define JSONBUFSIZ      4096
 
-unsigned int create_mqtt_command(buffer_t* buf, const char* command, char* argument, char* result) {
 
-    buffer_write(buf, "{ \"command\": \"%s\"", command);
-    if (argument != NULL) {
-        buffer_write(buf, ", \"argument\": %s", argument);
+
+/*
+ * End of node info store code
+ */
+
+static void
+send_command_node_info(int nodenum, spin_data sd) {
+    char mosqchan[100];
+    spin_data command;
+
+    command = spin_data_create_mqtt_command("nodeInfo", NULL, sd);
+
+    sprintf(mosqchan, "SPIN/traffic/node/%d", nodenum);
+    core2pubsub_publish_chan(mosqchan, command, 1);
+
+    spin_data_delete(command);
+}
+
+static void
+update_node_ips(int nodenum, tree_t *tree) {
+    tree_entry_t* ip_entry;
+
+    ip_entry = tree_first(tree);
+    while (ip_entry != NULL) {
+        c2b_node_ipaddress(nodenum, ip_entry->key);
+        ip_entry = tree_next(ip_entry);
     }
-    if (result != NULL) {
-        buffer_write(buf, ", \"result\": %s", result);
+}
+
+// TODO: move to lib?
+
+#define NODE_FILENAME_DIR "/etc/spin/nodestore"
+#define NODEPAIRFILE "/etc/spin/nodepair.list"
+static char node_filename[100];
+static char *
+node_filename_int(int nodenum) {
+    sprintf(node_filename, "%s/%d", NODE_FILENAME_DIR, nodenum);
+    return node_filename;
+}
+static void
+store_node_info(int nodenum, spin_data sd) {
+    FILE *nodefile;
+    char *sdstr;
+
+    mkdir(NODE_FILENAME_DIR, 0777);
+    nodefile = fopen(node_filename_int(nodenum), "w");
+    sdstr = spin_data_serialize(sd);
+    fprintf(nodefile, "%s\n", sdstr);
+    spin_data_ser_delete(sdstr);
+    fclose(nodefile);
+}
+
+static void
+node_is_updated(node_t *node) {
+    spin_data sd;
+
+    sd = spin_data_node(node);
+    if (node->persistent) /* Persistent? */ {
+        // Store modified node in file
+        store_node_info(node->id, sd);
+
+        // Update IP addresses in c2b
+        update_node_ips(node->id, node->ips);
     }
-    buffer_write(buf, " }");
-    return buf->pos;
+    // This effectively deletes sd
+    send_command_node_info(node->id, sd);
+}
+
+void
+publish_nodes() {
+
+    // Currently called just before traffic messages
+    // Maybe also with timer?
+    //
+    // If so, how often?
+
+    node_callback_new(node_cache, node_is_updated);
 }
 
 void send_command_blocked(pkt_info_t* pkt_info) {
-    buffer_t* response_json = buffer_create(JSONBUFSIZ);
-    buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
-    unsigned int p_size;
+    spin_data pkt_sd, cmd_sd;
 
-    p_size = pkt_info2json(node_cache, pkt_info, pkt_json);
-    if (p_size > 0) {
-        buffer_finish(pkt_json);
-        create_mqtt_command(response_json, "blocked", NULL, buffer_str(pkt_json));
-        if (buffer_finish(response_json)) {
-            core2pubsub_publish(response_json);
-        } else {
-            spin_log(LOG_WARNING, "Error converting blocked pkt_info to JSON; partial packet: %s\n", buffer_str(response_json));
-        }
-    } else {
-        spin_log(LOG_DEBUG, "[XX] did not get an actual block command (size 0)\n");
-    }
-    buffer_destroy(response_json);
-    buffer_destroy(pkt_json);
+    // Publish recently changed nodes
+    publish_nodes();
+
+    pkt_sd = spin_data_pkt_info(node_cache, pkt_info);
+    cmd_sd = spin_data_create_mqtt_command("blocked", NULL, pkt_sd);
+
+    core2pubsub_publish_chan(NULL, cmd_sd, 0);
+
+    spin_data_delete(cmd_sd);
 }
 
 void send_command_dnsquery(dns_pkt_info_t* pkt_info) {
-    buffer_t* response_json = buffer_create(JSONBUFSIZ);
-    buffer_t* pkt_json = buffer_create(JSONBUFSIZ);
-    unsigned int p_size;
-    STAT_COUNTER(ctr, dnsquerysize, STAT_MAX);
+    spin_data dns_sd, cmd_sd;
 
-    p_size = dns_query_pkt_info2json(node_cache, pkt_info, pkt_json);
-    if (p_size > 0) {
-        spin_log(LOG_DEBUG, "[XX] got an actual dns query command (size >0)\n");
-        buffer_finish(pkt_json);
+    // Publish recently changed nodes
+    publish_nodes();
 
-        STAT_VALUE(ctr, strlen(buffer_str(pkt_json)));
+    dns_sd = spin_data_dns_query_pkt_info(node_cache, pkt_info);
+    cmd_sd = spin_data_create_mqtt_command("dnsquery", NULL, dns_sd);
 
-        create_mqtt_command(response_json, "dnsquery", NULL, buffer_str(pkt_json));
-        if (buffer_finish(response_json)) {
-            core2pubsub_publish(response_json);
-        } else {
-            spin_log(LOG_WARNING, "Error converting dnsquery pkt_info to JSON; partial packet: %s\n", buffer_str(response_json));
-        }
-    } else {
-        spin_log(LOG_DEBUG, "[XX] did not get an actual dns query command (size 0)\n");
-    }
-    buffer_destroy(response_json);
-    buffer_destroy(pkt_json);
+    core2pubsub_publish_chan(NULL, cmd_sd, 0);
+
+    spin_data_delete(cmd_sd);
 }
 
 // function definition below
 // void connect_mosquitto(const char* host, int port);
-
 void maybe_sendflow(flow_list_t *flow_list, time_t now) {
-    buffer_t* json_buf = buffer_create(JSONBUFSIZ);
-    buffer_allow_resize(json_buf);
     STAT_COUNTER(ctr1, send-flow, STAT_TOTAL);
     STAT_COUNTER(ctr2, create-traffic, STAT_TOTAL);
 
     if (flow_list_should_send(flow_list, now)) {
         STAT_VALUE(ctr1, 1);
         if (!flow_list_empty(flow_list)) {
+            spin_data cmd_sd;
+
+            // Publish recently changed nodes
+            publish_nodes();
+
             // create json, send it
-            buffer_reset(json_buf);
             STAT_VALUE(ctr2, 1);
-            create_traffic_command(node_cache, flow_list, json_buf, now);
-            if (buffer_finish(json_buf)) {
-                core2pubsub_publish(json_buf);
-                // mosq_result = mosquitto_publish(mosq, NULL, MQTT_CHANNEL_TRAFFIC, buffer_size(json_buf), buffer_str(json_buf), 0, false);
-            }
+            cmd_sd = spin_data_create_traffic(node_cache, flow_list, now);
+            core2pubsub_publish_chan(NULL, cmd_sd, 0);
+
+            spin_data_delete(cmd_sd);
+
         }
         flow_list_clear(flow_list, now);
     }
-    buffer_destroy(json_buf);
 }
 
 void
@@ -141,116 +183,34 @@ report_block(int af, int proto, uint8_t *src_addr, uint8_t *dest_addr, unsigned 
     send_command_blocked(&pkt);
 }
 
-/*
- * The three lists of IP addresses are now kept in memory in spind, with
- * a copy written to file.
- * BLOCK, IGNORE, ALLOW
+/* Worker function to regularly synchronize the ip lists
+ * (see spin_list.h) to persistent storage
  */
-// TODO: move this out to the library, this feels like pretty commonly shared code
-struct list_info {
-    tree_t *        li_tree;                 // Tree of IP addresses
-    char *          li_filename;             // Name of shadow file
-    int                     li_modified;     // File should be written
-} ipl_list_ar[N_IPLIST] = {
-    { 0, "/etc/spin/block.list",   0 },
-    { 0, "/etc/spin/ignore.list",  0 },
-    { 0, "/etc/spin/allow.list",   0 },
-};
-
-#define ipl_block ipl_list_ar[IPLIST_BLOCK]
-#define ipl_ignore ipl_list_ar[IPLIST_IGNORE]
-#define ipl_allow ipl_list_ar[IPLIST_ALLOW]
-
 void wf_ipl(void *arg, int data, int timeout) {
     int i;
     struct list_info *lip;
+    char *fname;
+    struct list_info* ipl_list_ar = get_spin_iplists();
 
     if (timeout) {
         // What else could it be ??
         for (i=0; i<N_IPLIST; i++) {
             lip = &ipl_list_ar[i];
             if (lip->li_modified) {
-                store_ip_tree(lip->li_tree, lip->li_filename);
+                fname = ipl_filename(lip);
+                store_ip_tree(lip->li_tree, fname);
                 lip->li_modified = 0;
             }
         }
     }
 }
 
-void init_ipl(struct list_info *lip) {
-    int cnt;
-
-    lip->li_tree = tree_create(cmp_ips);
-    cnt = read_ip_tree(lip->li_tree, lip->li_filename);
-    spin_log(LOG_DEBUG, "File %s, read %d entries\n", lip->li_filename, cnt);
-}
-
-void init_all_ipl() {
-    int i;
-    struct list_info *lip;
-
-    for (i=0; i<N_IPLIST; i++) {
-        lip = &ipl_list_ar[i];
-        init_ipl(lip);
-    }
+void
+init_ipl_list_ar() {
+    init_all_ipl(get_spin_iplists());
 
     // Sync trees to files every 2.5 seconds for now
     mainloop_register("IP list sync", wf_ipl, (void *) 0, 0, 2500);
-}
-
-static void
-add_ip_tree_to_li(tree_t* tree, struct list_info *lip) {
-    tree_entry_t* cur;
-
-    if (tree == NULL)
-        return;
-    cur = tree_first(tree);
-    while(cur != NULL) {
-        tree_add(lip->li_tree, cur->key_size, cur->key, cur->data_size, cur->data, 1);
-        cur = tree_next(cur);
-    }
-    lip->li_modified++;
-}
-
-static void
-remove_ip_tree_from_li(tree_t *tree, struct list_info *lip) {
-    tree_entry_t* cur;
-
-    if (tree == NULL) {
-        return;
-    }
-    cur = tree_first(tree);
-    while(cur != NULL) {
-        tree_remove(lip->li_tree, cur->key_size, cur->key);
-        cur = tree_next(cur);
-    }
-    lip->li_modified++;
-}
-
-void remove_ip_from_li(ip_t* ip, struct list_info *lip) {
-
-    tree_remove(lip->li_tree, sizeof(ip_t), ip);
-    lip->li_modified++;
-}
-
-int ip_in_li(ip_t* ip, struct list_info* lip) {
-
-    return tree_find(lip->li_tree, sizeof(ip_t), ip) != NULL;
-}
-
-int ip_in_ignore_list(ip_t* ip) {
-
-    return ip_in_li(ip, &ipl_list_ar[IPLIST_IGNORE]);
-}
-
-// hmz, we probably want to refactor ip_t/the tree list
-// into something that requires less data copying
-int addr_in_ignore_list(int family, uint8_t* addr) {
-    ip_t ip;
-
-    ip.family = family;
-    memcpy(ip.addr, addr, 16);
-    return ip_in_ignore_list(&ip);
 }
 
 #define MAXSR 3 /* More than this would be excessive */
@@ -277,211 +237,7 @@ void spin_register(char *name, spinfunc wf, void *arg, int list[N_IPLIST]) {
     n_sr++;
 }
 
-static void
-list_inout_do_ip(int iplist, int addrem, ip_t *ip_addr) {
-    int i;
-
-    for (i = 0; i < n_sr; i++) {
-        if (sr[i].sr_list[iplist]) {
-            // This one is interested
-            spin_log(LOG_DEBUG, "Called spin list func %s(%d,%d)\n",
-                                sr[i].sr_name, iplist, addrem);
-            (*sr[i].sr_wf)(sr[i].sr_wfarg, iplist, addrem, ip_addr);
-        }
-    }
-}
-
-static void
-call_kernel_for_tree(int iplist, int addrem, tree_t *tree) {
-    tree_entry_t* ip_entry;
-
-    ip_entry = tree_first(tree);
-    while (ip_entry != NULL) {
-        // spin_log(LOG_DEBUG, "ckft: %d %x\n", cmd, tree);
-        list_inout_do_ip(iplist, addrem, ip_entry->key);
-        ip_entry = tree_next(ip_entry);
-    }
-}
-
-static void
-push_ips_from_list_to_kernel(int iplist) {
-
-    //
-    // Make sure the kernel gets to know on init
-    //
-    call_kernel_for_tree(iplist, SF_ADD, ipl_list_ar[iplist].li_tree);
-}
-
-void push_all_ipl() {
-    int i;
-
-    for (i=0; i<N_IPLIST; i++) {
-        // Push into kernel
-        push_ips_from_list_to_kernel(i);
-    }
-}
-
-static void
-call_kernel_for_node_ips(int listid, int addrem, node_t *node) {
-
-    if (node == NULL) {
-        return;
-    }
-    call_kernel_for_tree(listid, addrem, node->ips);
-}
-
-void handle_command_remove_ip_from_list(int iplist, ip_t* ip) {
-
-    list_inout_do_ip(iplist, SF_REM, ip);
-    remove_ip_from_li(ip, &ipl_list_ar[iplist]);
-}
-
-void handle_command_remove_all_from_list(int iplist) {
-    tree_entry_t* ip_entry;
-
-    ip_entry = tree_first(ipl_list_ar[iplist].li_tree);
-    while (ip_entry != NULL) {
-        list_inout_do_ip(iplist, SF_REM, ip_entry->key);
-        ip_entry = tree_next(ip_entry);
-    }
-    // Remove whole tree, will be recreated
-    tree_destroy(ipl_list_ar[iplist].li_tree);
-}
-
-static node_t *
-find_node_id(int node_id) {
-    node_t *node;
-
-    /*
-     * Find it and give warning if non-existent. This should not happen.
-     */
-    node = node_cache_find_by_id(node_cache, node_id);
-    if (node == NULL) {
-        spin_log(LOG_WARNING, "Node-id %d not found!\n", node_id);
-        return NULL;
-    }
-    return node;
-}
-
-// Switch code
-void handle_list_membership(int listid, int addrem, int node_id) {
-    node_t* node;
-
-    if ((node = find_node_id(node_id)) == NULL)
-        return;
-
-    node->is_onlist[listid] = addrem == SF_ADD ? 1 : 0;
-
-    call_kernel_for_node_ips(listid, addrem, node);
-    if (addrem == SF_ADD) {
-        add_ip_tree_to_li(node->ips, &ipl_list_ar[listid]);
-    } else {
-        remove_ip_tree_from_li(node->ips, &ipl_list_ar[listid]);
-    }
-}
-
-void handle_command_reset_ignores() {
-
-    // clear the ignores; derive them from our own addresses again
-
-    // First remove all current ignores
-    handle_command_remove_all_from_list(IPLIST_IGNORE);
-
-    // Now generate new list
-    system("/usr/lib/spin/show_ips.lua -o /etc/spin/ignore.list -f");
-
-    // Load the ignores again
-    init_ipl(&ipl_list_ar[IPLIST_IGNORE]);
-    push_ips_from_list_to_kernel(IPLIST_IGNORE);
-}
-
-void handle_command_add_name(int node_id, char* name) {
-    // find the node
-    node_t* node = node_cache_find_by_id(node_cache, node_id);
-    tree_entry_t* ip_entry;
-
-    if (node == NULL) {
-        return;
-    }
-    node_set_name(node, name);
-
-    // re-read node names, just in case someone has been editing it
-    // TODO: make filename configurable? right now it will silently fail
-    node_names_read_userconfig(node_cache->names, "/etc/spin/names.conf");
-
-    // if it has a mac address, use that, otherwise, add for all its ip
-    // addresses
-    if (node->mac != NULL) {
-        node_names_add_user_name_mac(node_cache->names, node->mac, name);
-    } else {
-        ip_entry = tree_first(node->ips);
-        while (ip_entry != NULL) {
-            node_names_add_user_name_ip(node_cache->names, (ip_t*)ip_entry->key, name);
-            ip_entry = tree_next(ip_entry);
-        }
-    }
-    // TODO: make filename configurable? right now it will silently fail
-    node_names_write_userconfig(node_cache->names, "/etc/spin/names.conf");
-}
-
-static void
-iptree2json(tree_t* tree, buffer_t* result) {
-    tree_entry_t* cur;
-    char ip_str[INET6_ADDRSTRLEN];
-    char *prefix;
-
-    cur = tree_first(tree);
-
-    if (cur == NULL) {
-        // empty tree
-        buffer_write(result, " [ ] ");
-        return;
-    }
-
-    // Prefix is [ at first, after that ,
-    prefix = " [ ";
-
-    while (cur != NULL) {
-        spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
-        buffer_write(result, prefix);
-        buffer_write(result, "\"%s\" ", ip_str);
-        prefix = " , ";
-        cur = tree_next(cur);
-    }
-    buffer_write(result, " ] ");
-}
-
-void handle_command_get_iplist(int iplist, const char* json_command) {
-    buffer_t* response_json = buffer_create(JSONBUFSIZ);
-    buffer_t* result_json = buffer_create(JSONBUFSIZ);
-
-    iptree2json(ipl_list_ar[iplist].li_tree, result_json);
-    if (!buffer_ok(result_json)) {
-        buffer_destroy(result_json);
-        buffer_destroy(response_json);
-        return;
-    }
-    buffer_finish(result_json);
-
-    spin_log(LOG_DEBUG, "get_iplist result %s\n", buffer_str(result_json));
-
-    create_mqtt_command(response_json, json_command, NULL, buffer_str(result_json));
-    if (!buffer_ok(response_json)) {
-        buffer_destroy(result_json);
-        buffer_destroy(response_json);
-        return;
-    }
-    buffer_finish(response_json);
-
-    core2pubsub_publish(response_json);
-
-    buffer_destroy(result_json);
-    buffer_destroy(response_json);
-
-}
-
 void int_handler(int signal) {
-
     mainloop_end();
 }
 
@@ -513,20 +269,32 @@ void print_help() {
 void node_cache_clean_wf() {
     // should we make this configurable?
     const uint32_t node_cache_retain_seconds = spinconfig_node_cache_retain_time();
+    static int runcounter;
     uint32_t older_than = time(NULL) - node_cache_retain_seconds;
-    node_cache_clean(node_cache, older_than);
+
+    spinhook_clean(node_cache);
+    runcounter++;
+    if (runcounter > 3) {
+        node_cache_clean(node_cache, older_than);
+        runcounter = 0;
+    }
 }
+
+#define CLEAN_TIMEOUT 15000
 
 void init_cache() {
     dns_cache = dns_cache_create();
     node_cache = node_cache_create();
-    mainloop_register("node_cache_clean", node_cache_clean_wf, (void *) 0, 0, 60000);
+
+    mainloop_register("node_cache_clean", node_cache_clean_wf, (void *) 0, 0, CLEAN_TIMEOUT);
 }
 
 void cleanup_cache() {
     dns_cache_destroy(dns_cache);
     node_cache_destroy(node_cache);
 }
+
+void ubus_main();
 
 int main(int argc, char** argv) {
     int c;
@@ -584,26 +352,46 @@ int main(int argc, char** argv) {
     spin_log_init(use_syslog, log_verbosity, "spind");
     log_version();
 
+    SPIN_STAT_START();
+
     init_cache();
 
-    init_core2conntrack(node_cache, local_mode);
+    init_core2conntrack(node_cache, local_mode, spinhook_traffic);
     init_core2nflog_dns(node_cache, dns_cache);
 
     init_core2block();
 
-    init_all_ipl();
+    init_core2extsrc(node_cache, dns_cache);
+
+    init_ipl_list_ar();
+
+    init_rpcs(node_cache);
 
     init_mosquitto(mosq_host, mosq_port);
     signal(SIGINT, int_handler);
 
-    push_all_ipl();
+#ifdef USE_UBUS 
+    ubus_main();
+#else
+    init_json_rpc();
+#endif
 
     mainloop_run();
 
     cleanup_cache();
     cleanup_core2block();
+    cleanup_core2conntrack();
+    cleanup_core2nflog_dns();
+    cleanup_core2extsrc();
+
+    nfq_close_handle();
+    nflog_close_handle();
+    rpc_cleanup();
 
     finish_mosquitto();
+    clean_all_ipl();
+
+    SPIN_STAT_FINISH();
 
     return 0;
 }

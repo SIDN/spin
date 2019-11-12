@@ -1,23 +1,21 @@
-#include <stdio.h>
+
+#include <stdint.h>
+#include <assert.h>
+#include <fcntl.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
+#include <stdint.h>
+#include <libnetfilter_queue/libnetfilter_queue.h>
 #include <netinet/in.h>
-#include <linux/types.h>
-#include <linux/netfilter.h>
-#include <linux/udp.h>
-#include <linux/tcp.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
-#include <libnetfilter_queue/libnetfilter_queue.h>
-#include <fcntl.h>
+#include <linux/netfilter.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
 
-#include <assert.h>
-
-#include "spin_log.h"
-//#include "pkt_info.h"
 #include "mainloop.h"
 #include "nfqroutines.h"
+#include "spin_log.h"
 #include "statistics.h"
 
 STAT_MODULE(nfq)
@@ -277,7 +275,7 @@ nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
         return nfq_set_verdict(qh, id, verdict ? NF_ACCEPT : NF_DROP, 0, NULL);
 }
 
-static struct nfq_handle *library_handle;
+static struct nfq_handle *library_handle = NULL;
 static int library_fd;
 
 static void
@@ -338,4 +336,19 @@ void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
     nfr[n_nfr].nfr_qh = qh;
     nfr[n_nfr].nfr_packets = 0;
     n_nfr++;
+}
+
+void nfqroutine_close(char* name) {
+    int i;
+    for (i=0; i < n_nfr; i++) {
+        if (strcmp(nfr[i].nfr_name, name) == 0) {
+            nfq_destroy_queue(nfr[i].nfr_qh);
+        }
+    }
+}
+
+void nfq_close_handle() {
+    if (library_handle != NULL) {
+        nfq_close(library_handle);
+    }
 }

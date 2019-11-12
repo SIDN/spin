@@ -1,9 +1,8 @@
 
-#include "node_names.h"
-
-#include <stdio.h>
 #include <errno.h>
-#include <string.h>
+
+#include "node_names.h"
+#include "spin_log.h"
 
 node_names_t* node_names_create(void) {
     node_names_t* node_names = (node_names_t*) malloc(sizeof(node_names_t));
@@ -348,6 +347,7 @@ node_names_write_userconfig(node_names_t* node_names, const char* filename) {
     tree_entry_t* cur;
     FILE* output_file = fopen(filename, "w");
     char ip_str[INET6_ADDRSTRLEN];
+    int i = 0;
 
     if (output_file == NULL) {
         return -1;
@@ -357,11 +357,13 @@ node_names_write_userconfig(node_names_t* node_names, const char* filename) {
     while (cur != NULL) {
         spin_ntop(ip_str, cur->key, INET6_ADDRSTRLEN);
         fprintf(output_file, "name: %s %s\n", ip_str, (char*)cur->data);
+        i++;
         cur = tree_next(cur);
     }
     cur = tree_first(node_names->user_names_by_mac);
     while (cur != NULL) {
         fprintf(output_file, "name: %s %s\n", (char*)cur->key, (char*)cur->data);
+        i++;
         cur = tree_next(cur);
     }
 

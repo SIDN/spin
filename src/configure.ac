@@ -19,6 +19,8 @@ dnl Checks for header files.
 AC_HEADER_DIRENT
 AC_HEADER_STDC
 AC_CHECK_HEADERS(fcntl.h unistd.h)
+AC_CHECK_HEADER([netinet/if_ether.h], AC_DEFINE([HAVE_NETINET_IF_ETHER_H], [1], [netinet/if_ether.h available]))
+AC_CHECK_HEADER([net/ethernet.h], AC_DEFINE([HAVE_NET_ETHERNET_H], [1], [net/ethernet.h available]))
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -34,9 +36,6 @@ AC_PROG_RANLIB
 
 regular_CFLAGS="-Wall -Wextra -Wno-unused-parameter -Werror -O0"
 AC_SUBST([regular_CFLAGS])
-
-dnl Check for the right nfnetlink version
-PKG_CHECK_MODULES([libnfnetlink], [libnfnetlink >= 1.0.1])
 
 AC_CHECK_LIB([mosquitto], [mosquitto_lib_version], [], [AC_MSG_ERROR([libmosquitto not found])])
 
@@ -61,6 +60,16 @@ AC_CHECK_LIB([uci], [uci_alloc_context],
         AC_DEFINE([USE_UCI], [0], [Do not use UCI for configuration])
     ])
 
+AC_CHECK_LIB([ubus], [ubus_connect],
+    [
+        use_ubus=1
+        AC_DEFINE([USE_UBUS], [1], [Use UBUS for RPC])
+    ],
+    [
+        use_ubus=0
+    ])
+AM_CONDITIONAL([USE_UBUS],  [test "x$use_ubus" = "x1"])
+
 AC_ARG_WITH(linux-headers,
     AC_HELP_STRING([--with-linux-headers=PATH], [specify path of linux headers]),
     [ AC_SUBST(KERNELPATH, "$withval") ]
@@ -68,13 +77,22 @@ AC_ARG_WITH(linux-headers,
 
 MAKEFILES="Makefile src/Makefile"
 
+AC_ARG_ENABLE(spin-pcap-reader,
+              AC_HELP_STRING([--enable-spin-pcap-reader], [enable spin-pcap-reader]),
+              [
+                MAKEFILES="$MAKEFILES tools/spin-pcap-reader/Makefile";
+                AC_CONFIG_FILES(tools/spin-pcap-reader/Makefile)
+                CFLAGS="$CFLAGS -g -O0"
+                AC_CHECK_LIB([pcap], [pcap_create], [LDFLAGS="$LDFLAGS -lpcap"], [AC_MSG_ERROR([pcap not found])])
+              ], [])
+
 AC_ARG_ENABLE(tests,
               AC_HELP_STRING([--enable-tests], [enable unit tests and code coverage]),
               [
                 MAKEFILES="$MAKEFILES lib/tests/Makefile";
                 AC_SUBST(TESTDIR, "tests")
                 AC_CONFIG_FILES(lib/tests/Makefile)
-                CFLAGS="-g -O0"
+                CFLAGS="$CFLAGS -g -O0"
               ], [])
 
 
@@ -82,7 +100,5 @@ AC_CONFIG_FILES(
     Makefile
     lib/Makefile
     spind/Makefile
-    tools/spin_print/Makefile
-    tools/spin_config/Makefile
 )
 AC_OUTPUT
