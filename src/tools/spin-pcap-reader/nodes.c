@@ -1,5 +1,10 @@
 #include "config.h"
 
+#include <sys/types.h>
+#include <sys/socket.h>
+
+#include <net/if.h>
+#include <netinet/in.h>
 #ifdef HAVE_NET_ETHERNET_H
 #include <net/ethernet.h>
 #endif
