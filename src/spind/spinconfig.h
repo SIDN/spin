@@ -27,5 +27,6 @@ char *spinconfig_iptable_debug();
 // The time (in seconds) that node_cache entries
 // are kept after they have last been seen
 int spinconfig_node_cache_retain_time();
-
+int spinconfig_dots_enabled();
+int spinconfig_dots_log_only();
 #endif // SPIN_CONFIG_H
