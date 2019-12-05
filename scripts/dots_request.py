@@ -111,36 +111,19 @@ def main(args):
 
     if args.print:
         print(json.dumps(mr.as_obj(), indent=2))
-    if True:
-        sender = RPCSender()
+    if args.apply:
+        sender = RPCSender(url=args.url)
         result = sender.send(mr)
         if result:
             print(result)
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('-s', '--source', type=str, action='append', default=[], help='Source prefix')
-    parser.add_argument('-t', '--target', type=str, action='append', default=[], help='Target prefix')
+    parser.add_argument('-s', '--source', type=str, action='append', default=[], help='Source prefix (can be used multiple times)')
+    parser.add_argument('-t', '--target', type=str, action='append', default=[], help='Target prefix (can be used multiple times)')
     parser.add_argument('-p', '--print', action="store_true", help="Print the request as json")
+    parser.add_argument('-a', '--apply', action="store_true", help="Send the command to the SPIN JSON-RPC API")
+    parser.add_argument('-u', '--url', help="Use the given URL for -a. Default: http://192.168.8.1/spin_api/jsonrpc")
 
     args = parser.parse_args()
     main(args)
-
-
-SAMPLE = """
-     {
-       "ietf-dots-signal-channel:mitigation-scope": {
-         "scope": [
-           {
-             "target-prefix": [
-                "2001:db8:c000::/128"
-              ],
-             "ietf-dots-call-home:source-prefix": [
-                "2001:db8:123::/128"
-              ],
-             "lifetime": 3600
-           }
-         ]
-       }
-     }
-"""
