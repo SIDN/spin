@@ -787,7 +787,6 @@ node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
             if (name != NULL) {
                 node_set_name(node, name);
             }
-
             // we may discover at this point that now we have two nodes with the same
             // mac address in our cache
             // the mac_cache fix should have made this unnecessary

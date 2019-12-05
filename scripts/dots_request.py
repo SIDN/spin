@@ -15,14 +15,10 @@ import sys
 
 class Prefix(object):
     def __init__(self, prefix_str):
-        self.prefix_str = prefix_str
         self.prefix = ipaddress.ip_network(prefix_str)
 
-    def validate(self):
-        pass
-
     def __str__(self):
-        return self.prefix_str
+        return str(self.prefix)
 
 class MitigationRequest(object):
     def __init__(self):
@@ -48,7 +44,7 @@ class MitigationRequest(object):
             scope['ietf-dots-call-home:source-prefix'] = [str(p) for p in self.source_prefixes]
 
         if self.target_prefixes:
-            scope['target-prefix'] = [str(p) for p in self.target_prefixes],
+            scope['target-prefix'] = [str(p) for p in self.target_prefixes]
 
         result = {
             "ietf-dots-signal-channel:mitigation-scope": {
@@ -58,6 +54,10 @@ class MitigationRequest(object):
         return result
 
 class RPCSender(object):
+    """
+    Creates and sends a JSON-RPC request to a SPIN device, containing
+    a MitigationRequest
+    """
     def __init__(self, url=None):
         if url is None:
             self.url = "http://192.168.8.1/spin_api/jsonrpc"
@@ -66,7 +66,7 @@ class RPCSender(object):
 
     def create_jsonrpc_request(self, mitigation_request):
         result = {
-            'method': 'dots-signal',
+            'method': 'dots_signal',
             'params': {
                 'dots_signal': mitigation_request.as_obj()
             }
@@ -74,9 +74,23 @@ class RPCSender(object):
 
         return result
 
-    def send(self):
-        #requests.
-        pass
+    def send(self, mitigation_request):
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+        data = self.create_jsonrpc_request(mitigation_request)
+        response = requests.post(self.url, data=json.dumps(data), headers=headers)
+        if response.content and response.content != "":
+            try:
+                print("[XX] RESPONSE: '%s'" % response.content)
+                return response.json()
+            except Exception as exc:
+                sys.stderr.write("Server response was not JSON: %s\n" % str(exc))
+                sys.stderr.write("Server response: %s\n" % response.content.decode('utf-8'))
+                return None
+        else:
+            return None
 
 def main(args):
     mr = MitigationRequest()
@@ -97,6 +111,11 @@ def main(args):
 
     if args.print:
         print(json.dumps(mr.as_obj(), indent=2))
+    if True:
+        sender = RPCSender()
+        result = sender.send(mr)
+        if result:
+            print(result)
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Process some integers.')

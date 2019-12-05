@@ -15,7 +15,9 @@ enum configs {
     IPTABLE_PLACE_DNS,
     IPTABLE_PLACE_BLOCK,
     IPTABLE_DEBUG,
-    NODE_CACHE_RETAIN_TIME
+    NODE_CACHE_RETAIN_TIME,
+    DOTS_ENABLED,   // Enable DOTS handler functionality
+    DOTS_LOG_ONLY, // Only LOG DOTS mitigation request matches (do not block them)
 };
 
 struct conf_item {
@@ -46,7 +48,11 @@ struct conf_item {
     [IPTABLE_DEBUG] =
             { "iptable_debug",              "/tmp/block_commands",                 0   },
     [NODE_CACHE_RETAIN_TIME] =
-            { "node_cache_retain_time",     "1800",              0   },
+            { "node_cache_retain_time",     "1800",             0   },
+    [DOTS_ENABLED] =
+            { "dots_enabled",               "0",                0   },
+    [DOTS_LOG_ONLY] =
+            { "dots_log_only",              "0",                0   },
  { 0, 0, 0 }
 };
 
@@ -168,4 +174,12 @@ char *spinconfig_iptable_debug() {
 
 int spinconfig_node_cache_retain_time() {
     return(spi_int(NODE_CACHE_RETAIN_TIME));
+}
+
+int spinconfig_dots_enabled() {
+    return(spi_int(DOTS_ENABLED));
+}
+
+int spinconfig_dots_log_only() {
+    return(spi_int(DOTS_LOG_ONLY));
 }
