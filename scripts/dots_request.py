@@ -118,7 +118,7 @@ def main(args):
             print(result)
 
 if __name__=='__main__':
-    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser = argparse.ArgumentParser(description='Create a DOTS signal phone home mitigation request.')
     parser.add_argument('-s', '--source', type=str, action='append', default=[], help='Source prefix (can be used multiple times)')
     parser.add_argument('-t', '--target', type=str, action='append', default=[], help='Target prefix (can be used multiple times)')
     parser.add_argument('-p', '--print', action="store_true", help="Print the request as json")
