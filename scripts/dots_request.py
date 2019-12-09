@@ -83,7 +83,6 @@ class RPCSender(object):
         response = requests.post(self.url, data=json.dumps(data), headers=headers)
         if response.content and response.content != "":
             try:
-                print("[XX] RESPONSE: '%s'" % response.content)
                 return response.json()
             except Exception as exc:
                 sys.stderr.write("Server response was not JSON: %s\n" % str(exc))
