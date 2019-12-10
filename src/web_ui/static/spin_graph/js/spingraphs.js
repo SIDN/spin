@@ -661,7 +661,6 @@ function showNetwork() {
     network.on("deselectNode", nodeDeselected);
     network.on("selectEdge", edgeSelected);
     network.on("deselectEdge", edgeDeselected);
-    network.on("dragStart", nodeSelected);
     network.on("zoom", enableZoomLock);
 }
 
