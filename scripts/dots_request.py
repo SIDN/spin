@@ -10,8 +10,37 @@
 import argparse
 import ipaddress
 import json
+import re
 import requests
 import sys
+
+
+range_matcher = re.compile("^([0-9]+)-([0-9]+)$")
+def parse_range(keyword, port_str):
+    """one of "80" or "80-89" """
+    match = range_matcher.match(port_str)
+    if match:
+        lower = int(match.group(1))
+        upper = int(match.group(2))
+        if lower > upper:
+            raise ValueError("Invalid %s range string, lower %s is larger than upper %s" % (keyword, keyword, keyword))
+        return {
+            "lower-%s" % keyword: lower,
+            "upper-%s" % keyword: upper,
+        }
+    else:
+        try:
+            return {
+                "lower-%s" % keyword: int(port_str)
+            }
+        except ValueError:
+            raise ValueError("Invalid %s range string, should be <number>[-<number>]" % keyword)
+
+def parse_port_range(port_str):
+    return parse_range("port", port_str)
+
+def parse_type_range(type_str):
+    return parse_range("type", type_str)
 
 class Prefix(object):
     def __init__(self, prefix_str):
@@ -25,6 +54,8 @@ class MitigationRequest(object):
         self.lifetime = 3600
         self.target_prefixes = []
         self.source_prefixes = []
+        self.ports = []
+        self.icmp_types = []
 
     def add_target_prefix(self, prefix):
         self.target_prefixes.append(Prefix(prefix))
@@ -34,6 +65,15 @@ class MitigationRequest(object):
 
     def set_lifetime(self, lifetime):
         self.lifetime = lifetime
+
+    def add_port_range(self, port_str):
+        """port_str can be a single port number ("80", or a range in the
+           form "80-89"
+        """
+        self.ports.append(parse_port_range(port_str))
+
+    def add_icmp_type_range(self, icmp_str):
+        self.icmp_types.append(parse_type_range(icmp_str))
 
     def as_obj(self):
         scope = {
@@ -45,6 +85,12 @@ class MitigationRequest(object):
 
         if self.target_prefixes:
             scope['target-prefix'] = [str(p) for p in self.target_prefixes]
+
+        if self.ports:
+            scope['target-port-range'] = self.ports
+
+        if self.icmp_types:
+            scope['source-icmp-type-range'] = self.icmp_types
 
         result = {
             "ietf-dots-signal-channel:mitigation-scope": {
@@ -108,6 +154,14 @@ def main(args):
                 print("Bad prefix: %s" % str(ve))
                 sys.exit(1)
 
+    if args.port:
+        for port_str in args.port:
+            mr.add_port_range(port_str)
+
+    if args.icmp:
+        for icmp_str in args.icmp:
+            mr.add_icmp_type_range(icmp_str)
+
     if args.print:
         print(json.dumps(mr.as_obj(), indent=2))
     if args.apply:
@@ -123,6 +177,8 @@ if __name__=='__main__':
     parser.add_argument('-p', '--print', action="store_true", help="Print the request as json")
     parser.add_argument('-a', '--apply', action="store_true", help="Send the command to the SPIN JSON-RPC API")
     parser.add_argument('-u', '--url', help="Use the given URL for -a. Default: http://192.168.8.1/spin_api/jsonrpc")
-
+    parser.add_argument('--port', type=str, action='append', default=[], help="Target port range (can be used multiple times)")
+    parser.add_argument('--icmp', type=str, action='append', default=[], help="ICMP Type range (can be used multiple times)")
     args = parser.parse_args()
+
     main(args)

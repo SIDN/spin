@@ -80,6 +80,13 @@ int cmp_strs(size_t size_a, const void* key_a, size_t size_b, const void* key_b)
     return 0;
 }
 
+// compares two 'ip_t addr' data by their raw 16 bytes
+int cmp_ipdata_raw(size_t size_a, const void* key_a, size_t size_b, const void* key_b) {
+    assert(size_a == 16);
+    assert(size_b == 16);
+    return memcmp(key_a, key_b, 16);
+}
+
 // hmm, we define these in node_cache as well. move to tree itself? (as helper functions?)
 int cmp_ips(size_t size_a, const void* key_a, size_t size_b, const void* key_b) {
     ip_t* ip_a = (ip_t*) key_a;

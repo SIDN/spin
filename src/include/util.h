@@ -14,6 +14,7 @@
 int cmp_ints(size_t size_a, const void* key_a, size_t size_b, const void* key_b);
 int cmp_2ints(size_t size_a, const void* key_a, size_t size_b, const void* key_b);
 int cmp_strs(size_t size_a, const void* key_a, size_t size_b, const void* key_b);
+int cmp_ipdata_raw(size_t size_a, const void* key_a, size_t size_b, const void* key_b);
 int cmp_ips(size_t size_a, const void* key_a, size_t size_b, const void* key_b);
 int cmp_domains(size_t size_a, const void* a, size_t size_b, const void* b);
 int cmp_pktinfos(size_t size_a, const void* a, size_t size_b, const void* b);
