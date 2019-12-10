@@ -195,8 +195,15 @@ device_flow_remove(node_cache_t *node_cache, tree_t *ftree, tree_entry_t* leaf) 
     STAT_VALUE(ctr, 1);
 }
 
-#define MAX_IDLE_PERIODS    10
-#define MIN_DEV_NEIGHBOURS  5
+// The minimum number of flows that are remembered for a device
+// (i.e. remote node, dst port, icmp_type combinations)
+#define MIN_DEV_NEIGHBOURS  10
+// Once more than MIN_DEV_NEIGHBOURS flows are stored,
+// we remove them based on idle time. This is
+// MAX_IDLE_PERIODS * CLEAN_TIMEOUT from spind (which is currently
+// 15000 ms). To set it to, say half an hour, this value should be
+// 120.
+#define MAX_IDLE_PERIODS    120
 
 static void
 device_clean(node_cache_t *node_cache, node_t *node, void *ap) {
@@ -244,14 +251,8 @@ spinhook_clean(node_cache_t *node_cache) {
     node_callback_devices(node_cache, device_clean, NULL);
 }
 
-static void
-node_merge_flow(node_cache_t *node_cache, node_t *node, void *ap) {
-    // XXXXXXXXXXXXXXX REPLACE WITH FUNCTIONAL VERSION AGAIN
-    return;
-}
-
 void
-orig_node_merge_flow(node_cache_t *node_cache, node_t *node, void *ap) {
+node_merge_flow(node_cache_t *node_cache, node_t *node, void *ap) {
     device_t *dev;
     tree_entry_t *srcleaf, *dstleaf;
     devflow_key_t* flow_key;
@@ -260,7 +261,6 @@ orig_node_merge_flow(node_cache_t *node_cache, node_t *node, void *ap) {
     STAT_COUNTER(ctr, merge-flow, STAT_TOTAL);
     int *nodenumbers = (int *) ap;
     int srcnodenum, dstnodenum;
-
     dev = node->device;
     assert(dev != NULL);
 
@@ -268,57 +268,63 @@ orig_node_merge_flow(node_cache_t *node_cache, node_t *node, void *ap) {
     dstnodenum = nodenumbers[1];
 
     spin_log(LOG_DEBUG, "Renumber %d->%d in flows(%d) of node %d:\n", srcnodenum, dstnodenum, dev->dv_nflows, node->id);
+    // We need to add every flow that has the source node number as a target
+    // to the list of flows that have the destination node number
+    // So we need to walk through the full list of flows of the source,
+    // and add/update all flows on the target accordingly
+    srcleaf = tree_first(dev->dv_flowtree);
 
-    srcleaf = tree_find(dev->dv_flowtree, sizeof(srcnodenum), &srcnodenum);
+    while (srcleaf != NULL) {
 
-    STAT_VALUE(ctr, srcleaf!= NULL);
+        dstleaf = tree_find(dev->dv_flowtree, sizeof(srcleaf->key), srcleaf->key);
+        if (dstleaf) {
 
-    if (srcleaf == NULL) {
-        // Nothing do to  here
-        return;
+            // This flow must be renumbered
+
+            // Merge these two flow numbers if destination also in flowlist
+            dstleaf = tree_find(dev->dv_flowtree, sizeof(dstnodenum), &dstnodenum);
+
+            src_node = node_cache_find_by_id(node_cache, srcnodenum);
+            assert(src_node != NULL);
+            assert(src_node->references > 0);
+
+            flow_key = (devflow_key_t*) srcleaf->key;
+
+            dfp = (devflow_t *) srcleaf->data;
+            srcleaf->key = NULL;
+            srcleaf->data = NULL;
+            tree_remove_entry(dev->dv_flowtree, srcleaf);
+
+            if (dstleaf != 0) {
+                // Merge the numbers
+                destdfp = (devflow_t *) dstleaf->data;
+                destdfp->dvf_packets += dfp->dvf_packets;;
+                destdfp->dvf_bytes += dfp->dvf_bytes;
+                destdfp->dvf_idleperiods = 0;
+                destdfp->dvf_activelastperiod = 1;
+
+                free(flow_key);
+                free(dfp);
+
+                dev->dv_nflows--;
+            } else {
+                // Reuse memory of key and data, renumber key, add it to the tree
+                dest_node = node_cache_find_by_id(node_cache, dstnodenum);
+                assert(dest_node != NULL);
+
+                devflow_key_t* dst_flow_key = flow_key;
+                dst_flow_key->dst_node_id = dstnodenum;
+                tree_add(dev->dv_flowtree, sizeof(int), dst_flow_key, sizeof(devflow_t), dfp, 0);
+                spin_log(LOG_DEBUG, "Added new leaf\n");
+                dest_node->references++;
+            }
+            src_node->references--;
+        }
+
+        STAT_VALUE(ctr, srcleaf != NULL);
+        srcleaf = tree_next(srcleaf);
     }
 
-    // This flow must be renumbered
-
-    // Merge these two flow numbers if destination also in flowlist
-    dstleaf = tree_find(dev->dv_flowtree, sizeof(dstnodenum), &dstnodenum);
-
-    src_node = node_cache_find_by_id(node_cache, srcnodenum);
-    assert(src_node != NULL);
-    assert(src_node->references > 0);
-
-    flow_key = (devflow_key_t*) srcleaf->key;
-
-    dfp = (devflow_t *) srcleaf->data;
-    srcleaf->key = NULL;
-    srcleaf->data = NULL;
-    tree_remove_entry(dev->dv_flowtree, srcleaf);
-
-    if (dstleaf != 0) {
-        // Merge the numbers
-        destdfp = (devflow_t *) dstleaf->data;
-        destdfp->dvf_packets += dfp->dvf_packets;;
-        destdfp->dvf_bytes += dfp->dvf_bytes;
-        destdfp->dvf_idleperiods = 0;
-        destdfp->dvf_activelastperiod = 1;
-
-        free(flow_key);
-        free(dfp);
-
-        dev->dv_nflows--;
-    } else {
-        // Reuse memory of key and data, renumber key
-        dest_node = node_cache_find_by_id(node_cache, dstnodenum);
-        assert(dest_node != NULL);
-
-        devflow_key_t* dst_flow_key = flow_key;
-        dst_flow_key->dst_node_id = dstnodenum;
-        //tree_add(dev->dv_flowtree, sizeof(int), remnodenump, sizeof(devflow_t), dfp, 0);
-//XXX        tree_add(dev->dv_flowtree, sizeof(int), dst_flow_key, sizeof(devflow_t), dfp, 0);
-        spin_log(LOG_DEBUG, "Added new leaf\n");
-        dest_node->references++;
-    }
-    src_node->references--;
 }
 
 void
