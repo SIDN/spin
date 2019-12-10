@@ -267,11 +267,21 @@ function handler:handle_capture_start(request, response)
     end
     self.active_dumps[dname] = dumper
 
+    -- send the response first, we will misuse this copas
+    -- coroutine to keep the tcpdump run() function going,
+    -- but the web client needs a response first
+    response:send_status()
+    response.content = "{}"
+    response:send_headers()
+    response:send_content()
+    response.raw_sock:close()
+
     dumper:run()
     -- remove it again
     self.active_dumps[dname] = nil
-    response.content = "{}"
-    return response
+
+    -- already responded, so return nothing now
+    return nil
 end
 
 function handler:handle_capture_stop(request, response)
@@ -281,8 +291,7 @@ function handler:handle_capture_stop(request, response)
     if self.active_dumps[dname] ~= nil then
         self.active_dumps[dname]:stop()
     end
-    response:set_header("Location", "/spin_api/tcpdump?device=" .. device)
-    response:set_status(302, "Found")
+    response:set_status(204, "No Content")
     return response
 end
 
