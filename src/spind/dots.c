@@ -58,9 +58,14 @@ int check_dots_match(spin_data scope, flow_entry_t* flow) {
 int dots_match_flows(node_cache_t* node_cache, spin_data scope, tree_entry_t* flow_entry, int* matches, char** error) {
     devflow_key_t* key = (devflow_key_t*) flow_entry->key;
     int node_id = key->dst_node_id;
+    int dest_port = key->dst_port;
     node_t* dest_node = node_cache_find_by_id(node_cache, node_id);
 
     *matches = 0;
+
+    if (!dest_node) {
+        return 0;
+    }
 
     for (int i = 0 ; i < cJSON_GetArraySize(scope) ; i++) {
         cJSON* scope_item = cJSON_GetArrayItem(scope, i);
@@ -96,14 +101,46 @@ int dots_match_flows(node_cache_t* node_cache, spin_data scope, tree_entry_t* fl
                 }
             }
         }
-    }
-    // Already no match, stop now
-    if (!*matches) {
-        return 0;
-    }
+        // Already no match, move to next scope
+        if (!*matches) {
+            continue;
+        }
 
-    // If a port range is specified, it must match that as well
-    // TODO
+        // If a port range is specified, it must match that as well
+        spin_data target_port_range_list;
+        if (get_object(scope_item, &target_port_range_list, "target-port-range", cJSON_Array) == 0) {
+            // reset the match
+            *matches = 0;
+            for (int i=0; i < cJSON_GetArraySize(target_port_range_list); i++) {
+                cJSON* target_port_range = cJSON_GetArrayItem(target_port_range_list, i);
+                printf("[XX] MATCH SET TO ZERO\n");
+                // if only 'upper' is given, we want an exact match.
+                // if 'upper' and 'lower' are given, it should be in-between
+                spin_data upper_port_data;
+                spin_data lower_port_data;
+                printf("[XX] PORT RANGE: %s\n", cJSON_Print(target_port_range));
+                if (get_object(target_port_range, &upper_port_data, "upper-port", cJSON_Number) != 0) {
+                    *error = "Missing 'upper-port' in target-port-range";
+                    return 1;
+                }
+                if (get_object(target_port_range, &lower_port_data, "lower-port", cJSON_Number) == 0) {
+                    printf("[XX] TRY PORT RANGE\n");
+                    if (dest_port <= upper_port_data->valueint && dest_port >= lower_port_data->valueint) {
+                        printf("[XX] PORT RANGE MATCH\n");
+                        *matches = 1;
+                    }
+                } else {
+                    if (dest_port == upper_port_data->valueint) {
+                        printf("[XX] EXACT PORT MATCH\n");
+                        *matches = 1;
+                    }
+                }
+            }
+        } else {
+            printf("[XX] NO PORT RANGE IN SCOPE\n");
+        }
+
+    }
 
     return 0;
 }

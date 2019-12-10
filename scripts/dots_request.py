@@ -10,8 +10,28 @@
 import argparse
 import ipaddress
 import json
+import re
 import requests
 import sys
+
+
+port_range_matcher = re.compile("^([0-9]+)-([0-9]+)$")
+def parse_port_range(port_str):
+    """one of "80" or "80-89" """
+    match = port_range_matcher.match(port_str)
+    if match:
+        return {
+            "lower-port": int(match.group(1)),
+            "upper-port": int(match.group(2)),
+        }
+    else:
+        try:
+            return {
+                "upper-port": int(port_str)
+            }
+        except ValueError:
+            raise ValueError("Invalid port range string, should be <number>[-<number>]")
+    
 
 class Prefix(object):
     def __init__(self, prefix_str):
@@ -25,6 +45,7 @@ class MitigationRequest(object):
         self.lifetime = 3600
         self.target_prefixes = []
         self.source_prefixes = []
+        self.ports = []
 
     def add_target_prefix(self, prefix):
         self.target_prefixes.append(Prefix(prefix))
@@ -34,6 +55,12 @@ class MitigationRequest(object):
 
     def set_lifetime(self, lifetime):
         self.lifetime = lifetime
+
+    def add_port_range(self, port_str):
+        """port_str can be a single port number ("80", or a range in the
+           form "80-89"
+        """
+        self.ports.append(parse_port_range(port_str))
 
     def as_obj(self):
         scope = {
@@ -45,6 +72,9 @@ class MitigationRequest(object):
 
         if self.target_prefixes:
             scope['target-prefix'] = [str(p) for p in self.target_prefixes]
+
+        if self.ports:
+            scope['target-port-range'] = self.ports
 
         result = {
             "ietf-dots-signal-channel:mitigation-scope": {
@@ -108,6 +138,10 @@ def main(args):
                 print("Bad prefix: %s" % str(ve))
                 sys.exit(1)
 
+    if args.port:
+        for port_str in args.port:
+            mr.add_port_range(port_str)
+
     if args.print:
         print(json.dumps(mr.as_obj(), indent=2))
     if args.apply:
@@ -123,6 +157,7 @@ if __name__=='__main__':
     parser.add_argument('-p', '--print', action="store_true", help="Print the request as json")
     parser.add_argument('-a', '--apply', action="store_true", help="Send the command to the SPIN JSON-RPC API")
     parser.add_argument('-u', '--url', help="Use the given URL for -a. Default: http://192.168.8.1/spin_api/jsonrpc")
-
+    parser.add_argument('--port', type=str, action='append', default=[], help="Target port range (can be used multiple times)")
     args = parser.parse_args()
+
     main(args)
