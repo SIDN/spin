@@ -142,6 +142,6 @@ static inline uint64_t read_int64(uint8_t* src) {
 
 
 int pkt_info_equal(pkt_info_t* a, pkt_info_t* b) {
-    return (memcmp(a, b, 38) == 0);
+    return (memcmp(a, b, 39) == 0);
 }
 

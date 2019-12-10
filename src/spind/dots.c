@@ -40,6 +40,11 @@ int get_object(spin_data parent, spin_data* result, const char* name, int type) 
     return 0;
 }
 
+// returns 1 if the flow matches the given mitigation request scope
+//int check_dots_match(spin_data scope, flow_entry_t* flow) {
+//    
+//}
+
 
 int process_dots_signal(node_cache_t* node_cache, spin_data dots_message, char** error) {
     char* str;

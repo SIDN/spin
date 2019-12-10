@@ -20,6 +20,15 @@ typedef struct {
 } devflow_t;
 
 typedef struct {
+    int     dst_node_id;
+    int     dst_port;
+    // Should we differentiate on source port too?
+    // that makes ephemeral port use a problem, but
+    // would result in better DOTS matching...
+    int     icmp_type;
+} devflow_key_t;
+
+typedef struct {
     tree_t *dv_flowtree;
     int dv_nflows;
 } device_t;

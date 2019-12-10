@@ -54,6 +54,7 @@ node_destroy(node_t* node) {
     }
     if (node->device) {
         if (node->device->dv_flowtree) {
+            printf("[XX] DESTROY NODE DEVICE FLOWTREE\n");
             tree_destroy(node->device->dv_flowtree);
         }
         free(node->device);
@@ -927,7 +928,7 @@ makedevice(node_t *node) {
     spin_log(LOG_DEBUG, "Promote node %d to device", node->id);
     assert(node->device == 0);
     dev = (device_t *) malloc(sizeof(device_t));
-    dev->dv_flowtree = tree_create(cmp_ints);
+    dev->dv_flowtree = tree_create(cmp_flow_keys);
     dev->dv_nflows = 0;
     node->device = dev;
 }
@@ -984,10 +985,7 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
     if (node->mac) {
         existing_node = oldnode(node_cache->mac_refs, strlen(node->mac) + 1, node->mac);
         if (existing_node != NULL) {
-	    printf("[XX] A NODE WITH MAC %s ALREADY EXISTS. WILL MERGE\n", node->mac);
             add_node_to_ar(existing_node, nodes_to_merge, &nnodes_to_merge);
-        } else {
-            printf("[XX] A NODE WITH MAC %s DOES NOT EXIST YET\n", node->mac);
         }
     }
 

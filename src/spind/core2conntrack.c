@@ -46,6 +46,7 @@ void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
     pkt_info->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
     pkt_info->payload_offset = 0;
     pkt_info->protocol = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
+    pkt_info->icmp_type = nfct_get_attr_u8(ct, ATTR_ICMP_TYPE);
     STAT_VALUE(ctr4, 1);
 
     break;
@@ -57,8 +58,11 @@ void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
     pkt_info->payload_size += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_BYTES);
     pkt_info->packet_count = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS);
     pkt_info->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
+    pkt_info->src_port = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_SRC);
+    pkt_info->dest_port = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_DST);
     pkt_info->payload_offset = 0;
     pkt_info->protocol = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
+    pkt_info->icmp_type = nfct_get_attr_u8(ct, ATTR_ICMP_TYPE);
     STAT_VALUE(ctr6, 1);
     break;
     // note: ipv6 is u128
@@ -122,7 +126,7 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
 
         if (src_node != NULL && dest_node != NULL) {
             // Inform flow accounting layer
-            (*cb_data->traffic_hook)(cb_data->node_cache, src_node, dest_node, pkt_info.packet_count, pkt_info.payload_size, now);
+            (*cb_data->traffic_hook)(cb_data->node_cache, src_node, dest_node, pkt_info.packet_count, pkt_info.payload_size, now, ntohs(pkt_info.dest_port), pkt_info.icmp_type);
 
             // small experiment, try to ignore messages from and to
             // this device, unless local_mode is set

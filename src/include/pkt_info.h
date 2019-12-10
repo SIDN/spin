@@ -39,7 +39,7 @@ typedef enum {
 
 
 // Note: when changing this structure, check pkt_info_equals,
-// which assumes all equality data is in the first 38 bytes
+// which assumes all equality data is in the first 39 bytes
 typedef struct packet_info {
 	uint8_t family; // 4, 6, etc
 	uint8_t protocol; // value for tcp/udp/icmp/etc.
@@ -47,6 +47,7 @@ typedef struct packet_info {
 	uint8_t dest_addr[16]; // v4 just uses last 4 bytes
 	uint16_t src_port;
 	uint16_t dest_port;
+	uint8_t icmp_type;
 	uint64_t payload_size;
 	uint64_t packet_count; // amount of packets for this set of
 	                       // fam, proto, source, dest, and ports
