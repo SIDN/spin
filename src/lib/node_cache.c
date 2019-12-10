@@ -54,6 +54,7 @@ node_destroy(node_t* node) {
     }
     if (node->device) {
         if (node->device->dv_flowtree) {
+            printf("[XX] DESTROY NODE DEVICE FLOWTREE\n");
             tree_destroy(node->device->dv_flowtree);
         }
         free(node->device);
@@ -927,7 +928,7 @@ makedevice(node_t *node) {
     spin_log(LOG_DEBUG, "Promote node %d to device", node->id);
     assert(node->device == 0);
     dev = (device_t *) malloc(sizeof(device_t));
-    dev->dv_flowtree = tree_create(cmp_ints);
+    dev->dv_flowtree = tree_create(cmp_flow_keys);
     dev->dv_nflows = 0;
     node->device = dev;
 }

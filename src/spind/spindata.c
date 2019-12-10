@@ -143,7 +143,8 @@ spin_data_devicelist(node_cache_t *node_cache) {
 spin_data
 spin_data_flowlist(node_t *node) {
     cJSON *flow_ar_obj, *flow_obj;
-    int *nodenump;
+    //int *nodenump;
+    devflow_key_t* flow_key;
     devflow_t *dfp;
     tree_entry_t* cur;
 
@@ -151,10 +152,12 @@ spin_data_flowlist(node_t *node) {
     if (node->device) {
         cur = tree_first(node->device->dv_flowtree);
         while (cur != NULL) {
-            nodenump = (int *) cur->key;
+            flow_key = (devflow_key_t *) cur->key;
             dfp = (devflow_t *) cur->data;
             flow_obj = cJSON_CreateObject();
-            cJSON_AddNumberToObject(flow_obj, "to", *nodenump);
+            cJSON_AddNumberToObject(flow_obj, "to", flow_key->dst_node_id);
+            cJSON_AddNumberToObject(flow_obj, "dst_port", flow_key->dst_port);
+            cJSON_AddNumberToObject(flow_obj, "icmp_type", flow_key->icmp_type);
             if (dfp->dvf_blocked) {
                 cJSON_AddNumberToObject(flow_obj, "blocked", 1);
             } else {
