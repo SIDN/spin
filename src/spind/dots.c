@@ -59,6 +59,7 @@ int dots_match_flows(node_cache_t* node_cache, spin_data scope, tree_entry_t* fl
     devflow_key_t* key = (devflow_key_t*) flow_entry->key;
     int node_id = key->dst_node_id;
     int dest_port = key->dst_port;
+    int icmp_type = key->icmp_type;
     node_t* dest_node = node_cache_find_by_id(node_cache, node_id);
 
     *matches = 0;
@@ -118,19 +119,19 @@ int dots_match_flows(node_cache_t* node_cache, spin_data scope, tree_entry_t* fl
                 // if 'upper' and 'lower' are given, it should be in-between
                 spin_data upper_port_data;
                 spin_data lower_port_data;
-                printf("[XX] PORT RANGE: %s\n", cJSON_Print(target_port_range));
-                if (get_object(target_port_range, &upper_port_data, "upper-port", cJSON_Number) != 0) {
-                    *error = "Missing 'upper-port' in target-port-range";
+                //printf("[XX] PORT RANGE: %s\n", cJSON_Print(target_port_range));
+                if (get_object(target_port_range, &lower_port_data, "lower-port", cJSON_Number) != 0) {
+                    *error = "Missing 'lower-port' in target-port-range";
                     return 1;
                 }
-                if (get_object(target_port_range, &lower_port_data, "lower-port", cJSON_Number) == 0) {
+                if (get_object(target_port_range, &upper_port_data, "upper-port", cJSON_Number) == 0) {
                     printf("[XX] TRY PORT RANGE\n");
                     if (dest_port <= upper_port_data->valueint && dest_port >= lower_port_data->valueint) {
                         printf("[XX] PORT RANGE MATCH\n");
                         *matches = 1;
                     }
                 } else {
-                    if (dest_port == upper_port_data->valueint) {
+                    if (dest_port == lower_port_data->valueint) {
                         printf("[XX] EXACT PORT MATCH\n");
                         *matches = 1;
                     }
@@ -138,6 +139,44 @@ int dots_match_flows(node_cache_t* node_cache, spin_data scope, tree_entry_t* fl
             }
         } else {
             printf("[XX] NO PORT RANGE IN SCOPE\n");
+        }
+
+        // Already no match, move to next scope
+        if (!*matches) {
+            continue;
+        }
+        // If a port range is specified, it must match that as well
+        spin_data target_icmp_type_range_list;
+        if (get_object(scope_item, &target_icmp_type_range_list, "source-icmp-type-range", cJSON_Array) == 0) {
+            // reset the match
+            *matches = 0;
+            for (int i=0; i < cJSON_GetArraySize(target_icmp_type_range_list); i++) {
+                cJSON* target_icmp_type_range = cJSON_GetArrayItem(target_icmp_type_range_list, i);
+                printf("[XX] MATCH SET TO ZERO\n");
+                // if only 'upper' is given, we want an exact match.
+                // if 'upper' and 'lower' are given, it should be in-between
+                spin_data upper_icmp_type_data;
+                spin_data lower_icmp_type_data;
+                printf("[XX] ICMPTYPE RANGE: %s\n", cJSON_Print(target_icmp_type_range));
+                if (get_object(target_icmp_type_range, &lower_icmp_type_data, "lower-type", cJSON_Number) != 0) {
+                    *error = "Missing 'lower-type' in target-icmp-type-range";
+                    return 1;
+                }
+                if (get_object(target_icmp_type_range, &upper_icmp_type_data, "upper-type", cJSON_Number) == 0) {
+                    printf("[XX] TRY ICMPTYPE RANGE AGAINST %d <= %d <= %d\n", lower_icmp_type_data->valueint, icmp_type, upper_icmp_type_data->valueint);
+                    if (icmp_type <= upper_icmp_type_data->valueint && icmp_type >= lower_icmp_type_data->valueint) {
+                        printf("[XX] ICMPTYPE RANGE MATCH\n");
+                        *matches = 1;
+                    }
+                } else {
+                    if (icmp_type == lower_icmp_type_data->valueint) {
+                        printf("[XX] EXACT ICMPTYPE MATCH\n");
+                        *matches = 1;
+                    }
+                }
+            }
+        } else {
+            printf("[XX] NO ICMPTYPE RANGE IN SCOPE\n");
         }
 
     }
