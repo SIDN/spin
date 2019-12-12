@@ -39,9 +39,6 @@ spin_data rpc_json_callreg(spin_data call_info, char *method, spin_data jsonpara
     int res;
 
     nargs = 0;
-    char* tmp = cJSON_Print(jsonparams);
-    printf("[XX] JSON REQUEST: %s\n", tmp);
-    free(tmp);
 
     if (jsonparams != NULL && cJSON_IsObject(jsonparams)) {
         // Iterate over Object

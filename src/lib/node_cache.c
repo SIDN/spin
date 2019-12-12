@@ -54,7 +54,6 @@ node_destroy(node_t* node) {
     }
     if (node->device) {
         if (node->device->dv_flowtree) {
-            printf("[XX] DESTROY NODE DEVICE FLOWTREE\n");
             tree_destroy(node->device->dv_flowtree);
         }
         free(node->device);
@@ -713,7 +712,6 @@ add_mac_and_name(node_cache_t* node_cache, node_t* node, ip_t* ip) {
             node_set_name(node, name);
         }
     }
-    // spin_log(LOG_DEBUG, "[XX] mac at %p: %s\n", node->mac, node->mac);
 }
 
 void
@@ -793,7 +791,6 @@ node_cache_add_ip_info(node_cache_t* node_cache, ip_t* ip, uint32_t timestamp) {
             // the mac_cache fix should have made this unnecessary
             //node_t* result[10];
             //int count = node_cache_find_all_by_mac(result, node_cache, node->mac);
-            //spin_log(LOG_INFO, "[XX] DONE LOOKING FOR DUPES OF MAC, FOUND %d\n", count);
         }
     }
 }
@@ -1046,7 +1043,6 @@ node_cache_add_node(node_cache_t *node_cache, node_t *node) {
     spin_log(LOG_DEBUG, "Just created node %d\n", node->id);
 
     if (node->mac) {
-        printf("[XX] THIS NODE HAS A MAC, ADD TO TREE: %s\n", node->mac);
         cache_tree_add_mac(node_cache, node, node->mac);
         if (node->device == NULL) {
             makedevice(node);
