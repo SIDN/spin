@@ -28,7 +28,6 @@ static int local_mode;
 
 const char* mosq_host;
 int mosq_port;
-int stop_on_error;
 
 STAT_MODULE(spind)
 
@@ -309,15 +308,11 @@ int main(int argc, char** argv) {
     mosq_port = spinconfig_pubsub_port();
 
     printf("[XX] mosq host: %s\n", mosq_host);
-    stop_on_error = 0;
 
-    while ((c = getopt (argc, argv, "dehlm:op:v")) != -1) {
+    while ((c = getopt (argc, argv, "dhlm:op:v")) != -1) {
         switch (c) {
         case 'd':
             log_verbosity = 7;
-            break;
-        case 'e':
-            stop_on_error = 1;
             break;
         case 'h':
             print_help();
