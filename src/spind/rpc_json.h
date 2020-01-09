@@ -4,6 +4,8 @@
 #include "rpc_common.h"
 #include "spindata.h"
 
+#define JSON_RPC_SOCKET_PATH "/var/run/spin_rpc.sock"
+
 char *call_ubus2json(const char *, char*);
 char *call_ubus2jsonnew(char*);
 

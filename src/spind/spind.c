@@ -8,6 +8,7 @@
 #include "core2extsrc.h"
 #include "core2nflog_dns.h"
 #include "core2pubsub.h"
+#include "extsrc.h"
 #include "ipl.h"
 #include "mainloop.h"
 #include "nflogroutines.h"
@@ -256,7 +257,9 @@ void print_help() {
     printf("Usage: spind [options]\n");
     printf("Options:\n");
     printf("-d\t\t\tlog debug messages (set log level to LOG_DEBUG)\n");
+    printf("-e <path>\t\textsrc socket path (default: %s)\n", EXTSRC_SOCKET_PATH);
     printf("-h\t\t\tshow this help\n");
+    printf("-j <path>\t\tJSON RPC socket path (default: %s)\n", JSON_RPC_SOCKET_PATH);
     printf("-l\t\t\trun in local mode (do not check for ARP cache entries)\n");
     printf("-o\t\t\tlog to stdout instead of syslog\n");
     printf("-m <address>\t\tHostname or IP address of the MQTT server\n");
@@ -299,6 +302,10 @@ int main(int argc, char** argv) {
     int c;
     int log_verbosity;
     int use_syslog;
+    char *extsrc_socket_path = EXTSRC_SOCKET_PATH;
+#ifndef USE_UBUS
+    char *json_rpc_socket_path = JSON_RPC_SOCKET_PATH;
+#endif
 
     init_config();
     log_verbosity = spinconfig_log_loglevel();
@@ -309,14 +316,26 @@ int main(int argc, char** argv) {
 
     printf("[XX] mosq host: %s\n", mosq_host);
 
-    while ((c = getopt (argc, argv, "dhlm:op:v")) != -1) {
+    while ((c = getopt (argc, argv, "de:hj:lm:op:v")) != -1) {
         switch (c) {
         case 'd':
             log_verbosity = 7;
             break;
+        case 'e':
+            extsrc_socket_path = optarg;
+            break;
         case 'h':
             print_help();
             exit(0);
+            break;
+        case 'j':
+#ifdef USE_UBUS
+            fprintf(stderr, "Error: this build of SPIN does not use JSON RPC.\n");
+            fprintf(stderr, "Cannot specify -j.\n");
+            exit(1);
+#else
+            json_rpc_socket_path = optarg;
+#endif
             break;
         case 'l':
             spin_log(LOG_INFO, "Running in local mode; traffic without either entry in arp cache will be shown too\n");
@@ -359,7 +378,7 @@ int main(int argc, char** argv) {
 
     init_core2block();
 
-    init_core2extsrc(node_cache, dns_cache);
+    init_core2extsrc(node_cache, dns_cache, extsrc_socket_path);
 
     init_ipl_list_ar();
 
@@ -371,7 +390,7 @@ int main(int argc, char** argv) {
 #ifdef USE_UBUS 
     ubus_main();
 #else
-    init_json_rpc();
+    init_json_rpc(json_rpc_socket_path);
 #endif
 
     mainloop_run();

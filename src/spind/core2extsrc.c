@@ -12,6 +12,7 @@
 
 static node_cache_t *node_cache;
 static dns_cache_t *dns_cache;
+static char *extsrc_socket_path;
 
 static flow_list_t *flow_list;
 
@@ -221,11 +222,11 @@ out:
 static void
 removesocket(void)
 {
-    remove(EXTSRC_SOCKET_PATH);
+    remove(extsrc_socket_path);
 }
 
 void
-init_core2extsrc(node_cache_t *nc, dns_cache_t *dc)
+init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, char *sp)
 {
     struct sockaddr_un s_un;
     mode_t old_umask;
@@ -234,6 +235,7 @@ init_core2extsrc(node_cache_t *nc, dns_cache_t *dc)
 
     node_cache = nc;
     dns_cache = dc;
+    extsrc_socket_path = sp;
 
     // XXX does it matter what timestamp we use? No idea.
     flow_list = flow_list_create(time(NULL));
@@ -246,12 +248,12 @@ init_core2extsrc(node_cache_t *nc, dns_cache_t *dc)
 
     s_un.sun_family = AF_UNIX;
     if (snprintf(s_un.sun_path, sizeof(s_un.sun_path), "%s",
-        EXTSRC_SOCKET_PATH) >= (ssize_t)sizeof(s_un.sun_path)) {
+        extsrc_socket_path) >= (ssize_t)sizeof(s_un.sun_path)) {
         spin_log(LOG_ERR, "socket path too long\n");
         exit(1);
     }
 
-    remove(EXTSRC_SOCKET_PATH);
+    remove(extsrc_socket_path);
 
     old_umask = umask(077);
     if (bind(fd, (struct sockaddr *)&s_un, sizeof(s_un)) == -1) {
@@ -259,7 +261,7 @@ init_core2extsrc(node_cache_t *nc, dns_cache_t *dc)
         exit(1);
     }
     umask(old_umask);
-    if (chmod(EXTSRC_SOCKET_PATH, 0600) == -1) {
+    if (chmod(extsrc_socket_path, 0600) == -1) {
         spin_log(LOG_ERR, "chmod: %s\n", strerror(errno));
         exit(1);
     }

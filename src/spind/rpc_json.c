@@ -245,30 +245,29 @@ wf_jsonrpc(void *arg, int data, int timeout) {
 #include "mainloop.h"
 
 void
-init_json_rpc() {
+init_json_rpc(char *json_rpc_socket_path) {
     spin_log(LOG_INFO, "No libubus; setting up JSON RPC handling\n");
-    const char* socket_path = "/var/run/spin_rpc.sock";
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path)-1);
+    strncpy(addr.sun_path, json_rpc_socket_path, sizeof(addr.sun_path)-1);
     rpc_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
-    if (!access(socket_path, F_OK )) {
-        if (unlink(socket_path) != 0) {
-            spin_log(LOG_ERR, "Error unlinking domain socket %s: %s\n", socket_path, strerror(errno));
+    if (!access(json_rpc_socket_path, F_OK )) {
+        if (unlink(json_rpc_socket_path) != 0) {
+            spin_log(LOG_ERR, "Error unlinking domain socket %s: %s\n", json_rpc_socket_path, strerror(errno));
             exit(errno);
         }
     }
     if (bind(rpc_fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
-        spin_log(LOG_ERR, "Error opening domain socket %s: %s\n", socket_path, strerror(errno));
+        spin_log(LOG_ERR, "Error opening domain socket %s: %s\n", json_rpc_socket_path, strerror(errno));
         exit(errno);
     }
     if (listen(rpc_fd, 100) != 0) {
-        spin_log(LOG_ERR, "Error listening on domain socket %s: %s\n", socket_path, strerror(errno));
+        spin_log(LOG_ERR, "Error listening on domain socket %s: %s\n", json_rpc_socket_path, strerror(errno));
         exit(errno);
     }
-    spin_log(LOG_INFO, "Listening for JSON-RPC commands on %s\n", socket_path);
+    spin_log(LOG_INFO, "Listening for JSON-RPC commands on %s\n", json_rpc_socket_path);
     mainloop_register("jsonrpc", wf_jsonrpc, (void *) 0, rpc_fd, 0);
 }
 
