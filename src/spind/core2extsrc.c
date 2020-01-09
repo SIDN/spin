@@ -255,17 +255,11 @@ init_core2extsrc(node_cache_t *nc, dns_cache_t *dc)
 
     old_umask = umask(077);
     if (bind(fd, (struct sockaddr *)&s_un, sizeof(s_un)) == -1) {
-        // XXX do we want to fail or do we want to continue without this
-        // functionality in this case?
         spin_log(LOG_ERR, "bind: %s\n", strerror(errno));
         exit(1);
     }
     umask(old_umask);
     if (chmod(EXTSRC_SOCKET_PATH, 0600) == -1) {
-        spin_log(LOG_ERR, "chmod: %s\n", strerror(errno));
-        exit(1);
-    }
-    if (chown(EXTSRC_SOCKET_PATH, 0, 0) == -1) {
         spin_log(LOG_ERR, "chmod: %s\n", strerror(errno));
         exit(1);
     }
