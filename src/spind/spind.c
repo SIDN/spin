@@ -341,7 +341,8 @@ int main(int argc, char** argv) {
             exit(0);
             break;
         default:
-            abort ();
+            print_help();
+            exit(1);
         }
     }
 
