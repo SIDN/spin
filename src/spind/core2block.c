@@ -4,6 +4,7 @@
 #include "spind.h"
 #include "spin_log.h"
 #include "statistics.h"
+#include <errno.h>
 
 #define MAXSTR 1024
 
@@ -23,6 +24,10 @@ setup_debug() {
     }
 
     logfile = fopen(fname, "w");
+    if (logfile == NULL) {
+        fprintf(stderr, "Error opening logfile %s: %s", fname, strerror(errno));
+        return;
+    }
     setbuf(logfile, NULL);
     dolog = 1;
 }
