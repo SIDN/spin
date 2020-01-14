@@ -28,7 +28,6 @@ static int local_mode;
 
 const char* mosq_host;
 int mosq_port;
-int stop_on_error;
 
 STAT_MODULE(spind)
 
@@ -260,8 +259,8 @@ void print_help() {
     printf("-h\t\t\tshow this help\n");
     printf("-l\t\t\trun in local mode (do not check for ARP cache entries)\n");
     printf("-o\t\t\tlog to stdout instead of syslog\n");
-    printf("-m <address>\t\t\tHostname or IP address of the MQTT server\n");
-    printf("-p <port number>\t\t\tPort number of the MQTT server\n");
+    printf("-m <address>\t\tHostname or IP address of the MQTT server\n");
+    printf("-p <port number>\tPort number of the MQTT server\n");
     printf("-v\t\t\tprint the version of spind and exit\n");
 }
 
@@ -309,15 +308,11 @@ int main(int argc, char** argv) {
     mosq_port = spinconfig_pubsub_port();
 
     printf("[XX] mosq host: %s\n", mosq_host);
-    stop_on_error = 0;
 
-    while ((c = getopt (argc, argv, "dehlm:op:v")) != -1) {
+    while ((c = getopt (argc, argv, "dhlm:op:v")) != -1) {
         switch (c) {
         case 'd':
             log_verbosity = 7;
-            break;
-        case 'e':
-            stop_on_error = 1;
             break;
         case 'h':
             print_help();
@@ -346,7 +341,8 @@ int main(int argc, char** argv) {
             exit(0);
             break;
         default:
-            abort ();
+            print_help();
+            exit(1);
         }
     }
 

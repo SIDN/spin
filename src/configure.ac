@@ -18,9 +18,14 @@ AC_PROG_INSTALL
 dnl Checks for header files.
 AC_HEADER_DIRENT
 AC_HEADER_STDC
-AC_CHECK_HEADERS(fcntl.h unistd.h)
-AC_CHECK_HEADER([netinet/if_ether.h], AC_DEFINE([HAVE_NETINET_IF_ETHER_H], [1], [netinet/if_ether.h available]))
-AC_CHECK_HEADER([net/ethernet.h], AC_DEFINE([HAVE_NET_ETHERNET_H], [1], [net/ethernet.h available]))
+AC_CHECK_HEADERS(fcntl.h net/ethernet.h unistd.h)
+AC_CHECK_HEADERS(netinet/if_ether.h, [], [],
+[
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <net/if.h>
+#include <netinet/in.h>
+])
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -40,10 +45,34 @@ AC_SUBST([regular_CFLAGS])
 AC_CHECK_LIB([mosquitto], [mosquitto_lib_version], [], [AC_MSG_ERROR([libmosquitto not found])])
 
 #AC_CHECK_LIB([netfilter-log], [XXXXXXXX], [], [AC_MSG_ERROR([libXXXXXXX not found])])
-AC_CHECK_LIB([mnl], [mnl_socket_open], [LDFLAGS="$LDFLAGS -lmnl"], [AC_MSG_ERROR([libmnl not found])])
-AC_CHECK_LIB([netfilter_log], [nflog_open], [LDFLAGS="$LDFLAGS -lnetfilter_log"], [AC_MSG_ERROR([libnetfilter-log not found])])
-AC_CHECK_LIB([netfilter_queue], [nfq_open], [LDFLAGS="$LDFLAGS -lnetfilter_queue"], [AC_MSG_ERROR([libnetfilter-queue not found])])
-AC_CHECK_LIB([netfilter_conntrack], [nfct_new], [LDFLAGS="$LDFLAGS -lnetfilter_conntrack"], [AC_MSG_ERROR([libnetfilter-conntrack not found])])
+AC_CHECK_LIB([mnl], [mnl_socket_open],
+    [
+        LDFLAGS="$LDFLAGS -lmnl"
+    ],
+    [
+        AC_MSG_ERROR([libmnl not found])
+    ])
+AC_CHECK_LIB([netfilter_log], [nflog_open],
+    [
+        LDFLAGS="$LDFLAGS -lnetfilter_log"
+    ],
+    [
+        AC_MSG_ERROR([libnetfilter-log not found])
+    ])
+AC_CHECK_LIB([netfilter_queue], [nfq_open],
+    [
+        LDFLAGS="$LDFLAGS -lnetfilter_queue"
+    ],
+    [
+        AC_MSG_ERROR([libnetfilter-queue not found])
+    ])
+AC_CHECK_LIB([netfilter_conntrack], [nfct_new],
+    [
+        LDFLAGS="$LDFLAGS -lnetfilter_conntrack"
+    ],
+    [
+        AC_MSG_ERROR([libnetfilter-conntrack not found])
+    ])
 
 AC_CHECK_LIB([ldns], [ldns_wire2pkt], [LDFLAGS="$LDFLAGS -lldns"], [AC_MSG_ERROR([ldns not found])])
 
