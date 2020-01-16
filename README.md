@@ -117,6 +117,29 @@ load the kernel module and start the spin_mqtt.lua daemon.
 
 Please keep in mind that for the 'bubble-app' front-end, you will also need to install a webserver, and configure it to serve the pages installed by the package in /usr/lib/spin/web_ui/static.
 
+## On OpenBSD
+
+OpenBSD is not fully supported at this time.
+For now, it is possible to compile spind and run with limited functionality
+(compared to the Linux/OpenWRT build).
+
+Installing the dependencies:
+
+```
+# pkg_add autoconf%2.69 automake%1.16 ldns-utils mosquitto
+```
+
+Compiling spind:
+
+```
+$ cd src
+$ AUTOCONF_VERSION=2.69 AUTOMAKE_VERSION=1.16 autoreconf --install
+$ mkdir build
+$ cd build
+$ CC=clang LDFLAGS="-L/usr/local/lib" CFLAGS="-g -O0 -I/usr/local/include" ../configure --enable-passive-mode-only
+$ find . -name Makefile | xargs sed -i -e 's/-Werror//g'
+$ AUTOCONF_VERSION=2.69 AUTOMAKE_VERSION=1.16 make
+```
 
 # Running SPIN
 
