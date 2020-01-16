@@ -261,8 +261,8 @@ void print_help() {
     printf("-h\t\t\tshow this help\n");
     printf("-j <path>\t\tJSON RPC socket path (default: %s)\n", JSON_RPC_SOCKET_PATH);
     printf("-l\t\t\trun in local mode (do not check for ARP cache entries)\n");
-    printf("-o\t\t\tlog to stdout instead of syslog\n");
     printf("-m <address>\t\tHostname or IP address of the MQTT server\n");
+    printf("-o\t\t\tlog to stdout instead of syslog\n");
     printf("-p <port number>\tPort number of the MQTT server\n");
     printf("-v\t\t\tprint the version of spind and exit\n");
 }
