@@ -27,6 +27,7 @@ dns_cache_t* dns_cache;
 
 static int local_mode;
 
+const char* config_file = NULL;
 const char* mosq_host;
 int mosq_port;
 
@@ -256,6 +257,7 @@ void log_version() {
 void print_help() {
     printf("Usage: spind [options]\n");
     printf("Options:\n");
+    printf("-c <file>\tspecify spind config file (default: %s)\n", CONFIG_FILE);
     printf("-d\t\t\tlog debug messages (set log level to LOG_DEBUG)\n");
     printf("-e <path>\t\textsrc socket path (default: %s)\n", EXTSRC_SOCKET_PATH);
     printf("-h\t\t\tshow this help\n");
@@ -307,17 +309,14 @@ int main(int argc, char** argv) {
     char *json_rpc_socket_path = JSON_RPC_SOCKET_PATH;
 #endif
 
-    init_config();
-    log_verbosity = spinconfig_log_loglevel();
-    use_syslog = spinconfig_log_usesyslog();
-
-    mosq_host = spinconfig_pubsub_host();
-    mosq_port = spinconfig_pubsub_port();
-
     printf("[XX] mosq host: %s\n", mosq_host);
 
-    while ((c = getopt (argc, argv, "de:hj:lm:op:v")) != -1) {
+    while ((c = getopt (argc, argv, "c:de:hj:lm:op:v")) != -1) {
         switch (c) {
+        case 'c':
+            printf("[XX] config file arg: %s\n", optarg);
+            config_file = optarg;
+            break;
         case 'd':
             log_verbosity = 7;
             break;
@@ -365,6 +364,18 @@ int main(int argc, char** argv) {
         }
     }
 
+    if (config_file) {
+        init_config(config_file, 1);
+    } else {
+        // Don't error if default config file doesn't exist
+        init_config(CONFIG_FILE, 0);
+    }
+    log_verbosity = spinconfig_log_loglevel();
+    use_syslog = spinconfig_log_usesyslog();
+
+    mosq_host = spinconfig_pubsub_host();
+    mosq_port = spinconfig_pubsub_port();
+
 
     spin_log_init(use_syslog, log_verbosity, "spind");
     log_version();
@@ -387,7 +398,7 @@ int main(int argc, char** argv) {
     init_mosquitto(mosq_host, mosq_port);
     signal(SIGINT, int_handler);
 
-#ifdef USE_UBUS 
+#ifdef USE_UBUS
     ubus_main();
 #else
     init_json_rpc(json_rpc_socket_path);
