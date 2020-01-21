@@ -1,4 +1,6 @@
+#include <errno.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "spinconfig.h"
 #include "spin_log.h"
@@ -33,7 +35,7 @@ static void uci_report_section(struct uci_section *s)
     }
 }
 
-int get_config_entries() {
+int get_config_entries(const char* config_file, int must_exist) {
     struct uci_context *c;
     struct uci_ptr ptr;
     struct uci_element *e;
@@ -41,6 +43,10 @@ int get_config_entries() {
 
 
     c = uci_alloc_context();
+
+    if (config_file != NULL && must_exist) {
+        spin_log(LOG_WARN, "UCI Mode enabled, config file %s ignored\n", config_file);
+    }
 
     strcpy(buf, UCI_SECTION_NAME);  // IMPORTANT 
     if (uci_lookup_ptr(c, &ptr, buf, true) != UCI_OK) {
@@ -60,20 +66,47 @@ int get_config_entries() {
 #else /* USE_UCI */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
 
 #define MAXLINE 200
 
-int get_config_entries() {
+void
+config_read_error(int abort, const char* format, ...) {
+    va_list arg;
+    va_start(arg, format);
+    va_end(arg);
+    vfprintf(stderr, format, arg);
+    spin_vlog(LOG_ERR, format, arg);
+
+    if (abort) {
+        fprintf(stderr, "aborting spind startup\n");
+        spin_log(LOG_ERR, "aborting spind startup\n");
+        exit(1);
+    }
+}
+
+int get_config_entries(const char* config_file, int must_exist) {
     FILE *conf_file;
     char line[MAXLINE];
     char *beginofkeyw, *endofkeyw;
     char *beginofvalue, *endofvalue;
     char *equalsptr;
+    struct stat file_stat;
 
-    conf_file = fopen(CONFIG_FILE, "r");
+    fprintf(stderr, "[XX] opening file: %s\n", config_file);
+    if (stat(config_file, &file_stat) != 0) {
+        config_read_error(must_exist, "Config file %s does not exist\n", config_file);
+        return 1;
+    }
+    fprintf(stderr, "[XX] opening fileAAA: %s\n", config_file);
+    if (!S_ISREG(file_stat.st_mode)) {
+        config_read_error(1, "Config file %s does not appear to be a file, aborting\n", config_file);
+        return 1;
+    }
+    conf_file = fopen(config_file, "r");
     if (conf_file == 0) {
-        spin_log(LOG_INFO, "Could not open %s\n", CONFIG_FILE);
+        config_read_error(1, "Could not open %s: %s\n", config_file, strerror(errno));
         return 1;
     }
 
@@ -84,7 +117,7 @@ int get_config_entries() {
 
         equalsptr = strchr(line, '=');
         if (equalsptr == NULL) {
-            spin_log(LOG_ERR, "Bad config line, no = character\n");
+            config_read_error(1, "Bad config line, no = character\n");
             continue;
         }
 
@@ -95,9 +128,8 @@ int get_config_entries() {
         }
 
         endofkeyw = equalsptr -1;
-        printf("[XX] endofkeyw: %p, equalsptr: %p\n", endofkeyw, equalsptr);
         if (endofkeyw < line) {
-            spin_log(LOG_ERR, "Conf line starts with =\n");
+            config_read_error(1, "Conf line starts with =\n");
             continue;
         }
         while (endofkeyw > line && isspace(endofkeyw[0])) {
@@ -112,7 +144,7 @@ int get_config_entries() {
 
         endofvalue = strchr(beginofvalue, '\n');
         if (endofvalue == 0) {
-            spin_log(LOG_ERR, "Very long conf line\n");
+            config_read_error(1, "Very long conf line\n");
             continue;
         }
         while (isspace(endofvalue[0])) {
@@ -120,7 +152,7 @@ int get_config_entries() {
         }
 
         if (endofvalue <= endofkeyw) {
-            spin_log(LOG_ERR, "No conf value found\n");
+            config_read_error(1, "No conf value found\n");
             continue;
         }
 

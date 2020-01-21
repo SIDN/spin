@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "spin_log.h"
+#include "spind_config.h"
 
 enum configs {
     LOG_USESYSLOG,
@@ -71,23 +72,11 @@ config_set_option(char *name, char *value) {
 }
 
 void
-init_config() {
+init_config(const char* config_file, int must_exist) {
     struct conf_item *p;
-    int get_config_entries();
+    //int get_config_entries(const char* config_file, int must_exist);
 
-#ifdef notdef
-    char *s;
-    char *get_config_entry();
-    for (p=ci_list; p->ci_name != 0; p++) {
-        s = get_config_entry(p->ci_name);
-        if (s == 0) {
-            s = p->ci_default;
-        }
-        p->ci_value = s;
-    }
-#endif
-
-    if (get_config_entries()) {
+    if (get_config_entries(config_file, must_exist)) {
         spin_log(LOG_ERR, " init_config GCE failed\n");
     }
 
