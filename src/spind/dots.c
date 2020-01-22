@@ -43,7 +43,7 @@ int get_object(spin_data parent, spin_data* result, const char* name, int type) 
 // returns 1 if the flow matches the given mitigation request scope
 /*
 int check_dots_match(spin_data scope, flow_entry_t* flow) {
-    
+
 }
 */
 
@@ -60,6 +60,7 @@ int dots_match_flows(node_cache_t* node_cache, spin_data scope, tree_entry_t* fl
     int node_id = key->dst_node_id;
     int dest_port = key->dst_port;
     int icmp_type = key->icmp_type;
+    int i,j;
     node_t* dest_node = node_cache_find_by_id(node_cache, node_id);
 
     *matches = 0;
@@ -68,17 +69,17 @@ int dots_match_flows(node_cache_t* node_cache, spin_data scope, tree_entry_t* fl
         return 0;
     }
 
-    for (int i = 0 ; i < cJSON_GetArraySize(scope) ; i++) {
+    for (i = 0 ; i < cJSON_GetArraySize(scope) ; i++) {
         cJSON* scope_item = cJSON_GetArrayItem(scope, i);
         spin_data target_prefix;
-        
+
         // match if any ip matches any prefix
         if (get_object(scope_item, &target_prefix, "target-prefix", cJSON_Array) != 0) {
             // MUST have at least one target prefix
             *error = error_message;
             return 1;
         }
-        for (int j = 0; j < cJSON_GetArraySize(target_prefix); j++) {
+        for (j = 0; j < cJSON_GetArraySize(target_prefix); j++) {
             const char* prefix_str = cJSON_GetArrayItem(target_prefix, j)->valuestring;
             spin_log(LOG_DEBUG, "Checking prefix: %s\n", prefix_str);
             ip_t prefix_ip;
@@ -112,7 +113,7 @@ int dots_match_flows(node_cache_t* node_cache, spin_data scope, tree_entry_t* fl
         if (get_object(scope_item, &target_port_range_list, "target-port-range", cJSON_Array) == 0) {
             // reset the match
             *matches = 0;
-            for (int i=0; i < cJSON_GetArraySize(target_port_range_list); i++) {
+            for (i=0; i < cJSON_GetArraySize(target_port_range_list); i++) {
                 cJSON* target_port_range = cJSON_GetArrayItem(target_port_range_list, i);
                 // if only 'upper' is given, we want an exact match.
                 // if 'upper' and 'lower' are given, it should be in-between
@@ -143,7 +144,7 @@ int dots_match_flows(node_cache_t* node_cache, spin_data scope, tree_entry_t* fl
         if (get_object(scope_item, &target_icmp_type_range_list, "source-icmp-type-range", cJSON_Array) == 0) {
             // reset the match
             *matches = 0;
-            for (int i=0; i < cJSON_GetArraySize(target_icmp_type_range_list); i++) {
+            for (i=0; i < cJSON_GetArraySize(target_icmp_type_range_list); i++) {
                 cJSON* target_icmp_type_range = cJSON_GetArrayItem(target_icmp_type_range_list, i);
                 // if only 'upper' is given, we want an exact match.
                 // if 'upper' and 'lower' are given, it should be in-between
@@ -232,8 +233,8 @@ process_dots_signal(node_cache_t* node_cache, spin_data dots_message, char** err
                     snprintf(json_call, 1024, "{ \"jsonrpc\": \"2.0\", \"id\": 12345, \"method\": \"add_iplist_node\", \"params\": { \"list\": \"block\", \"node\": %d}}", node->id);
                     call_string_jsonrpc(json_call);
                     spin_log(LOG_INFO, "[dots] Device with mac %s was blocked due to DOTS mitigation request\n", node->mac);
-                    
-                    //add_iplist_node(node_cache, 
+
+                    //add_iplist_node(node_cache,
                 }
             }
             flow_entry = tree_next(flow_entry);
