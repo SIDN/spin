@@ -1,5 +1,16 @@
 # Changelog
 
+## Upcoming
+* Added '-c' option to spind for specifying a configuration file
+* Added '-e' option to spind for specifying an external traffic data input socket
+* Added '-a' and '
+* Added experimental DOTS signal message processing (disabled by default)
+* Device flow data now includes port numbers and ICMP types
+* Fixed an issue where spind would crash if the logfile can't be opened
+* Fixed an issue where clicking on empty space in the Web UI showed an error
+* Fixed an issue where traffic captures would time out
+
+
 ## [0.10] (2019-11-07)
 * The MQTT Traffic channel protocol has changed; node information is now sent in a separate subchannel,
 and flow information uses node id's instead of the full node data
