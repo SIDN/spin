@@ -2,11 +2,12 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "config.h"
 #include "spinconfig.h"
 #include "spin_log.h"
 
-
 #if USE_UCI
+#include <uci.h>
 
 /*
  * WARNING!!
@@ -44,11 +45,13 @@ int get_config_entries(const char* config_file, int must_exist) {
 
     c = uci_alloc_context();
 
+    spin_log(LOG_INFO, "Reading config from UCI\n");
+
     if (config_file != NULL && must_exist) {
-        spin_log(LOG_WARN, "UCI Mode enabled, config file %s ignored\n", config_file);
+        spin_log(LOG_WARNING, "UCI Mode enabled, config file %s ignored\n", config_file);
     }
 
-    strcpy(buf, UCI_SECTION_NAME);  // IMPORTANT 
+    strcpy(buf, UCI_SECTION_NAME);  // IMPORTANT
     if (uci_lookup_ptr(c, &ptr, buf, true) != UCI_OK) {
         spin_log(LOG_ERR, "UCI lookup spin.spind failed");
         return 1;

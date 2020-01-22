@@ -304,21 +304,23 @@ int main(int argc, char** argv) {
     int c;
     int log_verbosity;
     int use_syslog;
+    int debug_mode = 0;
+    int cmdline_console_output = 0;
     char *extsrc_socket_path = EXTSRC_SOCKET_PATH;
 #ifndef USE_UBUS
     char *json_rpc_socket_path = JSON_RPC_SOCKET_PATH;
 #endif
 
-    printf("[XX] mosq host: %s\n", mosq_host);
-
     while ((c = getopt (argc, argv, "c:de:hj:lm:op:v")) != -1) {
         switch (c) {
         case 'c':
-            printf("[XX] config file arg: %s\n", optarg);
             config_file = optarg;
             break;
         case 'd':
+            // Set up logging directly, do not wait until we read config
             log_verbosity = 7;
+            debug_mode = 1;
+            spin_log_init(use_syslog, log_verbosity, "spind");
             break;
         case 'e':
             extsrc_socket_path = optarg;
@@ -346,6 +348,13 @@ int main(int argc, char** argv) {
         case 'o':
             printf("Logging to stdout instead of syslog\n");
             use_syslog = 0;
+            cmdline_console_output = 1;
+            // Again, set up logging directly, so even config reading goes to
+            // console
+            if (!debug_mode) {
+                log_verbosity = 1;
+            }
+            spin_log_init(0, log_verbosity, "spind");
             break;
         case 'p':
             mosq_port = strtol(optarg, NULL, 10);
@@ -370,14 +379,17 @@ int main(int argc, char** argv) {
         // Don't error if default config file doesn't exist
         init_config(CONFIG_FILE, 0);
     }
-    log_verbosity = spinconfig_log_loglevel();
-    use_syslog = spinconfig_log_usesyslog();
+    if (!cmdline_console_output) {
+        use_syslog = spinconfig_log_usesyslog();
+    }
+    if (!debug_mode) {
+        log_verbosity = spinconfig_log_loglevel();
+        spin_log_init(use_syslog, log_verbosity, "spind");
+    }
 
     mosq_host = spinconfig_pubsub_host();
     mosq_port = spinconfig_pubsub_port();
 
-
-    spin_log_init(use_syslog, log_verbosity, "spind");
     log_version();
 
     SPIN_STAT_START();

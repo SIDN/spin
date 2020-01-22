@@ -203,7 +203,6 @@ void init_mosquitto(const char* host, int port) {
 
     send_command_restart();
     for (object = 0; object < N_IPLIST; object++) {
-        printf("[XX] BROADCAST: %d %s\n", object, getnames[object]);
         broadcast_iplist(object, getnames[object]);
     }
 }
