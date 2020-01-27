@@ -1,6 +1,9 @@
 # Changelog
 
 ## Upcoming
+* Nothing yet
+
+## [0.11] (2020-01-27)
 * Added '-c' option to spind for specifying a configuration file
 * Added '-e' option to spind for specifying an external traffic data input socket
 * Added '-a' and '
