@@ -3,8 +3,8 @@
 ## [0.11] (2020-01-29)
 * Added '-c' option to spind for specifying a configuration file
 * Added '-e' option to spind for specifying an external traffic data input socket
-* Added '-a' and '
 * Added experimental DOTS signal message processing (disabled by default)
+* Added small command-line tool to send DOTS signal messages
 * Device flow data now includes port numbers and ICMP types
 * Fixed an issue where spind would crash if the logfile can't be opened
 * Fixed an issue where clicking on empty space in the Web UI showed an error
