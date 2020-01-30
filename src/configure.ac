@@ -110,6 +110,7 @@ AC_ARG_ENABLE(spin-pcap-reader,
               AC_HELP_STRING([--enable-spin-pcap-reader], [enable spin-pcap-reader]),
               [
                 MAKEFILES="$MAKEFILES tools/spin-pcap-reader/Makefile";
+                AC_SUBST(SPINPCAPREADER, "spin-pcap-reader")
                 AC_CONFIG_FILES(tools/spin-pcap-reader/Makefile)
                 CFLAGS="$CFLAGS -g -O0"
                 AC_CHECK_LIB([pcap], [pcap_create], [LDFLAGS="$LDFLAGS -lpcap"], [AC_MSG_ERROR([pcap not found])])
@@ -129,5 +130,6 @@ AC_CONFIG_FILES(
     Makefile
     lib/Makefile
     spind/Makefile
+    tools/Makefile
 )
 AC_OUTPUT

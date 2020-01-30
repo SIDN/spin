@@ -16,19 +16,16 @@ to spind through a socket.
 
 ==> Compiling the program
 
-Make sure you passed --enable-spin-pcap-reader to the SPIN configure script.
-Once you've done that, you can run make in this directory to build
-spin-pcap-reader.
-
-  $ cd spin/src/
-  $ autoreconf --install
-  $ ./configure --enable-spin-pcap-reader
-  $ make
-  $ cd tools/spin-pcap-reader/
-  $ make
+Follow the SPIN build instructions. When running configure, make sure to pass
+--enable-spin-pcap-reader.
 
 
 ==> Usage
+
+Before making use of the examples below, make sure to cd to the directory where
+spin-pcap-reader was built, for instance:
+
+  $ cd build/tools/spin-pcap-reader
 
 Parse file.pcap.
 
