@@ -32,6 +32,11 @@ AC_C_CONST
 AC_TYPE_SIZE_T
 AC_STRUCT_TM
 AC_SYS_LARGEFILE
+AC_CHECK_HEADER([net/bpf.h], AC_CHECK_TYPE([struct bpf_timeval],
+  AC_DEFINE([HAVE_BPF_TIMEVAL], [1], [struct bpf_timeval exists]), [], [[
+#include <sys/types.h>
+#include <net/bpf.h>
+]]))
 
 dnl Checks for library functions.
 AC_FUNC_VPRINTF
