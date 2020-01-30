@@ -120,9 +120,9 @@ usage(const char *error)
 
 	if (error)
 		fprintf(stderr, "%s\n", error);
-	fprintf(stderr,
-	    "Usage: %s [-R] [-f filter] [-i interface] [-m mac] [-r file]\n",
+	fprintf(stderr, "Usage: %s [-R] [-e extsrc-socket-path] [-f filter]\n",
 	    __progname);
+	fprintf(stderr, "\t[-i interface] [-m mac] [-r file]\n");
 	exit(1);
 }
 
@@ -469,6 +469,7 @@ int
 main(int argc, char *argv[])
 {
 	int ch;
+	char *extsrc_socket_path = EXTSRC_SOCKET_PATH;
 	char *device = NULL;
 	char *file = NULL;
 	char *pcap_errbuf;
@@ -482,8 +483,11 @@ main(int argc, char *argv[])
 
 	node_cache = node_cache_create();
 
-	while ((ch = getopt(argc, argv, "f:hi:m:Rr:")) != -1) {
+	while ((ch = getopt(argc, argv, "e:f:hi:m:Rr:")) != -1) {
 		switch(ch) {
+		case 'e':
+			extsrc_socket_path = optarg;
+			break;
 		case 'f':
 			filter = optarg;
 			break;
@@ -512,7 +516,7 @@ main(int argc, char *argv[])
 	if (!device && !file)
 		device = "eth0";
 
-	fd = socket_open(EXTSRC_SOCKET_PATH);
+	fd = socket_open(extsrc_socket_path);
 
 	if ((pcap_errbuf = malloc(PCAP_ERRBUF_SIZE)) == NULL)
 		err(1, "malloc");
