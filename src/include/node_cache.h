@@ -203,5 +203,7 @@ void merge_nodes(node_cache_t *node_cache, node_t* src_node, node_t* dest_node);
 void cache_tree_add_mac(node_cache_t *node_cache, node_t* node, char* mac);
 void cache_tree_remove_mac(node_cache_t *node_cache, char* mac);
 
+int cmp_flow_keys(size_t size_a, const void* a, size_t size_b, const void* b);
+
 
 #endif // SPIN_NODE_CACHE_H

@@ -7,33 +7,6 @@
 
 STAT_MODULE(spinhook)
 
-int cmp_flow_keys(size_t size_a, const void* a, size_t size_b, const void* b) {
-    // Could we just replace this with memcmp?
-    devflow_key_t* ka = (devflow_key_t*)a;
-    devflow_key_t* kb = (devflow_key_t*)b;
-    if (size_a < size_b) {
-        return -1;
-    } else if (size_a > size_b) {
-        return 1;
-    }
-    if (ka->dst_node_id < kb->dst_node_id) {
-        return -1;
-    } else if (ka->dst_node_id > kb->dst_node_id) {
-        return 1;
-    }
-    if (ka->dst_port < kb->dst_port) {
-        return -1;
-    } else if (ka->dst_port > kb->dst_port) {
-        return 1;
-    }
-    if (ka->icmp_type < kb->icmp_type) {
-        return -1;
-    } else if (ka->icmp_type > kb->icmp_type) {
-        return 1;
-    }
-    return 0;
-}
-
 devflow_t *spinhook_get_devflow(device_t *dev, node_t *node, int dst_port, int icmp_type) {
     tree_entry_t *leaf;
     int nodeid = node->id;
