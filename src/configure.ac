@@ -40,7 +40,7 @@ AC_CHECK_HEADER([net/bpf.h], AC_CHECK_TYPE([struct bpf_timeval],
 
 dnl Checks for library functions.
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS(socket strerror)
+AC_CHECK_FUNCS(pledge socket strerror)
 
 AC_PROG_RANLIB
 
