@@ -5,9 +5,9 @@
 
 #if USE_UCI
 #define UCI_SECTION_NAME "spin.spind"
-#else
-#define CONFIG_FILE "/etc/spin/spind.conf"
 #endif
+
+#define CONFIG_FILE "/etc/spin/spind.conf"
 
 void init_config();
 void config_set_option(char*, char*);
