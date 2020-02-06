@@ -8,6 +8,7 @@
 #include "core2extsrc.h"
 #include "core2nflog_dns.h"
 #include "core2pubsub.h"
+#include "dnshooks.h"
 #include "extsrc.h"
 #include "ipl.h"
 #include "mainloop.h"
@@ -396,6 +397,7 @@ int main(int argc, char** argv) {
 
     init_cache();
 
+    dns_hooks_init(node_cache, dns_cache);
     init_core2conntrack(node_cache, local_mode, spinhook_traffic);
     init_core2nflog_dns(node_cache, dns_cache);
 

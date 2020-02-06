@@ -24,8 +24,6 @@ static void nflog_dns_callback(void* arg, int family, int protocol,
 void init_core2nflog_dns(node_cache_t* node_cache, dns_cache_t* dns_cache) {
     int nflog_dns_group;
 
-    dns_hooks_init(node_cache, dns_cache);
-
     handle_dns_ctx = handle_dns_init(&dns_query_hook, &dns_answer_hook);
     if (handle_dns_ctx == NULL) {
         spin_log(LOG_ERR, "handle_dns_init failure");

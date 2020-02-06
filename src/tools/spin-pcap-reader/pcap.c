@@ -23,6 +23,8 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#include "config.h"
+
 #include <sys/types.h>
 
 #include <net/if.h>
@@ -120,9 +122,9 @@ usage(const char *error)
 
 	if (error)
 		fprintf(stderr, "%s\n", error);
-	fprintf(stderr,
-	    "Usage: %s [-R] [-f filter] [-i interface] [-m mac] [-r file]\n",
+	fprintf(stderr, "Usage: %s [-R] [-e extsrc-socket-path] [-f filter]\n",
 	    __progname);
+	fprintf(stderr, "\t[-i interface] [-m mac] [-r file]\n");
 	exit(1);
 }
 
@@ -274,7 +276,7 @@ trunc:
 }
 
 static void
-#ifdef __OpenBSD__ /* XXX */
+#ifdef HAVE_BPF_TIMEVAL
 handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
     const struct bpf_timeval *ts)
 #else
@@ -330,7 +332,7 @@ handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
 }
 
 static void
-#ifdef __OpenBSD__ /* XXX */
+#ifdef HAVE_BPF_TIMEVAL
 handle_ip6(const u_char *p, u_int caplen, const struct ether_header *ep,
     const struct bpf_timeval *ts)
 #else
@@ -421,6 +423,9 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 	const struct ether_header *ep;
 	u_short ether_type;
 	u_int caplen = h->caplen;
+#ifdef HAVE_BPF_TIMEVAL
+	struct timeval tvts;
+#endif
 
 	if (h->caplen != h->len) {
 		warnx("caplen %d != len %d, ", h->caplen, h->len);
@@ -443,8 +448,15 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 	caplen -= 14;
 
 	// XXX find a better place for this piece of code
-	if (!Rflag)
+	if (!Rflag) {
+#ifdef HAVE_BPF_TIMEVAL
+		tvts.tv_sec = h->ts.tv_sec;
+		tvts.tv_usec = h->ts.tv_usec;
+		maybe_sleep(&tvts);
+#else
 		maybe_sleep(&h->ts);
+#endif
+}
 
 	switch (ether_type) {
 	case ETHERTYPE_IP:
@@ -469,6 +481,7 @@ int
 main(int argc, char *argv[])
 {
 	int ch;
+	char *extsrc_socket_path = EXTSRC_SOCKET_PATH;
 	char *device = NULL;
 	char *file = NULL;
 	char *pcap_errbuf;
@@ -482,8 +495,11 @@ main(int argc, char *argv[])
 
 	node_cache = node_cache_create();
 
-	while ((ch = getopt(argc, argv, "f:hi:m:Rr:")) != -1) {
+	while ((ch = getopt(argc, argv, "e:f:hi:m:Rr:")) != -1) {
 		switch(ch) {
+		case 'e':
+			extsrc_socket_path = optarg;
+			break;
 		case 'f':
 			filter = optarg;
 			break;
@@ -512,7 +528,7 @@ main(int argc, char *argv[])
 	if (!device && !file)
 		device = "eth0";
 
-	fd = socket_open(EXTSRC_SOCKET_PATH);
+	fd = socket_open(extsrc_socket_path);
 
 	if ((pcap_errbuf = malloc(PCAP_ERRBUF_SIZE)) == NULL)
 		err(1, "malloc");

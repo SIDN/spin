@@ -32,10 +32,15 @@ AC_C_CONST
 AC_TYPE_SIZE_T
 AC_STRUCT_TM
 AC_SYS_LARGEFILE
+AC_CHECK_HEADER([net/bpf.h], AC_CHECK_TYPE([struct bpf_timeval],
+  AC_DEFINE([HAVE_BPF_TIMEVAL], [1], [struct bpf_timeval exists]), [], [[
+#include <sys/types.h>
+#include <net/bpf.h>
+]]))
 
 dnl Checks for library functions.
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS(socket strerror)
+AC_CHECK_FUNCS(pledge socket strerror)
 
 AC_PROG_RANLIB
 
@@ -110,6 +115,7 @@ AC_ARG_ENABLE(spin-pcap-reader,
               AC_HELP_STRING([--enable-spin-pcap-reader], [enable spin-pcap-reader]),
               [
                 MAKEFILES="$MAKEFILES tools/spin-pcap-reader/Makefile";
+                AC_SUBST(SPINPCAPREADER, "spin-pcap-reader")
                 AC_CONFIG_FILES(tools/spin-pcap-reader/Makefile)
                 CFLAGS="$CFLAGS -g -O0"
                 AC_CHECK_LIB([pcap], [pcap_create], [LDFLAGS="$LDFLAGS -lpcap"], [AC_MSG_ERROR([pcap not found])])
@@ -129,5 +135,6 @@ AC_CONFIG_FILES(
     Makefile
     lib/Makefile
     spind/Makefile
+    tools/Makefile
 )
 AC_OUTPUT
