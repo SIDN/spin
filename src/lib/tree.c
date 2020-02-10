@@ -61,6 +61,10 @@ void tree_destroy(tree_t* tree) {
 int tree_add(tree_t* tree, size_t key_size, void* key, size_t data_size, void* data, int copy) {
     tree_entry_t* current;
     tree_entry_t* parent;
+    // Keep a separate pointer to the 'current parent' during balancing;
+    // as the pointer reference may be changed while balancing, depending
+    // on compiler
+    tree_entry_t* current_parent;
     int c;
 
     if (tree->root == NULL) {
@@ -91,13 +95,15 @@ int tree_add(tree_t* tree, size_t key_size, void* key, size_t data_size, void* d
                 parent->left = tree_entry_create(key_size, key, data_size, data, copy);
                 parent->left->parent = parent;
                 current = parent->left;
-                while (current->parent != NULL) {
-                    if (current->parent->left == current) {
-                        current->parent->left = tree_entry_balance(current);
-                    } else if (current->parent->right == current) {
-                        current->parent->right = tree_entry_balance(current);
+                current_parent = current->parent;
+                while (current_parent != NULL) {
+                    if (current_parent->left == current) {
+                        current_parent->left = tree_entry_balance(current);
+                    } else if (current_parent->right == current) {
+                        current_parent->right = tree_entry_balance(current);
                     }
                     current = current->parent;
+                    current_parent = current->parent;
                 }
                 tree->root = tree_entry_balance(tree->root);
                 return -1;
@@ -109,13 +115,15 @@ int tree_add(tree_t* tree, size_t key_size, void* key, size_t data_size, void* d
                 parent->right = tree_entry_create(key_size, key, data_size, data, copy);
                 parent->right->parent = parent;
                 current = parent->right;
-                while (current->parent != NULL) {
-                    if (current->parent->left == current) {
-                        current->parent->left = tree_entry_balance(current);
-                    } else if (current->parent->right == current) {
-                        current->parent->right = tree_entry_balance(current);
+                current_parent = current->parent;
+                while (current_parent != NULL) {
+                    if (current_parent->left == current) {
+                        current_parent->left = tree_entry_balance(current);
+                    } else if (current_parent->right == current) {
+                        current_parent->right = tree_entry_balance(current);
                     }
                     current = current->parent;
+                    current_parent = current->parent;
                 }
                 tree->root = tree_entry_balance(tree->root);
                 return 1;
