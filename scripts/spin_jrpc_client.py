@@ -28,7 +28,7 @@ class JsonRPCClient(object):
 
     def build_json_command(self):
         result = {
-            'json_rpc': '2.0',
+            'jsonrpc': '2.0',
             'id': random.randint(1, 65535),
             'method': self.command
         }
