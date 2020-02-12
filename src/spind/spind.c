@@ -303,7 +303,7 @@ void ubus_main();
 
 int main(int argc, char** argv) {
     int c;
-    int log_verbosity;
+    int log_verbosity = 1;
     int use_syslog;
     int debug_mode = 0;
     int cmdline_console_output = 0;
