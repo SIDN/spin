@@ -27,12 +27,12 @@ void spin_log(int level, const char* format, ...) {
     }
 
     va_start(arg, format);
-    va_end(arg);
     if (use_syslog_) {
         vsyslog(level, format, arg);
     } else {
         vprintf(format, arg);
     }
+    va_end(arg);
 }
 
 void spin_vlog(int level, const char* format, va_list arg) {

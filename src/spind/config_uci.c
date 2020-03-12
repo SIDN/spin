@@ -78,9 +78,11 @@ void
 config_read_error(int abort, const char* format, ...) {
     va_list arg;
     va_start(arg, format);
-    va_end(arg);
     vfprintf(stderr, format, arg);
+    va_end(arg);
+    va_start(arg, format);
     spin_vlog(LOG_ERR, format, arg);
+    va_end(arg);
 
     if (abort) {
         fprintf(stderr, "aborting spind startup\n");
