@@ -36,8 +36,9 @@ void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
     memcpy((pkt_info->src_addr) + 12, &tmp, 4);
     tmp = nfct_get_attr_u32(ct, ATTR_IPV4_DST);
     memcpy((pkt_info->dest_addr) + 12, &tmp, 4);
-    pkt_info->src_port = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_SRC);
-    pkt_info->dest_port = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_DST);
+    // libnetfilter returns the port numbers in network byte order, so convert if necessary
+    pkt_info->src_port = ntohs(nfct_get_attr_u16(ct, ATTR_ORIG_PORT_SRC));
+    pkt_info->dest_port = ntohs(nfct_get_attr_u16(ct, ATTR_ORIG_PORT_DST));
     pkt_info->payload_size = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_BYTES);
     // We count both the orig and the repl for size and packet numbers
     pkt_info->payload_size = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_BYTES);
@@ -58,8 +59,9 @@ void nfct_to_pkt_info(pkt_info_t* pkt_info, struct nf_conntrack *ct) {
     pkt_info->payload_size += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_BYTES);
     pkt_info->packet_count = nfct_get_attr_u64(ct, ATTR_ORIG_COUNTER_PACKETS);
     pkt_info->packet_count += nfct_get_attr_u64(ct, ATTR_REPL_COUNTER_PACKETS);
-    pkt_info->src_port = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_SRC);
-    pkt_info->dest_port = nfct_get_attr_u16(ct, ATTR_ORIG_PORT_DST);
+    // libnetfilter returns the port number in network byte order, so convert if necessary
+    pkt_info->src_port = ntohs(nfct_get_attr_u16(ct, ATTR_ORIG_PORT_SRC));
+    pkt_info->dest_port = ntohs(nfct_get_attr_u16(ct, ATTR_ORIG_PORT_DST));
     pkt_info->payload_offset = 0;
     pkt_info->protocol = nfct_get_attr_u8(ct, ATTR_ORIG_L4PROTO);
     pkt_info->icmp_type = nfct_get_attr_u8(ct, ATTR_ICMP_TYPE);
@@ -126,7 +128,7 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
 
         if (src_node != NULL && dest_node != NULL) {
             // Inform flow accounting layer
-            (*cb_data->traffic_hook)(cb_data->node_cache, src_node, dest_node, pkt_info.packet_count, pkt_info.payload_size, now, ntohs(pkt_info.dest_port), pkt_info.icmp_type);
+            (*cb_data->traffic_hook)(cb_data->node_cache, src_node, dest_node, pkt_info.packet_count, pkt_info.payload_size, now, pkt_info.dest_port, pkt_info.icmp_type);
 
             // small experiment, try to ignore messages from and to
             // this device, unless local_mode is set

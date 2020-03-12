@@ -45,7 +45,9 @@ typedef struct packet_info {
 	uint8_t protocol; // value for tcp/udp/icmp/etc.
 	uint8_t src_addr[16]; // v4 just uses last 4 bytes
 	uint8_t dest_addr[16]; // v4 just uses last 4 bytes
+	// Source port (in host endianness)
 	uint16_t src_port;
+	// Destination port (in host endianness)
 	uint16_t dest_port;
 	uint8_t icmp_type;
 	uint64_t payload_size;
