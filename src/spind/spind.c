@@ -258,7 +258,7 @@ void log_version() {
 void print_help() {
     printf("Usage: spind [options]\n");
     printf("Options:\n");
-    printf("-c <file>\tspecify spind config file (default: %s)\n", CONFIG_FILE);
+    printf("-c <file>\t\tspecify spind config file (default: %s)\n", CONFIG_FILE);
     printf("-d\t\t\tlog debug messages (set log level to LOG_DEBUG)\n");
     printf("-e <path>\t\textsrc socket path (default: %s)\n", EXTSRC_SOCKET_PATH);
     printf("-h\t\t\tshow this help\n");
