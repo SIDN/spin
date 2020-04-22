@@ -30,7 +30,7 @@ dns_cache_t* dns_cache;
 static int local_mode;
 
 const char* config_file = NULL;
-const char* mosq_host;
+const char* mosq_host = NULL;
 int mosq_port;
 
 STAT_MODULE(spind)
@@ -397,7 +397,9 @@ int main(int argc, char** argv) {
         spin_log_init(use_syslog, log_verbosity, "spind");
     }
 
-    mosq_host = spinconfig_pubsub_host();
+    if (!mosq_host) {
+        mosq_host = spinconfig_pubsub_host();
+    }
     mosq_port = spinconfig_pubsub_port();
 
 #ifdef PASSIVE_MODE_ONLY
