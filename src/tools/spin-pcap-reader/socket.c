@@ -34,7 +34,24 @@ socket_open(const char *sockpath)
 void
 socket_writemsg(int fd, char *msg, size_t msg_len)
 {
+	static unsigned long ok = 0;
+	static unsigned long fail = 0;
+
 	if (send(fd, msg, msg_len, 0) != msg_len) {
-		err(1, "send");
+		if (errno == ENOBUFS) {
+			/*
+			 * XXX perhaps distinguish between the case where we
+			 * read a PCAP and the case where we're listening to an
+			 * interface? In the former case we could perhaps wait,
+			 * e.g. using poll().
+			 */
+			++fail;
+			warnx("send returned ENOBUFS; %lu/%lu fail/ok", fail,
+			    ok);
+		} else {
+			err(1, "send");
+		}
+	} else {
+		++ok;
 	}
 }
