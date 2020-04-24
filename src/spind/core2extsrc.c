@@ -249,7 +249,7 @@ init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, char *sp)
     s_un.sun_family = AF_UNIX;
     if (snprintf(s_un.sun_path, sizeof(s_un.sun_path), "%s",
         extsrc_socket_path) >= (ssize_t)sizeof(s_un.sun_path)) {
-        spin_log(LOG_ERR, "socket path too long\n");
+        spin_log(LOG_ERR, "%s: socket path too long\n", extsrc_socket_path);
         exit(1);
     }
 
@@ -257,12 +257,14 @@ init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, char *sp)
 
     old_umask = umask(077);
     if (bind(fd, (struct sockaddr *)&s_un, sizeof(s_un)) == -1) {
-        spin_log(LOG_ERR, "bind: %s\n", strerror(errno));
+        spin_log(LOG_ERR, "bind: %s: %s\n", extsrc_socket_path,
+            strerror(errno));
         exit(1);
     }
     umask(old_umask);
     if (chmod(extsrc_socket_path, 0600) == -1) {
-        spin_log(LOG_ERR, "chmod: %s\n", strerror(errno));
+        spin_log(LOG_ERR, "chmod: %s: %s\n", extsrc_socket_path,
+            strerror(errno));
         exit(1);
     }
 
