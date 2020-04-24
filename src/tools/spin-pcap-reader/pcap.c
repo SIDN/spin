@@ -276,13 +276,7 @@ trunc:
 }
 
 static void
-#ifdef HAVE_BPF_TIMEVAL
-handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
-    const struct bpf_timeval *ts)
-#else
-handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
-    const struct timeval *ts)
-#endif
+handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep)
 {
 	const struct ip *ip;
 	u_int hlen, len;
@@ -332,13 +326,7 @@ handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep,
 }
 
 static void
-#ifdef HAVE_BPF_TIMEVAL
-handle_ip6(const u_char *p, u_int caplen, const struct ether_header *ep,
-    const struct bpf_timeval *ts)
-#else
-handle_ip6(const u_char *p, u_int caplen, const struct ether_header *ep,
-    const struct timeval *ts)
-#endif
+handle_ip6(const u_char *p, u_int caplen, const struct ether_header *ep)
 {
 	const struct ip6_hdr *ip6;
 	u_int hlen, len;
@@ -460,11 +448,11 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 
 	switch (ether_type) {
 	case ETHERTYPE_IP:
-		handle_ip(p, caplen, ep, &h->ts);
+		handle_ip(p, caplen, ep);
 		break;
 
 	case ETHERTYPE_IPV6:
-		handle_ip6(p, caplen, ep, &h->ts);
+		handle_ip6(p, caplen, ep);
 		break;
 
 	case ETHERTYPE_ARP:
