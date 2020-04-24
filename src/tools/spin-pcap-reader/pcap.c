@@ -209,8 +209,8 @@ static void
 handle_l4(const struct ether_header *ep, const u_char *l4, u_int len,
     pkt_info_t *pkt_info, int truncated)
 {
-	const struct tcphdr *tp;
-	const struct udphdr *up;
+	const struct tcphdr *tp = NULL;
+	const struct udphdr *up = NULL;
 	const u_char *cp;
 	u_int cplen;
 #ifdef unusedfornow
