@@ -1,6 +1,8 @@
 #ifndef CORE2CONNTRACK
 #define CORE2CONNTRACK 1
 #include "node_cache.h"
+#include "process_pkt_info.h"
+#include "spinhook.h"
 
 // Initialize the core2conntrack module
 // Arguments:
@@ -9,7 +11,6 @@
 //
 // We may want to add some options here (such as a configurable queue number)
 
-typedef void (*trafficfunc)(node_cache_t *, node_t *, node_t *, int, int, uint32_t, int, int);
 void init_core2conntrack(node_cache_t* node_cache, int local_mode, trafficfunc);
 void cleanup_core2conntrack();
 

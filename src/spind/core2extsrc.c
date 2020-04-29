@@ -3,15 +3,18 @@
 #include <sys/un.h>
 #include <time.h>
 
+#include "core2extsrc.h"
 #include "dnshooks.h"
 #include "extsrc.h"
 #include "mainloop.h"
+#include "process_pkt_info.h"
 #include "spind.h"
 #include "spin_log.h"
 
 
 static node_cache_t *node_cache;
 static dns_cache_t *dns_cache;
+static trafficfunc traffic_hook;
 static char *extsrc_socket_path;
 
 static flow_list_t *flow_list;
@@ -51,11 +54,8 @@ process_pkt_info_extsrc(pkt_info_t *pkt_info)
      */
     maybe_sendflow(flow_list, now);
 
-    if (pkt_info->packet_count > 0 || pkt_info->payload_size > 0) {
-        node_cache_add_pkt_info(node_cache, pkt_info, now);
-
-        flow_list_add_pktinfo(flow_list, pkt_info);
-    }
+    // XXX: we should probably use the local_mode flag instead of passing 1
+    process_pkt_info(node_cache, flow_list, traffic_hook, 1, pkt_info);
 }
 
 static void
@@ -229,7 +229,7 @@ removesocket(void)
 }
 
 void
-init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, char *sp)
+init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, trafficfunc th, char *sp)
 {
     struct sockaddr_un s_un;
     mode_t old_umask;
@@ -238,6 +238,7 @@ init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, char *sp)
 
     node_cache = nc;
     dns_cache = dc;
+    traffic_hook = th;
     extsrc_socket_path = sp;
 
     // XXX does it matter what timestamp we use? No idea.

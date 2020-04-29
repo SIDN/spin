@@ -432,7 +432,7 @@ int main(int argc, char** argv) {
 
     init_core2block(passive_mode);
 
-    init_core2extsrc(node_cache, dns_cache, extsrc_socket_path);
+    init_core2extsrc(node_cache, dns_cache, spinhook_traffic, extsrc_socket_path);
 
     init_ipl_list_ar();
 

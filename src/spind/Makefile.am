@@ -16,6 +16,7 @@ spind_SOURCES = spind.c \
                 dnshooks.c \
                 mainloop.c \
                 mainloop.h \
+                process_pkt_info.c \
                 rpc_calls.c \
                 rpc_calls.h \
                 rpc_common.c \

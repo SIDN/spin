@@ -5,6 +5,7 @@
 #include "core2conntrack.h"
 #include "ipl.h"
 #include "mainloop.h"
+#include "process_pkt_info.h"
 #include "spind.h"
 #include "spin_log.h"
 #include "statistics.h"
@@ -94,16 +95,9 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
     struct nf_conntrack *ct;
     pkt_info_t pkt_info;
     cb_data_t* cb_data = (cb_data_t*) data;
-    //flow_list_t* flow_list = cb_data->flow_list;
     // TODO: remove time() calls, use the single one at caller
     uint32_t now = time(NULL);
     STAT_COUNTER(ctr, callback, STAT_TOTAL);
-    STAT_COUNTER(ctrsf, sendflow, STAT_TOTAL);
-    STAT_COUNTER(ctrlocal, cb-ignore-local, STAT_TOTAL);
-    STAT_COUNTER(ctrignore, ignore-ip, STAT_TOTAL);
-    ip_t ip;
-    node_t* src_node;
-    node_t* dest_node;
 
     STAT_VALUE(ctr, 1);
     maybe_sendflow(cb_data->flow_list, now);
@@ -118,41 +112,7 @@ static int conntrack_cb(const struct nlmsghdr *nlh, void *data)
     // TODO: remove repl?
     nfct_to_pkt_info(&pkt_info, ct);
 
-    if (pkt_info.packet_count > 0 || pkt_info.payload_size > 0) {
-        node_cache_add_pkt_info(cb_data->node_cache, &pkt_info, now);
-
-        copy_ip_data(&ip, pkt_info.family, 0, pkt_info.src_addr);
-        src_node = node_cache_find_by_ip(cb_data->node_cache, sizeof(ip_t), &ip);
-        copy_ip_data(&ip, pkt_info.family, 0, pkt_info.dest_addr);
-        dest_node = node_cache_find_by_ip(cb_data->node_cache, sizeof(ip_t), &ip);
-
-        if (src_node != NULL && dest_node != NULL) {
-            // Inform flow accounting layer
-            (*cb_data->traffic_hook)(cb_data->node_cache, src_node, dest_node, pkt_info.packet_count, pkt_info.payload_size, now, pkt_info.dest_port, pkt_info.icmp_type);
-
-            // small experiment, try to ignore messages from and to
-            // this device, unless local_mode is set
-            if (!cb_data->local_mode && src_node->mac==NULL && dest_node->mac==NULL) {
-                nfct_destroy(ct);
-                STAT_VALUE(ctrlocal, 1);
-                return MNL_CB_OK;
-            }
-        }
-
-        // check for configured ignores as well
-        // do we need to cache it or should we do this check earlier?
-        // do we need to check both source and reply?
-        if (addr_in_ignore_list(pkt_info.family, pkt_info.src_addr) ||
-            addr_in_ignore_list(pkt_info.family, pkt_info.dest_addr)
-           ) {
-            nfct_destroy(ct);
-            STAT_VALUE(ctrignore, 1);
-            return MNL_CB_OK;
-        }
-
-        STAT_VALUE(ctrsf, 1);
-        flow_list_add_pktinfo(cb_data->flow_list, &pkt_info);
-    }
+    process_pkt_info(cb_data->node_cache, cb_data->flow_list, cb_data->traffic_hook, cb_data->local_mode, &pkt_info);
 
     nfct_destroy(ct);
 
