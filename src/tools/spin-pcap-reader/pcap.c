@@ -56,7 +56,7 @@
 #include "external/interface.h"
 #include "external/extract.h" /* must come after interface.h */
 
-#include "nodes.h"
+#include "arpupdate.h"
 #include "sleep.h"
 #include "socket.h"
 
@@ -124,7 +124,7 @@ usage(const char *error)
 		fprintf(stderr, "%s\n", error);
 	fprintf(stderr, "Usage: %s [-R] [-e extsrc-socket-path] [-f filter]\n",
 	    __progname);
-	fprintf(stderr, "\t[-i interface] [-m mac] [-r file]\n");
+	fprintf(stderr, "\t[-i interface] [-r file]\n");
 	exit(1);
 }
 
@@ -179,9 +179,8 @@ handle_icmp6(const u_char *bp, const struct ether_header *ep)
 
 		TCHECK(p->nd_na_target);
 
-		x_node_cache_add_mac_uint8t(node_cache, ep->ether_shost);
-		mark_local_device(fd, node_cache, ep->ether_shost,
-		    p->nd_na_target.s6_addr, AF_INET6);
+		arp_update(fd, ep->ether_shost, p->nd_na_target.s6_addr,
+		    AF_INET6);
 		break;
 
 	default:
@@ -391,9 +390,7 @@ handle_arp(const u_char *bp, u_int length)
 	op = EXTRACT_16BITS(&ap->arp_op);
 	switch (op) {
 	case ARPOP_REPLY:
-		x_node_cache_add_mac_uint8t(node_cache, ap->arp_sha);
-		mark_local_device(fd, node_cache, ap->arp_sha, ap->arp_spa,
-		    AF_INET);
+		arp_update(fd, ap->arp_sha, ap->arp_spa, AF_INET);
 		break;
 
 	default:
@@ -483,7 +480,7 @@ main(int argc, char *argv[])
 
 	node_cache = node_cache_create(ARP_TABLE_VIRTUAL);
 
-	while ((ch = getopt(argc, argv, "e:f:hi:m:Rr:")) != -1) {
+	while ((ch = getopt(argc, argv, "e:f:hi:Rr:")) != -1) {
 		switch(ch) {
 		case 'e':
 			extsrc_socket_path = optarg;
@@ -495,10 +492,6 @@ main(int argc, char *argv[])
 			usage(NULL);
 		case 'i':
 			device = optarg;
-			break;
-		case 'm':
-			// XXX should do input validation
-			x_node_cache_add_mac_macstr(node_cache, optarg);
 			break;
 		case 'R':
 			Rflag = 1;
