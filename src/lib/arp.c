@@ -19,6 +19,10 @@ void arp_table_destroy(arp_table_t* arp_table) {
     free(arp_table);
 }
 
+void arp_table_add_ip_t(arp_table_t* arp_table, ip_t* ip, char* mac) {
+    tree_add(arp_table->entries, sizeof(ip_t), ip, strlen(mac) + 1, mac, 1);
+}
+
 void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
     ip_t ip;
     if (!spin_pton(&ip, ip_str)) {
@@ -26,7 +30,7 @@ void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
         return;
     }
 
-    tree_add(arp_table->entries, sizeof(ip_t), &ip, strlen(mac) + 1, mac, 1);
+    arp_table_add_ip_t(arp_table, &ip, mac);
 }
 
 static void
