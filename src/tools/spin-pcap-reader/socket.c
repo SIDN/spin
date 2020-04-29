@@ -22,10 +22,10 @@ socket_open(const char *sockpath)
 	s_un.sun_family = AF_UNIX;
 	if (snprintf(s_un.sun_path, sizeof(s_un.sun_path), "%s",
 	    sockpath) >= (ssize_t)sizeof(s_un.sun_path)) {
-		errx(1, "socket path too long");
+		errx(1, "%s: socket path too long", sockpath);
 	}
 	if (connect(fd, (struct sockaddr *)&s_un, sizeof(s_un)) == -1) {
-		err(1, "connect");
+		err(1, "connect: %s", sockpath);
 	}
 
 	return fd;
