@@ -478,7 +478,7 @@ void node_callback_devices(node_cache_t* node_cache, cleanfunc mf, void * ap) {
  */
 
 node_cache_t*
-node_cache_create() {
+node_cache_create(enum arp_table_backend backend) {
     node_cache_t* node_cache = (node_cache_t*)malloc(sizeof(node_cache_t));
     node_cache->nodes = tree_create(cmp_ints);
 
@@ -488,7 +488,7 @@ node_cache_create() {
 
     node_cache->available_id = 1;
 
-    node_cache->arp_table = arp_table_create();
+    node_cache->arp_table = arp_table_create(backend);
     node_cache->names = node_names_create();
     node_names_read_dhcpconfig(node_cache->names, "/etc/config/dhcp");
     // can/should we regularly call this again?

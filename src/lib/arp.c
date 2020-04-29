@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <errno.h>
 
 #include "arp.h"
@@ -6,8 +7,9 @@
 
 STAT_MODULE(arp)
 
-arp_table_t* arp_table_create(void) {
+arp_table_t* arp_table_create(enum arp_table_backend backend) {
     arp_table_t* arp_table = (arp_table_t*) malloc(sizeof(arp_table_t));
+    arp_table->backend = backend;
     arp_table->entries = tree_create(cmp_ips);
     return arp_table;
 }
@@ -17,7 +19,6 @@ void arp_table_destroy(arp_table_t* arp_table) {
     free(arp_table);
 }
 
-static
 void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
     ip_t ip;
     if (!spin_pton(&ip, ip_str)) {
@@ -28,7 +29,8 @@ void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
     tree_add(arp_table->entries, sizeof(ip_t), &ip, strlen(mac) + 1, mac, 1);
 }
 
-void arp_table_read(arp_table_t* arp_table) {
+static void
+arp_table_read_linux(arp_table_t* arp_table) {
     FILE *fp;
     char ip[INET6_ADDRSTRLEN];
     char mac[18];
@@ -55,6 +57,19 @@ void arp_table_read(arp_table_t* arp_table) {
     }
 
     pclose(fp);
+}
+
+void arp_table_read(arp_table_t* arp_table) {
+    switch (arp_table->backend) {
+    case ARP_TABLE_LINUX:
+        arp_table_read_linux(arp_table);
+        break;
+    case ARP_TABLE_VIRTUAL:
+        /* NOP; nothing to do */
+        break;
+    default:
+        assert(0);
+    }
 }
 
 void arp_table_print(arp_table_t* arp_table) {

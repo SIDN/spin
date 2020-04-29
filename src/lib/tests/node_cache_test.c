@@ -144,7 +144,7 @@ sample_dns_pkt_info_3(dns_pkt_info_t* dns_pkt_info) {
 
 void
 test_node_cache_add_1() {
-    node_cache_t* node_cache = node_cache_create();
+    node_cache_t* node_cache = node_cache_create(ARP_TABLE_LINUX);
     //pkt_info_t pkt_info;
     dns_pkt_info_t info1, info2, info3;
     //char str[1024];
@@ -159,7 +159,7 @@ test_node_cache_add_1() {
     assert(tree_size(node_cache->nodes) == 1);
 
     node_cache_destroy(node_cache);
-    node_cache = node_cache_create();
+    node_cache = node_cache_create(ARP_TABLE_LINUX);
 
     node_cache_add_dns_info(node_cache, &info1, 12345);
     node_cache_add_dns_info(node_cache, &info3, 12345);
@@ -175,7 +175,7 @@ test_node_cache_add_1() {
 
 void
 test_node_cache_add_2() {
-    node_cache_t* node_cache = node_cache_create();
+    node_cache_t* node_cache = node_cache_create(ARP_TABLE_LINUX);
     pkt_info_t pkt_info;
     sample_pkt_info_1(&pkt_info);
     node_cache_add_pkt_info(node_cache, &pkt_info, 12345);
@@ -186,7 +186,7 @@ test_node_cache_add_2() {
 
 void
 test_node_cache_add_3() {
-    node_cache_t* node_cache = node_cache_create();
+    node_cache_t* node_cache = node_cache_create(ARP_TABLE_LINUX);
     node_t* node1 = node_create(1);
     node_t* f_node;
     ip_t ip;
@@ -258,7 +258,7 @@ test_node_to_json() {
 
 void
 test_pkt_info_to_json() {
-    node_cache_t* node_cache = node_cache_create();
+    node_cache_t* node_cache = node_cache_create(ARP_TABLE_LINUX);
     buffer_t* json_buf = buffer_create(1024);
     //int str_cmp;
     pkt_info_t pkt_info;

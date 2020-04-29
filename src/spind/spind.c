@@ -3,6 +3,7 @@
 #include <time.h>
 #include <assert.h>
 
+#include "arp.h"
 #include "config.h"
 #include "core2block.h"
 #include "core2conntrack.h"
@@ -289,9 +290,9 @@ void node_cache_clean_wf() {
 
 #define CLEAN_TIMEOUT 15000
 
-void init_cache() {
+void init_cache(enum arp_table_backend backend) {
     dns_cache = dns_cache_create();
-    node_cache = node_cache_create();
+    node_cache = node_cache_create(backend);
 
     mainloop_register("node_cache_clean", node_cache_clean_wf, (void *) 0, 0, CLEAN_TIMEOUT);
 }
@@ -314,6 +315,7 @@ int main(int argc, char** argv) {
     char *json_rpc_socket_path = JSON_RPC_SOCKET_PATH;
 #endif
     int passive_mode = 0;
+    enum arp_table_backend arp_backend = ARP_TABLE_LINUX;
 
     while ((c = getopt (argc, argv, "c:de:hj:lm:oPp:v")) != -1) {
         switch (c) {
@@ -414,7 +416,11 @@ int main(int argc, char** argv) {
 
     SPIN_STAT_START();
 
-    init_cache();
+    if (passive_mode) {
+        arp_backend = ARP_TABLE_VIRTUAL;
+    }
+
+    init_cache(arp_backend);
 
     dns_hooks_init(node_cache, dns_cache);
 #ifndef PASSIVE_MODE_ONLY

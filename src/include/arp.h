@@ -15,12 +15,20 @@
 #include <string.h>
 #include <stdio.h>
 
+enum arp_table_backend {
+    ARP_TABLE_LINUX,
+    ARP_TABLE_VIRTUAL,
+};
+
 typedef struct {
+    enum arp_table_backend backend;
     tree_t* entries;
 } arp_table_t;
 
-arp_table_t* arp_table_create(void);
+arp_table_t* arp_table_create(enum arp_table_backend backend);
 void arp_table_destroy(arp_table_t* arp_table);
+
+void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac);
 
 void arp_table_read(arp_table_t* arp_table);
 

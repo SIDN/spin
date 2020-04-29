@@ -114,7 +114,7 @@ typedef struct {
     node_names_t* names;
 } node_cache_t;
 
-node_cache_t* node_cache_create(void);
+node_cache_t* node_cache_create(enum arp_table_backend backend);
 void node_cache_destroy(node_cache_t* node_cache);
 
 typedef void (*cleanfunc)(node_cache_t *, node_t*, void *);

@@ -481,7 +481,7 @@ main(int argc, char *argv[])
 	malloc_options = "S";
 #endif /* __OpenBSD__ */
 
-	node_cache = node_cache_create();
+	node_cache = node_cache_create(ARP_TABLE_VIRTUAL);
 
 	while ((ch = getopt(argc, argv, "e:f:hi:m:Rr:")) != -1) {
 		switch(ch) {
