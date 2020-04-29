@@ -30,7 +30,7 @@ static int fd;
  */
 
 static void
-process_pkt_info(pkt_info_t *pkt_info)
+process_pkt_info_extsrc(pkt_info_t *pkt_info)
 {
     time_t now;
 
@@ -164,7 +164,8 @@ wf_extsrc(void *arg, int data, int timeout)
             goto fail;
         }
 
-        process_pkt_info((pkt_info_t *)(msg + sizeof(struct extsrc_msg_hdr)));
+        process_pkt_info_extsrc((pkt_info_t *)
+	    (msg + sizeof(struct extsrc_msg_hdr)));
         break;
 
     case EXTSRC_MSG_TYPE_DNS_QUERY:
