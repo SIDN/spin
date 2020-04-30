@@ -19,18 +19,19 @@ void arp_table_destroy(arp_table_t* arp_table) {
     free(arp_table);
 }
 
-void arp_table_add_ip_t(arp_table_t* arp_table, ip_t* ip, char* mac) {
+void arp_table_add(arp_table_t* arp_table, ip_t* ip, char* mac) {
     tree_add(arp_table->entries, sizeof(ip_t), ip, strlen(mac) + 1, mac, 1);
 }
 
-void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac) {
+static void
+arp_table_add_ipstr(arp_table_t* arp_table, char* ip_str, char* mac) {
     ip_t ip;
     if (!spin_pton(&ip, ip_str)) {
         spin_log(LOG_ERR, "bad address, ignoring\n");
         return;
     }
 
-    arp_table_add_ip_t(arp_table, &ip, mac);
+    arp_table_add(arp_table, &ip, mac);
 }
 
 static void
@@ -54,7 +55,7 @@ arp_table_read_linux(arp_table_t* arp_table) {
         result = sscanf(line, "%s dev %s lladdr %s %s\n", ip, ignore, mac, ignore);
         if (result == 4) {
             spin_log(LOG_DEBUG, "[ARP] Adding mac %s IP %s to arp cache\n", mac, ip);
-            arp_table_add(arp_table, ip, mac);
+            arp_table_add_ipstr(arp_table, ip, mac);
         } else {
             spin_log(LOG_DEBUG, "[ARP] Warning: unrecognized line in arp results (%d)\n", result);
         }

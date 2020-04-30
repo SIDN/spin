@@ -28,8 +28,7 @@ typedef struct {
 arp_table_t* arp_table_create(enum arp_table_backend backend);
 void arp_table_destroy(arp_table_t* arp_table);
 
-void arp_table_add_ip_t(arp_table_t* arp_table, ip_t* ip, char* mac);
-void arp_table_add(arp_table_t* arp_table, char* ip_str, char* mac);
+void arp_table_add(arp_table_t* arp_table, ip_t* ip, char* mac);
 
 void arp_table_read(arp_table_t* arp_table);
 
