@@ -98,7 +98,7 @@ process_device_info(struct extsrc_arp_table_update *up)
 
     node = node_cache_find_by_mac(node_cache, up->mac);
     if (node == NULL) {
-        node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &up->ip);
+        node = node_cache_find_by_ip(node_cache, &up->ip);
         if (node == NULL) {
             node = node_create(0);
             if (node == NULL) {

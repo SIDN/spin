@@ -24,9 +24,9 @@ process_pkt_info(node_cache_t* node_cache, flow_list_t* flow_list, trafficfunc t
         node_cache_add_pkt_info(node_cache, pkt_info, now);
 
         copy_ip_data(&ip, pkt_info->family, 0, pkt_info->src_addr);
-        src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+        src_node = node_cache_find_by_ip(node_cache, &ip);
         copy_ip_data(&ip, pkt_info->family, 0, pkt_info->dest_addr);
-        dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+        dest_node = node_cache_find_by_ip(node_cache, &ip);
 
         if (src_node != NULL && dest_node != NULL) {
             // Inform flow accounting layer

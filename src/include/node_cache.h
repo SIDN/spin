@@ -140,7 +140,7 @@ void xnode_add_ip(node_cache_t *node_cache, node_t* node, ip_t* ip);
  */
 int node_cache_add_node(node_cache_t* node_cache, node_t* node);
 
-node_t* node_cache_find_by_ip(node_cache_t* node_cache, size_t key_size, ip_t* ip);
+node_t* node_cache_find_by_ip(node_cache_t* node_cache, ip_t* ip);
 /**
  * Note: currently the cache stores domain names by their string representation, so convert
  * if you are looking for a node by its wireformat domain

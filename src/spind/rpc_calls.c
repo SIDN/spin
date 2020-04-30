@@ -49,7 +49,7 @@ int addipnodefunc(void *cb_data, rpc_arg_val_t *args, rpc_arg_val_t *result) {
         result->rpca_svalue = "Not a valid IP address";
         return -1;
     }
-    node = node_cache_find_by_ip(node_cache, sizeof(ipval), &ipval);
+    node = node_cache_find_by_ip(node_cache, &ipval);
     if (node) {
         result->rpca_svalue = "IP address already assigned to a node";
         return -1;

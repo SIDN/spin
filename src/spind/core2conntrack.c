@@ -81,9 +81,9 @@ static int check_ignore_local(pkt_info_t* pkt, node_cache_t* node_cache) {
     int result;
 
     copy_ip_data(&ip, pkt->family, 0, pkt->src_addr);
-    src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    src_node = node_cache_find_by_ip(node_cache, &ip);
     copy_ip_data(&ip, pkt->family, 0, pkt->dest_addr);
-    dest_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    dest_node = node_cache_find_by_ip(node_cache, &ip);
     result = (src_node == NULL || dest_node == NULL || (src_node->mac == NULL && dest_node->mac == NULL));
     STAT_VALUE(ctr, result);
     return result;

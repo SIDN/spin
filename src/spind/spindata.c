@@ -177,7 +177,7 @@ spin_data_flowlist(node_t *node) {
 static node_t *lookup_ip(node_cache_t *node_cache, ip_t *ip, pkt_info_t *pkt_info, char *sd) {
     node_t *result;
 
-    result = node_cache_find_by_ip(node_cache, sizeof(ip_t), ip);
+    result = node_cache_find_by_ip(node_cache, ip);
     if (result == NULL) {
         char pkt_str[1024];
         spin_log(LOG_ERR, "[XX] ERROR! %s node not found in cache!\n", sd);
@@ -260,7 +260,7 @@ spin_data_dns_query_pkt_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_i
         return 0;
     }
 
-    src_node = node_cache_find_by_ip(node_cache, sizeof(ip_t), &ip);
+    src_node = node_cache_find_by_ip(node_cache, &ip);
     if (src_node == NULL) {
         printf("[XX] error, src node not found in cache");
         char pkt_str[1024];
