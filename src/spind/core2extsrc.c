@@ -81,46 +81,23 @@ process_dns_answer(dns_pkt_info_t *dns_pkt)
 static void
 process_device_info(struct extsrc_arp_table_update *up)
 {
-    node_t *node;
 #ifdef EXTSRC_DEBUG
     char ipstr[INET6_ADDRSTRLEN];
 #endif
-    time_t now;
 
     /*
      * Sanitize input.
      */
     up->mac[sizeof(up->mac) - 1] = 0;
 
-    now = time(NULL);
-
     arp_table_add(node_cache->arp_table, &up->ip, up->mac);
-
-    node = node_cache_find_by_mac(node_cache, up->mac);
-    if (node == NULL) {
-        node = node_cache_find_by_ip(node_cache, &up->ip);
-        if (node == NULL) {
-            node = node_create(0);
-            if (node == NULL) {
-                spin_log(LOG_ERR, "node_create failed\n");
-                exit(1);
-            }
-
-            node_cache_add_node(node_cache, node);
-        }
-
-        node_set_mac(node, up->mac);
-
-        spin_log(LOG_DEBUG, "core2extsrc: new MAC address: %s\n", up->mac);
-    }
-
-    node_add_ip(node, &up->ip);
-    node_set_modified(node, now);
 
 #ifdef EXTSRC_DEBUG
     spin_ntop(ipstr, &up->ip, sizeof(ipstr));
     spin_log(LOG_DEBUG, "core2extsrc: IP %s for MAC address %s\n", ipstr,
         up->mac);
+    spin_log(LOG_DEBUG, "Size of ARP table: %d\n",
+        arp_table_size(node_cache->arp_table));
 #endif
 }
 
