@@ -70,7 +70,7 @@ void arp_table_read(arp_table_t* arp_table) {
         arp_table_read_linux(arp_table);
         break;
     case ARP_TABLE_VIRTUAL:
-        /* NOP; nothing to do */
+        /* NOOP; nothing to do */
         break;
     default:
         assert(0);
