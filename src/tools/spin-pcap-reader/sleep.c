@@ -1,54 +1,53 @@
 #include <sys/types.h>
-#define __USE_GNU /* for TIMEVAL_TO_TIMESPEC */
+#define __USE_GNU /* for TIMESPEC_TO_TIMEVAL */
 #include <sys/time.h>
 #undef __USE_GNU
 
 #include <err.h>
 #include <errno.h>
+#include <string.h>
 #include <time.h>
 
 #include "sleep.h"
 
 static void
-monotime(struct timespec *ts)
+monotime(struct timeval *tv)
 {
-	if (clock_gettime(CLOCK_MONOTONIC, ts) == -1) {
+	struct timespec ts;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
 		err(1, "clock_gettime");
 	}
+
+	TIMESPEC_TO_TIMEVAL(tv, &ts);
 }
 
 void
-maybe_sleep(const struct timeval *cur_pcap_tv)
+maybe_sleep(const struct timeval *cur_pcap)
 {
-	static struct timespec last_pcap = { 0, 0 };
-	static struct timespec last_wall = { 0, 0 };
-	struct timespec cur_pcap;
-	struct timespec cur_wall;
-	struct timespec diff_pcap;
-	struct timespec diff_wall;
-	struct timespec to_sleep;
-	struct timespec remainder;
-
-	TIMEVAL_TO_TIMESPEC(cur_pcap_tv, &cur_pcap);
+	static struct timeval last_pcap = { 0, 0 };
+	static struct timeval last_wall = { 0, 0 };
+	struct timeval cur_wall;
+	struct timeval diff_pcap;
+	struct timeval diff_wall;
+	struct timeval to_sleep;
 
 	monotime(&cur_wall);
 
-	if (timespecisset(&last_wall)) {
-		timespecsub(&cur_pcap, &last_pcap, &diff_pcap);
-		timespecsub(&cur_wall, &last_wall, &diff_wall);
+	if (timerisset(&last_wall)) {
+		timersub(cur_pcap, &last_pcap, &diff_pcap);
+		timersub(&cur_wall, &last_wall, &diff_wall);
 
-		if (timespeccmp(&diff_wall, &diff_pcap, <)) {
-			timespecsub(&diff_pcap, &diff_wall, &to_sleep);
+		if (timercmp(&diff_wall, &diff_pcap, <)) {
+			timersub(&diff_pcap, &diff_wall, &to_sleep);
 
-			while (nanosleep(&to_sleep, &remainder) == -1) {
-				if (errno != EINTR) {
-					err(1, "nanosleep");
-				}
-				to_sleep = remainder;
+			if (select(0, NULL, NULL, NULL, &to_sleep) == -1 &&
+			    errno != EINTR) {
+				err(1, "select");
 			}
 		}
 	}
 
-	last_pcap = cur_pcap;
-	last_wall = cur_wall;
+	memcpy(&last_pcap, cur_pcap, sizeof(last_pcap));
+	memcpy(&last_wall, &cur_wall, sizeof(last_wall));
 }
