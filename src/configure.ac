@@ -63,44 +63,32 @@ if test "x$passivemodeonly" = "x1" ; then
 fi
 
 #AC_CHECK_LIB([netfilter-log], [XXXXXXXX], [], [AC_MSG_ERROR([libXXXXXXX not found])])
-AC_CHECK_LIB([mnl], [mnl_socket_open],
-    [
-        LDFLAGS="$LDFLAGS -lmnl"
-    ],
+AC_CHECK_LIB([mnl], [mnl_socket_open], [],
     [
         if test "x$passivemodeonly" != "x1" ; then
             AC_MSG_ERROR([libmnl not found])
         fi
     ])
-AC_CHECK_LIB([netfilter_log], [nflog_open],
-    [
-        LDFLAGS="$LDFLAGS -lnetfilter_log"
-    ],
+AC_CHECK_LIB([netfilter_log], [nflog_open], [],
     [
         if test "x$passivemodeonly" != "x1" ; then
             AC_MSG_ERROR([libnetfilter-log not found])
         fi
     ])
-AC_CHECK_LIB([netfilter_queue], [nfq_open],
-    [
-        LDFLAGS="$LDFLAGS -lnetfilter_queue"
-    ],
+AC_CHECK_LIB([netfilter_queue], [nfq_open], [],
     [
         if test "x$passivemodeonly" != "x1" ; then
             AC_MSG_ERROR([libnetfilter-queue not found])
         fi
     ])
-AC_CHECK_LIB([netfilter_conntrack], [nfct_new],
-    [
-        LDFLAGS="$LDFLAGS -lnetfilter_conntrack"
-    ],
+AC_CHECK_LIB([netfilter_conntrack], [nfct_new], [],
     [
         if test "x$passivemodeonly" != "x1" ; then
             AC_MSG_ERROR([libnetfilter-conntrack not found])
         fi
     ])
 
-AC_CHECK_LIB([ldns], [ldns_wire2pkt], [LDFLAGS="$LDFLAGS -lldns"], [AC_MSG_ERROR([ldns not found])])
+AC_CHECK_LIB([ldns], [ldns_wire2pkt], [], [AC_MSG_ERROR([ldns not found])])
 
 
 
@@ -109,7 +97,7 @@ AC_CHECK_LIB([ldns], [ldns_wire2pkt], [LDFLAGS="$LDFLAGS -lldns"], [AC_MSG_ERROR
 AC_CHECK_LIB([uci], [uci_alloc_context],
     [
         AC_DEFINE([USE_UCI], [1], [Use UCI for configuration])
-        LDFLAGS="$LDFLAGS -luci"
+        LIBS="$LIBS -luci"
     ],
     [
         AC_DEFINE([USE_UCI], [0], [Do not use UCI for configuration])
@@ -139,7 +127,7 @@ AC_ARG_ENABLE(spin-pcap-reader,
                 AC_SUBST(SPINPCAPREADER, "spin-pcap-reader")
                 AC_CONFIG_FILES(tools/spin-pcap-reader/Makefile)
                 CFLAGS="$CFLAGS -g -O0"
-                AC_CHECK_LIB([pcap], [pcap_create], [LDFLAGS="$LDFLAGS -lpcap"], [AC_MSG_ERROR([pcap not found])])
+                AC_CHECK_LIB([pcap], [pcap_create], [], [AC_MSG_ERROR([pcap not found])])
               ], [])
 
 AC_ARG_ENABLE(tests,
