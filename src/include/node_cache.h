@@ -198,6 +198,10 @@ void node_cache_update_iplist_node(node_cache_t* node_cache, int listid, int add
  * The node must not have the device status yet (e.g. the device field must be null)
  */
 void makedevice(node_t *node);
+/*
+ * Note: merge_nodes() destroys src_node so src_node must not be used after
+ * calling this function.
+ */
 void merge_nodes(node_cache_t *node_cache, node_t* src_node, node_t* dest_node);
 
 void cache_tree_add_mac(node_cache_t *node_cache, node_t* node, char* mac);
