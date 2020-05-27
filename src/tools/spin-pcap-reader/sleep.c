@@ -5,7 +5,6 @@
 
 #include <err.h>
 #include <errno.h>
-#include <string.h>
 #include <time.h>
 
 #include "sleep.h"
@@ -48,6 +47,6 @@ maybe_sleep(const struct timeval *cur_pcap)
 		}
 	}
 
-	memcpy(&last_pcap, cur_pcap, sizeof(last_pcap));
-	memcpy(&last_wall, &cur_wall, sizeof(last_wall));
+	last_pcap = *cur_pcap;
+	last_wall = cur_wall;
 }
