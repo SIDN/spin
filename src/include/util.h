@@ -90,6 +90,6 @@ int ip_in_net(ip_t* ip, ip_t* net);
  * in ip_t format; e.g. 16 octets of data for ipv6, or 12 zero bytes
  * followed by 4 octets of data for ipv4
  */
-void copy_ip_data(ip_t* dest, int family, int netmask, void* ip_data);
+void copy_ip_data(ip_t* dest, int family, int netmask, const void* ip_data);
 
 #endif // SPIN_UTIL_H

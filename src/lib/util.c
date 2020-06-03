@@ -405,7 +405,7 @@ void hexdump(uint8_t* data, unsigned int size) {
     spin_log(LOG_DEBUG, "\n");
 }
 
-void copy_ip_data(ip_t* dest, int family, int netmask, void* ip_data) {
+void copy_ip_data(ip_t* dest, int family, int netmask, const void* ip_data) {
     dest->family = family;
     memcpy(dest->addr, ip_data, 16);
     if (netmask > 0) {
