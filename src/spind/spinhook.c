@@ -97,6 +97,7 @@ spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, 
     int found = 0;
     char *updated_mac = NULL;
     tree_entry_t* node_ip = NULL;
+    tree_entry_t* next_node;
 
     if (src_node == dest_node) {
         // Probably internal stuff
@@ -110,19 +111,21 @@ spinhook_traffic(node_cache_t *node_cache, node_t *src_node, node_t *dest_node, 
         node_cache_update_arp(node_cache, timestamp);
         node_ip = tree_first(src_node->ips);
         while (node_ip) {
+            next_node = tree_next(node_ip);
             updated_mac = arp_table_find_by_ip(node_cache->arp_table, node_ip->key);
             if (updated_mac) {
                 src_node = check_for_existing_node_with_mac(node_cache, src_node, updated_mac);
             }
-            node_ip = tree_next(node_ip);
+            node_ip = next_node;
         }
         node_ip = tree_first(dest_node->ips);
         while (node_ip) {
+            next_node = tree_next(node_ip);
             updated_mac = arp_table_find_by_ip(node_cache->arp_table, node_ip->key);
             if (updated_mac) {
                 src_node = check_for_existing_node_with_mac(node_cache, dest_node, updated_mac);
             }
-            node_ip = tree_next(node_ip);
+            node_ip = next_node;
         }
     }
 
