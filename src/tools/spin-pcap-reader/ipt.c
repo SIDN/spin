@@ -11,6 +11,7 @@ ipt_from_uint8t(ip_t *ip_t, const uint8_t *ip, uint8_t family)
 	assert(family == AF_INET || family == AF_INET6);
 
 	ip_t->family = family;
+	ip_t->netmask = 0;
 	if (family == AF_INET) {
 		memset(ip_t->addr, 0, 12);
 		memcpy(ip_t->addr + 12, ip, 4); // XXX 4
