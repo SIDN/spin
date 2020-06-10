@@ -1,21 +1,23 @@
 #include <sys/socket.h>
+#include <arpa/inet.h>
 
 #include <assert.h>
+#include <err.h>
 #include <string.h>
 
 #include "ipt.h"
 
 void
-ipt_from_uint8t(ip_t *ip_t, const uint8_t *ip, uint8_t family)
+ipt_from_uint8t(ip_t *ip_t, char *ipstr, size_t ipstr_len, const uint8_t *ip,
+    uint8_t af)
 {
-	assert(family == AF_INET || family == AF_INET6);
-
-	ip_t->family = family;
-	ip_t->netmask = 0;
-	if (family == AF_INET) {
-		memset(ip_t->addr, 0, 12);
-		memcpy(ip_t->addr + 12, ip, 4); // XXX 4
-	} else { /* AF_INET6 */
-		memcpy(ip_t->addr, ip, 16); // XXX 16
+	assert(af == AF_INET || af == AF_INET6);
+	
+	if (inet_ntop(af, ip, ipstr, ipstr_len) == NULL) {
+		err(1, "inet_ntop");
+	}
+	
+	if (spin_pton(ip_t, ipstr) == 0) {
+		errx(1, "spin_pton");
 	}
 }

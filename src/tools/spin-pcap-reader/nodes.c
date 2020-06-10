@@ -69,14 +69,14 @@ mark_local_device(int fd, node_cache_t *node_cache, const uint8_t *mac,
 	time_t now;
 #ifdef NODES_DEBUG
 	char macstr[ETHER_ADDR_STRLEN];
-	char ipstr[INET6_ADDRSTRLEN];
 #endif
+	char ipstr[INET6_ADDRSTRLEN];
 
 	assert(family == AF_INET || family == AF_INET6);
 
 	now = time(NULL);
 
-	ipt_from_uint8t(&up.ip, ip, family);
+	ipt_from_uint8t(&up.ip, ipstr, sizeof(ipstr), ip, family);
 
 #ifdef NODES_DEBUG
 	macstr_from_uint8t(mac, macstr, sizeof(macstr));
