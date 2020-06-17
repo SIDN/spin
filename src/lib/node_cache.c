@@ -399,9 +399,7 @@ node_t* node_clone(node_t* node) {
 static void
 node_print(node_t* node) {
     tree_entry_t* cur;
-    int fam;
-    unsigned char* keyp;
-    char str[512];
+    char str[INET6_ADDRSTRLEN];
 
     spin_log(LOG_DEBUG, "[NODE] id: %d\n", node->id);
     if (node->name != NULL) {
@@ -414,13 +412,7 @@ node_print(node_t* node) {
     cur = tree_first(node->ips);
     while (cur != NULL) {
         assert(cur->key_size == sizeof(ip_t));
-        keyp = (unsigned char*) cur->key;
-        fam = (int)keyp[0];
-        if (fam == AF_INET) {
-            ntop((int)keyp[0], str, (const uint8_t*)&keyp[13], 1024);
-        } else {
-            ntop((int)keyp[0], str, (const uint8_t*)&keyp[1], 1024);
-        }
+        spin_ntop(str, cur->key, sizeof(str));
         spin_log(LOG_DEBUG, "        %s\n", str);
         cur = tree_next(cur);
     }
