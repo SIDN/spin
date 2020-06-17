@@ -890,20 +890,20 @@ nodecompar(const void *a, const void *b) {
     na = *((node_t **) a);
     nb = *((node_t **) b);
 
-    // If a device put in front
-    if (na->device) {
-        return -1;
-    }
-    if (nb->device) {
-        return 1;
-    }
-
     // If dummy 0 node put in back
     if (na->id == 0) {
         return 1;
     }
     if (nb->id == 0) {
         return -1;
+    }
+
+    // If a device put in front
+    if (na->device) {
+        return -1;
+    }
+    if (nb->device) {
+        return 1;
     }
 
     // Lowest nodenumber first
