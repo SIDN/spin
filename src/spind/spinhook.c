@@ -76,7 +76,9 @@ check_for_existing_node_with_mac(node_cache_t* node_cache, node_t* node, char* m
     // If there is a node with this mac already, merge this one into it,
     existing_node = node_cache_find_by_mac(node_cache, mac);
     if (existing_node != NULL) {
-        merge_nodes(node_cache, node, existing_node);
+        if (existing_node != node) {
+            merge_nodes(node_cache, node, existing_node);
+        }
         // use the existing node now in this function
         result_node = existing_node;
     } else {
