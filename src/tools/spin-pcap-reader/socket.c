@@ -37,7 +37,7 @@ socket_writemsg(int fd, char *msg, size_t msg_len)
 	static unsigned long ok = 0;
 	static unsigned long fail = 0;
 
-	if (send(fd, msg, msg_len, 0) != msg_len) {
+	if (send(fd, msg, msg_len, 0) == -1) {
 		if (errno == ENOBUFS) {
 			/*
 			 * XXX perhaps distinguish between the case where we
