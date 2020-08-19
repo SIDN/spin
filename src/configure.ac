@@ -48,6 +48,7 @@ regular_CFLAGS="-Wall -Wextra -Wno-unused-parameter -Werror -O0"
 AC_SUBST([regular_CFLAGS])
 
 AC_CHECK_LIB([mosquitto], [mosquitto_lib_version], [], [AC_MSG_ERROR([libmosquitto not found])])
+AC_CHECK_LIB([microhttpd], [MHD_start_daemon], [], [AC_MSG_ERROR([libmicrohttpd not found])])
 
 passivemodeonly=0
 AC_ARG_ENABLE([passive-mode-only],
@@ -118,7 +119,7 @@ AC_ARG_WITH(linux-headers,
     [ AC_SUBST(KERNELPATH, "$withval") ]
 )
 
-MAKEFILES="Makefile src/Makefile tools/endian-check/Makefile"
+MAKEFILES="Makefile src/Makefile tools/spin-webapi/Makefile tools/endian-check/Makefile"
 
 AC_ARG_ENABLE(spin-pcap-reader,
               AC_HELP_STRING([--enable-spin-pcap-reader], [enable spin-pcap-reader]),
@@ -145,6 +146,7 @@ AC_CONFIG_FILES(
     lib/Makefile
     spind/Makefile
     tools/Makefile
+    tools/spin-webapi/Makefile
     tools/endian-check/Makefile
 )
 AC_OUTPUT

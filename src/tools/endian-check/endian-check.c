@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <endian.h>
+#include <arpa/inet.h>
 
 /*
  * This is a temporary tool to test some endianness properties on 
