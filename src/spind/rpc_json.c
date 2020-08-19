@@ -214,6 +214,7 @@ wf_jsonrpc(void *arg, int data, int timeout) {
     spin_log(LOG_DEBUG, "Got JSON RPC command (data: %d)\n", data);
     char buf[4096] __attribute__ ((aligned));
     int rv;
+    size_t write_result;
     int msgsock;
     char* response = NULL;
 
@@ -227,8 +228,14 @@ wf_jsonrpc(void *arg, int data, int timeout) {
         response = call_string_jsonrpc(buf);
         spin_log(LOG_DEBUG, "json rpc called, response: %s\n", response);
         if (response != NULL) {
-            write(msgsock, response, strlen(response));
-            write(msgsock, "\n", 1);
+            write_result = write(msgsock, response, strlen(response));
+            if (write_result != strlen(response)) {
+                spin_log(LOG_WARNING, "incomplete write");
+            }
+            write_result = write(msgsock, "\n", 1);
+            if (write_result != 1) {
+                spin_log(LOG_WARNING, "incomplete write");
+            }
             free(response);
             response = NULL;
         }

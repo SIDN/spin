@@ -717,12 +717,19 @@ int list_iplist_ips(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
  */
 int reset_iplist_ignore(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
     struct list_info* iplist = get_spin_iplist(IPLIST_IGNORE);
+    int system_rcode;
 
     // Remove whole tree, will be recreated
     tree_destroy(iplist->li_tree);
 
-    system("rm /etc/spin/ignore.list");
-    system("/usr/lib/spin/show_ips.lua -o /etc/spin/ignore.list -f");
+    system_rcode = system("rm /etc/spin/ignore.list");
+    if (system_rcode != 0) {
+        spin_log(LOG_WARNING, "Error removing ignore.list");
+    }
+    system_rcode = system("/usr/lib/spin/show_ips.lua -o /etc/spin/ignore.list -f");
+    if (system_rcode != 0) {
+        spin_log(LOG_WARNING, "Error recreating ignore.list");
+    }
 
     // Load the ignores again
     init_ipl(iplist);

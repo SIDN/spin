@@ -17,27 +17,16 @@ if [ "$OPTION" = "-n" ]; then
 fi
 
 echo "cp -r * ${OUTDIR}${BNAME}/"
-if [ $CHECK -eq 0 ]; then
 
-    mkdir -p ${OUTDIR}${BNAME} &&\
-    echo "Directory created" &&\
-    cp -r * ${OUTDIR}${BNAME}/ &&\
-    echo "Directory created" &&\
-    (cd ${OUTDIR}${BNAME}/src; autoreconf --install && (make distclean||/bin/true) && rm -rf lua/tests && rm -rf src/tests) &&\
-    echo "autoreconf called, creating tarball" &&\
-    (cd ${OUTDIR}; tar -czvf ${BNAME}.tar.gz ${BNAME}) &&\
-    echo "Created ${OUTDIR}${BNAME}.tar.gz" &&\
-    #rm -rf ${OUTDIR}${BNAME}
-    sha256sum ${OUTDIR}${BNAME}.tar.gz
-
-else
-
-    mkdir -p ${OUTDIR}${BNAME} &&\
-    cp -r * ${OUTDIR}${BNAME}/ &&\
-    (cd ${OUTDIR}${BNAME}/src/; autoreconf --install && ./configure && make && make distclean && rm -rf lua/tests && rm -rf src/tests) &&\
-    (cd ${OUTDIR}; tar -czvf ${BNAME}.tar.gz ${BNAME}) &&\
-    echo "Created ${OUTDIR}${BNAME}.tar.gz" &&\
-    rm -rf ${OUTDIR}${BNAME} &&\
-    sha256sum ${OUTDIR}${BNAME}.tar.gz
-
-fi
+mkdir -p ${OUTDIR}${BNAME} &&\
+cp -r . ${OUTDIR}${BNAME}/ &&\
+(cd ${OUTDIR}${BNAME}; git clean -fxd) &&\
+(cd ${OUTDIR}${BNAME}/src/; autoreconf --install && ./configure && rm -rf lua/tests && rm -rf src/tests) &&\
+(cd ${OUTDIR}${BNAME} && rm -rf .git .gitignore && rm -rf build) &&\
+if [ $CHECK -eq 1 ]; then
+    (cd ${OUTDIR}${BNAME}/src/; make && make distclean)
+fi &&\
+(cd ${OUTDIR}; tar -czvf ${BNAME}.tar.gz ${BNAME}) &&\
+echo "Created ${OUTDIR}${BNAME}.tar.gz" &&\
+rm -rf ${OUTDIR}${BNAME} &&\
+sha256sum ${OUTDIR}${BNAME}.tar.gz
