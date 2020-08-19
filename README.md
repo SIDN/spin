@@ -37,6 +37,7 @@ Pi 3. See the [Valibox website](https://valibox.sidnlabs.nl)
 - libnetfilter-queue-dev
 - libnetfilter-log-dev
 - libldns-dev
+- libmicrohttpd-dev
 
     `apt-get install gcc make autoconf libnfnetlink-dev libmnl-dev libnetfilter-queue-dev`
 
@@ -91,7 +92,7 @@ To run spind from the source tree, with stdout output and debug logging, use:
     `(sudo) (cd ./src/build/spind/; spind -o -d)`
 
 To run the webserver, use:
-    `(sudo) (cd ./src/web_ui/; minittp-server -a 127.0.0.1 -p 8080 ./spin_webui.lua`
+    `(sudo) (cd ./src/web_ui/; minittp-server -a 127.0.0.1 -p 8080 ./spin_webui.lua)`
 
 
 ### System
