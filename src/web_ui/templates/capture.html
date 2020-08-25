@@ -1,5 +1,6 @@
 {{ --$def with (device_name, device_mac, device_ips) }}
 <!DOCTYPE html>
+    _TEMPLATE_ARG0_
 <html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8">
@@ -10,9 +11,11 @@
     <script type="text/javascript" src="/spin_graph/js/jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
     <script src="/spin_graph/js/mqttws31.js"></script>
 <div>
+    _TEMPLATE_ARG0_
     <div id="capture">
         <div class="section section-top">
             <table>
+                _TEMPLATE_ARG1_
                 <tr>
                     <td nowrap="nowrap">
                         <b>Device traffic capture</b>
@@ -543,4 +546,6 @@ function connectToMQTT() {
 
 </style>
   
+_TEMPLATE_ARG0_
+_TEMPLATE_ARG3_
 </html>
