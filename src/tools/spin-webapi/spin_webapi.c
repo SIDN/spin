@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <sys/stat.h>
 
 /*
  * TODO:
@@ -87,18 +88,37 @@ char* template_render(const char* template, size_t template_size, ...) {
 }
 
 /*
+ * Returns opened FILE* pointer if the path exists and is a regular
+ * file.
+ * NULL otherwise, or if fopen() fails.
+ */
+FILE*
+try_file(const char* path) {
+    struct stat path_stat;
+    FILE* fp;
+    fprintf(stdout, "[XX] try: %s\n", path);
+    stat(path, &path_stat);
+    if S_ISREG(path_stat.st_mode) {
+        fp = fopen(path, "r");
+        if (fp != NULL) {
+            return fp;
+        }
+    }
+    return NULL;
+}
+
+/*
  * Tries whether the file path exists, and if not, whether the path
  * with '.html', or '/index.html' exists, in that order
  * Returns open file pointer if so, NULL if not
  */
 FILE*
-try_file(const char* base_path, const char* path) {
+try_files(const char* base_path, const char* path) {
     char file_path[256];
     FILE* fp;
     
     snprintf(file_path, 256, "%s%s", base_path, path);
-    fprintf(stdout, "[XX] try: %s\n", file_path);
-    fp = fopen(file_path, "r");
+    fp = try_file(file_path);
     if (fp != NULL) {
         fprintf(stdout, "[XX] returning file for : %s\n", file_path);
         return fp;
@@ -106,7 +126,7 @@ try_file(const char* base_path, const char* path) {
 
     snprintf(file_path, 256, "%s%s%s", base_path, path, ".html");
     fprintf(stdout, "[XX] try: %s\n", file_path);
-    fp = fopen(file_path, "r");
+    fp = try_file(file_path);
     if (fp != NULL) {
         fprintf(stdout, "[XX] returning file for : %s\n", file_path);
         return fp;
@@ -114,7 +134,7 @@ try_file(const char* base_path, const char* path) {
     
     snprintf(file_path, 256, "%s%s%s", base_path, path, "/index.html");
     fprintf(stdout, "[XX] try: %s\n", file_path);
-    fp = fopen(file_path, "r");
+    fp = try_file(file_path);
     if (fp != NULL) {
         fprintf(stdout, "[XX] returning file for : %s\n", file_path);
         return fp;
@@ -159,7 +179,7 @@ serve_static_page(void * cls,
     /* Read the file, if any */
     fprintf(stdout, "Requested URL: %s\n", url);
     
-    fp = try_file("/home/jelte/repos/spin/src/web_ui/static", url);
+    fp = try_files("/home/jelte/repos/spin/src/web_ui/static", url);
     if(fp) {
         fseek(fp, 0, SEEK_END);
         file_size = ftell(fp);
@@ -232,7 +252,7 @@ serve_api_call(void * cls,
     /* Read the file, if any */
     fprintf(stdout, "Requested API URL: %s\n", url);
     
-    fp = try_file("/home/jelte/repos/spin/src/web_ui/templates", url);
+    fp = try_files("/home/jelte/repos/spin/src/web_ui/templates", url);
     if(fp) {
         fseek(fp, 0, SEEK_END);
         file_size = ftell(fp);
