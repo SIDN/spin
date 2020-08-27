@@ -8,16 +8,18 @@
 #include <string.h>
 #include <microhttpd.h>
 
+// TODO: configuration for some of these
 #define PORT            1234
 #define POSTBUFFERSIZE  512
-#define MAXCLIENTS      2
+#define MAXCLIENTS      64
+
+static const char* STATIC_PATH = "/home/jelte/repos/spin/src/web_ui/static";
+static const char* TEMPLATE_PATH = "/home/jelte/repos/spin/src/web_ui/templates";
 
 enum ConnectionType {
     GET = 0,
     POST = 1
 };
-
-static unsigned int nr_of_uploading_clients = 0;
 
 
 /**
@@ -25,16 +27,6 @@ static unsigned int nr_of_uploading_clients = 0;
  */
 struct connection_info_struct {
     enum ConnectionType connectiontype;
-
-    /**
-    * Handle to the POST processing state.
-    */
-    struct MHD_PostProcessor *postprocessor;
-
-    /**
-    * File handle where we write uploaded data.
-    */
-    FILE *fp;
 
     /**
     * HTTP response body we will return, for static data string
@@ -56,13 +48,6 @@ struct connection_info_struct {
 };
 
 
-const char *askpage = "<html><body>\n\
-                       Upload a file, please!<br>\n\
-                       There are %u clients uploading at the moment.<br>\n\
-                       <form action=\"/filepost\" method=\"post\" enctype=\"multipart/form-data\">\n\
-                       <input name=\"file\" type=\"file\">\n\
-                       <input type=\"submit\" value=\" Send \"></form>\n\
-                       </body></html>";
 const char* busypage =
   "<html><body>This server is busy, please try again later.</body></html>";
 const char* completepage =
@@ -298,8 +283,6 @@ send_page_from_string(struct MHD_Connection *connection,
 }
 
 
-
-static const char* STATIC_PATH = "/home/jelte/repos/spin/src/web_ui/static";
 static int
 send_page_from_file(struct MHD_Connection *connection,
                     const char *url) {
@@ -339,8 +322,6 @@ send_page_from_file(struct MHD_Connection *connection,
     
     return ret;
 }
-
-const char* TEMPLATE_PATH = "/home/jelte/repos/spin/src/web_ui/templates";
 
 static int
 send_page_from_template(struct MHD_Connection *connection,
@@ -391,71 +372,6 @@ send_page_from_template(struct MHD_Connection *connection,
     return ret;
 }
 
-/*
- * Currently unused; this handler is called in case of
- * form data that is posted, which can be processed in multiple steps
- */
-static int
-iterate_post(void *coninfo_cls,
-             enum MHD_ValueKind kind,
-             const char *key,
-             const char *filename,
-             const char *content_type,
-             const char *transfer_encoding,
-             const char *data,
-             uint64_t off,
-             size_t size) {
-    struct connection_info_struct *con_info = coninfo_cls;
-    FILE *fp;
-    (void)kind;               /* Unused. Silent compiler warning. */
-    (void)content_type;       /* Unused. Silent compiler warning. */
-    (void)transfer_encoding;  /* Unused. Silent compiler warning. */
-    (void)off;                /* Unused. Silent compiler warning. */
-
-    fprintf(stdout, "[XX] POST with key: %s\n", key);
-    fprintf(stderr, "[XX] POST with key: %s\n", key);
-    fprintf(stdout, "[XX] POST with key: %s\n", key);
-    fprintf(stdout, "[XX] POST with key: %s\n", key);
-    fprintf(stdout, "[XX] POST with key: %s\n", key);
-    exit(1);
-    if (0 != strcmp (key, "file")) {
-        con_info->answerstring = servererrorpage;
-        con_info->answercode = MHD_HTTP_BAD_REQUEST;
-        return MHD_YES;
-    }
-
-    if (!con_info->fp) {
-        if (0 != con_info->answercode) { /* something went wrong */
-          return MHD_YES;
-        }
-        if (NULL != (fp = fopen (filename, "rb"))) {
-            fclose (fp);
-            con_info->answerstring = fileexistspage;
-            con_info->answercode = MHD_HTTP_FORBIDDEN;
-            return MHD_YES;
-        }
-        /* NOTE: This is technically a race with the 'fopen()' above,
-           but there is no easy fix, short of moving to open(O_EXCL)
-           instead of using fopen(). For the example, we do not care. */
-        con_info->fp = fopen (filename, "ab");
-        if (!con_info->fp) {
-            con_info->answerstring = fileioerror;
-            con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
-            return MHD_YES;
-        }
-    }
-
-    if (size > 0) {
-        if (! fwrite (data, sizeof (char), size, con_info->fp)) {
-            con_info->answerstring = fileioerror;
-            con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
-            return MHD_YES;
-        }
-    }
-
-    return MHD_YES;
-}
-
 
 static void
 request_completed(void *cls,
@@ -473,17 +389,8 @@ request_completed(void *cls,
     }
 
     if (con_info->connectiontype == POST) {
-        if (NULL != con_info->postprocessor) {
-            MHD_destroy_post_processor(con_info->postprocessor);
-            nr_of_uploading_clients--;
-        }
-
         if (con_info->dynamic_answerstring != NULL) {
             free(con_info->dynamic_answerstring);
-        }
-
-        if (con_info->fp) {
-            fclose (con_info->fp);
         }
     }
 
@@ -501,48 +408,23 @@ answer_to_connection(void *cls,
                      const char *upload_data,
                      size_t *upload_data_size,
                      void **con_cls) {
-  (void)cls;               /* Unused. Silent compiler warning. */
-  (void)url;               /* Unused. Silent compiler warning. */
-  (void)version;           /* Unused. Silent compiler warning. */
+    (void)cls;               /* Unused. Silent compiler warning. */
+    (void)version;           /* Unused. Silent compiler warning. */
 
     if (NULL == *con_cls) {
         fprintf(stdout, "[XX] con_cls is NULL\n");
         /* First call, setup data structures */
         struct connection_info_struct *con_info;
 
-        if (nr_of_uploading_clients >= MAXCLIENTS) {
-            return send_page_from_string(connection,
-                                         busypage,
-                                         MHD_HTTP_SERVICE_UNAVAILABLE);
-        }
-
         con_info = malloc(sizeof (struct connection_info_struct));
         if (NULL == con_info) {
             return MHD_NO;
         }
         con_info->answercode = 0; /* none yet */
-        con_info->fp = NULL;
         con_info->answerstring = NULL;
         con_info->dynamic_answerstring = NULL;
 
         if (0 == strcasecmp (method, MHD_HTTP_METHOD_POST)) {
-            con_info->postprocessor =
-              MHD_create_post_processor (connection,
-                                         POSTBUFFERSIZE,
-                                         &iterate_post,
-                                         (void *) con_info);
-            fprintf(stdout, "[XX] create postprocessor at %p\n", con_info->postprocessor);
-
-            if (NULL == con_info->postprocessor) {
-                // No matter, we'll process uploaded data directly if
-                // there is no postprocessor
-                //free (con_info);
-                //return MHD_NO;
-                //return MHD_YES;
-            }
-
-            nr_of_uploading_clients++;
-
             con_info->connectiontype = POST;
         } else {
             con_info->connectiontype = GET;
@@ -583,28 +465,15 @@ answer_to_connection(void *cls,
                 *upload_data_size = 0;
                 return MHD_YES;
             }
-            fprintf(stdout, "[XX] call POST processor at %p\n", con_info->postprocessor);
-            if (con_info->postprocessor != NULL) {
-                if (MHD_YES !=
-                    MHD_post_process(con_info->postprocessor,
-                                     upload_data,
-                                     *upload_data_size)) {
-                    con_info->answerstring = postprocerror;
-                    con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
-                }
+            // TODO: check if content_type application/json
+            char* json_response = send_jsonrpc_message(upload_data);
+            if (json_response != NULL) {
+                con_info->dynamic_answerstring = json_response;
+                con_info->answercode = MHD_HTTP_OK;
             } else {
-                fprintf(stdout, "[XX] post processor undefined, process data directly\n");
-                // TODO: check if content_type application/json
-                char* json_response = send_jsonrpc_message(upload_data);
-                if (json_response != NULL) {
-                    con_info->dynamic_answerstring = json_response;
-                    con_info->answercode = MHD_HTTP_OK;
-                } else {
-                    fprintf(stdout, "[XX] JSON response null\n");
-                    con_info->answerstring = errorpage;
-                    con_info->answercode = MHD_HTTP_OK;
-                }
-                nr_of_uploading_clients--;
+                fprintf(stdout, "[XX] JSON response null\n");
+                con_info->answerstring = errorpage;
+                con_info->answercode = MHD_HTTP_OK;
             }
             *upload_data_size = 0;
 
@@ -614,11 +483,6 @@ answer_to_connection(void *cls,
         fprintf(stdout, "[XX] upload data size is 0, upload is done\n");
 
         /* Upload finished */
-        if (NULL != con_info->fp) {
-            fprintf(stdout, "[XX] fp is not null, closing\n");
-            fclose (con_info->fp);
-            con_info->fp = NULL;
-        }
         if (0 == con_info->answercode) {
             fprintf(stdout, "[XX] answercode is 0, set success\n");
             /* No errors encountered, declare success */
