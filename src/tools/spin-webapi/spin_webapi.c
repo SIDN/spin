@@ -1,38 +1,153 @@
-#include <microhttpd.h>
+#include <sys/types.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <sys/stat.h>
+#include <microhttpd.h>
+
+#define PORT            1234
+#define POSTBUFFERSIZE  512
+#define MAXCLIENTS      2
+
+enum ConnectionType {
+    GET = 0,
+    POST = 1
+};
+
+static unsigned int nr_of_uploading_clients = 0;
+
+
+/**
+ * Information we keep per connection.
+ */
+struct connection_info_struct {
+    enum ConnectionType connectiontype;
+
+    /**
+    * Handle to the POST processing state.
+    */
+    struct MHD_PostProcessor *postprocessor;
+
+    /**
+    * File handle where we write uploaded data.
+    */
+    FILE *fp;
+
+    /**
+    * HTTP response body we will return, for static data string
+    * NULL if not yet known.
+    */
+    const char* answerstring;
+    
+    /**
+    * HTTP response body we will return, for dynamically allocated data string
+    * NULL if not yet known.
+    * Will be freed when the request has been answered.
+    */
+    char* dynamic_answerstring;
+
+    /**
+    * HTTP status code we will return, 0 for undecided.
+    */
+    unsigned int answercode;
+};
+
+
+const char *askpage = "<html><body>\n\
+                       Upload a file, please!<br>\n\
+                       There are %u clients uploading at the moment.<br>\n\
+                       <form action=\"/filepost\" method=\"post\" enctype=\"multipart/form-data\">\n\
+                       <input name=\"file\" type=\"file\">\n\
+                       <input type=\"submit\" value=\" Send \"></form>\n\
+                       </body></html>";
+const char* busypage =
+  "<html><body>This server is busy, please try again later.</body></html>";
+const char* completepage =
+  "<html><body>The upload has been completed.</body></html>";
+const char* errorpage =
+  "<html><body>This doesn't seem to be right.</body></html>";
+const char* jsonpage =
+  "<html><body>No response from JSON-RPC, please try again.</body></html>";
+const char* servererrorpage =
+  "<html><body>Invalid request.</body></html>";
+const char* fileexistspage =
+  "<html><body>This file already exists.</body></html>";
+const char* fileioerror =
+  "<html><body>IO error writing to disk.</body></html>";
+const char* const postprocerror =
+  "<html><head><title>Error</title></head><body>Error processing POST data</body></html>";
+const char* notfounderror =
+  "<html><body><title>Error</title></head><body>File not found.</body></html>";
+const char* methodnotallowederror =
+  "<html><body><title>Error</title></head><body>HTTP Method not allowed for this URL.</body></html>";
 
 /*
- * TODO:
- * - serve static pages
- * - serve JSON-rpc pages
- * - configuration (IP, port, page location?)
- * - documentation, defaults, etc.
- * 
- * Optional:
- * - redo old tcpdump?
- * 
- * Alternative:
- * - call spin_webui.lua instead of full remake?
+ * Returns opened FILE* pointer if the path exists and is a regular
+ * file.
+ * NULL otherwise, or if fopen() fails.
  */
+FILE*
+try_file(const char* path) {
+    struct stat path_stat;
+    FILE* fp;
+    int rc;
 
-#define PAGE "<html><head><title>libmicrohttpd demo</title>"\
-             "</head><body>Hello, world!</body></html>"
+    fprintf(stdout, "[XX] try: %s\n", path);
+    rc = stat(path, &path_stat);
+    if (rc != 0) {
+        return NULL;
+    }
+    if S_ISREG(path_stat.st_mode) {
+        fp = fopen(path, "r");
+        if (fp != NULL) {
+            return fp;
+        }
+    }
+    return NULL;
+}
 
-#define NOT_FOUND "<html><head><title>SPIN Web API</title>"\
-             "</head><body>File not found</body></html>"
-
-/* 
- * Almost painfully minimalistic template 'engine'
- * replaces all occurences of %TEMPLATE_ARGX% (X being a number)
- * with the corresponding variable argument
- *
- * Note: returned data pointer must be freed by caller
+/*
+ * Tries whether the file path exists, and if not, whether the path
+ * with '.html', or '/index.html' exists, in that order
+ * Returns open file pointer if so, NULL if not
  */
+FILE*
+try_files(const char* base_path, const char* path) {
+    char file_path[256];
+    FILE* fp;
+    
+    snprintf(file_path, 256, "%s%s", base_path, path);
+    fp = try_file(file_path);
+    if (fp != NULL) {
+        fprintf(stdout, "[XX] returning file for : %s\n", file_path);
+        return fp;
+    }
+
+    snprintf(file_path, 256, "%s%s%s", base_path, path, ".html");
+    fprintf(stdout, "[XX] try: %s\n", file_path);
+    fp = try_file(file_path);
+    if (fp != NULL) {
+        fprintf(stdout, "[XX] returning file for : %s\n", file_path);
+        return fp;
+    }
+    
+    snprintf(file_path, 256, "%s%s%s", base_path, path, "/index.html");
+    fprintf(stdout, "[XX] try: %s\n", file_path);
+    fp = try_file(file_path);
+    if (fp != NULL) {
+        fprintf(stdout, "[XX] returning file for : %s\n", file_path);
+        return fp;
+    }
+    
+    fprintf(stdout, "[XX] %s not found\n", file_path);
+    return NULL;
+}
+
 #define TEMPLATE_ARG_STR_SIZE 64
+
 char* template_render(const char* template, size_t template_size, ...) {
     // Keep track of size in case replacement is much larger than
     // reserved space
@@ -87,99 +202,114 @@ char* template_render(const char* template, size_t template_size, ...) {
     return new_template;
 }
 
-/*
- * Returns opened FILE* pointer if the path exists and is a regular
- * file.
- * NULL otherwise, or if fopen() fails.
- */
-FILE*
-try_file(const char* path) {
-    struct stat path_stat;
-    FILE* fp;
-    fprintf(stdout, "[XX] try: %s\n", path);
-    stat(path, &path_stat);
-    if S_ISREG(path_stat.st_mode) {
-        fp = fopen(path, "r");
-        if (fp != NULL) {
-            return fp;
+
+// Sends the given string to the rpc domain socket
+// returns the response
+// caller must free response data
+char*
+send_jsonrpc_message(const char* request) {
+    size_t response_size=1024;
+    char* response;// = malloc(response_size);
+    const char* domain_socket_path = "/var/run/spin_rpc.sock";
+    
+    struct sockaddr_un addr;
+    int fd;
+    ssize_t rc;
+    size_t data_read;
+    size_t data_size;
+    
+    if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1){
+        fprintf(stderr, "Error connecting to domain socket %s", domain_socket_path);
+        return NULL;
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    if (*domain_socket_path == '\0') {
+        *addr.sun_path = '\0';
+        strncpy(addr.sun_path+1, domain_socket_path+1, sizeof(addr.sun_path)-2);
+    } else {
+        strncpy(addr.sun_path, domain_socket_path, sizeof(addr.sun_path)-1);
+    }
+
+    if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+        fprintf(stderr, "Error connecting to JSONRPC socket");
+        exit(-1);
+    }
+
+    data_read = 0;
+    data_size = strlen(request);
+    while (data_read < data_size) {
+        rc = write(fd, request, data_size - data_read);
+        if (rc < 0) {
+            fprintf(stderr, "Error while writing");
+            return NULL;
+        }
+        data_read += rc;
+    }
+    fprintf(stdout, "Message written, reading response\n");
+
+    data_read = 0;
+    response = malloc(response_size);
+    if (response == NULL) {
+        fprintf(stderr, "[XX] out of memory\n");
+        return NULL;
+    }
+    rc = 1;
+    while(rc != 0) {
+        rc = read(fd, response + data_read, response_size - data_read);
+        if (rc < 0) {
+            fprintf(stderr, "Error while reading\n");
+            free(response);
+            return NULL;
+        } else if (rc > 0) {
+            data_read += rc;
         }
     }
-    return NULL;
+    response[data_read] = '\0';
+    close(fd);
+    return response;
 }
 
-/*
- * Tries whether the file path exists, and if not, whether the path
- * with '.html', or '/index.html' exists, in that order
- * Returns open file pointer if so, NULL if not
- */
-FILE*
-try_files(const char* base_path, const char* path) {
-    char file_path[256];
-    FILE* fp;
-    
-    snprintf(file_path, 256, "%s%s", base_path, path);
-    fp = try_file(file_path);
-    if (fp != NULL) {
-        fprintf(stdout, "[XX] returning file for : %s\n", file_path);
-        return fp;
-    }
 
-    snprintf(file_path, 256, "%s%s%s", base_path, path, ".html");
-    fprintf(stdout, "[XX] try: %s\n", file_path);
-    fp = try_file(file_path);
-    if (fp != NULL) {
-        fprintf(stdout, "[XX] returning file for : %s\n", file_path);
-        return fp;
-    }
-    
-    snprintf(file_path, 256, "%s%s%s", base_path, path, "/index.html");
-    fprintf(stdout, "[XX] try: %s\n", file_path);
-    fp = try_file(file_path);
-    if (fp != NULL) {
-        fprintf(stdout, "[XX] returning file for : %s\n", file_path);
-        return fp;
-    }
-    
-    fprintf(stdout, "[XX] %s not found\n", file_path);
-    return NULL;
-}
 
-int
-serve_static_page(void * cls,
-         struct MHD_Connection * connection,
-         const char * url,
-         const char * method,
-         const char * version,
-         const char * upload_data,
-         size_t * upload_data_size,
-         void ** ptr) {
-
-    static int dummy;
-    struct MHD_Response * response;
+static int
+send_page_from_string(struct MHD_Connection *connection,
+                      const char *page,
+                      int status_code) {
     int ret;
+    struct MHD_Response* response;
 
+    response = MHD_create_response_from_buffer (strlen (page),
+                                                (void *) page,
+                                                MHD_RESPMEM_MUST_COPY);
+    if (!response) {
+        return MHD_NO;
+    }
+    MHD_add_response_header(response,
+                            MHD_HTTP_HEADER_CONTENT_TYPE,
+                            "text/html");
+    ret = MHD_queue_response(connection,
+                             status_code,
+                             response);
+    MHD_destroy_response(response);
+
+    return ret;
+}
+
+
+
+static const char* STATIC_PATH = "/home/jelte/repos/spin/src/web_ui/static";
+static int
+send_page_from_file(struct MHD_Connection *connection,
+                    const char *url) {
     char* page = NULL;
     long file_size = 0;
     FILE* fp = NULL;
+    struct MHD_Response* response;
+    int ret;
 
-    if (0 != strcmp(method, "GET")) {
-        return MHD_NO; /* unexpected method */
-    }
-    if (&dummy != *ptr) {
-        /* The first time only the headers are valid,
-         do not respond in the first round... */
-        *ptr = &dummy;
-        return MHD_YES;
-    }
-    if (0 != *upload_data_size) {
-        return MHD_NO; /* upload data in a GET!? */
-    }
-    *ptr = NULL; /* clear context pointer */
-
-    /* Read the file, if any */
-    fprintf(stdout, "Requested URL: %s\n", url);
-    
-    fp = try_files("/home/jelte/repos/spin/src/web_ui/static", url);
+    fp = try_files(STATIC_PATH, url);
     if(fp) {
         fseek(fp, 0, SEEK_END);
         file_size = ftell(fp);
@@ -202,57 +332,26 @@ serve_static_page(void * cls,
                                  response);
         MHD_destroy_response(response);
     } else {
-        page = NOT_FOUND;
-        response = MHD_create_response_from_buffer (strlen(page),
-                                                    (void*) page,
-                                                    MHD_RESPMEM_PERSISTENT);
-        ret = MHD_queue_response(connection,
-                                 MHD_HTTP_NOT_FOUND,
-                                 response);
-        MHD_destroy_response(response);
+        return send_page_from_string(connection,
+                                     notfounderror,
+                                     MHD_HTTP_NOT_FOUND);
     }
     
     return ret;
 }
 
-int
-serve_api_call(void * cls,
-               struct MHD_Connection * connection,
-               const char * url,
-               const char * method,
-               const char * version,
-               const char * upload_data,
-               size_t * upload_data_size,
-               void ** ptr) {
+const char* TEMPLATE_PATH = "/home/jelte/repos/spin/src/web_ui/templates";
 
-    /* Depending on the specific call, we may need to respond differently;
-     * some are simply static pages as well */
-    static int dummy;
-    struct MHD_Response * response;
-    int ret;
-
+static int
+send_page_from_template(struct MHD_Connection *connection,
+                        const char *url) {
     char* page = NULL;
     long file_size = 0;
     FILE* fp = NULL;
+    struct MHD_Response* response;
+    int ret;
 
-    if (0 != strcmp(method, "GET")) {
-        return MHD_NO; /* unexpected method */
-    }
-    if (&dummy != *ptr) {
-        /* The first time only the headers are valid,
-         do not respond in the first round... */
-        *ptr = &dummy;
-        return MHD_YES;
-    }
-    if (0 != *upload_data_size) {
-        return MHD_NO; /* upload data in a GET!? */
-    }
-    *ptr = NULL; /* clear context pointer */
-
-    /* Read the file, if any */
-    fprintf(stdout, "Requested API URL: %s\n", url);
-    
-    fp = try_files("/home/jelte/repos/spin/src/web_ui/templates", url);
+    fp = try_files(TEMPLATE_PATH, url);
     if(fp) {
         fseek(fp, 0, SEEK_END);
         file_size = ftell(fp);
@@ -263,10 +362,8 @@ serve_api_call(void * cls,
         // page will be freed by MHD (MHD_RESPMEM_MUST_FREE)
         page = malloc(file_size);
         if (page == NULL) {
-            printf("OHNOES!\n");
-            printf("OHNOES!\n");
-            printf("OHNOES!\n");
-            printf("OHNOES!\n");
+            // TODO: handle oom
+            fprintf(stderr, "out of memory\n");
         }
         memset(page, 0, file_size);
         fread(page, file_size, 1, fp);
@@ -286,57 +383,286 @@ serve_api_call(void * cls,
                                  response);
         MHD_destroy_response(response);
     } else {
-        page = NOT_FOUND;
-        response = MHD_create_response_from_buffer (strlen(page),
-                                                    (void*) page,
-                                                    MHD_RESPMEM_PERSISTENT);
-        ret = MHD_queue_response(connection,
-                                 MHD_HTTP_NOT_FOUND,
-                                 response);
-        MHD_destroy_response(response);
+        return send_page_from_string(connection,
+                                     notfounderror,
+                                     MHD_HTTP_NOT_FOUND);
     }
     
     return ret;
 }
 
-int
-handle_request(void * cls,
-               struct MHD_Connection * connection,
-               const char * url,
-               const char * method,
-               const char * version,
-               const char * upload_data,
-               size_t * upload_data_size,
-               void ** ptr) {
-    
-    // Finally, try to serve a static page
-    printf("[XX] URL: '%s'\n", url);
-    if (strncmp(url, "/spin_api/", 10) == 0) {
-        printf("[XX] api call\n");
-        return serve_api_call(cls, connection, url+9, method, version, upload_data, upload_data_size, ptr);
+/*
+ * Currently unused; this handler is called in case of
+ * form data that is posted, which can be processed in multiple steps
+ */
+static int
+iterate_post(void *coninfo_cls,
+             enum MHD_ValueKind kind,
+             const char *key,
+             const char *filename,
+             const char *content_type,
+             const char *transfer_encoding,
+             const char *data,
+             uint64_t off,
+             size_t size) {
+    struct connection_info_struct *con_info = coninfo_cls;
+    FILE *fp;
+    (void)kind;               /* Unused. Silent compiler warning. */
+    (void)content_type;       /* Unused. Silent compiler warning. */
+    (void)transfer_encoding;  /* Unused. Silent compiler warning. */
+    (void)off;                /* Unused. Silent compiler warning. */
+
+    fprintf(stdout, "[XX] POST with key: %s\n", key);
+    fprintf(stderr, "[XX] POST with key: %s\n", key);
+    fprintf(stdout, "[XX] POST with key: %s\n", key);
+    fprintf(stdout, "[XX] POST with key: %s\n", key);
+    fprintf(stdout, "[XX] POST with key: %s\n", key);
+    exit(1);
+    if (0 != strcmp (key, "file")) {
+        con_info->answerstring = servererrorpage;
+        con_info->answercode = MHD_HTTP_BAD_REQUEST;
+        return MHD_YES;
     }
-    
-    printf("[XX] static call\n");
-    return serve_static_page(cls, connection, url, method, version, upload_data, upload_data_size, ptr);
+
+    if (!con_info->fp) {
+        if (0 != con_info->answercode) { /* something went wrong */
+          return MHD_YES;
+        }
+        if (NULL != (fp = fopen (filename, "rb"))) {
+            fclose (fp);
+            con_info->answerstring = fileexistspage;
+            con_info->answercode = MHD_HTTP_FORBIDDEN;
+            return MHD_YES;
+        }
+        /* NOTE: This is technically a race with the 'fopen()' above,
+           but there is no easy fix, short of moving to open(O_EXCL)
+           instead of using fopen(). For the example, we do not care. */
+        con_info->fp = fopen (filename, "ab");
+        if (!con_info->fp) {
+            con_info->answerstring = fileioerror;
+            con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
+            return MHD_YES;
+        }
+    }
+
+    if (size > 0) {
+        if (! fwrite (data, sizeof (char), size, con_info->fp)) {
+            con_info->answerstring = fileioerror;
+            con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
+            return MHD_YES;
+        }
+    }
+
+    return MHD_YES;
 }
 
-int main(int argc, char ** argv) {
-    struct MHD_Daemon * d;
-    if (argc != 2) {
-        printf("%s PORT\n", argv[0]);
+
+static void
+request_completed(void *cls,
+                  struct MHD_Connection *connection,
+                  void **con_cls,
+                  enum MHD_RequestTerminationCode toe)
+{
+    struct connection_info_struct *con_info = *con_cls;
+    (void)cls;         /* Unused. Silent compiler warning. */
+    (void)connection;  /* Unused. Silent compiler warning. */
+    (void)toe;         /* Unused. Silent compiler warning. */
+
+    if (NULL == con_info) {
+        return;
+    }
+
+    if (con_info->connectiontype == POST) {
+        if (NULL != con_info->postprocessor) {
+            MHD_destroy_post_processor(con_info->postprocessor);
+            nr_of_uploading_clients--;
+        }
+
+        if (con_info->dynamic_answerstring != NULL) {
+            free(con_info->dynamic_answerstring);
+        }
+
+        if (con_info->fp) {
+            fclose (con_info->fp);
+        }
+    }
+
+    free(con_info);
+    *con_cls = NULL;
+}
+
+
+static int
+answer_to_connection(void *cls,
+                     struct MHD_Connection *connection,
+                     const char *url,
+                     const char *method,
+                     const char *version,
+                     const char *upload_data,
+                     size_t *upload_data_size,
+                     void **con_cls) {
+  (void)cls;               /* Unused. Silent compiler warning. */
+  (void)url;               /* Unused. Silent compiler warning. */
+  (void)version;           /* Unused. Silent compiler warning. */
+
+    if (NULL == *con_cls) {
+        fprintf(stdout, "[XX] con_cls is NULL\n");
+        /* First call, setup data structures */
+        struct connection_info_struct *con_info;
+
+        if (nr_of_uploading_clients >= MAXCLIENTS) {
+            return send_page_from_string(connection,
+                                         busypage,
+                                         MHD_HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        con_info = malloc(sizeof (struct connection_info_struct));
+        if (NULL == con_info) {
+            return MHD_NO;
+        }
+        con_info->answercode = 0; /* none yet */
+        con_info->fp = NULL;
+        con_info->answerstring = NULL;
+        con_info->dynamic_answerstring = NULL;
+
+        if (0 == strcasecmp (method, MHD_HTTP_METHOD_POST)) {
+            con_info->postprocessor =
+              MHD_create_post_processor (connection,
+                                         POSTBUFFERSIZE,
+                                         &iterate_post,
+                                         (void *) con_info);
+            fprintf(stdout, "[XX] create postprocessor at %p\n", con_info->postprocessor);
+
+            if (NULL == con_info->postprocessor) {
+                // No matter, we'll process uploaded data directly if
+                // there is no postprocessor
+                //free (con_info);
+                //return MHD_NO;
+                //return MHD_YES;
+            }
+
+            nr_of_uploading_clients++;
+
+            con_info->connectiontype = POST;
+        } else {
+            con_info->connectiontype = GET;
+        }
+
+        *con_cls = (void *)con_info;
+
+        return MHD_YES;
+    }
+
+    fprintf(stdout, "[XX] have postprocessor\n");
+
+    if (0 == strcasecmp (method, MHD_HTTP_METHOD_GET)) {
+        fprintf(stdout, "[XX] GET URL: %s\n", url);
+        // The API endpoints only accept POST for now
+        if (strncmp(url, "/spin_api/jsonrpc", 18) == 0 || strncmp(url, "/spin_api/jsonrpc/", 19) == 0) {
+            return send_page_from_string(connection,
+                                         methodnotallowederror,
+                                         MHD_HTTP_METHOD_NOT_ALLOWED);
+        } else if (strncmp(url, "/spin_api/", 10) == 0) {
+            // strip the 'spin_api' part from the url
+            return send_page_from_template(connection, url + 9);
+        }
+        return send_page_from_file(connection, url);
+    }
+
+    if (0 == strcasecmp (method, MHD_HTTP_METHOD_POST)) {
+        fprintf(stdout, "[XX] POST URL: %s\n", url);
+        struct connection_info_struct *con_info = *con_cls;
+        fprintf(stdout, "[XX] data size: %ld\n", *upload_data_size);
+
+        if (0 != *upload_data_size) {
+            fprintf(stdout, "[XX] upload data size not 0\n");
+            /* Upload not yet done */
+            if (0 != con_info->answercode) {
+                /* we already know the answer, skip rest of upload */
+                fprintf(stdout, "[XX] done processing, send answer\n");
+                *upload_data_size = 0;
+                return MHD_YES;
+            }
+            fprintf(stdout, "[XX] call POST processor at %p\n", con_info->postprocessor);
+            if (con_info->postprocessor != NULL) {
+                if (MHD_YES !=
+                    MHD_post_process(con_info->postprocessor,
+                                     upload_data,
+                                     *upload_data_size)) {
+                    con_info->answerstring = postprocerror;
+                    con_info->answercode = MHD_HTTP_INTERNAL_SERVER_ERROR;
+                }
+            } else {
+                fprintf(stdout, "[XX] post processor undefined, process data directly\n");
+                // TODO: check if content_type application/json
+                char* json_response = send_jsonrpc_message(upload_data);
+                if (json_response != NULL) {
+                    con_info->dynamic_answerstring = json_response;
+                    con_info->answercode = MHD_HTTP_OK;
+                } else {
+                    fprintf(stdout, "[XX] JSON response null\n");
+                    con_info->answerstring = errorpage;
+                    con_info->answercode = MHD_HTTP_OK;
+                }
+                nr_of_uploading_clients--;
+            }
+            *upload_data_size = 0;
+
+            return MHD_YES;
+        }
+
+        fprintf(stdout, "[XX] upload data size is 0, upload is done\n");
+
+        /* Upload finished */
+        if (NULL != con_info->fp) {
+            fprintf(stdout, "[XX] fp is not null, closing\n");
+            fclose (con_info->fp);
+            con_info->fp = NULL;
+        }
+        if (0 == con_info->answercode) {
+            fprintf(stdout, "[XX] answercode is 0, set success\n");
+            /* No errors encountered, declare success */
+            con_info->answerstring = completepage;
+            con_info->answercode = MHD_HTTP_OK;
+        }
+        if (con_info->answerstring) {
+            return send_page_from_string(connection,
+                                         con_info->answerstring,
+                                         con_info->answercode);
+        } else if (con_info->dynamic_answerstring) {
+            return send_page_from_string(connection,
+                                         con_info->dynamic_answerstring,
+                                         con_info->answercode);
+        }
+    }
+
+    /* Not a GET or a POST, generate error */
+    return send_page_from_string(connection,
+                                 errorpage,
+                                 MHD_HTTP_BAD_REQUEST);
+}
+
+
+int
+main() {
+    struct MHD_Daemon *daemon;
+    int terminal_input = 0;
+
+    daemon = MHD_start_daemon(MHD_USE_INTERNAL_POLLING_THREAD,
+                              PORT, NULL, NULL,
+                              &answer_to_connection, NULL,
+                              MHD_OPTION_NOTIFY_COMPLETED, &request_completed, NULL,
+                              MHD_OPTION_END);
+    if (NULL == daemon) {
+        fprintf (stderr,
+                 "Failed to start daemon\n");
         return 1;
     }
-    d = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION,
-                         atoi(argv[1]),
-                         NULL,
-                         NULL,
-                         &handle_request,
-                         PAGE,
-                         MHD_OPTION_END);
-    if (d == NULL) {
-        return 1;
+    while (1) {
+        terminal_input = getchar();
+        if (terminal_input == 'q') {
+            MHD_stop_daemon(daemon);
+            return 0;
+        }
     }
-    (void) getc (stdin);
-    MHD_stop_daemon(d);
-    return 0;
 }
