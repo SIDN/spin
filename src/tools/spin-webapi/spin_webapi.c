@@ -8,11 +8,13 @@
 #include <string.h>
 #include <microhttpd.h>
 
+#include "traffic_capture.h"
+#include "rpc_client.h"
+
 // TODO: configuration for some of these
 #define PORT            1234
 #define POSTBUFFERSIZE  512
 #define MAXCLIENTS      64
-
 static const char* STATIC_PATH = "/home/jelte/repos/spin/src/web_ui/static";
 static const char* TEMPLATE_PATH = "/home/jelte/repos/spin/src/web_ui/templates";
 
@@ -187,75 +189,54 @@ char* template_render(const char* template, size_t template_size, ...) {
     return new_template;
 }
 
+char* template_render2(const char* template, size_t template_size, va_list valist) {
+    // Keep track of size in case replacement is much larger than
+    // reserved space
+    size_t MAX_SIZE = template_size * 2;
+    size_t cur_size = 0;
+    char* new_template = malloc(MAX_SIZE);
 
-// Sends the given string to the rpc domain socket
-// returns the response
-// caller must free response data
-char*
-send_jsonrpc_message(const char* request) {
-    size_t response_size=1024;
-    char* response;// = malloc(response_size);
-    const char* domain_socket_path = "/var/run/spin_rpc.sock";
+    // variable arguments
+    const char* template_var = "";
+    int i = 0;
+    char templ_arg_str[TEMPLATE_ARG_STR_SIZE];
     
-    struct sockaddr_un addr;
-    int fd;
-    ssize_t rc;
-    size_t data_read;
-    size_t data_size;
-    
-    if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1){
-        fprintf(stderr, "Error connecting to domain socket %s", domain_socket_path);
-        return NULL;
-    }
+    // tracking data when replacing variables
+    char* pos;
 
-    memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    if (*domain_socket_path == '\0') {
-        *addr.sun_path = '\0';
-        strncpy(addr.sun_path+1, domain_socket_path+1, sizeof(addr.sun_path)-2);
-    } else {
-        strncpy(addr.sun_path, domain_socket_path, sizeof(addr.sun_path)-1);
-    }
+    memset(new_template, 0, MAX_SIZE);
+    memcpy(new_template, template, template_size);
+    new_template[template_size] = '\0';
 
-    if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        fprintf(stderr, "Error connecting to JSONRPC socket");
-        exit(-1);
-    }
+    cur_size = template_size;
+    while (template_var != NULL) {
+        template_var = va_arg(valist, const char*);
+        if (template_var != NULL) {
+            snprintf(templ_arg_str, TEMPLATE_ARG_STR_SIZE, "_TEMPLATE_ARG%d_", i);
+            pos = new_template;
+            while (pos != NULL) {
+                pos = strstr(pos, templ_arg_str);
+                if (pos != NULL) {
+                    cur_size = cur_size - strlen(templ_arg_str) + strlen(template_var);
+                    if (cur_size > MAX_SIZE - 1) {
+                        MAX_SIZE = MAX_SIZE * 2;
+                        new_template = realloc(new_template, MAX_SIZE);
+                    }
 
-    data_read = 0;
-    data_size = strlen(request);
-    while (data_read < data_size) {
-        rc = write(fd, request, data_size - data_read);
-        if (rc < 0) {
-            fprintf(stderr, "Error while writing");
-            return NULL;
-        }
-        data_read += rc;
-    }
-    fprintf(stdout, "Message written, reading response\n");
-
-    data_read = 0;
-    response = malloc(response_size);
-    if (response == NULL) {
-        fprintf(stderr, "[XX] out of memory\n");
-        return NULL;
-    }
-    rc = 1;
-    while(rc != 0) {
-        rc = read(fd, response + data_read, response_size - data_read);
-        if (rc < 0) {
-            fprintf(stderr, "Error while reading\n");
-            free(response);
-            return NULL;
-        } else if (rc > 0) {
-            data_read += rc;
+                    // backup the rest, replace the macro, and add
+                    // the rest again.
+                    char* buf = strdup(pos + strlen(templ_arg_str));
+                    strcpy(pos, template_var);
+                    strcpy(pos + strlen(template_var), buf);
+                    free(buf);
+                }
+            }
+            i++;
         }
     }
-    response[data_read] = '\0';
-    close(fd);
-    return response;
+
+    return new_template;
 }
-
 
 
 static int
@@ -325,7 +306,8 @@ send_page_from_file(struct MHD_Connection *connection,
 
 static int
 send_page_from_template(struct MHD_Connection *connection,
-                        const char *url) {
+                        const char *url,
+                        ...) {
     char* page = NULL;
     long file_size = 0;
     FILE* fp = NULL;
@@ -351,7 +333,11 @@ send_page_from_template(struct MHD_Connection *connection,
     
         fclose(fp);
         
-        char* templres = template_render(page, file_size, "FOOBAR", "EXISTATIONASDFASDF", "AAAAA", NULL);
+        //char* templres = template_render(page, file_size, "FOOBAR", "EXISTATIONASDFASDF", "AAAAA", NULL);
+        va_list valist;
+        va_start(valist, url);
+        char* templres = template_render2(page, file_size, valist);
+        va_end(valist);
         file_size = strlen(templres);
         free(page);
         page = templres;
@@ -398,6 +384,16 @@ request_completed(void *cls,
     *con_cls = NULL;
 }
 
+// main capture page for a device
+#define TEMPLATE_URL_CAPTURE "/spin_api/capture"
+// 'old style' capture
+#define TEMPLATE_URL_TCPDUMP "/spin_api/tcpdump"
+#define TEMPLATE_URL_TCPDUMP_START "/spin_api/tcpdump_start"
+#define TEMPLATE_URL_TCPDUMP_STOP "/spin_api/tcpdump_stop"
+#define TEMPLATE_URL_TCPDUMP_STATUS "/spin_api/tcpdump_status"
+// 'new style' capture
+#define TEMPLATE_URL_MQTT_CAPTURE_START "/spin_api/capture_start"
+#define TEMPLATE_URL_MQTT_CAPTURE_STOP "/spin_api/capture_stop"
 
 static int
 answer_to_connection(void *cls,
@@ -444,9 +440,80 @@ answer_to_connection(void *cls,
             return send_page_from_string(connection,
                                          methodnotallowederror,
                                          MHD_HTTP_METHOD_NOT_ALLOWED);
+        } else if (strncmp(url, TEMPLATE_URL_MQTT_CAPTURE_START, strlen(TEMPLATE_URL_MQTT_CAPTURE_START)) == 0) {
+            const char* device_mac = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
+            printf("[XX] START TCPDUMP FOR %s\n", device_mac);
+            int result = tc_start_mqtt_capture_for(device_mac);
+            if (result == 0) {
+                // Return an empty ok answer?
+                return send_page_from_string(connection,
+                                             "",
+                                             MHD_HTTP_OK);
+            } else {
+                return send_page_from_string(connection,
+                                             "error",
+                                             MHD_HTTP_INTERNAL_SERVER_ERROR);
+            }
+        } else if (strncmp(url, TEMPLATE_URL_MQTT_CAPTURE_STOP, strlen(TEMPLATE_URL_MQTT_CAPTURE_STOP)) == 0) {
+            const char* device_mac = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
+            printf("[XX] STOP TCPDUMP FOR %s\n", device_mac);
+            tc_stop_capture_for(device_mac);
+            // Return an empty ok answer?
+            return send_page_from_string(connection,
+                                         "",
+                                         MHD_HTTP_OK);
+        } else if (strncmp(url, TEMPLATE_URL_TCPDUMP_START, strlen(TEMPLATE_URL_TCPDUMP_START)) == 0) {
+            printf("[XX] START TCPDUMP\n");
+            return tc_answer_direct_capture_request(connection, url);
+        } else if (strncmp(url, TEMPLATE_URL_TCPDUMP_STOP, strlen(TEMPLATE_URL_TCPDUMP_STOP)) == 0) {
+            const char* device_mac = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
+            printf("[XX] STOP TCPDUMP FOR %s\n", device_mac);
+            tc_stop_capture_for(device_mac);
+            // Return an empty ok answer?
+            return send_page_from_string(connection,
+                                         "",
+                                         MHD_HTTP_OK);
+        } else if (strncmp(url, TEMPLATE_URL_CAPTURE, strlen(TEMPLATE_URL_CAPTURE)) == 0) {
+            /* template parameters:
+             * TODO
+             * device name
+             * device mac
+             * ip address(es)
+             */
+            spin_data devlist = rpcc_list_devices();
+            spin_data_delete(devlist);
+            const char* device_mac = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
+            spin_data device = rpcc_get_device_by_mac(device_mac);
+            char* device_name = rpcc_get_device_name(device);
+            char* device_ips = rpcc_get_device_ips_as_string(device);
+            int result = send_page_from_template(connection, url + 9, device_name, device_mac, device_ips, NULL);
+            free(device_name);
+            free(device_ips);
+            spin_data_delete(device);
+            return result;
+        } else if (strncmp(url, TEMPLATE_URL_TCPDUMP, strlen(TEMPLATE_URL_TCPDUMP) + 1) == 0) {
+            // Template args:
+            // device mac, running, bytes_sent
+            // get 1 from 'dev' parameter in query
+            // need to get 2 and 3 from our tcpdump manager code
+            const char* device_param = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
+            printf("[XX] QUERY PARAMETER: %s\n", device_param);
+            return send_page_from_template(connection, url + 9, device_param, "B", NULL);
+        } else if (strncmp(url, TEMPLATE_URL_TCPDUMP_STATUS, strlen(TEMPLATE_URL_TCPDUMP_STATUS) + 1) == 0) {
+            // Template args:
+            // device mac, running, bytes_sent
+            // get 1 from 'dev' parameter in query
+            // need to get 2 and 3 from our tcpdump manager code
+            const char* device_mac = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
+            const char* running = tc_capture_running_for(device_mac)?"true":"false";
+            char bytes_string[100];
+            int bytes_sent = tc_get_bytes_sent_for(device_mac);
+            snprintf(bytes_string, 100, "%d", bytes_sent);
+            return send_page_from_template(connection, url + 9, device_mac, running, bytes_string, NULL);
         } else if (strncmp(url, "/spin_api/", 10) == 0) {
             // strip the 'spin_api' part from the url
-            return send_page_from_template(connection, url + 9);
+            //return send_page_from_file(connection, url);
+            return send_page_from_template(connection, url + 9, "GENERAL", NULL);
         }
         return send_page_from_file(connection, url);
     }
@@ -466,7 +533,7 @@ answer_to_connection(void *cls,
                 return MHD_YES;
             }
             // TODO: check if content_type application/json
-            char* json_response = send_jsonrpc_message(upload_data);
+            char* json_response = send_jsonrpc_message_raw(upload_data);
             if (json_response != NULL) {
                 con_info->dynamic_answerstring = json_response;
                 con_info->answercode = MHD_HTTP_OK;
@@ -512,7 +579,7 @@ main() {
     struct MHD_Daemon *daemon;
     int terminal_input = 0;
 
-    daemon = MHD_start_daemon(MHD_USE_INTERNAL_POLLING_THREAD,
+    daemon = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION,
                               PORT, NULL, NULL,
                               &answer_to_connection, NULL,
                               MHD_OPTION_NOTIFY_COMPLETED, &request_completed, NULL,
@@ -525,6 +592,11 @@ main() {
     while (1) {
         terminal_input = getchar();
         if (terminal_input == 'q') {
+            // Stop all running capture processes, and wait for them to end
+            tc_stop_all_captures();
+            while (tc_captures_running() > 0) {
+                //printf("[XX] Captures running: %d\n", tc_captures_running());
+            }
             MHD_stop_daemon(daemon);
             return 0;
         }

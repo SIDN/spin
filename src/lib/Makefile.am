@@ -28,8 +28,9 @@ libspin_a_SOURCES = pkt_info.c \
 					node_names.c \
 					jsmn.h \
 					jsmn.c \
-					statistics.c \
+					spindata_type.c \
 					spin_list.c \
+					statistics.c \
 					version.c
 
 #libspin_a_CFLAGS =

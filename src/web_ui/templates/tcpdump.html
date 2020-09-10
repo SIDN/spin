@@ -1,8 +1,9 @@
-{{ --$def with (device, running, bytes_sent) }}<?xml version="1.0" encoding="utf-8"?>
+<!--{{ --$def with (device, running, bytes_sent) }}-->
+<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
     <head>
-        <title>Download device traffic {{= device }}</title>
+        <title>Download device traffic _TEMPLATE_ARG0_</title>
         <script type="text/javascript" src="/spin_graph/js/jquery-3.1.1.min.js" ></script>
         <script type="text/javascript" src="/spin_graph/js/jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
         <script type="text/javascript" src="/spin_graph/js/StreamSaver.js"></script>
@@ -14,7 +15,7 @@
     <body onunload="stop()">
         <div>
             <h3>SPIN traffic capture</h3>
-            <p>Device MAC address: {{= device }}</p>
+            <p>Device MAC address: _TEMPLATE_ARG0_</p>
         </div>
         </div>
         <div id="bytes_sent_status"></div>
@@ -24,12 +25,12 @@
         function load_status() {
             //alert("load!");
             //$("bytes_sent_status").load("/spin_api/tcpdump_status?device={{=device}}", function (data) { $(this).html(data); console.log("status set to " + data); });
-            $("#bytes_sent_status").load("/spin_api/tcpdump_status?device={{=device}}");
+            $("#bytes_sent_status").load("/spin_api/tcpdump_status?device=_TEMPLATE_ARG0_");
         }
 
         function stop() {
             clearInterval(reloader);
-            $.get("/spin_api/tcpdump_stop?device={{=device}}").done(function(){window.close();});
+            $.get("/spin_api/tcpdump_stop?device=_TEMPLATE_ARG0_").done(function(){window.close();});
         }
 
         function reload_once() {
@@ -46,7 +47,7 @@
             $.ajax({
             async: false,
             cache: false,
-            url: "/spin_api/tcpdump_stop?device={{=device}}"
+            url: "/spin_api/tcpdump_stop?device=_TEMPLATE_ARG0_"
             });
             return void(0);
         });

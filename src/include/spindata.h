@@ -1,14 +1,8 @@
 #ifndef SPIN_DATA_H
 #define SPIN_DATA_H 1
-#include "cJSON.h"
+#include "spindata_type.h"
 #include "node_cache.h"
 #include "tree.h"
-
-typedef cJSON *spin_data;
-
-char *spin_data_serialize(spin_data sd);
-void spin_data_ser_delete(char *str);
-void spin_data_delete(spin_data sd);
 
 spin_data spin_data_nodes_merged(int node1, int node2);
 spin_data spin_data_node_deleted(int node);

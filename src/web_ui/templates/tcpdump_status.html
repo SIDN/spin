@@ -1,11 +1,28 @@
-{{ --$def with (device, running, bytes_sent) }}
+<!--{{ --$def with (device, running, bytes_sent) }}-->
 
+<!--
+_TEMPLATE_ARG0_
+_TEMPLATE_ARG1_
+_TEMPLATE_ARG2_
+_TEMPLATE_ARG3_
+-->
 
-{{ if running then }}
+<div id="when_running">
     <p>Closing or reloading this window will stop the capture!</p>
-    <p>Bytes sent: {{= bytes_sent }} </p>
-    <p><a href="#" onclick="stop();">Stop download</a></p>
-{{ else }}
+    <p>Bytes sent: _TEMPLATE_ARG2_ </p>
+    <p><a href="#" onclick="stop(); return false;">Stop download</a></p>
+</div>
+<div id="when_not_running">
     <p>Click start to start the capture.</p>
-    <p><a href="/spin_api/tcpdump_start?device={{= device }}" onclick="start()" target="_blank">Start capture</a></p>
-{{ end }}
+    <p><a href="/spin_api/tcpdump_start?device=_TEMPLATE_ARG0_" onclick="start()" target="_blank">Start capture</a></p>
+</div>
+
+<script>
+if ('_TEMPLATE_ARG1_' == 'true') {
+    let el = document.getElementById('when_not_running');
+    el.parentNode.removeChild(el);
+} else {
+    let el = document.getElementById('when_running');
+    el.parentNode.removeChild(el);
+}
+</script>
