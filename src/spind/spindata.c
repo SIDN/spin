@@ -5,28 +5,6 @@
 
 STAT_MODULE(spindata)
 
-char *
-spin_data_serialize(spin_data sd) {
-    char *result;
-
-    result = cJSON_PrintUnformatted(sd);
-
-    // result is malloced, should be freed
-    return result;
-}
-
-void
-spin_data_ser_delete(char *str) {
-
-    free(str);
-}
-
-void
-spin_data_delete(spin_data sd) {
-
-    cJSON_Delete(sd);
-}
-
 spin_data
 spin_data_nodes_merged(int node1, int node2) {
     cJSON *resobj;
