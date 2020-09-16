@@ -449,12 +449,22 @@ answer_to_connection(void *cls,
                                          MHD_HTTP_OK);
         } else if (strncmp(url, TEMPLATE_URL_CAPTURE, strlen(TEMPLATE_URL_CAPTURE)) == 0) {
             /* template parameters:
+             * TODO
              * device name
              * device mac
              * ip address(es)
              */
+            spin_data devlist = rpcc_list_devices();
+            spin_data_delete(devlist);
             const char* device_mac = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
-            return send_page_from_template(connection, url + 9, "1", device_mac, "3", NULL);
+            spin_data device = rpcc_get_device_by_mac(device_mac);
+            char* device_name = rpcc_get_device_name(device);
+            char* device_ips = rpcc_get_device_ips_as_string(device);
+            int result = send_page_from_template(connection, url + 9, device_name, device_mac, device_ips, NULL);
+            free(device_name);
+            free(device_ips);
+            spin_data_delete(device);
+            return result;
         } else if (strncmp(url, TEMPLATE_URL_TCPDUMP, strlen(TEMPLATE_URL_TCPDUMP) + 1) == 0) {
             // Template args:
             // device mac, running, bytes_sent
@@ -497,7 +507,7 @@ answer_to_connection(void *cls,
                 return MHD_YES;
             }
             // TODO: check if content_type application/json
-            char* json_response = send_jsonrpc_message(upload_data);
+            char* json_response = send_jsonrpc_message_raw(upload_data);
             if (json_response != NULL) {
                 con_info->dynamic_answerstring = json_response;
                 con_info->answercode = MHD_HTTP_OK;
