@@ -8,3 +8,4 @@ spin_webapi_SOURCES = spin_webapi.c \
                       ../../spind/cJSON.c \
                       ../../lib/spindata_type.c
 
+spin_webapi_LDFLAGS = -lpthread

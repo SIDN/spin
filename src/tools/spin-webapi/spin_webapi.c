@@ -384,12 +384,16 @@ request_completed(void *cls,
     *con_cls = NULL;
 }
 
+// main capture page for a device
+#define TEMPLATE_URL_CAPTURE "/spin_api/capture"
+// 'old style' capture
 #define TEMPLATE_URL_TCPDUMP "/spin_api/tcpdump"
 #define TEMPLATE_URL_TCPDUMP_START "/spin_api/tcpdump_start"
 #define TEMPLATE_URL_TCPDUMP_STOP "/spin_api/tcpdump_stop"
 #define TEMPLATE_URL_TCPDUMP_STATUS "/spin_api/tcpdump_status"
-#define TEMPLATE_URL_CAPTURE "/spin_api/capture"
-
+// 'new style' capture
+#define TEMPLATE_URL_MQTT_CAPTURE_START "/spin_api/capture_start"
+#define TEMPLATE_URL_MQTT_CAPTURE_STOP "/spin_api/capture_stop"
 
 static int
 answer_to_connection(void *cls,
@@ -436,6 +440,28 @@ answer_to_connection(void *cls,
             return send_page_from_string(connection,
                                          methodnotallowederror,
                                          MHD_HTTP_METHOD_NOT_ALLOWED);
+        } else if (strncmp(url, TEMPLATE_URL_MQTT_CAPTURE_START, strlen(TEMPLATE_URL_MQTT_CAPTURE_START)) == 0) {
+            const char* device_mac = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
+            printf("[XX] START TCPDUMP FOR %s\n", device_mac);
+            int result = tc_start_mqtt_capture_for(device_mac);
+            if (result == 0) {
+                // Return an empty ok answer?
+                return send_page_from_string(connection,
+                                             "",
+                                             MHD_HTTP_OK);
+            } else {
+                return send_page_from_string(connection,
+                                             "error",
+                                             MHD_HTTP_INTERNAL_SERVER_ERROR);
+            }
+        } else if (strncmp(url, TEMPLATE_URL_MQTT_CAPTURE_STOP, strlen(TEMPLATE_URL_MQTT_CAPTURE_STOP)) == 0) {
+            const char* device_mac = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
+            printf("[XX] STOP TCPDUMP FOR %s\n", device_mac);
+            tc_stop_capture_for(device_mac);
+            // Return an empty ok answer?
+            return send_page_from_string(connection,
+                                         "",
+                                         MHD_HTTP_OK);
         } else if (strncmp(url, TEMPLATE_URL_TCPDUMP_START, strlen(TEMPLATE_URL_TCPDUMP_START)) == 0) {
             printf("[XX] START TCPDUMP\n");
             return tc_answer_direct_capture_request(connection, url);
