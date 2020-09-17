@@ -76,6 +76,9 @@ tc_capture_running_for(const char* device_mac) {
     return get_capture_running_for(device_mac) != NULL;
 }
 
+/**
+ * Returns the number of bytes captured so far for the given mac address
+ */
 int tc_get_bytes_sent_for(const char* device_mac) {
     capture_process_t* cp = get_capture_running_for(device_mac);
     if (cp != NULL) {
@@ -84,7 +87,9 @@ int tc_get_bytes_sent_for(const char* device_mac) {
     return -1;
 }
 
-
+/**
+ * Stops capturing packets for the given mac address
+ */
 void
 tc_stop_capture_for(const char* device_mac) {
     capture_process_t* cp = get_capture_running_for(device_mac);
@@ -93,6 +98,9 @@ tc_stop_capture_for(const char* device_mac) {
     }
 }
 
+/**
+ * Stop all the packet captures
+ */
 void tc_stop_all_captures() {
     capture_process_t* cp = cp_global;
     while (cp != NULL) {
@@ -236,6 +244,10 @@ ssize_t direct_capture_callback(void* ld_v, uint64_t pos, char* buf, size_t max)
     }
 }
 
+/*
+ * Convert the data in buf to uppercase hexadecimal, and store it
+ * in hexbuf. Hexbuf must have size*2+1 bytes of memory allocated
+ */
 void
 bytes_to_hex(char* hexbuf, char* buf, int size) {
     int i;
