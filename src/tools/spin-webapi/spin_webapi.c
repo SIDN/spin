@@ -21,9 +21,9 @@ static const char* STATIC_PATH = "/home/jelte/repos/spin/src/tools/spin-webapi/s
 static const char* TEMPLATE_PATH = "/home/jelte/repos/spin/src/tools/spin-webapi/templates";
 
 #define TEMPLATE_SRC_PATH SRCDIR "/templates"
-#define TEMPLATE_INSTALL_PATH DATADIR "/templates"
+#define TEMPLATE_INSTALL_PATH DATADIR "/spin/spin-webapi/templates"
 #define STATIC_SRC_PATH SRCDIR "/static"
-#define STATIC_INSTALL_PATH DATADIR "/static"
+#define STATIC_INSTALL_PATH DATADIR "/spin/spin-webapi/static"
 
 //
 // Endpoints
