@@ -15,8 +15,31 @@
 #define PORT            1234
 #define POSTBUFFERSIZE  512
 #define MAXCLIENTS      64
-static const char* STATIC_PATH = "/home/jelte/repos/spin/src/web_ui/static";
-static const char* TEMPLATE_PATH = "/home/jelte/repos/spin/src/web_ui/templates";
+
+
+static const char* STATIC_PATH = "/home/jelte/repos/spin/src/tools/spin-webapi/static";
+static const char* TEMPLATE_PATH = "/home/jelte/repos/spin/src/tools/spin-webapi/templates";
+
+#define TEMPLATE_SRC_PATH SRCDIR "/templates"
+#define TEMPLATE_INSTALL_PATH DATADIR "/templates"
+#define STATIC_SRC_PATH SRCDIR "/static"
+#define STATIC_INSTALL_PATH DATADIR "/static"
+
+//
+// Endpoints
+//
+
+// main capture page for a device
+#define TEMPLATE_URL_CAPTURE "/spin_api/capture"
+// 'old style' capture
+#define TEMPLATE_URL_TCPDUMP "/spin_api/tcpdump"
+#define TEMPLATE_URL_TCPDUMP_START "/spin_api/tcpdump_start"
+#define TEMPLATE_URL_TCPDUMP_STOP "/spin_api/tcpdump_stop"
+#define TEMPLATE_URL_TCPDUMP_STATUS "/spin_api/tcpdump_status"
+// 'new style' capture
+#define TEMPLATE_URL_MQTT_CAPTURE_START "/spin_api/capture_start"
+#define TEMPLATE_URL_MQTT_CAPTURE_STOP "/spin_api/capture_stop"
+
 
 enum ConnectionType {
     GET = 0,
@@ -50,22 +73,10 @@ struct connection_info_struct {
 };
 
 
-const char* busypage =
-  "<html><body>This server is busy, please try again later.</body></html>";
-const char* completepage =
-  "<html><body>The upload has been completed.</body></html>";
 const char* errorpage =
   "<html><body>This doesn't seem to be right.</body></html>";
 const char* jsonpage =
   "<html><body>No response from JSON-RPC, please try again.</body></html>";
-const char* servererrorpage =
-  "<html><body>Invalid request.</body></html>";
-const char* fileexistspage =
-  "<html><body>This file already exists.</body></html>";
-const char* fileioerror =
-  "<html><body>IO error writing to disk.</body></html>";
-const char* const postprocerror =
-  "<html><head><title>Error</title></head><body>Error processing POST data</body></html>";
 const char* notfounderror =
   "<html><body><title>Error</title></head><body>File not found.</body></html>";
 const char* methodnotallowederror =
@@ -95,6 +106,7 @@ try_file(const char* path) {
     }
     return NULL;
 }
+
 
 /*
  * Tries whether the file path exists, and if not, whether the path
@@ -132,6 +144,35 @@ try_files(const char* base_path, const char* path) {
     fprintf(stdout, "[XX] %s not found\n", file_path);
     return NULL;
 }
+
+/*
+ * Tries to find a template file for the given path
+ * First checks the 'local' source directory (in case we are
+ * running from a source build), then the global directory
+ */
+FILE* try_template_files(const char* path) {
+    FILE* fp;
+    fp = try_files(TEMPLATE_SRC_PATH, path);
+    if (fp == NULL) {
+        fp = try_files(TEMPLATE_INSTALL_PATH, path);
+    }
+    return fp;
+}
+
+/*
+ * Tries to find a static file for the given path
+ * First checks the 'local' source directory (in case we are
+ * running from a source build), then the global directory
+ */
+FILE* try_static_files(const char* path) {
+    FILE* fp;
+    fp = try_files(STATIC_SRC_PATH, path);
+    if (fp == NULL) {
+        fp = try_files(STATIC_INSTALL_PATH, path);
+    }
+    return fp;
+}
+
 
 #define TEMPLATE_ARG_STR_SIZE 64
 
@@ -273,7 +314,7 @@ send_page_from_file(struct MHD_Connection *connection,
     struct MHD_Response* response;
     int ret;
 
-    fp = try_files(STATIC_PATH, url);
+    fp = try_static_files(url);
     if(fp) {
         fseek(fp, 0, SEEK_END);
         file_size = ftell(fp);
@@ -306,15 +347,14 @@ send_page_from_file(struct MHD_Connection *connection,
 
 static int
 send_page_from_template(struct MHD_Connection *connection,
+                        FILE* fp,
                         const char *url,
                         ...) {
     char* page = NULL;
     long file_size = 0;
-    FILE* fp = NULL;
     struct MHD_Response* response;
     int ret;
 
-    fp = try_files(TEMPLATE_PATH, url);
     if(fp) {
         fseek(fp, 0, SEEK_END);
         file_size = ftell(fp);
@@ -383,17 +423,6 @@ request_completed(void *cls,
     free(con_info);
     *con_cls = NULL;
 }
-
-// main capture page for a device
-#define TEMPLATE_URL_CAPTURE "/spin_api/capture"
-// 'old style' capture
-#define TEMPLATE_URL_TCPDUMP "/spin_api/tcpdump"
-#define TEMPLATE_URL_TCPDUMP_START "/spin_api/tcpdump_start"
-#define TEMPLATE_URL_TCPDUMP_STOP "/spin_api/tcpdump_stop"
-#define TEMPLATE_URL_TCPDUMP_STATUS "/spin_api/tcpdump_status"
-// 'new style' capture
-#define TEMPLATE_URL_MQTT_CAPTURE_START "/spin_api/capture_start"
-#define TEMPLATE_URL_MQTT_CAPTURE_STOP "/spin_api/capture_stop"
 
 static int
 answer_to_connection(void *cls,
@@ -486,7 +515,8 @@ answer_to_connection(void *cls,
             spin_data device = rpcc_get_device_by_mac(device_mac);
             char* device_name = rpcc_get_device_name(device);
             char* device_ips = rpcc_get_device_ips_as_string(device);
-            int result = send_page_from_template(connection, url + 9, device_name, device_mac, device_ips, NULL);
+            FILE* template_fp = try_template_files(url+9);
+            int result = send_page_from_template(connection, template_fp, url + 9, device_name, device_mac, device_ips, NULL);
             free(device_name);
             free(device_ips);
             spin_data_delete(device);
@@ -498,7 +528,8 @@ answer_to_connection(void *cls,
             // need to get 2 and 3 from our tcpdump manager code
             const char* device_param = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
             printf("[XX] QUERY PARAMETER: %s\n", device_param);
-            return send_page_from_template(connection, url + 9, device_param, "B", NULL);
+            FILE* template_fp = try_template_files(url+9);
+            return send_page_from_template(connection, template_fp, url + 9, device_param, "B", NULL);
         } else if (strncmp(url, TEMPLATE_URL_TCPDUMP_STATUS, strlen(TEMPLATE_URL_TCPDUMP_STATUS) + 1) == 0) {
             // Template args:
             // device mac, running, bytes_sent
@@ -509,12 +540,20 @@ answer_to_connection(void *cls,
             char bytes_string[100];
             int bytes_sent = tc_get_bytes_sent_for(device_mac);
             snprintf(bytes_string, 100, "%d", bytes_sent);
-            return send_page_from_template(connection, url + 9, device_mac, running, bytes_string, NULL);
-        } else if (strncmp(url, "/spin_api/", 10) == 0) {
+            FILE* template_fp = try_template_files(url+9);
+            return send_page_from_template(connection, template_fp, url + 9, device_mac, running, bytes_string, NULL);
+        //} else if (strncmp(url, "/spin_api/", 10) == 0) {
             // strip the 'spin_api' part from the url
             //return send_page_from_file(connection, url);
-            return send_page_from_template(connection, url + 9, "GENERAL", NULL);
+        //    return send_page_from_template(connection, url + 9, "GENERAL", NULL);
         }
+        // Try any template file
+        FILE* template_fp = try_template_files(url+9);
+        if (template_fp != NULL) {
+            return send_page_from_template(connection, template_fp, url + 9, "GENERAL", NULL);
+        }
+
+        // Try any static file
         return send_page_from_file(connection, url);
     }
 
@@ -549,13 +588,6 @@ answer_to_connection(void *cls,
 
         fprintf(stdout, "[XX] upload data size is 0, upload is done\n");
 
-        /* Upload finished */
-        if (0 == con_info->answercode) {
-            fprintf(stdout, "[XX] answercode is 0, set success\n");
-            /* No errors encountered, declare success */
-            con_info->answerstring = completepage;
-            con_info->answercode = MHD_HTTP_OK;
-        }
         if (con_info->answerstring) {
             return send_page_from_string(connection,
                                          con_info->answerstring,
