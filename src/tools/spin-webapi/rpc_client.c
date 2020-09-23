@@ -34,13 +34,13 @@ send_jsonrpc_message_raw(const char* request) {
     char* response;// = malloc(response_size);
     const char* domain_socket_path = "/var/run/spin_rpc.sock";
     fprintf(stdout, "[XX] Received RPC request:\n%s\n", request);
-    
+
     struct sockaddr_un addr;
     int fd;
     ssize_t rc;
     size_t data_read;
     size_t data_size;
-    
+
     if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1){
         fprintf(stderr, "Error connecting to domain socket %s", domain_socket_path);
         return NULL;
@@ -127,7 +127,7 @@ rpcc_send_request(spin_data request) {
     char* request_str = cJSON_Print(request);
     char* response_str = send_rpc_message_raw(request_str);
     cJSON* response = cJSON_Parse(response_str);
-    
+
     // TODO: check id and jsonrpc version?
     cJSON* result = cJSON_DetachItemFromObject(response, "result");
 
@@ -135,7 +135,7 @@ rpcc_send_request(spin_data request) {
     cJSON_Delete(response);
     free(request_str);
     free(response_str);
-    
+
     rpcc_print_json(result);
 
     return result;
@@ -143,10 +143,10 @@ rpcc_send_request(spin_data request) {
 
 spin_data
 rpcc_list_devices() {
-    
+
     cJSON* request = rpcc_create_request();
     cJSON_AddStringToObject(request, "method", "list_devices");
-    
+
     rpcc_print_json(request);
 
     cJSON* response = rpcc_send_request(request);
@@ -170,10 +170,6 @@ rpcc_get_device_by_mac(const char* device_mac) {
     cJSON_Delete(devices);
     return result;
 }
-
-/*
- * High-level functions that return specific data retrieved from JSONRPC
- */
 
 /*
  * High-level functions to extract specific data from known spin_data (/cJSON) structures
