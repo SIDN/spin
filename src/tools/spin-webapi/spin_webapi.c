@@ -572,7 +572,7 @@ answer_to_connection(void *cls,
                 return MHD_YES;
             }
             // TODO: check if content_type application/json
-            char* json_response = send_jsonrpc_message_raw(upload_data);
+            char* json_response = send_rpc_message_raw(upload_data);
             if (json_response != NULL) {
                 con_info->dynamic_answerstring = json_response;
                 con_info->answercode = MHD_HTTP_OK;

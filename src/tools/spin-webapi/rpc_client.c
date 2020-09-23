@@ -14,6 +14,11 @@
 #include <cJSON.h>
 #include <spindata.h>
 
+#include "config.h"
+
+#ifdef USE_UBUS
+#include "rpc_ubus_client.h"
+#endif
 
 /*
  * Helper functions
@@ -22,11 +27,13 @@
 // Sends the given string to the rpc domain socket
 // returns the response
 // caller must free response data
+// TODO: json errors
 char*
 send_jsonrpc_message_raw(const char* request) {
     size_t response_size=1024;
     char* response;// = malloc(response_size);
     const char* domain_socket_path = "/var/run/spin_rpc.sock";
+    fprintf(stdout, "[XX] Received RPC request:\n%s\n", request);
     
     struct sockaddr_un addr;
     int fd;
@@ -49,8 +56,8 @@ send_jsonrpc_message_raw(const char* request) {
     }
 
     if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        fprintf(stderr, "Error connecting to JSONRPC socket");
-        exit(-1);
+        fprintf(stderr, "Error connecting to JSONRPC socket!\n");
+        return NULL;
     }
 
     data_read = 0;
@@ -87,6 +94,16 @@ send_jsonrpc_message_raw(const char* request) {
     return response;
 }
 
+char*
+send_rpc_message_raw(const char* request) {
+    printf("[XX] SENDING RPC MESSAGE! USE_UBUS: %d\n", USE_UBUS);
+#ifdef USE_UBUS
+    return send_ubus_message_raw(request);
+#else
+    return send_jsonrpc_message_raw(request);
+#endif
+}
+
 spin_data
 rpcc_create_request() {
     cJSON* request = cJSON_CreateObject();
@@ -108,7 +125,7 @@ rpcc_print_json(spin_data json) {
 spin_data
 rpcc_send_request(spin_data request) {
     char* request_str = cJSON_Print(request);
-    char* response_str = send_jsonrpc_message_raw(request_str);
+    char* response_str = send_rpc_message_raw(request_str);
     cJSON* response = cJSON_Parse(response_str);
     
     // TODO: check id and jsonrpc version?
