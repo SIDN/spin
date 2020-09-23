@@ -1,103 +1,98 @@
 
+#include <cJSON.h>
+
 #include <libubus.h>
+#include <libubox/blobmsg_json.h>
+
+#define TIMEOUT 2000
 
 static void
 receive_call_result_data(struct ubus_request *req, int type, struct blob_attr *msg) {
-    char *str;
     if (!msg) {
         return;
     }
-
-    str = blobmsg_format_json_indent(msg, true, simple_output ? -1 : 0);
-    printf("[XX] UBUS CLIENT CALL RESULT: %s\n", str);
-    free(str);
+    char* res = blobmsg_format_json_indent(msg, true, 0);
+    char** result = (char**) req->priv;
+    *result = res;
 }
 
 
 static int
-ubus_cli_call(struct ubus_context *ctx, int argc, char **argv) {
+ubus_cli_call(struct ubus_context *ctx, char** result, const char* path, const char* method, const char* arguments) {
     uint32_t id;
     int ret;
+    struct blob_buf b;
 
-    if (argc < 2 || argc > 3)
-        return -2;
-
+    memset(&b, 0, sizeof(b));
     blob_buf_init(&b, 0);
-    if (argc == 3 && !blobmsg_add_json_from_string(&b, argv[2])) {
-        if (!simple_output)
-            fprintf(stderr, "Failed to parse message data\n");
+    if (!blobmsg_add_json_from_string(&b, arguments)) {
+        fprintf(stderr, "Failed to parse message data\n");
         return -1;
     }
 
-    ret = ubus_lookup_id(ctx, argv[0], &id);
-    if (ret)
+    ret = ubus_lookup_id(ctx, path, &id);
+    if (ret) {
         return ret;
+    }
 
-    return ubus_invoke(ctx, id, argv[1], b.head, receive_call_result_data, NULL, timeout * 1000);
+    return ubus_invoke(ctx, id, method, b.head, receive_call_result_data, result, TIMEOUT);
 }
 
+char*
+send_ubus_message_raw(const char* request) {
+    const char* path = "spin";
+    const char* method = "rpc";
+    struct ubus_context* ctx = NULL;
+    char* result = NULL;
+    cJSON* json_request;
+    char* params_str;
 
-int
-main(int argc, char **argv) {
-    const char *progname, *ubus_socket = NULL;
-    static struct ubus_context *ctx;
-    char *cmd;
-    int ret = 0;
-    int i, ch;
+    //fprintf(stdout, "[XX] RPC Request to send to UBUS: %s\n", request);
 
-    progname = argv[0];
+    // The received request is a JSONRPC request
+    // {"jsonrpc": "2.0", "id": 34154, "method": "list_devices", "params": {"a": "b"}}
+    //
+    // It's not very efficient, but we'll convert to cJSON, remove jsonrpc elements
+    // convert back to string, then send that
 
-    while ((ch = getopt(argc, argv, "vs:t:S")) != -1) {
-        switch (ch) {
-        case 's':
-            ubus_socket = optarg;
-            break;
-        case 't':
-            timeout = atoi(optarg);
-            break;
-        case 'S':
-            simple_output = true;
-            break;
-        case 'v':
-            verbose++;
-            break;
-        default:
-            return usage(progname);
-        }
+    json_request = cJSON_Parse(request);
+    if (json_request == NULL) {
+        fprintf(stderr, "Error parsing JSON request: %s\n", request);
+        goto done;
+    }
+    cJSON_DeleteItemFromObject(json_request, "id");
+    cJSON_DeleteItemFromObject(json_request, "jsonrpc");
+    params_str = cJSON_Print(json_request);
+
+    ctx = ubus_connect(NULL);
+    if (ctx == NULL) {
+        fprintf(stderr, "Error connecting to UBUS\n");
+        goto done;
     }
 
-    argc -= optind;
-    argv += optind;
-
-    cmd = argv[0];
-    if (argc < 1)
-        return usage(progname);
-
-    ctx = ubus_connect(ubus_socket);
-    if (!ctx) {
-        if (!simple_output)
-            fprintf(stderr, "Failed to connect to ubus\n");
-        return -1;
+    int call_result = ubus_cli_call(ctx, &result, path, method, params_str);
+    if (call_result != 0) {
+        fprintf(stderr, "Error sending request to ubus: %s\n", ubus_strerror(call_result));
+    }
+    int i = 0;
+    while (result == NULL && i < 10) {
+        printf("[XX] waiting for result\n");
+        usleep(200000);
+        i++;
+    }
+    if (result == NULL ) {
+        fprintf(stderr, "ubus call timeout\n");
     }
 
-    argv++;
-    argc--;
-
-    ret = -2;
-    for (i = 0; i < ARRAY_SIZE(commands); i++) {
-        if (strcmp(commands[i].name, cmd) != 0)
-            continue;
-
-        ret = commands[i].cb(ctx, argc, argv);
-        break;
+done:
+    if (ctx != NULL) {
+        ubus_free(ctx);
     }
-
-    if (ret > 0 && !simple_output)
-        fprintf(stderr, "Command failed: %s\n", ubus_strerror(ret));
-    else if (ret == -2)
-        usage(progname);
-
-    ubus_free(ctx);
-    return ret;
+    if (params_str != NULL) {
+        free(params_str);
+    }
+    if (json_request != NULL) {
+        cJSON_Delete(json_request);
+    }
+    return result;
 }
-

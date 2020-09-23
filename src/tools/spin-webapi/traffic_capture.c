@@ -228,7 +228,7 @@ ssize_t direct_capture_callback(void* ld_v, uint64_t pos, char* buf, size_t max)
             return MHD_CONTENT_READER_END_WITH_ERROR;
         }
         /* up to here */
-        
+
         // TODO: maybe do one last read if stopped?
         if (ld->stop) {
             capture_process_stop(ld);
@@ -311,6 +311,7 @@ void* process_mqtt_capture(void* cp_v) {
     capture_process_stop(cp);
     ct_remove_capture_process(cp);
     printf("[XX] capture stop requested, closing\n");
+    pthread_detach(pthread_self());
     return NULL;
 }
 
@@ -385,7 +386,7 @@ tc_start_mqtt_capture_for(const char* device_mac) {
         ct_remove_capture_process(cp);
         return -3;
     }
-    
+
     int d = fileno(cp->process);
     fcntl(d, F_SETFL, O_NONBLOCK);
 
