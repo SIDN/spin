@@ -10,6 +10,7 @@
 
 #include "traffic_capture.h"
 #include "rpc_client.h"
+#include "spin_config.h"
 
 // TODO: configuration for some of these
 #define PORT            1234
@@ -605,22 +606,68 @@ answer_to_connection(void *cls,
                                  MHD_HTTP_BAD_REQUEST);
 }
 
+#define MAX_DAEMONS 10
+
+int
+start_daemon(char* address, int port, struct MHD_Daemon* daemons[], int daemon_count) {
+    struct sockaddr_in addr1;
+    addr1.sin_family = AF_INET;
+    addr1.sin_port = htons(spinconfig_spinweb_port());
+    printf("Binding to '%s' port %d\n", address, port);
+    if (inet_aton(address, &addr1.sin_addr) == 0) {
+        fprintf(stderr, "Invalid IP address: %s\n", address);
+        return 1;
+    }
+
+    daemons[daemon_count] = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION,
+                              spinconfig_spinweb_port(), NULL, NULL,
+                              &answer_to_connection, NULL,
+                              MHD_OPTION_NOTIFY_COMPLETED, &request_completed, NULL,
+                              MHD_OPTION_SOCK_ADDR, &addr1, NULL,
+                              MHD_OPTION_END);
+    if (NULL == daemons[daemon_count]) {
+        fprintf (stderr,
+                 "Failed to start daemon: %s\n", strerror(errno));
+        return 1;
+    }
+    return 0;
+}
+
+int
+start_daemons(const char* address_list, int port, struct MHD_Daemon* daemons[], int* daemon_count) {
+    // address_list is a comma-separated list of IP addresses
+    // it may contain whitespace. Clone it so we can safely use strtok
+    char* dup = strdup(address_list);
+    char* p = strtok (dup,",");
+    while (p != NULL) {
+        while (*p == ' ') {
+            p++;
+        }
+        printf ("start daemon at '%s'\n",p);
+        if (start_daemon(p, spinconfig_spinweb_port(), daemons, *daemon_count) != 0) {
+            free(dup);
+            return 1;
+        }
+        *daemon_count = *daemon_count + 1;
+        p = strtok (NULL, ",");
+    }
+    free(dup);
+    return 0;
+}
 
 int
 main() {
-    struct MHD_Daemon *daemon;
+    /* It would appear MHD can only accept one address,
+     * so in order to allow multiple addresses to be specified, without
+     * going 'all' immediately, we may need multiple daemon instances
+     */
+    struct MHD_Daemon *daemons[MAX_DAEMONS];
+    int daemon_count = 0;
     int terminal_input = 0;
 
-    daemon = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION,
-                              PORT, NULL, NULL,
-                              &answer_to_connection, NULL,
-                              MHD_OPTION_NOTIFY_COMPLETED, &request_completed, NULL,
-                              MHD_OPTION_END);
-    if (NULL == daemon) {
-        fprintf (stderr,
-                 "Failed to start daemon\n");
-        return 1;
-    }
+    init_config(CONFIG_FILE, 0);
+    start_daemons(spinconfig_spinweb_interfaces(), spinconfig_spinweb_port(), daemons, &daemon_count);
+
     while (1) {
         terminal_input = getchar();
         if (terminal_input == 'q') {
@@ -629,7 +676,9 @@ main() {
             while (tc_captures_running() > 0) {
                 //printf("[XX] Captures running: %d\n", tc_captures_running());
             }
-            MHD_stop_daemon(daemon);
+            for (int i=0; i<daemon_count; i++) {
+                MHD_stop_daemon(daemons[i]);
+            }
             return 0;
         }
     }

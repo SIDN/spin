@@ -31,4 +31,6 @@ char *spinconfig_iptable_debug();
 int spinconfig_node_cache_retain_time();
 int spinconfig_dots_enabled();
 int spinconfig_dots_log_only();
+char* spinconfig_spinweb_interfaces();
+int spinconfig_spinweb_port();
 #endif // SPIN_CONFIG_H

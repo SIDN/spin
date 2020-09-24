@@ -20,6 +20,8 @@ enum configs {
     NODE_CACHE_RETAIN_TIME,
     DOTS_ENABLED,   // Enable DOTS handler functionality
     DOTS_LOG_ONLY, // Only LOG DOTS mitigation request matches (do not block them)
+    SPINWEB_INTERFACES,
+    SPINWEB_PORT,
 };
 
 struct conf_item {
@@ -55,6 +57,10 @@ struct conf_item {
             { "dots_enabled",               "0",                0   },
     [DOTS_LOG_ONLY] =
             { "dots_log_only",              "0",                0   },
+    [SPINWEB_INTERFACES] =
+            { "spinweb_interfaces",          "127.0.0.1",       0   },
+    [SPINWEB_PORT] =
+            { "spinweb_port",                "12345",           0   },
  { 0, 0, 0 }
 };
 
@@ -174,6 +180,14 @@ int spinconfig_dots_log_only() {
     return(spi_int(DOTS_LOG_ONLY));
 }
 
+char* spinconfig_spinweb_interfaces() {
+    return(spi_str(SPINWEB_INTERFACES));
+}
+
+int spinconfig_spinweb_port() {
+    return(spi_int(SPINWEB_PORT));
+}
+
 void spinconfig_print_defaults() {
     struct conf_item* ci;
     int i = 0;
@@ -183,3 +197,4 @@ void spinconfig_print_defaults() {
         ci = &ci_list[i++];
     }
 }
+
