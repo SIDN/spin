@@ -1,7 +1,10 @@
+#include <sys/stat.h>
+#include <sys/un.h>
 
 #include "rpc_common.h"
 #include "spinhook.h"
 #include "spin_log.h"
+#include "mainloop.h"
 
 static spin_data
 make_answer(spin_data id) {
@@ -248,11 +251,11 @@ wf_jsonrpc(void *arg, int data, int timeout) {
     }
 }
 
-#include <sys/un.h>
-#include "mainloop.h"
 
 void
 init_json_rpc(char *json_rpc_socket_path) {
+    mode_t old_umask;
+
     spin_log(LOG_INFO, "No libubus; setting up JSON RPC handling\n");
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
@@ -260,16 +263,20 @@ init_json_rpc(char *json_rpc_socket_path) {
     strncpy(addr.sun_path, json_rpc_socket_path, sizeof(addr.sun_path)-1);
     rpc_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
+
     if (!access(json_rpc_socket_path, F_OK )) {
         if (unlink(json_rpc_socket_path) != 0) {
             spin_log(LOG_ERR, "Error unlinking domain socket %s: %s\n", json_rpc_socket_path, strerror(errno));
             exit(errno);
         }
     }
+    // Any process on the local system may talk to SPIN
+    old_umask = umask(0);
     if (bind(rpc_fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
         spin_log(LOG_ERR, "Error opening domain socket %s: %s\n", json_rpc_socket_path, strerror(errno));
         exit(errno);
     }
+    umask(old_umask);
     if (listen(rpc_fd, 100) != 0) {
         spin_log(LOG_ERR, "Error listening on domain socket %s: %s\n", json_rpc_socket_path, strerror(errno));
         exit(errno);
