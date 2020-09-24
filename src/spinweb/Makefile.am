@@ -1,21 +1,21 @@
 AM_CPPFLAGS = -I$(top_srcdir)/include
 AM_CFLAGS = ${regular_CFLAGS} -g -Wall -Werror
 
-bin_PROGRAMS = spin_webapi
-spin_webapi_SOURCES = spinweb.c \
-                      traffic_capture.c \
-                      rpc_client.c \
-                      ../spind/cJSON.c \
-                      ../lib/spindata_type.c
+bin_PROGRAMS = spinweb
+spinweb_SOURCES = spinweb.c \
+                  traffic_capture.c \
+                  rpc_client.c \
+                  ../spind/cJSON.c \
+                  ../lib/spindata_type.c
 
 
-spin_webapi_CFLAGS = -DDATADIR='"$(datadir)"' -DSRCDIR='"$(srcdir)"'
-spin_webapi_LDFLAGS = -lpthread
-spin_webapi_LDADD =
+spinweb_CFLAGS = -DDATADIR='"$(datadir)"' -DSRCDIR='"$(srcdir)"'
+spinweb_LDFLAGS = -lpthread
+spinweb_LDADD =
 
 if USE_UBUS
-    spin_webapi_SOURCES += rpc_ubus_client.c
-    spin_webapi_LDADD += -lubox -lubus -lblobmsg_json
+    spinweb_SOURCES += rpc_ubus_client.c
+    spinweb_LDADD += -lubox -lubus -lblobmsg_json
 endif
 
 
