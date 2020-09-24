@@ -11,12 +11,10 @@
 #include "traffic_capture.h"
 #include "rpc_client.h"
 #include "spin_config.h"
+#include "version.h"
 
-// TODO: configuration for some of these
-#define PORT            1234
 #define POSTBUFFERSIZE  512
 #define MAXCLIENTS      64
-
 
 static const char* STATIC_PATH = "/home/jelte/repos/spin/src/tools/spin-webapi/static";
 static const char* TEMPLATE_PATH = "/home/jelte/repos/spin/src/tools/spin-webapi/templates";
@@ -655,17 +653,54 @@ start_daemons(const char* address_list, int port, struct MHD_Daemon* daemons[], 
     return 0;
 }
 
+void print_help() {
+    printf("Usage: spinweb [options]\n");
+    printf("Options:\n");
+    printf("-c <file>\t\tspecify spin config file (default: %s)\n", CONFIG_FILE);
+    printf("-v\t\t\tprint the version of spinweb and exit\n");
+}
+
+void print_version() {
+    printf("SPIN web version %s\n", BUILD_VERSION);
+    printf("Build date: %s\n", BUILD_DATE);
+}
+
 int
-main() {
+main(int argc, char** argv) {
     /* It would appear MHD can only accept one address,
      * so in order to allow multiple addresses to be specified, without
      * going 'all' immediately, we may need multiple daemon instances
      */
     struct MHD_Daemon *daemons[MAX_DAEMONS];
     int daemon_count = 0;
+    // when started in a terminal, press 'q<enter>' to quit gracefully
     int terminal_input = 0;
 
-    init_config(CONFIG_FILE, 0);
+    char* config_file = NULL;
+    int c;
+
+    while ((c = getopt (argc, argv, "c:hv")) != -1) {
+        switch (c) {
+        case 'c':
+            config_file = optarg;
+            break;
+        case 'h':
+            print_help();
+            exit(0);
+            break;
+        case 'v':
+            print_version();
+            exit(0);
+            break;
+        }
+    }
+
+    if (config_file) {
+        init_config(config_file, 1);
+    } else {
+        // Don't error if default config file doesn't exist
+        init_config(CONFIG_FILE, 0);
+    }
     start_daemons(spinconfig_spinweb_interfaces(), spinconfig_spinweb_port(), daemons, &daemon_count);
 
     while (1) {

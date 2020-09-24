@@ -193,8 +193,10 @@ void spinconfig_print_defaults() {
     int i = 0;
     ci = &ci_list[0];
     while (ci->ci_name != 0) {
-        printf("%s = %s\n", ci->ci_name, ci->ci_default);
         ci = &ci_list[i++];
+        if (ci->ci_name != NULL) {
+            printf("%s = %s\n", ci->ci_name, ci->ci_default);
+        }
     }
 }
 
