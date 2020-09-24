@@ -1,7 +1,7 @@
 
 #include "config.h"
 #include "nfqroutines.h"
-#include "spinconfig.h"
+#include "spin_config.h"
 #include "spind.h"
 #include "spin_log.h"
 #include "statistics.h"
@@ -176,7 +176,7 @@ ipset_blockflow(int v6, int option, int nodenum1, int nodenum2) {
         // Both directions
         sprintf(str, "%s %s %s %s %s %s %s %s %s -j %s",
             iptables_command[v6],
-            iaj_option[option], SpinCheck, 
+            iaj_option[option], SpinCheck,
             matchset, ipset_name(nodenum1, v6), sd[i],
             matchset, ipset_name(nodenum2, v6), sd[i+1],
             SpinBlock);

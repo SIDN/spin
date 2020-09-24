@@ -11,6 +11,8 @@
 
 void init_config();
 void config_set_option(char*, char*);
+int get_config_entries(const char* config_file, int must_exist);
+void spinconfig_print_defaults();
 
 int spinconfig_log_usesyslog();
 int spinconfig_log_loglevel();

@@ -18,7 +18,7 @@
 #include "nfqroutines.h"
 #include "rpc_calls.h"
 #include "rpc_json.h"
-#include "spinconfig.h"
+#include "spin_config.h"
 #include "spinhook.h"
 #include "spin_log.h"
 #include "statistics.h"
@@ -261,6 +261,7 @@ void print_help() {
     printf("Usage: spind [options]\n");
     printf("Options:\n");
     printf("-c <file>\t\tspecify spind config file (default: %s)\n", CONFIG_FILE);
+    printf("-C <file>\t\tprint default configuration values and exit\n");
     printf("-d\t\t\tlog debug messages (set log level to LOG_DEBUG)\n");
     printf("-e <path>\t\textsrc socket path (default: %s)\n", EXTSRC_SOCKET_PATH);
     printf("-h\t\t\tshow this help\n");
@@ -317,10 +318,14 @@ int main(int argc, char** argv) {
     int passive_mode = 0;
     enum arp_table_backend arp_backend = ARP_TABLE_LINUX;
 
-    while ((c = getopt (argc, argv, "c:de:hj:lm:oPp:v")) != -1) {
+    while ((c = getopt (argc, argv, "c:Cde:hj:lm:oPp:v")) != -1) {
         switch (c) {
         case 'c':
             config_file = optarg;
+            break;
+        case 'C':
+            spinconfig_print_defaults();
+            exit(0);
             break;
         case 'd':
             // Set up logging directly, do not wait until we read config

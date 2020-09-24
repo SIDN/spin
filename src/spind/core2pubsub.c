@@ -3,7 +3,7 @@
 #include "ipl.h"
 #include "mainloop.h"
 #include "rpc_json.h"
-#include "spinconfig.h"
+#include "spin_config.h"
 #include "spin_log.h"
 #include "statistics.h"
 

@@ -28,6 +28,8 @@ libspin_a_SOURCES = pkt_info.c \
 					node_names.c \
 					jsmn.h \
 					jsmn.c \
+					spin_config_common.c \
+					spin_config_uci.c \
 					spindata_type.c \
 					spin_list.c \
 					statistics.c \
