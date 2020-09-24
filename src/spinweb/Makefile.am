@@ -5,13 +5,12 @@ bin_PROGRAMS = spinweb
 spinweb_SOURCES = spinweb.c \
                   traffic_capture.c \
                   rpc_client.c \
-                  ../spind/cJSON.c \
-                  ../lib/spindata_type.c
+                  ../spind/cJSON.c
 
 
 spinweb_CFLAGS = -DDATADIR='"$(datadir)"' -DSRCDIR='"$(srcdir)"'
 spinweb_LDFLAGS = -lpthread
-spinweb_LDADD =
+spinweb_LDADD = $(top_builddir)/lib/libspin.a
 
 if USE_UBUS
     spinweb_SOURCES += rpc_ubus_client.c
