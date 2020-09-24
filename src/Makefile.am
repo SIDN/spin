@@ -5,7 +5,7 @@ EXTRA_DIST = $(man_MANS)
 
 AM_CFLAGS=-O0
 AM_CPPFLAGS = -I$(top_srcdir)/include
-SUBDIRS = lib spind tools
+SUBDIRS = lib spind spinweb tools
 
 CXXFLAGS=-O0
 CPPFLAGS=-O0

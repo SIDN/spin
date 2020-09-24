@@ -119,7 +119,7 @@ AC_ARG_WITH(linux-headers,
     [ AC_SUBST(KERNELPATH, "$withval") ]
 )
 
-MAKEFILES="Makefile src/Makefile tools/spin-webapi/Makefile tools/endian-check/Makefile"
+MAKEFILES="Makefile src/Makefile spinweb/Makefile tools/endian-check/Makefile"
 
 AC_ARG_ENABLE(spin-pcap-reader,
               AC_HELP_STRING([--enable-spin-pcap-reader], [enable spin-pcap-reader]),
@@ -145,8 +145,8 @@ AC_CONFIG_FILES(
     Makefile
     lib/Makefile
     spind/Makefile
+    spinweb/Makefile
     tools/Makefile
-    tools/spin-webapi/Makefile
     tools/endian-check/Makefile
 )
 AC_OUTPUT

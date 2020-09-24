@@ -2,7 +2,7 @@
 #include "dns.h"
 #include "dnshooks.h"
 #include "nflogroutines.h"
-#include "spinconfig.h"
+#include "spin_config.h"
 #include "spin_log.h"
 
 static struct handle_dns_ctx *handle_dns_ctx = NULL;

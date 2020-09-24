@@ -18,7 +18,7 @@
 
 #include "dots.h"
 #include "spin_log.h"
-#include "spinconfig.h"
+#include "spin_config.h"
 #include "rpc_json.h"
 
 #define MAX_ERR_LEN 256

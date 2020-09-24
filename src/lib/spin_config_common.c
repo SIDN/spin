@@ -1,8 +1,9 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "spin_log.h"
-#include "spind_config.h"
+#include "spin_config.h"
 
 enum configs {
     LOG_USESYSLOG,
@@ -171,4 +172,14 @@ int spinconfig_dots_enabled() {
 
 int spinconfig_dots_log_only() {
     return(spi_int(DOTS_LOG_ONLY));
+}
+
+void spinconfig_print_defaults() {
+    struct conf_item* ci;
+    int i = 0;
+    ci = &ci_list[0];
+    while (ci->ci_name != 0) {
+        printf("%s = %s\n", ci->ci_name, ci->ci_default);
+        ci = &ci_list[i++];
+    }
 }

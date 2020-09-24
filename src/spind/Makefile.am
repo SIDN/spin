@@ -6,8 +6,6 @@ bin_PROGRAMS = spind
 
 spind_SOURCES = spind.c \
                 cJSON.c \
-                config_common.c \
-                config_uci.c \
                 core2block.c \
                 core2extsrc.c \
                 core2pubsub.c \

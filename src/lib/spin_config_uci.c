@@ -3,7 +3,7 @@
 #include <sys/stat.h>
 
 #include "config.h"
-#include "spinconfig.h"
+#include "spin_config.h"
 #include "spin_log.h"
 
 #if USE_UCI
@@ -104,7 +104,6 @@ int get_config_entries(const char* config_file, int must_exist) {
         config_read_error(must_exist, "Config file %s does not exist\n", config_file);
         return 1;
     }
-    fprintf(stderr, "[XX] opening fileAAA: %s\n", config_file);
     if (!S_ISREG(file_stat.st_mode)) {
         config_read_error(1, "Config file %s does not appear to be a file, aborting\n", config_file);
         return 1;
@@ -149,8 +148,11 @@ int get_config_entries(const char* config_file, int must_exist) {
 
         endofvalue = strchr(beginofvalue, '\n');
         if (endofvalue == 0) {
-            config_read_error(1, "Very long conf line\n");
-            continue;
+            endofvalue = strchr(beginofvalue, EOF);
+            if (endofvalue == 0) {
+                config_read_error(1, "Very long conf line\n");
+                continue;
+            }
         }
         while (isspace(endofvalue[0])) {
             endofvalue--;
