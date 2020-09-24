@@ -58,7 +58,7 @@ struct connection_info_struct {
     * NULL if not yet known.
     */
     const char* answerstring;
-    
+
     /**
     * HTTP response body we will return, for dynamically allocated data string
     * NULL if not yet known.
@@ -117,7 +117,7 @@ FILE*
 try_files(const char* base_path, const char* path) {
     char file_path[256];
     FILE* fp;
-    
+
     snprintf(file_path, 256, "%s%s", base_path, path);
     fp = try_file(file_path);
     if (fp != NULL) {
@@ -132,7 +132,7 @@ try_files(const char* base_path, const char* path) {
         fprintf(stdout, "[XX] returning file for : %s\n", file_path);
         return fp;
     }
-    
+
     snprintf(file_path, 256, "%s%s%s", base_path, path, "/index.html");
     fprintf(stdout, "[XX] try: %s\n", file_path);
     fp = try_file(file_path);
@@ -140,7 +140,7 @@ try_files(const char* base_path, const char* path) {
         fprintf(stdout, "[XX] returning file for : %s\n", file_path);
         return fp;
     }
-    
+
     fprintf(stdout, "[XX] %s not found\n", file_path);
     return NULL;
 }
@@ -188,7 +188,7 @@ char* template_render(const char* template, size_t template_size, ...) {
     va_list valist;
     int i = 0;
     char templ_arg_str[TEMPLATE_ARG_STR_SIZE];
-    
+
     // tracking data when replacing variables
     char* pos;
 
@@ -241,7 +241,7 @@ char* template_render2(const char* template, size_t template_size, va_list valis
     const char* template_var = "";
     int i = 0;
     char templ_arg_str[TEMPLATE_ARG_STR_SIZE];
-    
+
     // tracking data when replacing variables
     char* pos;
 
@@ -326,7 +326,7 @@ send_page_from_file(struct MHD_Connection *connection,
         page = malloc(file_size);
         memset(page, 0, file_size);
         fread(page, file_size, 1, fp);
-    
+
         fclose(fp);
 
         response = MHD_create_response_from_buffer (file_size,
@@ -341,7 +341,7 @@ send_page_from_file(struct MHD_Connection *connection,
                                      notfounderror,
                                      MHD_HTTP_NOT_FOUND);
     }
-    
+
     return ret;
 }
 
@@ -370,9 +370,9 @@ send_page_from_template(struct MHD_Connection *connection,
         }
         memset(page, 0, file_size);
         fread(page, file_size, 1, fp);
-    
+
         fclose(fp);
-        
+
         //char* templres = template_render(page, file_size, "FOOBAR", "EXISTATIONASDFASDF", "AAAAA", NULL);
         va_list valist;
         va_start(valist, url);
@@ -394,7 +394,7 @@ send_page_from_template(struct MHD_Connection *connection,
                                      notfounderror,
                                      MHD_HTTP_NOT_FOUND);
     }
-    
+
     return ret;
 }
 
