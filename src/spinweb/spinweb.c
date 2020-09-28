@@ -8,6 +8,7 @@
 #include <string.h>
 #include <microhttpd.h>
 
+#include "config.h"
 #include "traffic_capture.h"
 #include "rpc_client.h"
 #include "spin_config.h"

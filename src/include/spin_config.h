@@ -1,5 +1,6 @@
 #ifndef SPIN_CONFIG_H
 #define SPIN_CONFIG_H
+#include "config.h"
 // if USE_UCI is defined we use UCI with section spin.spind
 // if not we use a file /etc/spin/spind.conf
 
