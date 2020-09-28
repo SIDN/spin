@@ -17,13 +17,10 @@
 #define POSTBUFFERSIZE  512
 #define MAXCLIENTS      64
 
-static const char* STATIC_PATH = "/home/jelte/repos/spin/src/tools/spin-webapi/static";
-static const char* TEMPLATE_PATH = "/home/jelte/repos/spin/src/tools/spin-webapi/templates";
-
 #define TEMPLATE_SRC_PATH SRCDIR "/templates"
-#define TEMPLATE_INSTALL_PATH DATADIR "/spin/spin-webapi/templates"
+#define TEMPLATE_INSTALL_PATH DATADIR "/spin/spinweb/templates"
 #define STATIC_SRC_PATH SRCDIR "/static"
-#define STATIC_INSTALL_PATH DATADIR "/spin/spin-webapi/static"
+#define STATIC_INSTALL_PATH DATADIR "/spin/spinweb/static"
 
 //
 // Endpoints
