@@ -23,7 +23,6 @@
 #include "spin_log.h"
 #include "statistics.h"
 #include "version.h"
-#include "config.h"
 
 node_cache_t* node_cache;
 dns_cache_t* dns_cache;
