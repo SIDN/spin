@@ -763,6 +763,7 @@ main(int argc, char** argv) {
     }
 
     if (start_daemons(interfaces, port_number, daemons, &daemon_count) != 0) {
+        free(interfaces);
         return errno;
     }
 
@@ -777,6 +778,7 @@ main(int argc, char** argv) {
             for (int i=0; i<daemon_count; i++) {
                 MHD_stop_daemon(daemons[i]);
             }
+            free(interfaces);
             return 0;
         }
     }
