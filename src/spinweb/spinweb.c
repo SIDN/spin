@@ -107,7 +107,7 @@ try_file(const char* path) {
 
 /*
  * Tries whether the file path exists, and if not, whether the path
- * with '.html', or '/index.html' exists, in that order
+ * with '.html', or (if url ends with /) 'index.html' exists, in that order
  * Returns open file pointer if so, NULL if not
  */
 FILE*
@@ -130,12 +130,15 @@ try_files(const char* base_path, const char* path) {
         return fp;
     }
 
-    snprintf(file_path, 256, "%s%s%s", base_path, path, "/index.html");
-    fprintf(stdout, "[XX] try: %s\n", file_path);
-    fp = try_file(file_path);
-    if (fp != NULL) {
-        fprintf(stdout, "[XX] returning file for : %s\n", file_path);
-        return fp;
+    size_t path_size = strlen(path);
+    if (path_size >= 0 && path[strlen(path)-1] == '/') {
+        snprintf(file_path, 256, "%s%s%s", base_path, path, "index.html");
+        fprintf(stdout, "[XX] try: %s\n", file_path);
+        fp = try_file(file_path);
+        if (fp != NULL) {
+            fprintf(stdout, "[XX] returning file for : %s\n", file_path);
+            return fp;
+        }
     }
 
     fprintf(stdout, "[XX] %s not found\n", file_path);
@@ -301,6 +304,26 @@ send_page_from_string(struct MHD_Connection *connection,
     return ret;
 }
 
+static int
+send_redirect_add_slash(struct MHD_Connection *connection,
+                        int status_code) {
+    int ret;
+    struct MHD_Response* response;
+
+    response = MHD_create_response_from_buffer (0, (void *) "",
+                                                MHD_RESPMEM_PERSISTENT);
+    if (!response) {
+        return MHD_NO;
+    }
+    MHD_add_response_header (response, "Location", "./");
+    ret = MHD_queue_response(connection,
+                             status_code,
+                             response);
+    MHD_destroy_response(response);
+
+    return ret;
+}
+
 
 static int
 send_page_from_file(struct MHD_Connection *connection,
@@ -334,9 +357,20 @@ send_page_from_file(struct MHD_Connection *connection,
                                  response);
         MHD_destroy_response(response);
     } else {
-        return send_page_from_string(connection,
-                                     notfounderror,
-                                     MHD_HTTP_NOT_FOUND);
+        // If the URL does not end with a /, redirect to one
+        // If the URL does, send a 404
+        size_t url_len = strlen(url);
+        if (url_len > 0 && url[url_len - 1] == '/') {
+            return send_page_from_string(connection,
+                                         notfounderror,
+                                         MHD_HTTP_NOT_FOUND);
+        } else {
+            return send_redirect(connection, 302);
+            //MHD_add_response_header (response, "Location", "http://somesite.com/");
+            //return send_page_from_string(connection,
+            //                             notfounderror,
+            //                             MHD_HTTP_NOT_FOUND);
+        }
     }
 
     return ret;
