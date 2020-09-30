@@ -365,7 +365,7 @@ send_page_from_file(struct MHD_Connection *connection,
                                          notfounderror,
                                          MHD_HTTP_NOT_FOUND);
         } else {
-            return send_redirect(connection, 302);
+            return send_redirect_add_slash(connection, 302);
             //MHD_add_response_header (response, "Location", "http://somesite.com/");
             //return send_page_from_string(connection,
             //                             notfounderror,
