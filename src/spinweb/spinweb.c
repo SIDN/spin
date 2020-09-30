@@ -640,7 +640,7 @@ start_daemons(const char* address_list, int port, struct MHD_Daemon* daemons[], 
             p++;
         }
         printf ("start daemon at '%s'\n",p);
-        if (start_daemon(p, spinconfig_spinweb_port(), daemons, *daemon_count) != 0) {
+        if (start_daemon(p, port, daemons, *daemon_count) != 0) {
             free(dup);
             return 1;
         }
@@ -655,6 +655,8 @@ void print_help() {
     printf("Usage: spinweb [options]\n");
     printf("Options:\n");
     printf("-c <file>\t\tspecify spin config file (default: %s)\n", CONFIG_FILE);
+    printf("-i <IP address>\t\tlisten on the given IP address (default: 127.0.0.1)\n");
+    printf("-p <port number>\t\tlisten on the given port number (default: 13026)\n");
     printf("-v\t\t\tprint the version of spinweb and exit\n");
 }
 
@@ -677,7 +679,10 @@ main(int argc, char** argv) {
     char* config_file = NULL;
     int c;
 
-    while ((c = getopt (argc, argv, "c:hv")) != -1) {
+    char* interfaces = NULL;
+    int port_number = 0;
+
+    while ((c = getopt (argc, argv, "c:hi:p:v")) != -1) {
         switch (c) {
         case 'c':
             config_file = optarg;
@@ -685,6 +690,22 @@ main(int argc, char** argv) {
         case 'h':
             print_help();
             exit(0);
+            break;
+        case 'i':
+            if (interfaces == NULL) {
+                interfaces = strdup(optarg);
+            } else {
+                char* tmp = malloc(strlen(interfaces) + strlen(optarg) + 3);
+                strcpy(tmp, interfaces);
+                strcat(tmp, ", ");
+                strcat(tmp, optarg);
+                free(interfaces);
+                interfaces = tmp;
+            }
+            printf("[XX] CLI IFS: %s\n", interfaces);
+            break;
+        case 'p':
+            port_number = atoi(optarg);
             break;
         case 'v':
             print_version();
@@ -699,7 +720,17 @@ main(int argc, char** argv) {
         // Don't error if default config file doesn't exist
         init_config(CONFIG_FILE, 0);
     }
-    start_daemons(spinconfig_spinweb_interfaces(), spinconfig_spinweb_port(), daemons, &daemon_count);
+
+    if (interfaces == NULL) {
+        interfaces = strdup(spinconfig_spinweb_interfaces());
+    }
+    if (port_number == 0) {
+        port_number = spinconfig_spinweb_port();
+    }
+
+    if (start_daemons(interfaces, port_number, daemons, &daemon_count) != 0) {
+        return errno;
+    }
 
     while (1) {
         terminal_input = getchar();

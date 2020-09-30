@@ -60,7 +60,7 @@ struct conf_item {
     [SPINWEB_INTERFACES] =
             { "spinweb_interfaces",          "127.0.0.1",       0   },
     [SPINWEB_PORT] =
-            { "spinweb_port",                "12345",           0   },
+            { "spinweb_port",                "13026",           0   },
  { 0, 0, 0 }
 };
 
