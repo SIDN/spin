@@ -160,9 +160,13 @@ rpcc_get_device_by_mac(const char* device_mac) {
     cJSON* devices = rpcc_list_devices();
     int index = 0;
     cJSON_ArrayForEach(device, devices) {
-        char* cur_device_mac = cJSON_GetObjectItem(device, "mac")->valuestring;
-        if (strcmp(device_mac, cur_device_mac) == 0) {
-            result = cJSON_DetachItemFromArray(devices, index);
+        cJSON* mac_obj = cJSON_GetObjectItem(device, "mac");
+        if (mac_obj != NULL) {
+            char* cur_device_mac = mac_obj->valuestring;
+            if (strcmp(device_mac, cur_device_mac) == 0) {
+                result = cJSON_DetachItemFromArray(devices, index);
+                break;
+            }
         }
         index++;
     }
@@ -176,12 +180,17 @@ rpcc_get_device_by_mac(const char* device_mac) {
 char* rpcc_get_device_name(spin_data device) {
     char* name = NULL;
 
-    char* cur_device_mac = cJSON_GetObjectItem(device, "mac")->valuestring;
-    cJSON* cur_device_name = cJSON_GetObjectItem(device, "name");
-    if (cur_device_name != NULL) {
-        name = strdup(cur_device_name->valuestring);
+    cJSON* mac_obj = cJSON_GetObjectItem(device, "mac");
+    if (mac_obj != NULL) {
+        char* cur_device_mac = mac_obj->valuestring;
+        cJSON* cur_device_name = cJSON_GetObjectItem(device, "name");
+        if (cur_device_name != NULL) {
+            name = strdup(cur_device_name->valuestring);
+        } else {
+            name = strdup(cur_device_mac);
+        }
     } else {
-        name = strdup(cur_device_mac);
+        name = strdup("<unknown>");
     }
     return name;
 }
