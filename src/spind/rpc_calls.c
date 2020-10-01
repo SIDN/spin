@@ -726,7 +726,7 @@ int reset_iplist_ignore(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
     if (system_rcode != 0) {
         spin_log(LOG_WARNING, "Error removing ignore.list");
     }
-    system_rcode = system("/usr/lib/spin/show_ips.lua -o /etc/spin/ignore.list -f");
+    system_rcode = system("spin_list_ips.sh -o /etc/spin/ignore.list -f");
     if (system_rcode != 0) {
         spin_log(LOG_WARNING, "Error recreating ignore.list");
     }
