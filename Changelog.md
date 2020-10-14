@@ -1,7 +1,7 @@
 # Changelog
 
 ## Upcoming
-* Nothing yet
+* Replaced the lua-based web api with spinweb, based on libmicrohttpd
 
 ## [0.11] (2020-01-29)
 * Added '-c' option to spind for specifying a configuration file
