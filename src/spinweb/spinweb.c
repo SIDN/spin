@@ -642,15 +642,15 @@ int
 start_daemon(char* address, int port, struct MHD_Daemon* daemons[], int daemon_count) {
     struct sockaddr_in addr1;
     addr1.sin_family = AF_INET;
-    addr1.sin_port = htons(spinconfig_spinweb_port());
+    addr1.sin_port = htons(port);
     printf("Binding to '%s' port %d\n", address, port);
     if (inet_aton(address, &addr1.sin_addr) == 0) {
         fprintf(stderr, "Invalid IP address: %s\n", address);
         return 1;
     }
 
-    daemons[daemon_count] = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION,
-                              spinconfig_spinweb_port(), NULL, NULL,
+    daemons[daemon_count] = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD,
+                              port, NULL, NULL,
                               &answer_to_connection, NULL,
                               MHD_OPTION_NOTIFY_COMPLETED, &request_completed, NULL,
                               MHD_OPTION_SOCK_ADDR, &addr1, NULL,
