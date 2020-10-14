@@ -1,5 +1,8 @@
 # Web API
 
+Note: this is the old API which is no longer in use; Most functionality
+has been replaced with a JSON-RPC mechanism, which is served
+
 The spin_webui daemon offers some web pages, and a REST API that can read and control several aspects of the SPIN software.
 
 - [JSON API Endpoints](#json-api-endpoints)

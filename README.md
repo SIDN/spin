@@ -39,7 +39,7 @@ Pi 3. See the [Valibox website](https://valibox.sidnlabs.nl)
 - libldns-dev
 - libmicrohttpd-dev
 
-    `apt-get install gcc make autoconf libnfnetlink-dev libmnl-dev libnetfilter-queue-dev`
+    `apt-get install gcc make autoconf libnfnetlink-dev libmnl-dev libnetfilter-queue-dev libldns-dev libmicrohttpd-dev`
 
 Library dependencies:
 
@@ -50,19 +50,6 @@ Library dependencies:
 
     `apt-get install libnfnetlink0 libmnl0`
 
-Lua dependencies (for client tooling, and web API):
-
-- libmosquitto-dev
-- lua 5.1 (and luarocks for easy install of libs below)
-- lua-mosquitto
-- lua-minittp
-- lua-websockets
-- luabitop
-- luaposix
-
-    `apt-get install libmosquitto-dev`
-
-    `luarocks install lua-mosquitto luabitop luaposix lua-minittp`
 
 Runtime dependencies:
 - mosquitto (or any MQTT software that supports websockets as well)
@@ -84,7 +71,7 @@ Run in the source dir:
 
 ### Running from source tree
 
-To run SPIN, you need to run two daemons; spind to collect data, and spin_webui for the traffic monitor to talk to. You'll also need an MQTT server, such as mosquitto, wich websockets support on port 1884 (as well as plain MQTT on port 1883).
+To run SPIN, you need to run two daemons; spind to collect data, and spinweb to serve the interface and process user commands. You'll also need an MQTT server, such as mosquitto, with websockets support on port 1884 (as well as plain MQTT on port 1883). MQTT is used to publish traffic data monitored by the SPIN daemon.
 
 The SPIN system is most useful when run on a gateway; there are several instructions on the web on how to set up a Debian system as a gateway. One example is [https://gridscale.io/en/community/tutorials/debian-router-gateway/](https://gridscale.io/en/community/tutorials/debian-router-gateway/).
 
@@ -92,16 +79,15 @@ To run spind from the source tree, with stdout output and debug logging, use:
     `(sudo) (cd ./src/build/spind/; spind -o -d)`
 
 To run the webserver, use:
-    `(sudo) (cd ./src/web_ui/; minittp-server -a 127.0.0.1 -p 8080 ./spin_webui.lua)`
+    `(cd ./src/build/spinweb; ./spinweb)`
 
+Note that the actual current working directory for spinweb must be the build directory of spinweb itself, as it needs the relative links to template files to be correct when run from the build tree. This is not an issue when SPIN is installed to the system.
 
 ### System
 
-After this step is complete, you can find the spin daemon in the spind directory. The tools/spin_print and tools/spin_config tools are supporting tools for older versions and deprectaed in the latest release.
+SPIN sends its data to MQTT, which any MQTT client can then read. A web-based client ('the bubble app') can be served with the spinweb daemon in `src/build/spinweb/`, the main HTML file is `spin_graph/graph.html`, and depending on where you host it. By default it listens to localhost only, on port 13026. You can access it from a browser with the URL `http://localhost:13026/spin_graph/graph.html` if spind is running. When running on a different system, you will need to configure spinweb to listen on the local network interface through either the configuration file or with the command-line option '-i'.
 
-SPIN sends its data to MQTT, which any MQTT client can then read. A web-based client ('the bubble app') can be found in `src/web_ui/static/spin_api/`, the main HTML file is `graph.html`, and depending on where you host it, you can access it from a browser with the URL `file://<path>/graph.html?mqtt_host=<ip address of MQTT server>`.
-
-Commands and other data requests are sent to spin through a Web API, which is run using lua-minittp. All RPC calls are exposed through this as well.
+Spinweb also provides a method to send commands to the SPIN daemon. A client command script can be found in the scripts/ directory.
 
 ## For OpenWRT
 
@@ -146,8 +132,9 @@ $ AUTOCONF_VERSION=2.69 AUTOMAKE_VERSION=1.16 make
 
 When the OpenWRT package is installed, SPIN should start automatically
 after a reboot. Simply use a browser to go to
-http://192.168.8.1/www/spin/graph.html to see it in action (assuming that
-the router that is running SPIN has the internal IP 192.168.8.1).
+http://192.168.8.1:13026/spin_graph/graph.html to see it in action (assuming
+that the router that is running SPIN has the internal IP 192.168.8.1).
+You may need to configure the local interface and port in /etc/config/spin
 
 When installed locally, a few manual steps are required:
 
@@ -156,8 +143,8 @@ When installed locally, a few manual steps are required:
 2. Load the relevant kernel modules: `modprobe nf_conntrack nfnetlink_log nfnetlink_queue`. On some systems, the conntrack modules are split into several separate modules, in which case you'll need to run modprobe on `nf_conntrack_ipv4` and `nf_conntrack_ipv6` as well.
 3. Enable conntrack accounting: `sysctl net.netfilter.nf_conntrack_acct=1`
 4. Start the spin daemon `(sudo) (cd ./src/build/spind/; spind -o -d)`
-5. Start the spin Web daemon `(sudo) (cd ./src/web_ui/; minittp-server -a 127.0.0.1 -p 8080 ./spin_webui.lua`
-5. Load the spin bubble app by visiting `http://127.0.0.1:8080/spin_graph/graph.html?mqtt_host=127.0.0.1`
+5. Start the spinweb daemon `(cd ./src/build/spinweb/; ./spinweb`
+5. Load the spin bubble app by visiting `http://127.0.0.1:13026/spin_graph/graph.html`
 
 
 # High-level technical overview
