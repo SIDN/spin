@@ -780,6 +780,9 @@ main(int argc, char** argv) {
             }
             free(interfaces);
             return 0;
+        } else if (terminal_input == EOF) {
+            // running in background, just sleep
+            sleep(1);
         }
     }
 }
