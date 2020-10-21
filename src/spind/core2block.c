@@ -191,6 +191,19 @@ setup_tables(int nflog_dns_group, int queue_block, int place) {
     char nfq_queue_str[MAXSTR];
     int block_iaj;
 
+    // If not enabled yet, load the conntrack modules, and set
+    // accounting
+    iptab_system("modprobe nf_conntrack");
+    // The following modules may or may not be present, depending on
+    // kernel specifics. If present, they must be loaded, if not,
+    // their functionality is in conntrack itself. We can simply
+    // try and ignore any errors
+    ignore_system_errors = 1;
+    iptab_system("modprobe -q nf_conntrack_ipv4");
+    iptab_system("modprobe -q nf_conntrack_ipv6");
+    ignore_system_errors = 0;
+    iptab_system("sysctl -q net.netfilter.nf_conntrack_acct=1");
+
     // Currently block and dns both in one list
     block_iaj = place ? IAJ_ADD : IAJ_INS;
 
