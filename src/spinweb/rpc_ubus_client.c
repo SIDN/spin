@@ -76,7 +76,6 @@ send_ubus_message_raw(const char* request) {
     }
     int i = 0;
     while (result == NULL && i < 10) {
-        printf("[XX] waiting for result\n");
         usleep(200000);
         i++;
     }

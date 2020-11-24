@@ -10,8 +10,11 @@ enum configs {
     LOG_LOGLEVEL,
     PUBSUB_HOST,
     PUBSUB_PORT,
+    PUBSUB_WEBSOCKET_HOST,
+    PUBSUB_WEBSOCKET_PORT,
     PUBSUB_CHANNEL_TRAFFIC,
     PUBSUB_TIMEOUT,
+    PUBSUB_RUN_MOSQUITTO,
     IPTABLE_QUEUE_DNS,
     IPTABLE_QUEUE_BLOCK,
     IPTABLE_PLACE_DNS,
@@ -37,10 +40,16 @@ struct conf_item {
             { "pubsub_host",                "127.0.0.1",        0   },
     [PUBSUB_PORT] =
             { "pubsub_port",                "1883",             0   },
+    [PUBSUB_WEBSOCKET_HOST] =
+            { "pubsub_websocket_host",      "127.0.0.1",        0   },
+    [PUBSUB_WEBSOCKET_PORT] =
+            { "pubsub_websocket_port",      "1884",             0   },
     [PUBSUB_CHANNEL_TRAFFIC] =
             { "pubsub_channel_traffic",     "SPIN/traffic",     0   },
     [PUBSUB_TIMEOUT] =
             { "pubsub_timeout",             "60",               0   },
+    [PUBSUB_RUN_MOSQUITTO] =
+            { "pubsub_run_mosquitto",       "1",                0   },
     [IPTABLE_QUEUE_DNS] =
             { "iptable_queue_dns",          "1",                0   },
     [IPTABLE_QUEUE_BLOCK] =
@@ -50,7 +59,7 @@ struct conf_item {
     [IPTABLE_PLACE_BLOCK] =
             { "iptable_place_block",        "0",                0   },
     [IPTABLE_DEBUG] =
-            { "iptable_debug",              "/tmp/block_commands",                 0   },
+            { "iptable_debug",           "/tmp/block_commands", 0   },
     [NODE_CACHE_RETAIN_TIME] =
             { "node_cache_retain_time",     "1800",             0   },
     [DOTS_ENABLED] =
@@ -133,6 +142,14 @@ int spinconfig_pubsub_port() {
     return(spi_int(PUBSUB_PORT));
 }
 
+char *spinconfig_pubsub_websocket_host() {
+    return(spi_str(PUBSUB_WEBSOCKET_HOST));
+}
+
+int spinconfig_pubsub_websocket_port() {
+    return(spi_int(PUBSUB_WEBSOCKET_PORT));
+}
+
 char *spinconfig_pubsub_channel_traffic() {
 
     return(spi_str(PUBSUB_CHANNEL_TRAFFIC));
@@ -141,6 +158,10 @@ char *spinconfig_pubsub_channel_traffic() {
 int spinconfig_pubsub_timeout() {
 
     return(spi_int(PUBSUB_TIMEOUT));
+}
+
+int spinconfig_pubsub_run_mosquitto() {
+    return(spi_int(PUBSUB_RUN_MOSQUITTO));
 }
 
 int spinconfig_iptable_nflog_dns_group() {
@@ -199,4 +220,3 @@ void spinconfig_print_defaults() {
         }
     }
 }
-

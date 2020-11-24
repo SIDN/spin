@@ -194,7 +194,7 @@ setup_tables(int nflog_dns_group, int queue_block, int place) {
     // If not enabled yet, load the conntrack modules, and set
     // accounting
     iptab_system("modprobe nf_conntrack");
-    iptab_system("modprobe nf_netlink_queue");
+    iptab_system("modprobe nfnetlink_queue");
     // The following modules may or may not be present, depending on
     // kernel specifics. If present, they must be loaded, if not,
     // their functionality is in conntrack itself. We can simply
