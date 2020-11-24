@@ -185,9 +185,75 @@ void broadcast_iplist(int iplist, const char* list_name) {
     spin_data_delete(cmd_sd);
 }
 
+#include <stdio.h>
+#include <signal.h>
+#define MOSQ_CONF_TEMPLATE "/tmp/spin_mosq_conf_XXXXXX"
+static char mosq_conf_filename[27];
+static int mosq_pid = 0;
+
+int mosquitto_create_config_file() {
+    FILE* mosq_conf;
+    sprintf(mosq_conf_filename, MOSQ_CONF_TEMPLATE);
+    printf("SIZE OF TMP: %lu\n", strlen(mosq_conf_filename));
+    mkstemp(mosq_conf_filename);
+    printf("Tempname #1: %s\n", mosq_conf_filename);
+    mosq_conf = fopen(mosq_conf_filename, "w");
+    if (mosq_conf == NULL) {
+        return 1;
+    }
+    fprintf(mosq_conf, "port 1883 127.0.0.1\n");
+    //fprintf(mosq_conf, "protocol mosquitto");
+    fprintf(mosq_conf, "listener 1884 127.0.0.1\n");
+    fprintf(mosq_conf, "protocol websockets\n");
+
+    return 0;
+}
+
+int mosquitto_start_server(const char* host, int port) {
+    char commandline[256];
+    int result;
+    printf("[XX] creating mosquitto configuration file\n");
+    if (mosquitto_create_config_file() != 0) {
+        fprintf(stderr, "Error creating temporary configuration file for mosquitto\n");
+        return 1;
+    }
+    printf("[XX] done creating mosquitto configuration file\n");
+
+    printf("[XX] starting mosquitto\n");
+    fflush(stdout);
+    // TODO: use posix_spawn?
+    int pid = fork();
+    result = 1234;
+    if(pid == 0) {
+        snprintf(commandline, 255, "mosquitto -c %s", mosq_conf_filename);
+        result = system(commandline);
+        exit(result);
+    }
+    mosq_pid = pid;
+
+    //result = 1;
+    printf("[XX] RESULT: %d\n", result);
+    printf("[XX] PID: %d\n", mosq_pid);
+    fflush(stdout);
+    sleep(2);
+    // TODO Check if it is running?
+    return 0;
+}
+
+void mosquitto_stop_server() {
+    printf("[XX] stopping mosquitto\n");
+    kill(mosq_pid, SIGTERM);
+    sleep(2);
+    kill(mosq_pid, SIGKILL);
+    printf("[XX] mosquitto stopped\n");
+}
 
 void init_mosquitto(const char* host, int port) {
     int object;
+    printf("[XX] INIT MOSQ\n");
+    fflush(stdout);
+
+    mosquitto_start_server(host, port);
 
     mosquitto_lib_init();
 
@@ -211,4 +277,6 @@ void finish_mosquitto() {
 
     mosquitto_destroy(mosq);
     mosquitto_lib_cleanup();
+
+    mosquitto_stop_server();
 }

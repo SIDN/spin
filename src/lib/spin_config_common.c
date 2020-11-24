@@ -12,6 +12,10 @@ enum configs {
     PUBSUB_PORT,
     PUBSUB_CHANNEL_TRAFFIC,
     PUBSUB_TIMEOUT,
+    PUBSUB_WEBSOCKET_HOST,
+    PUBSUB_WEBSOCKET_PORT TODO HERE,
+    PUBSUB_RUN_MOSQUITTO,
+    PUBSUB_RUN_MOSQUITTO,
     IPTABLE_QUEUE_DNS,
     IPTABLE_QUEUE_BLOCK,
     IPTABLE_PLACE_DNS,
@@ -37,10 +41,16 @@ struct conf_item {
             { "pubsub_host",                "127.0.0.1",        0   },
     [PUBSUB_PORT] =
             { "pubsub_port",                "1883",             0   },
+    [PUBSUB_WEBSOCKET_HOST] =
+            { "pubsub_websocket_host",      "127.0.0.1",        0   },
+    [PUBSUB_WEBSOCKET_PORT] =
+            { "pubsub_websocket_port",      "1884",             0   },
     [PUBSUB_CHANNEL_TRAFFIC] =
             { "pubsub_channel_traffic",     "SPIN/traffic",     0   },
     [PUBSUB_TIMEOUT] =
             { "pubsub_timeout",             "60",               0   },
+    [PUBSUB_RUN_MOSQUITTO] =
+            { "pubsub_run_mosquitto",       "1",                0   },
     [IPTABLE_QUEUE_DNS] =
             { "iptable_queue_dns",          "1",                0   },
     [IPTABLE_QUEUE_BLOCK] =
@@ -199,4 +209,3 @@ void spinconfig_print_defaults() {
         }
     }
 }
-
