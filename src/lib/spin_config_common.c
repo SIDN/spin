@@ -13,8 +13,7 @@ enum configs {
     PUBSUB_CHANNEL_TRAFFIC,
     PUBSUB_TIMEOUT,
     PUBSUB_WEBSOCKET_HOST,
-    PUBSUB_WEBSOCKET_PORT TODO HERE,
-    PUBSUB_RUN_MOSQUITTO,
+    PUBSUB_WEBSOCKET_PORT,
     PUBSUB_RUN_MOSQUITTO,
     IPTABLE_QUEUE_DNS,
     IPTABLE_QUEUE_BLOCK,
@@ -60,7 +59,7 @@ struct conf_item {
     [IPTABLE_PLACE_BLOCK] =
             { "iptable_place_block",        "0",                0   },
     [IPTABLE_DEBUG] =
-            { "iptable_debug",              "/tmp/block_commands",                 0   },
+            { "iptable_debug",           "/tmp/block_commands", 0   },
     [NODE_CACHE_RETAIN_TIME] =
             { "node_cache_retain_time",     "1800",             0   },
     [DOTS_ENABLED] =
