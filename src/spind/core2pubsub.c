@@ -191,7 +191,8 @@ void broadcast_iplist(int iplist, const char* list_name) {
 static char mosq_conf_filename[27];
 static int mosq_pid = 0;
 
-int mosquitto_create_config_file() {
+int
+mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const char* pubsub_websocket_host, int pubsub_websocket_port) {
     FILE* mosq_conf;
     sprintf(mosq_conf_filename, MOSQ_CONF_TEMPLATE);
     printf("SIZE OF TMP: %lu\n", strlen(mosq_conf_filename));
@@ -201,25 +202,23 @@ int mosquitto_create_config_file() {
     if (mosq_conf == NULL) {
         return 1;
     }
+    // Always listen on localhost 1883
     fprintf(mosq_conf, "port 1883 127.0.0.1\n");
+    fprintf(mosq_conf, "port %d %s\n", pubsub_port, pubsub_host);
     //fprintf(mosq_conf, "protocol mosquitto");
-    fprintf(mosq_conf, "listener 1884 127.0.0.1\n");
+    fprintf(mosq_conf, "listener %d %s\n", pubsub_websocket_port, pubsub_websocket_host);
     fprintf(mosq_conf, "protocol websockets\n");
 
     return 0;
 }
 
-int mosquitto_start_server(const char* host, int port) {
+int mosquitto_start_server(const char* host, int port, const char* websocket_host, int websocket_port) {
     char commandline[256];
     int result;
-    printf("[XX] creating mosquitto configuration file\n");
-    if (mosquitto_create_config_file() != 0) {
+    if (mosquitto_create_config_file(host, port, websocket_host, websocket_port) != 0) {
         fprintf(stderr, "Error creating temporary configuration file for mosquitto\n");
         return 1;
     }
-    printf("[XX] done creating mosquitto configuration file\n");
-
-    printf("[XX] starting mosquitto\n");
     fflush(stdout);
     // TODO: use posix_spawn?
     int pid = fork();
@@ -232,8 +231,6 @@ int mosquitto_start_server(const char* host, int port) {
     mosq_pid = pid;
 
     //result = 1;
-    printf("[XX] RESULT: %d\n", result);
-    printf("[XX] PID: %d\n", mosq_pid);
     fflush(stdout);
     sleep(2);
     // TODO Check if it is running?
@@ -248,12 +245,14 @@ void mosquitto_stop_server() {
     printf("[XX] mosquitto stopped\n");
 }
 
-void init_mosquitto(const char* host, int port) {
+void init_mosquitto(int start_own_instance, const char* host, int port, const char* websocket_host, int websocket_port) {
     int object;
     printf("[XX] INIT MOSQ\n");
     fflush(stdout);
 
-    mosquitto_start_server(host, port);
+    if (start_own_instance) {
+        mosquitto_start_server(host, port, websocket_host, websocket_port);
+    }
 
     mosquitto_lib_init();
 
@@ -273,10 +272,12 @@ void init_mosquitto(const char* host, int port) {
     }
 }
 
-void finish_mosquitto() {
+void finish_mosquitto(int started_own_instance) {
 
     mosquitto_destroy(mosq);
     mosquitto_lib_cleanup();
 
-    mosquitto_stop_server();
+    if (started_own_instance) {
+        mosquitto_stop_server();
+    }
 }

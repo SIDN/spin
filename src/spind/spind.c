@@ -31,7 +31,9 @@ static int local_mode;
 
 const char* config_file = NULL;
 const char* mosq_host = NULL;
-int mosq_port;
+int mosq_port = 0;
+const char* mosq_websocket_host = NULL;
+int mosq_websocket_port = 0;
 
 STAT_MODULE(spind)
 
@@ -354,6 +356,7 @@ int main(int argc, char** argv) {
             break;
         case 'm':
             mosq_host = optarg;
+            mosq_websocket_host = optarg;
             break;
         case 'o':
             printf("Logging to stdout instead of syslog\n");
@@ -374,10 +377,11 @@ int main(int argc, char** argv) {
             break;
         case 'p':
             mosq_port = strtol(optarg, NULL, 10);
-            if (mosq_port <= 0 || mosq_port > 65535) {
+            if (mosq_port <= 0 || mosq_port > 65534) {
                 fprintf(stderr, "Error, not a valid port number: %s\n", optarg);
                 exit(1);
             }
+            mosq_websocket_port = mosq_port + 1;
             break;
         case 'v':
             print_version();
@@ -405,8 +409,12 @@ int main(int argc, char** argv) {
 
     if (!mosq_host) {
         mosq_host = spinconfig_pubsub_host();
+        mosq_websocket_host = spinconfig_pubsub_websocket_host();
     }
-    mosq_port = spinconfig_pubsub_port();
+    if (mosq_port == 0) {
+        mosq_port = spinconfig_pubsub_port();
+        mosq_websocket_port = spinconfig_pubsub_websocket_port();
+    }
 
 #ifdef PASSIVE_MODE_ONLY
     if (!passive_mode) {
@@ -442,7 +450,7 @@ int main(int argc, char** argv) {
 
     init_rpcs(node_cache);
 
-    init_mosquitto(mosq_host, mosq_port);
+    init_mosquitto(spinconfig_pubsub_run_mosquitto(), mosq_host, mosq_port, mosq_websocket_host, mosq_websocket_port);
     signal(SIGINT, int_handler);
 
 #ifdef USE_UBUS
@@ -471,7 +479,7 @@ int main(int argc, char** argv) {
 #endif
     rpc_cleanup();
 
-    finish_mosquitto();
+    finish_mosquitto(spinconfig_pubsub_run_mosquitto());
     clean_all_ipl();
 
     SPIN_STAT_FINISH();

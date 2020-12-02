@@ -10,10 +10,10 @@ enum configs {
     LOG_LOGLEVEL,
     PUBSUB_HOST,
     PUBSUB_PORT,
-    PUBSUB_CHANNEL_TRAFFIC,
-    PUBSUB_TIMEOUT,
     PUBSUB_WEBSOCKET_HOST,
     PUBSUB_WEBSOCKET_PORT,
+    PUBSUB_CHANNEL_TRAFFIC,
+    PUBSUB_TIMEOUT,
     PUBSUB_RUN_MOSQUITTO,
     IPTABLE_QUEUE_DNS,
     IPTABLE_QUEUE_BLOCK,
@@ -142,6 +142,14 @@ int spinconfig_pubsub_port() {
     return(spi_int(PUBSUB_PORT));
 }
 
+char *spinconfig_pubsub_websocket_host() {
+    return(spi_str(PUBSUB_WEBSOCKET_HOST));
+}
+
+int spinconfig_pubsub_websocket_port() {
+    return(spi_int(PUBSUB_WEBSOCKET_PORT));
+}
+
 char *spinconfig_pubsub_channel_traffic() {
 
     return(spi_str(PUBSUB_CHANNEL_TRAFFIC));
@@ -150,6 +158,10 @@ char *spinconfig_pubsub_channel_traffic() {
 int spinconfig_pubsub_timeout() {
 
     return(spi_int(PUBSUB_TIMEOUT));
+}
+
+int spinconfig_pubsub_run_mosquitto() {
+    return(spi_int(PUBSUB_RUN_MOSQUITTO));
 }
 
 int spinconfig_iptable_nflog_dns_group() {
