@@ -191,9 +191,7 @@ void ct_remove_capture_process(void* cp_v) {
 
 ssize_t
 read_data_from_capture_process(capture_process_t* cp, char* buf, size_t max) {
-    printf("[XX] Reading at most %lu bytes from process\n", max);
     ssize_t result = read(fileno(cp->process), buf, max);
-    printf("[XX] Read: %ld bytes\n", result);
     return result;
 }
 
@@ -206,19 +204,11 @@ ssize_t direct_capture_callback(void* ld_v, uint64_t pos, char* buf, size_t max)
     //int read;
 
     if (ld->stopped) {
-        printf("[XX] REQUEST FOR STOPPED SHOULD NOT HAPPEN\n");
-        printf("[XX] REQUEST FOR STOPPED SHOULD NOT HAPPEN\n");
-        printf("[XX] REQUEST FOR STOPPED SHOULD NOT HAPPEN\n");
-        printf("[XX] REQUEST FOR STOPPED SHOULD NOT HAPPEN\n");
-        printf("[XX] REQUEST FOR STOPPED SHOULD NOT HAPPEN\n");
-        printf("[XX] REQUEST FOR STOPPED SHOULD NOT HAPPEN\n");
         return MHD_CONTENT_READER_END_OF_STREAM;
     } else {
         /* This should go elsewhere */
-        printf("[XX] STARTING CAPTURE FOR DEVICE %s\n", ld->mac);
         char cmdline[256];
         snprintf(cmdline, 255, "tcpdump --immediate-mode -s 1600 -w - ether host %s", ld->mac);
-        printf("[XX] %s", cmdline);
         if (ld->process == NULL) {
             ld->process = popen(cmdline, "r");
         }
@@ -240,18 +230,14 @@ ssize_t direct_capture_callback(void* ld_v, uint64_t pos, char* buf, size_t max)
             if (ld->byte_count == 0) {
                 to_read = 24;
             }
-            printf("[XX] capture_callback\n");
-            printf("[XX] to read: %ld\n", to_read);
             //size_t bread = fread(buf, 1, to_read, ld->process);
             ssize_t bread = read_data_from_capture_process(ld, buf, to_read);
             if (bread == -1 && errno == EAGAIN) {
                 return 0;
             } else if (bread > 0) {
-                printf("[XX] read %lu bytes from process\n", bread);
                 ld->byte_count += bread;
                 return bread;
             } else {
-                printf("[XX] zero bytes read, process closed\n");
                 return MHD_CONTENT_READER_END_OF_STREAM;
             }
         }
@@ -286,23 +272,16 @@ void* process_mqtt_capture(void* cp_v) {
             bread = read_data_from_capture_process(cp, buf, MAX_READ);
         }
         if (bread > 0) {
-            printf("[XX] read %ld bytes from process\n", bread);
             cp->byte_count += bread;
             bytes_to_hex(hexline, buf, bread);
-            printf("[XX] first four bytes: %u %u %u %u\n", buf[0], buf[1], buf[2], buf[3]);
-            printf("[XX] first four bytes: %02x %02x %02x %02x\n", (uint8_t)buf[0], (uint8_t)buf[1], (uint8_t)buf[2], (uint8_t)buf[3]);
-            printf("[XX] PUBLISHING %s to %s\n", hexline, cp->mqtt_channel);
             int mres = mosquitto_publish(cp->mqtt_client, NULL, cp->mqtt_channel, bread*2, hexline, 0, 0);
-            printf("[XX] read %lu bytes of data; total: %d\n", bread, cp->byte_count);
             //int mres = mosquitto_loop(cp->mqtt_client, 1, 1);
-            printf("[XX] mptr: %p, mosquitto loop result: %d\n", cp->mqtt_client, mres);
         } else if (bread == -1 && errno == EAGAIN) {
             // no data just now, keep looping, unless process stopped in the meantime
             if (cp->stop != 0) {
                 break;
             }
         } else {
-            printf("[XX] zero bytes read, process seems dead\n");
             break;
         }
 
@@ -310,7 +289,6 @@ void* process_mqtt_capture(void* cp_v) {
     }
     capture_process_stop(cp);
     ct_remove_capture_process(cp);
-    printf("[XX] capture stop requested, closing\n");
     pthread_detach(pthread_self());
     return NULL;
 }
@@ -324,7 +302,6 @@ void* process_mqtt_capture(void* cp_v) {
 
 // TODO not necessary in sync connect, right?
 void my_connect_callback(struct mosquitto *mosq, void *obj, int result) {
-    printf("[XX] CONNECTED TO MOSQUITTO!\n");
 }
 
 /* returns:
@@ -355,28 +332,21 @@ tc_start_mqtt_capture_for(const char* device_mac) {
     strcat(cp->mqtt_channel, TCPDUMP_MQTT_CHANNEL);
     strcat(cp->mqtt_channel, device_mac);
 
-    printf("[XX] connecting to mosquitto with client ptr %p\n", cp->mqtt_client);
     int result = mosquitto_connect(cp->mqtt_client, TODO_MOSQ_HOST, TODO_MOSQ_PORT, TODO_MOSQ_KEEPALIVE);
     if (result != 0) {
-        printf("[XX] ERROR CONNECTING TO MOSQUITTO\n");
         ct_remove_capture_process(cp);
         return -2;
     }
-    printf("[XX] mosquitto connected: rcode %d\n", result);
     mosquitto_loop(cp->mqtt_client, -1, 1);
 
     result = mosquitto_loop_start(cp->mqtt_client);
     if (result != 0) {
-        printf("[XX] ERROR CONNECTING TO MOSQUITTO\n");
         ct_remove_capture_process(cp);
         return -2;
     }
-    printf("[XX] mosquitto loop started\n");
-
 
     char cmdline[256];
     snprintf(cmdline, 255, "tcpdump --immediate-mode -s 1600 -w - ether host %s", device_mac);
-    printf("[XX] %s", cmdline);
     if (cp->process == NULL) {
         cp->process = popen(cmdline, "r");
     }

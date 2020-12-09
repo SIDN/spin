@@ -33,7 +33,6 @@ send_jsonrpc_message_raw(const char* request) {
     size_t response_size=1024;
     char* response;// = malloc(response_size);
     const char* domain_socket_path = "/var/run/spin_rpc.sock";
-    fprintf(stdout, "[XX] Received RPC request:\n%s\n", request);
 
     struct sockaddr_un addr;
     int fd;
@@ -75,7 +74,6 @@ send_jsonrpc_message_raw(const char* request) {
     data_read = 0;
     response = malloc(response_size);
     if (response == NULL) {
-        fprintf(stderr, "[XX] out of memory\n");
         return NULL;
     }
     rc = 1;
@@ -114,7 +112,6 @@ rpcc_create_request() {
 void
 rpcc_print_json(spin_data json) {
     char *string = cJSON_Print(json);
-    fprintf(stdout, "[XX] JSON: %s\n", string);
     free(string);
 }
 

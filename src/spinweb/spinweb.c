@@ -90,7 +90,6 @@ try_file(const char* path) {
     FILE* fp;
     int rc;
 
-    fprintf(stdout, "[XX] try: %s\n", path);
     rc = stat(path, &path_stat);
     if (rc != 0) {
         return NULL;
@@ -118,30 +117,24 @@ try_files(const char* base_path, const char* path) {
     snprintf(file_path, 256, "%s%s", base_path, path);
     fp = try_file(file_path);
     if (fp != NULL) {
-        fprintf(stdout, "[XX] returning file for : %s\n", file_path);
         return fp;
     }
 
     snprintf(file_path, 256, "%s%s%s", base_path, path, ".html");
-    fprintf(stdout, "[XX] try: %s\n", file_path);
     fp = try_file(file_path);
     if (fp != NULL) {
-        fprintf(stdout, "[XX] returning file for : %s\n", file_path);
         return fp;
     }
 
     size_t path_size = strlen(path);
     if (path_size >= 0 && path[strlen(path)-1] == '/') {
         snprintf(file_path, 256, "%s%s%s", base_path, path, "index.html");
-        fprintf(stdout, "[XX] try: %s\n", file_path);
         fp = try_file(file_path);
         if (fp != NULL) {
-            fprintf(stdout, "[XX] returning file for : %s\n", file_path);
             return fp;
         }
     }
 
-    fprintf(stdout, "[XX] %s not found\n", file_path);
     return NULL;
 }
 
@@ -340,8 +333,6 @@ send_page_from_file(struct MHD_Connection *connection,
         file_size = ftell(fp);
         fseek(fp, 0, SEEK_SET);// needed for next read from beginning of file
 
-        printf("[XX] file size: %ld fp: %p\n", file_size, fp);
-
         // page will be freed by MHD (MHD_RESPMEM_MUST_FREE)
         page = malloc(file_size);
         memset(page, 0, file_size);
@@ -390,8 +381,6 @@ send_page_from_template(struct MHD_Connection *connection,
         fseek(fp, 0, SEEK_END);
         file_size = ftell(fp);
         fseek(fp, 0, SEEK_SET);// needed for next read from beginning of file
-
-        printf("[XX] file size: %ld fp: %p\n", file_size, fp);
 
         // page will be freed by MHD (MHD_RESPMEM_MUST_FREE)
         page = malloc(file_size);
@@ -468,7 +457,6 @@ answer_to_connection(void *cls,
     (void)version;           /* Unused. Silent compiler warning. */
 
     if (NULL == *con_cls) {
-        fprintf(stdout, "[XX] con_cls is NULL\n");
         /* First call, setup data structures */
         struct connection_info_struct *con_info;
 
@@ -491,10 +479,7 @@ answer_to_connection(void *cls,
         return MHD_YES;
     }
 
-    fprintf(stdout, "[XX] have postprocessor\n");
-
     if (0 == strcasecmp (method, MHD_HTTP_METHOD_GET)) {
-        fprintf(stdout, "[XX] GET URL: %s\n", url);
         // The API endpoints only accept POST for now
         if (strncmp(url, "/spin_api/jsonrpc", 18) == 0 || strncmp(url, "/spin_api/jsonrpc/", 19) == 0) {
             return send_page_from_string(connection,
@@ -502,7 +487,6 @@ answer_to_connection(void *cls,
                                          MHD_HTTP_METHOD_NOT_ALLOWED);
         } else if (strncmp(url, TEMPLATE_URL_MQTT_CAPTURE_START, strlen(TEMPLATE_URL_MQTT_CAPTURE_START)) == 0) {
             const char* device_mac = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
-            printf("[XX] START TCPDUMP FOR %s\n", device_mac);
             int result = tc_start_mqtt_capture_for(device_mac);
             if (result == 0) {
                 // Return an empty ok answer?
@@ -516,18 +500,15 @@ answer_to_connection(void *cls,
             }
         } else if (strncmp(url, TEMPLATE_URL_MQTT_CAPTURE_STOP, strlen(TEMPLATE_URL_MQTT_CAPTURE_STOP)) == 0) {
             const char* device_mac = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
-            printf("[XX] STOP TCPDUMP FOR %s\n", device_mac);
             tc_stop_capture_for(device_mac);
             // Return an empty ok answer?
             return send_page_from_string(connection,
                                          "",
                                          MHD_HTTP_OK);
         } else if (strncmp(url, TEMPLATE_URL_TCPDUMP_START, strlen(TEMPLATE_URL_TCPDUMP_START)) == 0) {
-            printf("[XX] START TCPDUMP\n");
             return tc_answer_direct_capture_request(connection, url);
         } else if (strncmp(url, TEMPLATE_URL_TCPDUMP_STOP, strlen(TEMPLATE_URL_TCPDUMP_STOP)) == 0) {
             const char* device_mac = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
-            printf("[XX] STOP TCPDUMP FOR %s\n", device_mac);
             tc_stop_capture_for(device_mac);
             // Return an empty ok answer?
             return send_page_from_string(connection,
@@ -558,7 +539,6 @@ answer_to_connection(void *cls,
             // get 1 from 'dev' parameter in query
             // need to get 2 and 3 from our tcpdump manager code
             const char* device_param = MHD_lookup_connection_value (connection, MHD_GET_ARGUMENT_KIND, "device");
-            printf("[XX] QUERY PARAMETER: %s\n", device_param);
             FILE* template_fp = try_template_files(url+9);
             return send_page_from_template(connection, template_fp, url + 9, device_param, "B", NULL);
         } else if (strncmp(url, TEMPLATE_URL_TCPDUMP_STATUS, strlen(TEMPLATE_URL_TCPDUMP_STATUS) + 1) == 0) {
@@ -589,16 +569,12 @@ answer_to_connection(void *cls,
     }
 
     if (0 == strcasecmp (method, MHD_HTTP_METHOD_POST)) {
-        fprintf(stdout, "[XX] POST URL: %s\n", url);
         struct connection_info_struct *con_info = *con_cls;
-        fprintf(stdout, "[XX] data size: %ld\n", *upload_data_size);
 
         if (0 != *upload_data_size) {
-            fprintf(stdout, "[XX] upload data size not 0\n");
             /* Upload not yet done */
             if (0 != con_info->answercode) {
                 /* we already know the answer, skip rest of upload */
-                fprintf(stdout, "[XX] done processing, send answer\n");
                 *upload_data_size = 0;
                 return MHD_YES;
             }
@@ -608,7 +584,6 @@ answer_to_connection(void *cls,
                 con_info->dynamic_answerstring = json_response;
                 con_info->answercode = MHD_HTTP_OK;
             } else {
-                fprintf(stdout, "[XX] JSON response null\n");
                 con_info->answerstring = errorpage;
                 con_info->answercode = MHD_HTTP_OK;
             }
@@ -616,8 +591,6 @@ answer_to_connection(void *cls,
 
             return MHD_YES;
         }
-
-        fprintf(stdout, "[XX] upload data size is 0, upload is done\n");
 
         if (con_info->answerstring) {
             return send_page_from_string(connection,
@@ -736,7 +709,6 @@ main(int argc, char** argv) {
                 free(interfaces);
                 interfaces = tmp;
             }
-            printf("[XX] CLI IFS: %s\n", interfaces);
             break;
         case 'p':
             port_number = atoi(optarg);
