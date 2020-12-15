@@ -5,9 +5,14 @@
     <title></title>
   </head>
   <body>
+    <link href="/spin_graph/css/bootstrap-4.3.1.min.css" rel="stylesheet" type="text/css" />
+    <link href="/spin_graph/css/bootstrap-select-1.13.14.min.css" rel="stylesheet" type="text/css" />
+
     <script type="text/javascript" src="/spin_graph/js/jquery-3.1.1.min.js" ></script>
     <script type="text/javascript" src="/spin_graph/js/jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
-    <script src="/spin_graph/js/mqttws31.js"></script>
+    <script type="text/javascript" src="/spin_graph/js/bootstrap-4.3.1.bundle.min.js"></script>
+    <script type="text/javascript" src="/spin_graph/js/bootstrap-select-1.13.14.min.js"></script>
+    <script type="text/javascript" src="/spin_graph/js/mqttws31.js"></script>
 <div>
     <div id="capture">
         <div class="section section-top">
@@ -21,7 +26,7 @@
                         &nbsp;
                     </td>
                     <td nowrap="nowrap" style="spacing:0px 0px 0px 0px;;padding:0px 0px 0px 0px;">
-                        <button id="$capture_close" style="spacing:0px 0px 0px 0px;;padding:0px 0px 0px 0px;">Close window</button>
+                        <button class="btn btn-sm btn-secondary" id="$capture_close">Close window</button>
                     </td>
                 </tr>
             </table>
@@ -48,7 +53,7 @@
 
         <div class="section section-bottom">
             <div align="right">
-            <button id="$capture_startstop">Start capture</button>
+            <button class="btn btn-sm btn-secondary" id="$capture_startstop">Start capture</button>
             </div>
             <table>
                 <tr>
@@ -71,7 +76,7 @@
                 </tr>
             </table>
             <div align="right">
-                <button disabled id="$capture_save">Download captured data</button>
+                <button class="btn btn-sm btn-secondary" disabled id="$capture_save">Download captured data</button>
             </div>
         </div>
 
@@ -84,7 +89,7 @@
         </div>
         <div class="section2 section2">
             <center>
-                <button disabled id="$capture_upload">Upload captured data to SIDN</button>
+                <button class="btn btn-sm btn-secondary" disabled id="$capture_upload">Upload captured data to SIDN</button>
             </center>
         </div>
         <div class="section2 section2-bottom">
@@ -104,7 +109,7 @@
                         &nbsp;
                     </td>
                     <td nowrap="nowrap">
-                        <button id="$upload_back">Back to capture</button>
+                        <button class="btn btn-sm btn-secondary" id="$upload_back">Back to capture</button>
                     </td>
                 </tr>
             </table>
@@ -116,18 +121,55 @@
         </div>
         <div class="section">
             <table>
-                <tr>
-                    <td>Device type</td>
-                    <td><input id="$upload_device_type" type="textfield" name="text1" value="" /></td>
-                </tr>
-                <tr>
-                    <td>Device brand</td>
-                    <td><input id="$upload_device_brand" type="textfield" name="text1" value="" /></td>
-                </tr>
-                <tr>
-                    <td>Device name</td>
-                    <td><input id="$upload_device_name" type="textfield" name="text1" value="" /></td>
-                </tr>
+    <tr>
+      <td>
+        <label>Device name:</label>
+      </td>
+      <td style="text-align: left;">
+        <input id="device_name" type="text" onkeyup="clearError('device_name');"/></input>
+        <label id="device_name_error" style="color: red;"></label>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <label>Device type:</label>
+      </td>
+      <td style="text-align: left;">
+        <input id="device_type" placeholder="Click to see suggestions" type="text" onkeyup="clearError('device_type');" data-toggle="dropdown"/></input>
+        <label id="device_type_error" style="color: red;"></label>
+        <ul class="dropdown-menu" role="menu" aria-labelledby="device_type" id="device_type_suggestions">
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <label>Device brand:</label>
+      </td>
+      <td style="text-align: left;">
+        <input id="device_brand" placeholder="Click to see suggestions" type="text" onkeyup="clearError('device_brand');" data-toggle="dropdown"/></input>
+        <label id="device_brand_error" style="color: red;"></label>
+        <ul class="dropdown-menu" role="menu" aria-labelledby="device_brand" id="device_brand_suggestions">
+        </ul>
+      </td>
+    </tr>
+
+    <tr>
+        <td>Environment</td>
+        <td style="text-align: left;">
+            <input type="text" placeholder="Click to see suggestions" id="environment" data-toggle="dropdown">
+            <ul class="dropdown-menu" role="menu" aria-labelledby="environment" id="environment_suggestions">
+            </ul>
+        </td>
+    </tr>
+
+    <tr>
+        <td>Activity</td>
+        <td style="text-align: left;">
+            <input type="text" placeholder="Click to see suggestions" id="activity" data-toggle="dropdown">
+            <ul class="dropdown-menu" role="menu" aria-labelledby="activity" id="activity_suggestions">
+            </ul>
+        </td>
+    </tr>
             </table>
         </div>
         <div class="section">
@@ -136,7 +178,7 @@
         </div>
         <div class="section section-bottom">
             <div align="right">
-                <button id="$upload_upload">Upload captured data</button>
+                <button class="btn btn-sm btn-secondary" id="$submitButton">Upload captured data</button>
             </div>
         </div>
     </div>
@@ -219,7 +261,6 @@ function download(filename) {
 
 $capture_save.onclick = () => {
     if (receivedBytes.length > 0) {
-        //download('test.pcap');
         let filename = "_TEMPLATE_ARG0__" + statusStartedAt
         filename = filename.replace(/:/g, "-")
         filename = filename.replace(/\s/g, "_")
@@ -250,6 +291,7 @@ $capture_startstop.onclick = evt => {
 }
 
 $capture_upload.onclick = evt => {
+    loadSuggestionData();
     $( "#capture" ).toggle();
     $( "#upload" ).toggle();
     resizeWindow("upload");
@@ -261,9 +303,20 @@ $upload_back.onclick = evt => {
     resizeWindow("capture");
 }
 
-$upload_upload.onclick = evt => {
-    uploadData();
+$submitButton.onclick = evt => {
+    disableSubmit();
+    $("#greyOut").toggle();
+    $("#notice").toggle();
+    try {
+        sendFileAndForm(btoa(String.fromCharCode.apply(null, receivedBytes)));
+    } catch (error) {
+        console.error(error);
+    }
+    enableSubmit();
+    $("#greyOut").toggle();
+    $("#notice").toggle();
 }
+
 
 function uploadData() {
     post_data = {
@@ -346,7 +399,8 @@ function updateUIData() {
         $capture_save.disabled = false
         $capture_upload.disabled = false
     } else {
-        $capture_upload.disabled = true
+        //$capture_upload.disabled = true
+        $capture_upload.disabled = false
     }
     $statusByteCountField.innerHTML=statusByteCount
     var dt = new Date();
@@ -444,6 +498,234 @@ function connectToMQTT() {
 }
 
     </script>
+<!-- Code below as taken from spin.sidnlabs.nl -->
+<script>
+const apiUrl = "https://spin.sidnlabs.nl/api/v1/";
+var disabled = false;
+
+function disableSubmit() {
+  disabled = true
+  $submitButton.disabled = true;
+}
+
+function enableSubmit() {
+  disabled = false;
+  $submitButton.disabled = false;
+}
+
+function clearError(field) {
+  let el = document.getElementById(field + "_error");
+  if (el) {
+    el.innerHTML = "";
+  }
+}
+
+function clearAllErrors() {
+  clearError("general");
+  clearError("file");
+  clearError("device_type");
+  clearError("device_brand");
+  clearError("device_name");
+  clearError("additional_information");
+  clearError("public");
+  clearError("user_consent");
+}
+
+function setError(field, error) {
+  let el = document.getElementById(field + "_error");
+  if (el) {
+    el.innerHTML += error + "<br />"
+  } else {
+    el = document.getElementById("general_error");
+    el.innerHTML += field + ": " + error + "<br />"
+  }
+}
+
+function processErrors(data) {
+  let fields = Object.keys(data);
+  for (let i=0; i<fields.length; i++) {
+    let field = fields[i];
+    setError(field, data[field]);
+  }
+}
+
+function littleEndian() {
+    let uInt32 = new Uint32Array([0x11223344]);
+    let uInt8 = new Uint8Array(uInt32.buffer);
+    if(uInt8[0] === 0x44) {
+        return true;
+    } else if (uInt8[0] === 0x11) {
+        return false;
+    }
+}
+
+function isPcapFile(bytes) {
+    if (bytes.length < 24) {
+        console.error("Data buffer too small to be a pcap file");
+        return false;
+    }
+    if (littleEndian()) {
+        return (
+            (bytes[0].charCodeAt(0) == 0xd4 &&
+             bytes[1].charCodeAt(0) == 0xc3 &&
+             bytes[2].charCodeAt(0) == 0xb2 &&
+             bytes[3].charCodeAt(0) == 0xa1) ||
+            (bytes[0].charCodeAt(0) == 0xa1 &&
+             bytes[1].charCodeAt(0) == 0xb2 &&
+             bytes[2].charCodeAt(0) == 0xc3 &&
+             bytes[3].charCodeAt(0) == 0xd4) ||
+            (bytes[0].charCodeAt(0) == 0x0a &&
+             bytes[1].charCodeAt(0) == 0x0d &&
+             bytes[2].charCodeAt(0) == 0x0d &&
+             bytes[3].charCodeAt(0) == 0x0a)
+        )
+    } else {
+        return (
+            (bytes[0].charCodeAt(0) == 0xc3 &&
+             bytes[1].charCodeAt(0) == 0xd4 &&
+             bytes[2].charCodeAt(0) == 0xa1 &&
+             bytes[3].charCodeAt(0) == 0xb2) ||
+            (bytes[0].charCodeAt(0) == 0xb2 &&
+             bytes[1].charCodeAt(0) == 0xa1 &&
+             bytes[2].charCodeAt(0) == 0xd4 &&
+             bytes[3].charCodeAt(0) == 0xc3) ||
+            (bytes[0].charCodeAt(0) == 0x0d &&
+             bytes[1].charCodeAt(0) == 0x0a &&
+             bytes[2].charCodeAt(0) == 0x0a &&
+             bytes[3].charCodeAt(0) == 0x0d)
+        )
+    }
+}
+
+function uploadFile(event) {
+    if (disabled) {
+      return false;
+    }
+    disableSubmit();
+    clearAllErrors();
+    var file = document.getElementById("file").files[0];
+    if (!file) {
+      setError("file", "No file specified");
+      enableSubmit();
+      return false;
+    }
+    var reader = new FileReader();
+    reader.readAsBinaryString(file);
+
+    reader.onload = function() {
+        if (isPcapFile(reader.result)) {
+            sendFileAndForm(btoa(reader.result));
+        } else {
+            setError("file", "You can only upload PCAP files (the MIME type of this file is: " + file.type + ")");
+        }
+    };
+    reader.onerror = function() {
+        console.log('there are some problems');
+    };
+    enableSubmit();
+    return false;
+}
+
+function getCookie(name) {
+  if (!document.cookie) {
+    return null;
+  }
+
+  const xsrfCookies = document.cookie.split(';')
+    .map(c => c.trim())
+    .filter(c => c.startsWith(name + '='));
+
+  if (xsrfCookies.length === 0) {
+    return null;
+  }
+  return decodeURIComponent(xsrfCookies[0].split('=')[1]);
+}
+
+function sendFileAndForm(file_data) {
+  let formData = new FormData();
+  let device_type = document.getElementById("device_type").value;
+  //let file = document.getElementById("file").files[0];
+  formData.append("pcap_data", file_data);
+  formData.append("device_type", document.getElementById("device_type").value);
+  formData.append("device_brand", document.getElementById("device_brand").value);
+  formData.append("device_name", document.getElementById("device_name").value);
+  formData.append("environment", document.getElementById("environment").value);
+  formData.append("activity", document.getElementById("activity").value);
+  formData.append("additional_information", $upload_additional_info.value);
+  // 'public' flag currently set both 'public' (viewable by all) and 'indexed' (show in overview)
+  //formData.append("public", document.getElementById("public").checked);
+  //formData.append("indexed", document.getElementById("public").checked);
+  //formData.append("user_consent", document.getElementById("user_consent").checked);
+  //formData.append("csrfmiddlewaretoken", getCookie('csrftoken'));
+  formData.append("public", $upload_consent.value);
+  formData.append("indexed", $upload_consent.value);
+  formData.append("user_consent", $upload_consent.value);
+
+  //formData.append("pcap_data", file);
+  fetch(apiUrl + "pcaps/upload/", {method: "POST", body: formData}).then((response)=>{
+    if ((response.status) == 201) {
+      response.json().then((data) => {
+        window.open("https://spin.sidnlabs.nl/en/pcaps/analysis/?uuid=" + data['uuid'], "_blank")
+        alert('Data uploaded!\n\nThank you for your contribution.');
+      }).catch((error) => {
+        enableSubmit();
+        alert(JSON.stringify(error, null, 2));
+      })
+    } else if (response.status == 400) {
+      response.text().then((data) => {
+        try {
+          let json = JSON.parse(data);
+          processErrors(json);
+        } catch {
+          alert("Error: " + data);
+        }
+        enableSubmit();
+      });
+    } else {
+      alert("Unknown response from server: " + response.status);
+    }
+  }).catch((error)=>{
+    enableSubmit();
+    console.error(error);
+    alert('error: ' + error);
+  });
+
+  return false;
+}
+
+function suggestionSelected(field, value) {
+    $('#' + field).val(value);
+}
+
+function updateSuggestions(field, items) {
+    console.log("[XX] updateSuggestions called for " + field + " with " + items);
+    let select = $('#' + field + '_suggestions');
+    $.each(items, function (i, item) {
+        console.log("[XX] appending " + item + " to " + select);
+        select.append('<li class="suggestion-select" onclick="suggestionSelected(\''+field+'\', \''+item+'\')">' + item + '</li');
+    });
+}
+
+function loadSuggestionData() {
+    let loadURL = new URL(apiUrl + "pcaps/selections")
+    $.getJSON( loadURL, function( data ) {
+        console.log(JSON.stringify(data));
+        $.each( data, function( key, val ) {
+            console.log("[XX] calling updateSuggestions for " + key + " with " + val);
+            updateSuggestions(key, val);
+        });
+    });
+}
+
+// Disabled in this version, only load suggestions if user clicks 'upload captured data'
+//$(document).ready(function() {
+//    //$('.selectpicker').selectpicker();
+//    loadSuggestionData();
+//});
+
+</script>
+
+
   </body>
 
 <style>
@@ -539,6 +821,16 @@ function connectToMQTT() {
     top: 0px;
     left: 0px;
     display: none;
+}
+
+.suggestion-select {
+    cursor: pointer;
+    transition: 0.5s;
+}
+.suggestion-select:hover {
+    cursor: pointer;
+    background-color: lightgray;
+    transition: 0.5s;
 }
 
 </style>
