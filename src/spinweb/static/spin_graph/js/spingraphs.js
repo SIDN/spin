@@ -362,7 +362,6 @@ function initGraphs() {
                 "Remove Ignores": function() {
                     $("#filter-list .ui-selected", this).each(function() {
                         // The inner text contains the name of the filter
-                        //alertWithObject("[XX] selected:", this);
                         var address;
                         if (this.innerText) {
                             sendRPCCommand("remove_iplist_ip", { "list": "ignore", "ip": this.innerText });
@@ -403,7 +402,6 @@ function initGraphs() {
                 "Remove Blocks": function() {
                     $("#block-list .ui-selected", this).each(function() {
                         // The inner text contains the name of the block
-                        //alertWithObject("[XX] selected:", this);
                         var address;
                         if (this.innerText) {
                             sendRPCCommand("remove_iplist_ip", { "list": "block", "ip": this.innerText });
@@ -441,7 +439,6 @@ function initGraphs() {
                 "Remove Allowed": function() {
                     $("#allowed-list .ui-selected", this).each(function() {
                         // The inner text contains the name of the block
-                        //alertWithObject("[XX] selected:", this);
                         var address;
                         if (this.innerText) {
                             sendRPCCommand("remove_iplist_ip", { "list": "allow", "ip": this.innerText });
@@ -714,7 +711,6 @@ function updateEdgeInfo(edgeId) {
 }
 
 function edgeSelected(event) {
-    console.log("[XX] edgeSelected event");
     selectedEdgeId = event.edges[0];
     updateEdgeInfo(selectedEdgeId);
     $("#flowinfo").dialog('open');
@@ -722,23 +718,19 @@ function edgeSelected(event) {
 
 function edgeDeselected(event) {
     selectedEdgeId = 0;
-    console.log("[XX] edgedeSelected event");
     $("#flowinfo").dialog('close');
 }
 
 function nodeDeselected(event) {
     selectedNodeId = 0;
-    console.log("[XX] nodeDeselected event");
     $("#nodeinfo").dialog('close');
 }
 
 function updateNodeData(data) {
     handleNodeInfo(data);
-    console.log("[XX] " + JSON.stringify(data));
 }
 
 function nodeSelected(event) {
-    console.log("[XX] nodeSelected event");
     var nodeId = event.nodes[0];
     if (typeof(nodeId) == 'number' && selectedNodeId != nodeId) {
         var node = updateNodeInfo(nodeId);
@@ -963,29 +955,70 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
     }
 }
 
+
+function getServiceForPort(port) {
+    // Remember to include port_services.js for this to work
+    let service = get_port_service(port);
+    if (service) {
+        return service;
+    } else {
+        return port.toString();
+    }
+}
+
 // Used in AddFlow()
-function addEdge(from, to, colour, blocked) {
+function addEdge(from, to, colour, blocked, dest_port) {
     var existing = edges.get({
         filter: function(item) {
             return (item.from == from.id && item.to == to.id);
         }
     });
     if (existing.length == 0) {
+        let dest_ports = {}
+        let dest_ports_str = null;
+        if (dest_port) {
+            dest_ports[dest_port] = true;
+            dest_ports_str = getServiceForPort(dest_port);
+        }
         edges.add({
             id: curEdgeId,
             from: from.id,
             to: to.id,
             color: {color: colour},
-            blocked: blocked
+            blocked: blocked,
+            label: dest_ports_str,
+            dest_ports: dest_ports
         });
         curEdgeId += 1;
-    } else if (existing[0].color.color != colour) {
-        // If color changed, update it!
-        existing[0].color = {color: colour};
-        if (blocked !== undefined) {
-            existing[0].blocked = blocked;
+    } else {
+        let edge = existing[0];
+        if (edge.color.color != colour) {
+            // If color changed, update it!
+            edge.color = {color: colour};
+            if (blocked !== undefined) {
+                edge.blocked = blocked;
+            }
+            edges.update(edge);
         }
-        edges.update(existing[0]);
+        if (dest_port) {
+            let dest_ports = {};
+            if (edge.dest_ports) {
+                dest_ports = edge.dest_ports;
+            }
+            if (!dest_ports[dest_port]) {
+                dest_ports[dest_port] = true;
+                let dest_ports_str = "";
+                for (let key in dest_ports) {
+                    if (dest_ports_str != "") {
+                        dest_ports_str += ", ";
+                    }
+                    dest_ports_str += getServiceForPort(key);
+                }
+                edge.dest_ports = dest_ports;
+                edge.label = dest_ports_str;
+                edges.update(edge);
+            }
+        }
     }
 }
 
@@ -1070,11 +1103,7 @@ function contains(l, e) {
 }
 
 // Used in spinsocket.js
-function addFlow(timestamp, from, to, count, size) {
-    // there may be some residual additions from a recently added
-    // filter, so ignore those
-
-    // TODO ignore for now, data structure of from and to changed
+function addFlow(timestamp, from, to, count, size, dest_port) {
     for (var i = 0; i < to.ips.length; i++) {
       var ip = to.ips[i];
       if (contains(ignoreList, ip)) {
@@ -1089,7 +1118,7 @@ function addFlow(timestamp, from, to, count, size) {
     }
     addNode(timestamp, from, false, count, size, "to " + to, "source");
     addNode(timestamp, to, true, count, size, "from " + from, "traffic");
-    addEdge(from, to, colour_edge, false);
+    addEdge(from, to, colour_edge, false, dest_port);
     if (!zoom_locked) {
         network.fit({
             duration: 0
@@ -1103,7 +1132,6 @@ function addBlocked(from, to) {
     }
     // Calculate the 'lastseen' timestamp from our own clock
     var timestamp = Math.floor(Date.now() / 1000);
-    console.log("[XX] ADDBLOCKED FROM: " + from.id + " ts: " + timestamp)
     addNode(timestamp, from, false, 1, 1, "to " + to, "source");
     addNode(timestamp, to, false, 1, 1, "from " + from, "blocked");
     addEdge(from, to, colour_blocked, true);
@@ -1168,15 +1196,12 @@ function updateBlockedNodes() {
         var node = nodes.get(ids[i]);
         if ("ips" in node) {
             for (var j = 0; j < node.ips.length; j++) {
-                //filterList.push(node.ips[j]);
                 if (contains(blockList, node.ips[j])) {
-                    //alert("[XX] node " + i + " with ips: " + node.ips + "in block list!");
                     if  (!node.is_blocked) {
                         node.is_blocked = true;
                         nodes.update(node);
                     }
                 } else {
-                    //alert("[XX] node " + i + " with ips: " + node.ips + "not in block list");
                     if  (node.is_blocked) {
                         node.is_blocked = false;
                         nodes.update(node);
@@ -1193,15 +1218,12 @@ function updateAllowedNodes() {
         var node = nodes.get(ids[i]);
         if ("ips" in node) {
             for (var j = 0; j < node.ips.length; j++) {
-                //filterList.push(node.ips[j]);
                 if (contains(allowedList, node.ips[j])) {
-                    //alert("[XX] node " + i + " with ips: " + node.ips + "in allowed list!");
                     if  (!node.is_excepted) {
                         node.is_excepted = true;
                         nodes.update(node);
                     }
                 } else {
-                    //alert("[XX] node " + i + " with ips: " + node.ips + "not in allowed list");
                     if  (node.is_excepted) {
                         node.is_excepted = false;
                         nodes.update(node);

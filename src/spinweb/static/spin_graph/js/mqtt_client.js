@@ -120,14 +120,16 @@ function sendRPCCommand(procedure, params, success_callback, retry_count=0) {
     //xhttp.onerror = sendRPCCommandError;
     xhttp.onload = function () {
         //alert("[XX] status: " + xhttp.status);
-	if (xhttp.status === 502 && retry_count < 10) {
-	    // This may be just a timeout or a proxy short read
-	    // let's simply try again
-	    sendRPCCommand(procedure, params, success_callback, retry_count+1);
+        if (xhttp.status === 502 && retry_count < 10) {
+            // This may be just a timeout or a proxy short read
+            // let's simply try again
+            sendRPCCommand(procedure, params, success_callback, retry_count+1);
         } else if (xhttp.status !== 200) {
             alert("HTTP error " + xhttp.status + " from SPIN RPC server!");
             console.log(xhttp.response);
         } else {
+            console.log("XHTTP response:");
+            console.log(xhttp.response);
             let response = JSON.parse(xhttp.response)
             if (response.error) {
                 alert("JSON-RPC error from SPIN RPC server: " + xhttp.response);
@@ -369,9 +371,10 @@ function handleTrafficMessage(data) {
             // New version of protocol: if from_node or to_node is numeric, load from cache
             var from_node = getNodeInfo(f['from']);
             var to_node = getNodeInfo(f['to']);
+            //alert(JSON.stringify(f))
 
             if (from_node != null && to_node != null && from_node && to_node) {
-                addFlow(timestamp + time_sync, from_node, to_node, f['count'], f['size']);
+                addFlow(timestamp + time_sync, from_node, to_node, f['count'], f['size'], f['to_port']);
             } else {
                 console.error("partial message: " + JSON.stringify(data))
             }

@@ -72,6 +72,8 @@ struct connection_info_struct {
 
 const char* errorpage =
   "<html><body>This doesn't seem to be right.</body></html>";
+const char* rpcerrorpage =
+  "<html><body>Error trying to contact RPC server on spinweb host.</body></html>";
 const char* jsonpage =
   "<html><body>No response from JSON-RPC, please try again.</body></html>";
 const char* notfounderror =
@@ -317,17 +319,6 @@ send_redirect_add_slash(struct MHD_Connection *connection,
     return ret;
 }
 
-static int
-endswith(const char *str, const char *suffix)
-{
-    if (!str || !suffix)
-        return 0;
-    size_t lenstr = strlen(str);
-    size_t lensuffix = strlen(suffix);
-    if (lensuffix >  lenstr)
-        return 0;
-    return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
-}
 
 static int
 send_page_from_file(struct MHD_Connection *connection,
@@ -350,18 +341,10 @@ send_page_from_file(struct MHD_Connection *connection,
         fread(page, file_size, 1, fp);
 
         fclose(fp);
-        printf("[XX] SERVING FILE: '%s'\n", url);
 
         response = MHD_create_response_from_buffer (file_size,
                                                     (void*) page,
                                                     MHD_RESPMEM_MUST_FREE);
-
-        if (endswith(url, ".css")) {
-            MHD_add_response_header (response, "Content-Type", "text/css");
-        } else if (endswith(url, ".js")) {
-            MHD_add_response_header (response, "Content-Type", "text/javascript");
-        }
-
         ret = MHD_queue_response(connection,
                                  MHD_HTTP_OK,
                                  response);
@@ -603,7 +586,7 @@ answer_to_connection(void *cls,
                 con_info->dynamic_answerstring = json_response;
                 con_info->answercode = MHD_HTTP_OK;
             } else {
-                con_info->answerstring = errorpage;
+                con_info->answerstring = rpcerrorpage;
                 con_info->answercode = MHD_HTTP_OK;
             }
             *upload_data_size = 0;
