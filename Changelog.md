@@ -1,7 +1,25 @@
 # Changelog
 
 ## Upcoming
-* Replaced the lua-based web api with spinweb, based on libmicrohttpd
+* SPIN is now, by default, directly reachable on port 13026, rather that
+  needing a reverse proxy for handling web traffic. It is still advisable
+  to set one up yourself, to add TLS support and other security.
+* Added the SPIN Pcap Reader functionality
+* Added a 'passive mode', where SPIN does not modify firewall rules
+* The 'bubble app' now shows labels edges with the services or destination
+  ports of the traffic, such as 'ntp' or 'https'. This is based on the
+  destination port number, and SPIN does not inspect whether the traffic
+  actually matches the service. For instance, all traffic on port 443 is
+  shown as 'https'.
+* Replaced the lua-based web API to control the SPIN daemon with an
+  internal libmicrohttpd-based implementation. This eases initial
+  configuration and reduces the dependencies of the package, while
+  still allowing optional additional security features through a
+  (manually configured) http frontend such as nginx or apache
+* SPIN can now automatically start mosquitto if necessary
+* SPIN can now automatically load conntrack kernel modules and enable
+  IP Accounting
+* Fixed a compilation issue when using Clang
 
 ## [0.11] (2020-01-29)
 * Added '-c' option to spind for specifying a configuration file
