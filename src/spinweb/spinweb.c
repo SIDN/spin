@@ -530,10 +530,13 @@ answer_to_connection(void *cls,
             char* device_name = rpcc_get_device_name(device);
             char* device_ips = rpcc_get_device_ips_as_string(device);
             FILE* template_fp = try_template_files(url+9);
+
             int result = send_page_from_template(connection, template_fp, url + 9, device_name, device_mac, device_ips, NULL);
+
             free(device_name);
             free(device_ips);
             spin_data_delete(device);
+
             return result;
         } else if (strncmp(url, TEMPLATE_URL_TCPDUMP, strlen(TEMPLATE_URL_TCPDUMP) + 1) == 0) {
             // Template args:

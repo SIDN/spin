@@ -69,7 +69,6 @@ send_jsonrpc_message_raw(const char* request) {
         }
         data_read += rc;
     }
-    fprintf(stdout, "Message written, reading response\n");
 
     data_read = 0;
     response = malloc(response_size);
@@ -198,8 +197,8 @@ char* rpcc_get_device_ips_as_string(spin_data device) {
 
     cJSON* cur_device_ips = cJSON_GetObjectItem(device, "ips");
     if (cur_device_ips != NULL) {
-        // ip max len is 16, add 2 for comma separator
-        ips_string = malloc(18*cJSON_GetArraySize(cur_device_ips));
+        // ip(v6) max string len is 46, add 2 for comma separator
+        ips_string = malloc(48*cJSON_GetArraySize(cur_device_ips));
         ips_string[0] = '\0';
         cJSON_ArrayForEach(ip, cur_device_ips) {
             if (ips_string[0] != '\0') {
