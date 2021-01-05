@@ -1,6 +1,6 @@
 # Changelog
 
-## Upcoming
+## [0.12] (2020-01-05)
 * SPIN is now, by default, directly reachable on port 13026, rather that
   needing a reverse proxy for handling web traffic. It is still advisable
   to set one up yourself, to add TLS support and other security.
