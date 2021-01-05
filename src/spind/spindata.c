@@ -158,10 +158,8 @@ static node_t *lookup_ip(node_cache_t *node_cache, ip_t *ip, pkt_info_t *pkt_inf
     result = node_cache_find_by_ip(node_cache, ip);
     if (result == NULL) {
         char pkt_str[1024];
-        spin_log(LOG_ERR, "[XX] ERROR! %s node not found in cache!\n", sd);
+        spin_log(LOG_ERR, "%s node not found in cache!\n", sd);
         pktinfo2str(pkt_str, pkt_info, 1024);
-        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
-        spin_log(LOG_DEBUG, "[XX] node cache:\n");
         node_cache_print(node_cache);
         return 0;
     }
@@ -224,29 +222,23 @@ spin_data_dns_query_pkt_info(node_cache_t* node_cache, dns_pkt_info_t* dns_pkt_i
 
     copy_ip_data(&ip, dns_pkt_info->family, 0, dns_pkt_info->ip);
 
-    spin_log(LOG_DEBUG, "[XX] creating dns query command\n");
-
     dns_node = node_cache_find_by_domain(node_cache, dname_str);
     if (dns_node == NULL) {
-        // something went wrong, we should have just added t
+        // something went wrong, we should have just added it
         char pkt_str[1024];
-        spin_log(LOG_ERR, "[XX] ERROR! DNS node not found in cache!\n");
+        spin_log(LOG_ERR, "DNS node not found in cache for domain name %s!\n", dname_str);
         dns_pktinfo2str(pkt_str, dns_pkt_info, 1024);
-        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
-        spin_log(LOG_DEBUG, "[XX] node cache:\n");
-        node_cache_print(node_cache);
+        spin_log(LOG_ERR, "Packet info: %s", pkt_str);
         return 0;
     }
 
     src_node = node_cache_find_by_ip(node_cache, &ip);
     if (src_node == NULL) {
-        printf("[XX] error, src node not found in cache");
+        printf("src node not found in cache for ip");
         char pkt_str[1024];
-        spin_log(LOG_ERR, "[XX] ERROR! src node not found in cache!\n");
+        spin_log(LOG_ERR, "src node not found in cache!\n");
         dns_pktinfo2str(pkt_str, dns_pkt_info, 1024);
-        spin_log(LOG_DEBUG, "[XX] pktinfo: %s\n", pkt_str);
-        spin_log(LOG_DEBUG, "[XX] node cache:\n");
-        node_cache_print(node_cache);
+        spin_log(LOG_ERR, "Packet info: %s", pkt_str);
         return 0;
     }
 

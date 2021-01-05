@@ -123,7 +123,6 @@ decode_node_info(char *data, int datalen) {
     if (!cJSON_IsString(mac_json)) {
         spin_log(LOG_DEBUG, "No mac in node\n");
     } else {
-        spin_log(LOG_INFO, "[XX] NODE_SET_MAC 5\n");
         node_set_mac(newnode, mac_json->valuestring);
     }
 
@@ -533,10 +532,9 @@ set_device_name_func(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
     char* node_name = args[1].rpca_svalue;
     tree_entry_t* ip_entry;
 
-    spin_log(LOG_DEBUG, "[XX] RPC SET NAME OF NODE %d TO %s\n", node_id, node_name);
     node = node_cache_find_by_id(node_cache, node_id);
     if (node == NULL) {
-        spin_log(LOG_DEBUG, "[XX] NODE %d NOT FOUND\n", node_id);
+        spin_log(LOG_DEBUG, "Node %d not found\n", node_id);
         result->rpca_svalue = "Unknown node id";
         return -1;
     }
@@ -558,7 +556,6 @@ set_device_name_func(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
     }
 
     node_names_write_userconfig(node_cache->names, "/etc/spin/names.conf");
-    spin_log(LOG_DEBUG, "[XX] NAME SET\n");
     return 0;
 }
 
@@ -772,13 +769,9 @@ int
 rpc_dots_signal(void* cb, rpc_arg_val_t *args, rpc_arg_val_t *result) {
     node_cache_t* node_cache = (node_cache_t*)cb;
     spin_data message = args[0].rpca_cvalue;
-    char* strxx = args[0].rpca_svalue;
-    int ixx = args[0].rpca_ivalue;
-    spin_log(LOG_DEBUG, "[XX] other vals: s %s i %i\n", strxx, ixx);
 
     int rcode;
     char* error = NULL;
-    // TODO: prepare response message and pass it along
 
     rcode = process_dots_signal(node_cache, message, &error);
     if (error != NULL) {

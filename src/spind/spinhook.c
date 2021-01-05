@@ -167,8 +167,6 @@ device_flow_remove(node_cache_t *node_cache, tree_t *ftree, tree_entry_t* leaf) 
 
     // This also frees key and data
     tree_remove_entry(ftree, leaf);
-    // XXXXX TODO: did we own this?
-    //free(flow_key);
 
     STAT_VALUE(ctr, 1);
 }

@@ -42,7 +42,6 @@ rpc_list_registered_procedures(void *cb, rpc_arg_val_t *args, rpc_arg_val_t *res
     int i;
 
     rpctree = (tree_t *) cb;
-    printf("[XX] 2FUNCTREE AT %p\n", rpctree);
 
     arobj = cJSON_CreateArray();
     cur = tree_first(rpctree);

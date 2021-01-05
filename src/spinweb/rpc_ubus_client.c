@@ -47,8 +47,6 @@ send_ubus_message_raw(const char* request) {
     cJSON* json_request;
     char* params_str;
 
-    //fprintf(stdout, "[XX] RPC Request to send to UBUS: %s\n", request);
-
     // The received request is a JSONRPC request
     // {"jsonrpc": "2.0", "id": 34154, "method": "list_devices", "params": {"a": "b"}}
     //

@@ -747,7 +747,7 @@ main(int argc, char** argv) {
             // Stop all running capture processes, and wait for them to end
             tc_stop_all_captures();
             while (tc_captures_running() > 0) {
-                //printf("[XX] Captures running: %d\n", tc_captures_running());
+                sleep(1);
             }
             for (int i=0; i<daemon_count; i++) {
                 MHD_stop_daemon(daemons[i]);

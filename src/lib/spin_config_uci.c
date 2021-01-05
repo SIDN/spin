@@ -99,7 +99,7 @@ int get_config_entries(const char* config_file, int must_exist) {
     char *equalsptr;
     struct stat file_stat;
 
-    fprintf(stderr, "[XX] opening file: %s\n", config_file);
+    spin_log(LOG_INFO, "Reading config file: %s\n", config_file);
     if (stat(config_file, &file_stat) != 0) {
         config_read_error(must_exist, "Config file %s does not exist\n", config_file);
         return 1;

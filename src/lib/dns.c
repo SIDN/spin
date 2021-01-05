@@ -128,7 +128,6 @@ handle_dns_answer(const struct handle_dns_ctx *ctx, const u_char *bp, u_int leng
     i = 0;
     rr = ldns_rr_list_pop_rr(answers);
     while (rr && i < ips_len) {
-        // XXX TTL ldns_rr_ttl
         rdf = ldns_rr_rdf(rr, 0);
         s = ldns_rdf2str(rdf);
         if (!s) {

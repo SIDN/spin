@@ -351,7 +351,6 @@ int main(int argc, char** argv) {
 #endif
             break;
         case 'l':
-            spin_log(LOG_INFO, "Running in local mode; traffic without either entry in arp cache will be shown too\n");
             local_mode = 1;
             break;
         case 'm':
@@ -370,9 +369,6 @@ int main(int argc, char** argv) {
             spin_log_init(0, log_verbosity, "spind");
             break;
         case 'P':
-            // XXX: call to spin_log() before calling spin_log_init(), see
-            // issue 70.
-            spin_log(LOG_INFO, "Passive mode enabled\n");
             passive_mode = 1;
             break;
         case 'p':
@@ -423,8 +419,14 @@ int main(int argc, char** argv) {
         exit(1);
     }
 #endif
-
     log_version();
+
+    if (local_mode) {
+        spin_log(LOG_INFO, "Running in local mode; traffic without either entry in arp cache will be shown too\n");
+    }
+    if (passive_mode) {
+        spin_log(LOG_INFO, "Passive mode enabled\n");
+    }
 
     SPIN_STAT_START();
 

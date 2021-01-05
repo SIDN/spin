@@ -238,19 +238,18 @@ int mosquitto_start_server(const char* host, int port, const char* websocket_hos
 }
 
 void mosquitto_stop_server() {
-    printf("[XX] stopping mosquitto\n");
+    spin_log(LOG_INFO, "Stopping mosquitto server");
     kill(mosq_pid, SIGTERM);
     sleep(2);
     kill(mosq_pid, SIGKILL);
-    printf("[XX] mosquitto stopped\n");
+    spin_log(LOG_INFO, "Mosquitto server has been stopped");
 }
 
 void init_mosquitto(int start_own_instance, const char* host, int port, const char* websocket_host, int websocket_port) {
     int object;
-    printf("[XX] INIT MOSQ\n");
-    fflush(stdout);
 
     if (start_own_instance) {
+        spin_log(LOG_INFO, "Starting mosquitto server");
         mosquitto_start_server(host, port, websocket_host, websocket_port);
     }
 

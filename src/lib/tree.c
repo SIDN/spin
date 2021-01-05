@@ -10,7 +10,6 @@ tree_entry_create(size_t key_size, void* key, size_t data_size, void* data, int 
 
     if (copy) {
         tree_entry->key = malloc(key_size);
-        //spin_log(LOG_DEBUG, "[XX] created KEY at %p\n", tree_entry->key);
         memcpy(tree_entry->key, key, key_size);
         tree_entry->data = malloc(data_size);
         memcpy(tree_entry->data, data, data_size);
@@ -171,7 +170,7 @@ elv(tree_entry_t* e) {
 
 static inline void
 elp(tree_entry_t* e, const char* txt) {
-    spin_log(LOG_DEBUG, "[XX] %s: ", txt);
+    spin_log(LOG_DEBUG, "[TREE] %s: ", txt);
     elv(e);
     spin_log(LOG_DEBUG, "\n");
     spin_log(LOG_DEBUG, "     parent: ");
@@ -231,7 +230,6 @@ void tree_remove_entry(tree_t* tree, tree_entry_t* el) {
     } else {
         int is_left = (el->parent->left == el);
         btmp = el->parent;
-        //spin_log(LOG_DEBUG, "[XX] is_left? %d\n", is_left);
         if (el->left == NULL && el->right == NULL) {
             if (is_left) {
                 el->parent->left = NULL;
@@ -334,26 +332,12 @@ tree_entry_t* tree_entry_last(tree_entry_t* current) {
 }
 
 tree_entry_t* tree_next(tree_entry_t* current) {
-/*
-    if (current == NULL) {
-        spin_log(LOG_DEBUG, "[XX] tree_next() called. current node: <null>\n");
-    } else {
-        spin_log(LOG_DEBUG, "[XX] tree_next() called. current node: %p (%s)\n", current, current->key);
-        spin_log(LOG_DEBUG, "[XX] parent: %p\n", current->parent);
-        spin_log(LOG_DEBUG, "[XX] left: %p\n", current->left);
-        spin_log(LOG_DEBUG, "[XX] right: %p\n", current->right);
-    }
-*/
-//    spin_log(LOG_DEBUG, "[XX] tree_next on %p\n", current);
     if (current->right != NULL) {
-//        spin_log(LOG_DEBUG, "[Xx] have a right, returning leftmost of %p: %p\n", current->right, tree_entry_first(current->right));
         return tree_entry_first(current->right);
     } else {
-//        spin_log(LOG_DEBUG, "[XX] no right, finding first 'right' parent\n");
         // find the first parent where this is a left branch of
         while (current != NULL) {
             if (current->parent && current->parent->left == current) {
-//                spin_log(LOG_DEBUG, "[XX] returning 'right' parent %p\n", current->parent);
                 return current->parent;
             }
             current = current->parent;
@@ -376,7 +360,7 @@ int tree_entry_depth(tree_entry_t* current) {
         int* val;
         val = current->key;
         if (current == current->right) {
-            spin_log(LOG_DEBUG, "[XX] error, right of %d is %d\n", *val, *val);
+            spin_log(LOG_ERR, "Error, right of %d is %d\n", *val, *val);
             assert(0);
         }
         right = tree_entry_depth(current->right);
@@ -390,10 +374,7 @@ int tree_entry_depth(tree_entry_t* current) {
 
 tree_entry_t* rotate_right(tree_entry_t* q) {
     tree_entry_t* p = q->left;
-    //int *xxp;
     if (p != NULL) {
-        //xxp = (int*)p->key;
-        //spin_log(LOG_DEBUG, "[XX] p is %d\n", *xxp);
         q->left = p->right;
         if (q->left != NULL) {
             p->right->parent = q;
@@ -409,12 +390,7 @@ tree_entry_t* rotate_right(tree_entry_t* q) {
 
 tree_entry_t* rotate_left(tree_entry_t* p) {
     tree_entry_t* q = p->right;
-    //int* xxq, *xxp;
-    //xxp = (int*)p->key;
-    //spin_log(LOG_DEBUG, "[XX] p is %d\n", *xxp);
     if (q != NULL) {
-        //xxq = (int*)q->key;
-        //spin_log(LOG_DEBUG, "[XX] q is %d\n", *xxq);
         p->right = q->left;
         if (q->left != NULL) {
             q->left->parent = p;
@@ -438,7 +414,6 @@ tree_entry_t* AAAAtree_entry_balance(tree_entry_t* current) {
     int right = tree_entry_depth(current->right);
 
     if (left > right + 1) {
-        //spin_log(LOG_DEBUG, "[XX] unbalanced left (l: %d r: %d)\n", left, right);
         left = tree_entry_depth(current->left->left);
         right = tree_entry_depth(current->left->right);
         if (right > left) {
@@ -446,7 +421,6 @@ tree_entry_t* AAAAtree_entry_balance(tree_entry_t* current) {
         }
         return rotate_right(current);
     } else if (right > left + 1) {
-        //spin_log(LOG_DEBUG, "[XX] unbalanced right (l: %d r: %d)\n", left, right);
         left = tree_entry_depth(current->right->left);
         right = tree_entry_depth(current->right->right);
         if (left > right) {
