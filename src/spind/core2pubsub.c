@@ -195,7 +195,6 @@ int
 mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const char* pubsub_websocket_host, int pubsub_websocket_port) {
     FILE* mosq_conf;
     sprintf(mosq_conf_filename, MOSQ_CONF_TEMPLATE);
-    printf("SIZE OF TMP: %lu\n", strlen(mosq_conf_filename));
     mkstemp(mosq_conf_filename);
     printf("Tempname #1: %s\n", mosq_conf_filename);
     mosq_conf = fopen(mosq_conf_filename, "w");
@@ -208,6 +207,8 @@ mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const cha
     //fprintf(mosq_conf, "protocol mosquitto");
     fprintf(mosq_conf, "listener %d %s\n", pubsub_websocket_port, pubsub_websocket_host);
     fprintf(mosq_conf, "protocol websockets\n");
+
+    fclose(mosq_conf);
 
     return 0;
 }
@@ -243,6 +244,12 @@ void mosquitto_stop_server() {
     sleep(2);
     kill(mosq_pid, SIGKILL);
     spin_log(LOG_INFO, "Mosquitto server has been stopped");
+
+    // Remove the temporary file, doublecheck
+    // /tmp/spin_mosq_conf_
+    if (strncmp("/tmp/spin_mosq_conf_", mosq_conf_filename, 20) == 0) {
+        remove(mosq_conf_filename);
+    }
 }
 
 void init_mosquitto(int start_own_instance, const char* host, int port, const char* websocket_host, int websocket_port) {
