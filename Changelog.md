@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.12] (2020-01-05)
+## [0.12] (2020-01-11)
 * SPIN is now, by default, directly reachable on port 13026, rather that
   needing a reverse proxy for handling web traffic. It is still advisable
   to set one up yourself, to add TLS support and other security.
@@ -16,6 +16,8 @@
   configuration and reduces the dependencies of the package, while
   still allowing optional additional security features through a
   (manually configured) http frontend such as nginx or apache
+* Improved the pcap upload screen. It now shows more data fields, as well
+  as suggested entries.
 * SPIN can now automatically start mosquitto if necessary
 * SPIN can now automatically load conntrack kernel modules and enable
   IP Accounting
