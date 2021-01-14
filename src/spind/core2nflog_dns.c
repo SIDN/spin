@@ -14,6 +14,8 @@ static void nflog_dns_callback(void* arg, int family, int protocol,
     // skip udp header (all packets are udp atm)
     size_t header_size = 0;
 
+    spin_log(LOG_DEBUG, "DNS callback for packet src port %u dst port %u qid: %u\n", src_port, dest_port, ldns_pkt_id(p));
+
     if (src_port == 53) {
         handle_dns_answer(handle_dns_ctx, data + header_size, size - header_size, family);
     } else if (dest_port == 53) {
