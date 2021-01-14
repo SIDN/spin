@@ -226,6 +226,9 @@ setup_tables(int nflog_dns_group, int queue_block, int place) {
     iptab_add_jump(table_output, IAJ_INS, "-p udp --sport 53", nfq_queue_str);
     iptab_add_jump(table_input, IAJ_INS, "-p udp --dport 53", nfq_queue_str);
     iptab_add_jump(table_forward, IAJ_INS, "-p udp --dport 53", nfq_queue_str);
+    // This one is only necessary in bridge mode. Can it hurt in normal operation?
+    // If so, we'll need to add a run mode for bridge (next to router and local)
+    iptab_add_jump(table_forward, IAJ_INS, "-p udp --sport 53", nfq_queue_str);
 
     iptab_do_table(SpinBlock, IDT_MAKE);
     iptab_add_jump(SpinBlock, IAJ_ADD, 0, SpinLog);
