@@ -25,6 +25,8 @@ enum configs {
     DOTS_LOG_ONLY, // Only LOG DOTS mitigation request matches (do not block them)
     SPINWEB_INTERFACES,
     SPINWEB_PORT,
+    SPINWEB_TLS_CERTIFICATE_FILE,
+    SPINWEB_TLS_KEY_FILE
 };
 
 struct conf_item {
@@ -70,6 +72,10 @@ struct conf_item {
             { "spinweb_interfaces",          "127.0.0.1",       0   },
     [SPINWEB_PORT] =
             { "spinweb_port",                "13026",           0   },
+    [SPINWEB_TLS_CERTIFICATE_FILE] =
+            { "spinweb_tls_certificate_file", "",               0   },
+    [SPINWEB_TLS_KEY_FILE] =
+            { "spinweb_tls_key_file",         "",               0   },
  { 0, 0, 0 }
 };
 
@@ -209,6 +215,14 @@ int spinconfig_spinweb_port() {
     return(spi_int(SPINWEB_PORT));
 }
 
+char* spinconfig_spinweb_tls_certificate_file() {
+    return(spi_str(SPINWEB_TLS_CERTIFICATE_FILE));
+}
+
+char* spinconfig_spinweb_tls_key_file() {
+    return(spi_str(SPINWEB_TLS_KEY_FILE));
+}
+
 void spinconfig_print_defaults() {
     struct conf_item* ci;
     int i = 0;
@@ -220,3 +234,4 @@ void spinconfig_print_defaults() {
         }
     }
 }
+
