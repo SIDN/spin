@@ -616,8 +616,60 @@ answer_to_connection(void *cls,
 
 #define MAX_DAEMONS 10
 
+static long
+get_file_size (const char *filename) {
+    FILE *fp;
+
+    fp = fopen(filename, "rb");
+    if (fp) {
+        long size;
+
+        if ((0 != fseek(fp, 0, SEEK_END)) || (-1 == (size = ftell (fp)))) {
+            size = 0;
+        }
+
+        fclose (fp);
+
+        return size;
+    } else {
+        return 0;
+    }
+}
+
+static char *
+read_file (const char *filename) {
+    FILE *fp;
+    char *buffer;
+    long size;
+
+    size = get_file_size(filename);
+    if (0 == size) {
+        return NULL;
+    }
+
+    fp = fopen (filename, "rb");
+    if (!fp) {
+        return NULL;
+    }
+
+    buffer = malloc (size + 1);
+    if (! buffer) {
+        fclose (fp);
+        return NULL;
+    }
+    buffer[size] = '\0';
+
+    if (size != (long) fread (buffer, 1, size, fp)) {
+        free (buffer);
+        buffer = NULL;
+    }
+
+    fclose (fp);
+    return buffer;
+}
+
 int
-start_daemon(char* address, int port, struct MHD_Daemon* daemons[], int daemon_count) {
+start_daemon(char* address, int port, char* tls_cert_pem, char* tls_key_pem, struct MHD_Daemon* daemons[], int daemon_count) {
     struct sockaddr_in addr1;
     addr1.sin_family = AF_INET;
     addr1.sin_port = htons(port);
@@ -627,11 +679,18 @@ start_daemon(char* address, int port, struct MHD_Daemon* daemons[], int daemon_c
         return 1;
     }
 
-    daemons[daemon_count] = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD,
+    unsigned int daemon_flags = MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD;
+    if (tls_key_pem != NULL && tls_cert_pem != NULL) {
+        daemon_flags = daemon_flags | MHD_USE_SSL;
+    }
+
+    daemons[daemon_count] = MHD_start_daemon(daemon_flags,
                               port, NULL, NULL,
                               &answer_to_connection, NULL,
                               MHD_OPTION_NOTIFY_COMPLETED, &request_completed, NULL,
-                              MHD_OPTION_SOCK_ADDR, &addr1, NULL,
+                              MHD_OPTION_SOCK_ADDR, &addr1,
+                              MHD_OPTION_HTTPS_MEM_KEY, tls_key_pem,
+                              MHD_OPTION_HTTPS_MEM_CERT, tls_cert_pem,
                               MHD_OPTION_END);
     if (NULL == daemons[daemon_count]) {
         fprintf (stderr,
@@ -642,7 +701,7 @@ start_daemon(char* address, int port, struct MHD_Daemon* daemons[], int daemon_c
 }
 
 int
-start_daemons(const char* address_list, int port, struct MHD_Daemon* daemons[], int* daemon_count) {
+start_daemons(const char* address_list, int port, char* tls_cert_pem, char* tls_key_pem, struct MHD_Daemon* daemons[], int* daemon_count) {
     // address_list is a comma-separated list of IP addresses
     // it may contain whitespace. Clone it so we can safely use strtok
     char* dup = strdup(address_list);
@@ -652,7 +711,7 @@ start_daemons(const char* address_list, int port, struct MHD_Daemon* daemons[], 
             p++;
         }
         printf ("start daemon at '%s'\n",p);
-        if (start_daemon(p, port, daemons, *daemon_count) != 0) {
+        if (start_daemon(p, port, tls_cert_pem, tls_key_pem, daemons, *daemon_count) != 0) {
             free(dup);
             return 1;
         }
@@ -693,6 +752,11 @@ main(int argc, char** argv) {
 
     char* interfaces = NULL;
     int port_number = 0;
+
+    char* tls_cert_file = NULL;
+    char* tls_cert_pem = NULL;
+    char* tls_key_file = NULL;
+    char* tls_key_pem = NULL;
 
     while ((c = getopt (argc, argv, "c:hi:p:v")) != -1) {
         switch (c) {
@@ -739,7 +803,36 @@ main(int argc, char** argv) {
         port_number = spinconfig_spinweb_port();
     }
 
-    if (start_daemons(interfaces, port_number, daemons, &daemon_count) != 0) {
+    tls_cert_file = spinconfig_spinweb_tls_certificate_file();
+    tls_key_file = spinconfig_spinweb_tls_key_file();
+
+    if (tls_cert_file != NULL && strlen(tls_cert_file) > 0) {
+        tls_cert_pem = read_file(tls_cert_file);
+        if (tls_cert_pem == NULL) {
+            fprintf(stderr, "Error reading TLS certificate file %s: %s\n", tls_cert_file, strerror(errno));
+            return errno;
+        }
+        if (tls_key_file == NULL || strlen(tls_key_file) == 0) {
+            fprintf(stderr, "Error: TLS certificate file given, but no TLS key file\n");
+            return 1;
+        }
+    }
+
+    if (tls_key_file != NULL && strlen(tls_key_file) > 0) {
+        tls_key_pem = read_file(tls_key_file);
+        if (tls_key_pem == NULL) {
+            fprintf(stderr, "Error reading TLS key file %s: %s\n", tls_key_file, strerror(errno));
+            return errno;
+        }
+        if (tls_cert_file == NULL || strlen(tls_cert_file) == 0) {
+            fprintf(stderr, "Error: TLS key file given, but no TLS certificate file\n");
+            return 1;
+        }
+    }
+
+    if (start_daemons(interfaces, port_number, tls_cert_pem, tls_key_pem, daemons, &daemon_count) != 0) {
+        free(tls_cert_pem);
+        free(tls_key_pem);
         free(interfaces);
         return errno;
     }
@@ -755,6 +848,8 @@ main(int argc, char** argv) {
             for (int i=0; i<daemon_count; i++) {
                 MHD_stop_daemon(daemons[i]);
             }
+            free(tls_cert_pem);
+            free(tls_key_pem);
             free(interfaces);
             return 0;
         } else if (terminal_input == EOF) {
