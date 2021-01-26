@@ -37,4 +37,6 @@ int spinconfig_dots_enabled();
 int spinconfig_dots_log_only();
 char* spinconfig_spinweb_interfaces();
 int spinconfig_spinweb_port();
+char* spinconfig_spinweb_tls_certificate_file();
+char* spinconfig_spinweb_tls_key_file();
 #endif // SPIN_CONFIG_H

@@ -146,14 +146,19 @@ int get_config_entries(const char* config_file, int must_exist) {
             beginofvalue++;
         }
 
-        endofvalue = strchr(beginofvalue, '\n');
-        if (endofvalue == 0) {
-            endofvalue = strchr(beginofvalue, EOF);
+        if (*beginofvalue == '\n' || *beginofvalue == '\0') {
+            // empty config option, leave as default
+            endofvalue = beginofvalue;
+        } else {
+            endofvalue = strchr(beginofvalue, '\n');
             if (endofvalue == 0) {
-                config_read_error(1, "Very long conf line\n");
-                continue;
+                endofvalue = strchr(beginofvalue, EOF);
+                if (endofvalue == 0) {
+                    config_read_error(1, "Unset configuration value\n");
+                }
             }
         }
+
         while (isspace(endofvalue[0])) {
             endofvalue--;
         }
