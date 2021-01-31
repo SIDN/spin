@@ -49,6 +49,7 @@ AC_SUBST([regular_CFLAGS])
 
 AC_CHECK_LIB([mosquitto], [mosquitto_lib_version], [], [AC_MSG_ERROR([libmosquitto not found])])
 AC_CHECK_LIB([microhttpd], [MHD_start_daemon], [], [AC_MSG_ERROR([libmicrohttpd not found])])
+AC_CHECK_LIB([crypt], [crypt], [], [AC_MSG_ERROR([libcrypt not found])])
 
 passivemodeonly=0
 AC_ARG_ENABLE([passive-mode-only],
