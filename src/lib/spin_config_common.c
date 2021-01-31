@@ -26,7 +26,8 @@ enum configs {
     SPINWEB_INTERFACES,
     SPINWEB_PORT,
     SPINWEB_TLS_CERTIFICATE_FILE,
-    SPINWEB_TLS_KEY_FILE
+    SPINWEB_TLS_KEY_FILE,
+    SPINWEB_PASSWORD_FILE
 };
 
 struct conf_item {
@@ -76,6 +77,8 @@ struct conf_item {
             { "spinweb_tls_certificate_file", "",               0   },
     [SPINWEB_TLS_KEY_FILE] =
             { "spinweb_tls_key_file",         "",               0   },
+    [SPINWEB_PASSWORD_FILE] =
+            { "spinweb_password_file",        "",               0   },
  { 0, 0, 0 }
 };
 
@@ -221,6 +224,10 @@ char* spinconfig_spinweb_tls_certificate_file() {
 
 char* spinconfig_spinweb_tls_key_file() {
     return(spi_str(SPINWEB_TLS_KEY_FILE));
+}
+
+char* spinconfig_spinweb_password_file() {
+    return(spi_str(SPINWEB_PASSWORD_FILE));
 }
 
 void spinconfig_print_defaults() {
