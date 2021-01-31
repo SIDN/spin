@@ -5,6 +5,7 @@ bin_PROGRAMS = spinweb
 spinweb_SOURCES = spinweb.c \
                   traffic_capture.c \
                   rpc_client.c \
+                  files.c \
                   ../spind/cJSON.c
 
 
