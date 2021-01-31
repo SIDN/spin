@@ -106,11 +106,11 @@ int check_password(const char* username, const char* password) {
     char buf[BUFLEN];
     char passbuf[BUFLEN];
     char saltbuf[BUFLEN];
-
-    FILE* password_file = fopen("/etc/shadow", "r");
     
+    const char* password_file_name = spinconfig_spinweb_password_file();
+    FILE* password_file = fopen(password_file_name, "r");
     if (password_file == NULL) {
-        fprintf(stderr, "Error: unable to read passwords file. Are you root?\n");
+        fprintf(stderr, "Error: unable to read passwords file %s: %s\n", password_file_name, strerror(errno));
         return 0;
     }
     
@@ -586,31 +586,34 @@ answer_to_connection(void *cls,
         return MHD_YES;
     }
 
-    /* Then check for authentication */
-    int fail;
-    char* pass = NULL;
-    char* user = MHD_basic_auth_get_username_password(connection, &pass);
-    fail = ((user == NULL) ||
-            !(check_password(user, pass)));
-    if (user != NULL) {
-        free(user);
-    }
-    if (pass != NULL) {
-        free(pass);
-    }
-    if (fail) {
-        int ret;
-        struct MHD_Response *response;
-        const char *page = "<html><body>Go away.</body></html>";
-        response = MHD_create_response_from_buffer (strlen (page),
-                                                    (void *) page, 
-                                                    MHD_RESPMEM_PERSISTENT);
-        ret = MHD_queue_basic_auth_fail_response (connection,
-                                                  "my realm",
-                                                  response);
+    /* Then check for authentication, if password file has been set */
+    char* password_file = spinconfig_spinweb_password_file();
+    if (password_file != NULL && strlen(password_file) > 0) {
+        int fail;
+        char* pass = NULL;
+        char* user = MHD_basic_auth_get_username_password(connection, &pass);
+        fail = ((user == NULL) ||
+                !(check_password(user, pass)));
+        if (user != NULL) {
+            free(user);
+        }
+        if (pass != NULL) {
+            free(pass);
+        }
+        if (fail) {
+            int ret;
+            struct MHD_Response *response;
+            const char *page = "<html><body>Go away.</body></html>";
+            response = MHD_create_response_from_buffer (strlen (page),
+                                                        (void *) page, 
+                                                        MHD_RESPMEM_PERSISTENT);
+            ret = MHD_queue_basic_auth_fail_response (connection,
+                                                      "my realm",
+                                                      response);
 
-        MHD_destroy_response (response);
-        return ret;
+            MHD_destroy_response (response);
+            return ret;
+        }
     }
     
     if (0 == strcasecmp (method, MHD_HTTP_METHOD_GET)) {
