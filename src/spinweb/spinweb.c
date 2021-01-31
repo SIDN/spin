@@ -1,17 +1,13 @@
 #include <sys/types.h>
 #include <sys/select.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/un.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <microhttpd.h>
 
 #include "config.h"
 #include "traffic_capture.h"
 #include "rpc_client.h"
 #include "spin_config.h"
+#include "files.h"
 #include "version.h"
 
 #define POSTBUFFERSIZE  512
@@ -37,111 +33,6 @@
 #define TEMPLATE_URL_MQTT_CAPTURE_START "/spin_api/capture_start"
 #define TEMPLATE_URL_MQTT_CAPTURE_STOP "/spin_api/capture_stop"
 
-/*
- * finds the line that starts with <user>:
- * and places the data in buf.
- * returns 1 if found, 0 if not
- */
-int find_password_line(FILE* file, char* buf, size_t buf_len, const char* user) {
-    if (user == NULL || strlen(user) > buf_len) {
-        return 0;
-    }
-
-    while(getline(&buf, &buf_len, file) >= 0) {
-        if (strncmp(user, buf, strlen(user)) == 0) {
-            if (strlen(buf) > strlen(user) + 1 && buf[strlen(user)] == ':') {
-                fprintf(stderr, "[XX] FOUNDLINE!\n");
-                return 1;
-            }
-        }
-    }
-    return 0;
-}
-
-/*
- * finds the pointer to the first byte of the password data
- * (character after first :)
- */
-char* find_password_data_start(const char* password_line) {
-    char* c = strchr(password_line, ':');
-    if (c != NULL && c-password_line < strlen(password_line)-1) {
-        return c + 1;
-    }
-    return NULL;
-}
-
-int find_password_data_length(const char* password_data_start) {
-    char* e = strchr(password_data_start, ':');
-    int s = e - password_data_start;
-    return s;
-}
-
-int find_password_salt_length(const char* password_data_start) {
-    // first should be $, and we are looking for the 3rd $
-    char* e = strchr(password_data_start, '$');
-    if (e != password_data_start) {
-        printf("[XX] Error, password data does not start with $\n");
-        return -1;
-    }
-    e = strchr(e+1, '$');
-    if (e == NULL) {
-        printf("[XX] Error, password data does contain second $\n");
-        return -1;
-    }
-    e = strchr(e+1, '$');
-    if (e == NULL) {
-        printf("[XX] Error, password data does contain third $\n");
-        return -1;
-    }
-    
-    int s = e - password_data_start;
-    return s;
-}
-
-char* find_password_digest_start(const char* password_data_start) {
-}
-
-int check_password(const char* username, const char* password) {
-    size_t BUFLEN = 1024;
-    char buf[BUFLEN];
-    char passbuf[BUFLEN];
-    char saltbuf[BUFLEN];
-    
-    const char* password_file_name = spinconfig_spinweb_password_file();
-    FILE* password_file = fopen(password_file_name, "r");
-    if (password_file == NULL) {
-        fprintf(stderr, "Error: unable to read passwords file %s: %s\n", password_file_name, strerror(errno));
-        return 0;
-    }
-    
-    if (find_password_line(password_file, buf, BUFLEN, username)) {
-        fprintf(stderr, "[XX] FOUND PASSWD LINE!\n");
-        char* password_data_start = find_password_data_start(buf);
-        if (password_data_start != NULL) {
-            fprintf(stderr, "[XX] FOUND PASSWD DATA: %s\n", password_data_start);
-            int password_data_length = find_password_data_length(password_data_start);
-            if (password_data_length > 0) {
-                strncpy(passbuf, password_data_start, password_data_length);
-            }
-            fprintf(stderr, "[XX] PASSWD DATA: '%s'\n", passbuf);
-
-            int password_salt_length = find_password_salt_length(password_data_start);
-            fprintf(stderr, "[XX] SALT LEN: %d\n"   , password_salt_length);
-            if (password_salt_length > 0) {
-                strncpy(saltbuf, password_data_start, password_salt_length);
-            }
-            fprintf(stderr, "[XX] PASSWD SALT: '%s'\n", saltbuf);
-
-            char* crypted = crypt(password, saltbuf);
-            fprintf(stderr, "[XX] PASSWRD CRYPTED: '%s'\n", crypted);
-            if (strncmp(passbuf, crypted, strlen(crypted)) == 0) {
-                return 1;
-            }
-        }
-    }
-
-    return 0;
-}
 
 
 enum ConnectionType {
@@ -186,64 +77,6 @@ const char* notfounderror =
   "<html><body><title>Error</title></head><body>File not found.</body></html>";
 const char* methodnotallowederror =
   "<html><body><title>Error</title></head><body>HTTP Method not allowed for this URL.</body></html>";
-
-/*
- * Returns opened FILE* pointer if the path exists and is a regular
- * file.
- * NULL otherwise, or if fopen() fails.
- */
-FILE*
-try_file(const char* path) {
-    struct stat path_stat;
-    FILE* fp;
-    int rc;
-
-    rc = stat(path, &path_stat);
-    if (rc != 0) {
-        return NULL;
-    }
-    if S_ISREG(path_stat.st_mode) {
-        fp = fopen(path, "r");
-        if (fp != NULL) {
-            return fp;
-        }
-    }
-    return NULL;
-}
-
-/*
- * Tries whether the file path exists, and if not, whether the path
- * with '.html', or (if url ends with /) 'index.html' exists, in that order
- * Returns open file pointer if so, NULL if not
- */
-FILE*
-try_files(const char* base_path, const char* path) {
-    char file_path[256];
-    FILE* fp;
-
-    snprintf(file_path, 256, "%s%s", base_path, path);
-    fp = try_file(file_path);
-    if (fp != NULL) {
-        return fp;
-    }
-
-    snprintf(file_path, 256, "%s%s%s", base_path, path, ".html");
-    fp = try_file(file_path);
-    if (fp != NULL) {
-        return fp;
-    }
-
-    size_t path_size = strlen(path);
-    if (path_size >= 0 && path[strlen(path)-1] == '/') {
-        snprintf(file_path, 256, "%s%s%s", base_path, path, "index.html");
-        fp = try_file(file_path);
-        if (fp != NULL) {
-            return fp;
-        }
-    }
-
-    return NULL;
-}
 
 /*
  * Tries to find a template file for the given path
@@ -593,7 +426,7 @@ answer_to_connection(void *cls,
         char* pass = NULL;
         char* user = MHD_basic_auth_get_username_password(connection, &pass);
         fail = ((user == NULL) ||
-                !(check_password(user, pass)));
+                !(check_password(password_file, user, pass)));
         if (user != NULL) {
             free(user);
         }
@@ -750,58 +583,6 @@ answer_to_connection(void *cls,
 }
 
 #define MAX_DAEMONS 10
-
-static long
-get_file_size (const char *filename) {
-    FILE *fp;
-
-    fp = fopen(filename, "rb");
-    if (fp) {
-        long size;
-
-        if ((0 != fseek(fp, 0, SEEK_END)) || (-1 == (size = ftell (fp)))) {
-            size = 0;
-        }
-
-        fclose (fp);
-
-        return size;
-    } else {
-        return 0;
-    }
-}
-
-static char *
-read_file (const char *filename) {
-    FILE *fp;
-    char *buffer;
-    long size;
-
-    size = get_file_size(filename);
-    if (0 == size) {
-        return NULL;
-    }
-
-    fp = fopen (filename, "rb");
-    if (!fp) {
-        return NULL;
-    }
-
-    buffer = malloc (size + 1);
-    if (! buffer) {
-        fclose (fp);
-        return NULL;
-    }
-    buffer[size] = '\0';
-
-    if (size != (long) fread (buffer, 1, size, fp)) {
-        free (buffer);
-        buffer = NULL;
-    }
-
-    fclose (fp);
-    return buffer;
-}
 
 int
 start_daemon(char* address, int port, char* tls_cert_pem, char* tls_key_pem, struct MHD_Daemon* daemons[], int daemon_count) {
