@@ -589,7 +589,7 @@ start_daemon(char* address, int port, char* tls_cert_pem, char* tls_key_pem, str
     struct sockaddr_in addr1;
     addr1.sin_family = AF_INET;
     addr1.sin_port = htons(port);
-    fprintf(stderr, "Binding to '%s' port %d\n", address, port);
+    fprintf(stderr, "[XX] Binding to '%s' port %d\n", address, port);
     if (inet_aton(address, &addr1.sin_addr) == 0) {
         fprintf(stderr, "Invalid IP address: %s\n", address);
         return 1;
