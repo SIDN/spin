@@ -106,6 +106,13 @@ FILE* try_static_files(const char* path) {
     return fp;
 }
 
+void find_static_file(const char* path, web_file_t* web_file) {
+    try_files2(STATIC_SRC_PATH, path, web_file);
+    if (web_file->fp == NULL) {
+        try_files2(STATIC_INSTALL_PATH, path, web_file);
+    }
+}
+
 
 #define TEMPLATE_ARG_STR_SIZE 64
 
@@ -263,26 +270,39 @@ send_page_from_file(struct MHD_Connection *connection,
                     const char *url) {
     char* page = NULL;
     long file_size = 0;
-    FILE* fp = NULL;
+    //FILE* fp = NULL;
     struct MHD_Response* response;
     int ret;
+    web_file_t web_file;
+    web_file.fp = NULL;
+    web_file.gzipped = 0;
 
-    fp = try_static_files(url);
-    if(fp) {
-        fseek(fp, 0, SEEK_END);
-        file_size = ftell(fp);
-        fseek(fp, 0, SEEK_SET);// needed for next read from beginning of file
+    find_static_file(url, &web_file);
+    fprintf(stderr, "[XX] find_static_file %s: %p\n", url, web_file.fp);
+    if (web_file.fp) {
+    //fp = try_static_files(url);
+    //if(fp) {
+        fseek(web_file.fp, 0, SEEK_END);
+        file_size = ftell(web_file.fp);
+        fseek(web_file.fp, 0, SEEK_SET);// needed for next read from beginning of file
 
         // page will be freed by MHD (MHD_RESPMEM_MUST_FREE)
         page = malloc(file_size);
         memset(page, 0, file_size);
-        fread(page, file_size, 1, fp);
+        fread(page, file_size, 1, web_file.fp);
 
-        fclose(fp);
+        fclose(web_file.fp);
 
         response = MHD_create_response_from_buffer (file_size,
                                                     (void*) page,
                                                     MHD_RESPMEM_MUST_FREE);
+
+        fprintf(stderr, "[XX] Gzipped file? %d\n", web_file.gzipped);
+        if (web_file.gzipped) {
+            fprintf(stderr, "[XX] Gzipped file! %s(.gz)\n", url);
+            MHD_add_response_header(response, "Content-Encoding", "gzip");
+        }
+
         ret = MHD_queue_response(connection,
                                  MHD_HTTP_OK,
                                  response);
