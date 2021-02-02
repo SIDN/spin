@@ -11,8 +11,6 @@
  */
 "use strict";
 
-import { DataSet, Timeline } from "vis-timeline/standalone";
-
 var traffic_dataset = new vis.DataSet([]);
 var graph2d_1;
 var graph_peak_packets;
