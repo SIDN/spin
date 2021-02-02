@@ -597,6 +597,7 @@ function showGraph(dataset) {
 
 var shadowState, nodesArray, nodes, edgesArray, edges, network, curNodeId, curEdgeId;
 
+
 function showNetwork() {
     // mapping from ip to nodeId
     shadowState = true;
@@ -660,8 +661,6 @@ function showNetwork() {
     network.on("deselectEdge", edgeDeselected);
     network.on("zoom", enableZoomLock);
 }
-
-
 
 function updateNodeInfo(nodeId) {
     var node = nodes.get(nodeId);
@@ -942,11 +941,12 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
             is_blocked: node.is_blocked,
             is_excepted: node.is_excepted,
             scaling: {
-                min: 1,
-                label: {
-                    enabled: true
-                }
-            }
+                customScalingFunction: function (min, max, total, value) {
+                    return value / max;
+                },
+                //min: 1,
+                //max: 150,
+            },
         });
     }
     // If node is selected, update labels
