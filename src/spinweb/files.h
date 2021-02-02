@@ -7,6 +7,18 @@
  */
 
 /*
+ * Data structure to pass from and to the file scanner
+ * functions, which check whether a file exists (for instance,
+ * to find index.html for a query that does not have it specified)
+ * Any informative data that is found (such as whether it's a gzipped
+ * file) can be placed into this structure)
+ */
+typedef struct {
+    FILE* fp;
+    int gzipped;
+} web_file_t;
+
+/*
  * Returns opened FILE* pointer if the path exists and is a regular
  * file.
  * NULL otherwise, or if fopen() fails.
@@ -19,6 +31,7 @@ FILE* try_file(const char* path);
  * Returns open file pointer if so, NULL if not
  */
 FILE* try_files(const char* base_path, const char* path);
+void try_files2(const char* base_path, const char* path, web_file_t* web_file);
 
 
 /*

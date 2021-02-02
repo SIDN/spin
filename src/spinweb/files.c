@@ -5,6 +5,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "files.h"
+
 /*
  * Returns opened FILE* pointer if the path exists and is a regular
  * file.
@@ -16,6 +18,7 @@ try_file(const char* path) {
     FILE* fp;
     int rc;
 
+    fprintf(stderr, "[XX] trying file: %s\n", path);
     rc = stat(path, &path_stat);
     if (rc != 0) {
         return NULL;
@@ -23,6 +26,7 @@ try_file(const char* path) {
     if S_ISREG(path_stat.st_mode) {
         fp = fopen(path, "r");
         if (fp != NULL) {
+            fprintf(stderr, "[XX] found!\n");
             return fp;
         }
     }
@@ -61,6 +65,39 @@ try_files(const char* base_path, const char* path) {
     }
 
     return NULL;
+}
+
+void
+try_files2(const char* base_path, const char* path, web_file_t* web_file) {
+    char file_path[256];
+
+    snprintf(file_path, 256, "%s%s", base_path, path);
+    web_file->fp = try_file(file_path);
+    if (web_file->fp != NULL) {
+        return;
+    }
+
+    snprintf(file_path, 256, "%s%s.gz", base_path, path);
+    web_file->fp = try_file(file_path);
+    if (web_file->fp != NULL) {
+        web_file->gzipped = 1;
+        return;
+    }
+
+    snprintf(file_path, 256, "%s%s%s", base_path, path, ".html");
+    web_file->fp = try_file(file_path);
+    if (web_file->fp != NULL) {
+        return;
+    }
+
+    size_t path_size = strlen(path);
+    if (path_size >= 0 && path[strlen(path)-1] == '/') {
+        snprintf(file_path, 256, "%s%s%s", base_path, path, "index.html");
+        web_file->fp = try_file(file_path);
+        if (web_file->fp != NULL) {
+            return;
+        }
+    }
 }
 
 
