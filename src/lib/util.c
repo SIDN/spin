@@ -416,3 +416,15 @@ void copy_ip_data(ip_t* dest, int family, int netmask, const void* ip_data) {
         dest->netmask = 32;
     }
 }
+
+int is_ipv4_address(const char* str) {
+    char dst[16];
+    int result = inet_pton(AF_INET, str, dst);
+    return result;
+}
+
+int is_ipv6_address(const char* str) {
+    char dst[16];
+    int result = inet_pton(AF_INET6, str, dst);
+    return result;
+}

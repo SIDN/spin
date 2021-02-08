@@ -92,4 +92,16 @@ int ip_in_net(ip_t* ip, ip_t* net);
  */
 void copy_ip_data(ip_t* dest, int family, int netmask, const void* ip_data);
 
+/*
+ * Returns 1 if the given string represents an IPv4 address,
+ * 0 otherwise
+ */
+int is_ipv4_address(const char* str);
+
+/*
+ * Returns 1 if the given string represents an IPv6 address,
+ * 0 otherwise
+ */
+int is_ipv6_address(const char* str);
+
 #endif // SPIN_UTIL_H
