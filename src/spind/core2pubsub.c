@@ -201,17 +201,36 @@ mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const cha
     }
     printf("Tempname #1: %s\n", mosq_conf_filename);
     mosq_conf = fopen(mosq_conf_filename, "w");
+    char* tls_cert_file = NULL;
+    char* tls_key_file = NULL;
+
     if (mosq_conf == NULL) {
         spin_log(LOG_ERR, "fopen %s: %s\n", mosq_conf_filename, strerror(errno));
         return 1;
     }
-    // Always listen on localhost 1883
+    // Always listen on localhost 1883, no extra settings necessary
     fprintf(mosq_conf, "port 1883 127.0.0.1\n");
     fprintf(mosq_conf, "port %d %s\n", pubsub_port, pubsub_host);
-    //fprintf(mosq_conf, "protocol mosquitto");
+
+    // Configure the websockets listener.
+    // It MUST use the same configuration as spinweb for a number of
+    // settings (such as https; a ws-url will not be opened from an https
+    // page, due to browser security policies).
+    // Using the same cert and key is not strictly necessary, but does
+    // save a lot of maintenance work regarding maintenance of separate
+    // x509 certificates.
     fprintf(mosq_conf, "listener %d %s\n", pubsub_websocket_port, pubsub_websocket_host);
     fprintf(mosq_conf, "protocol websockets\n");
     fprintf(mosq_conf, "allow_anonymous true\n");
+
+    tls_cert_file = spinconfig_spinweb_tls_certificate_file();
+    tls_key_file = spinconfig_spinweb_tls_key_file();
+    if (tls_cert_file != NULL && strlen(tls_cert_file) > 0) {
+        fprintf(mosq_conf, "certfile %s\n", tls_cert_file);
+    }
+    if (tls_key_file != NULL && strlen(tls_key_file) > 0) {
+        fprintf(mosq_conf, "keyfile %s\n", tls_key_file);
+    }
 
     fclose(mosq_conf);
 
