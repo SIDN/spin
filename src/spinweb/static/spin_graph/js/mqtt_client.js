@@ -41,6 +41,11 @@ function setServerData() {
     } else {
         server_data.mqtt_port = 1884
     }
+    if (window.location.protocol == "https:") {
+        server_data.useSSL = true
+    } else {
+        server_data.useSSL = false
+    }
 
     // TODO: do we want to add query params for api url/port too?
     server_data.api_base_url = protocol + "//" + hostname + portstr
@@ -50,31 +55,27 @@ function setServerData() {
 function init() {
     setServerData();
 
-    connectToMQTT();
+    client = new Paho.MQTT.Client(server_data.mqtt_host, server_data.mqtt_port, "Web-" + Math.random().toString(16).slice(-5));
     initGraphs();
 
-    // set callback handlers
     client.onConnectionLost = onTrafficClose;
     client.onMessageArrived = onMessageArrived;
 
-    // connect the client
-    client.connect({onSuccess:onTrafficOpen});
+    let options = {
+        useSSL: server_data.useSSL,
+        onSuccess: onTrafficOpen,
+        onFailure: onConnectFailed
+    }
+
+    try {
+        client.connect(options);
+    } catch (err) {
+        // TODO: Ask for username/password here?
+        console.error(err);
+    }
 
     // Make smooth traffic graph when no data is received
     setInterval(redrawTrafficGraph, 1000);
-}
-
-function connectToMQTT() {
-    /*
-    var url = new URL(window.location);
-    var mqtt_port = url.searchParams.get("mqtt_port");
-    if (mqtt_port) {
-        mqtt_port = parseInt(mqtt_port);
-    } else {
-        mqtt_port = 1884;
-    }
-    */
-    client = new Paho.MQTT.Client(server_data.mqtt_host, server_data.mqtt_port, "Web-" + Math.random().toString(16).slice(-5));
 }
 
 // called when a message arrives
@@ -292,6 +293,10 @@ function onTrafficOpen(evt) {
     //show connected status somewhere
     $("#statustext").css("background-color", "#ccffcc").text("Connected");
     active = true;
+}
+
+function onConnectFailed(evt) {
+    console.error("error connecting: " + evt);
 }
 
 function onTrafficClose(evt) {
