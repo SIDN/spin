@@ -621,6 +621,7 @@ start_daemon(char* address, int port, char* tls_cert_pem, char* tls_key_pem, str
     if (tls_key_pem != NULL && tls_cert_pem != NULL) {
         fprintf(stderr, "[XX] Enable TLS mode (MHD_USE_SSL)\n");
         fprintf(stderr, "[XX] X509 certificate:\n%s\n", tls_cert_pem);
+        fprintf(stderr, "[XX] X509 key:\n%s\n", tls_key_pem);
         daemon_flags = daemon_flags | MHD_USE_SSL;
 
         daemons[daemon_count] = MHD_start_daemon(daemon_flags,
