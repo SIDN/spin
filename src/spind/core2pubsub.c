@@ -1,4 +1,5 @@
 #include <mosquitto.h>
+#include <string.h>
 
 #include "ipl.h"
 #include "mainloop.h"
@@ -128,7 +129,7 @@ void do_mosq_message(struct mosquitto* mosq, void* user_data, const struct mosqu
 }
 
 void connect_mosquitto(const char* host, int port) {
-    const char* client_name = "asdf";
+    const char* client_name = "SPIN Daemon";
     int result;
 
     if (mosq != NULL) {
@@ -204,33 +205,67 @@ mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const cha
     char* tls_cert_file = NULL;
     char* tls_key_file = NULL;
 
+    char* dup;
+    char* p;
+
     if (mosq_conf == NULL) {
         spin_log(LOG_ERR, "fopen %s: %s\n", mosq_conf_filename, strerror(errno));
         return 1;
     }
-    // Always listen on localhost 1883, no extra settings necessary
-    fprintf(mosq_conf, "port 1883 127.0.0.1\n");
-    fprintf(mosq_conf, "port %d %s\n", pubsub_port, pubsub_host);
+    // Enable per-listener settings
+    fprintf(mosq_conf, "per_listener_settings true\n");
 
-    // Configure the websockets listener.
+    // Always listen on localhost 1883
+    //fprintf(mosq_conf, "port 1883 127.0.0.1\n");
+    fprintf(mosq_conf, "port %d %s\n", pubsub_port, pubsub_host);
+    fprintf(mosq_conf, "allow_anonymous true\n");
+
+    // Configure the websockets listener(s).
     // It MUST use the same configuration as spinweb for a number of
     // settings (such as https; a ws-url will not be opened from an https
     // page, due to browser security policies).
     // Using the same cert and key is not strictly necessary, but does
     // save a lot of maintenance work regarding maintenance of separate
     // x509 certificates.
-    fprintf(mosq_conf, "listener %d %s\n", pubsub_websocket_port, pubsub_websocket_host);
-    fprintf(mosq_conf, "protocol websockets\n");
-    fprintf(mosq_conf, "allow_anonymous true\n");
 
     tls_cert_file = spinconfig_spinweb_tls_certificate_file();
     tls_key_file = spinconfig_spinweb_tls_key_file();
-    if (tls_cert_file != NULL && strlen(tls_cert_file) > 0) {
-        fprintf(mosq_conf, "certfile %s\n", tls_cert_file);
+
+    // Create a websockets listener for each interface spinweb listens on
+    // (this will generally be the location(s) the user will access it
+    // anyway
+    // Loop over the list of interfaces (dup), tokenize into p
+    dup = strdup(spinconfig_spinweb_interfaces());
+    fprintf(stderr, "[XX] spinweb_interfaces: '%s'\n", dup);
+    p = strtok (dup,",");
+    while (p != NULL) {
+        while (*p == ' ') {
+            p++;
+        }
+        fprintf(stderr, "[XX] adding websockets listener: '%s' port %d\n", p, pubsub_websocket_port);
+        fprintf(mosq_conf, "listener %d %s\n", pubsub_websocket_port, p);
+        // Mosquitto will try to default to some IPv6 addresses if we give
+        // an IPv4 address, which will fail if we do this multiple times,
+        // so we need to explicitely tell it what IP protocol we are using
+        if (is_ipv4_address(p)) {
+            fprintf(mosq_conf, "socket_domain ipv4\n");
+        } else if (is_ipv6_address(p)) {
+            fprintf(mosq_conf, "socket_domain ipv6\n");
+        }
+
+        fprintf(mosq_conf, "protocol websockets\n");
+        fprintf(mosq_conf, "allow_anonymous true\n");
+
+        if (tls_cert_file != NULL && strlen(tls_cert_file) > 0) {
+            fprintf(mosq_conf, "certfile %s\n", tls_cert_file);
+        }
+        if (tls_key_file != NULL && strlen(tls_key_file) > 0) {
+            fprintf(mosq_conf, "keyfile %s\n", tls_key_file);
+        }
+
+        p = strtok (NULL, ",");
     }
-    if (tls_key_file != NULL && strlen(tls_key_file) > 0) {
-        fprintf(mosq_conf, "keyfile %s\n", tls_key_file);
-    }
+    free(dup);
 
     fclose(mosq_conf);
 
