@@ -207,6 +207,7 @@ mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const cha
     //fprintf(mosq_conf, "protocol mosquitto");
     fprintf(mosq_conf, "listener %d %s\n", pubsub_websocket_port, pubsub_websocket_host);
     fprintf(mosq_conf, "protocol websockets\n");
+    fprintf(mosq_conf, "allow_anonymous true\n");
 
     fclose(mosq_conf);
 

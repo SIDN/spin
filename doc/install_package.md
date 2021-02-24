@@ -37,6 +37,8 @@ Configure mosquitto to use websockets. Add the following lines to /etc/mosquitto
     listener 1884 192.168.1.1
     protocol websockets
 
+    allow_anonymous true
+
 Configure the web server to serve the static pages and reverse proxy, we currently have example files for nginx only, but intend to add lighttpd config as well:
 
 If you are running nginx, copy the following sections into the relevant server settings (the local network part):
