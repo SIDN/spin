@@ -41,8 +41,8 @@ typedef struct spin_stat {
     stat_p              stat_next;
 } spin_stat_t;
 
-spin_stat_t spin_stat_end;
-stat_p spin_stat_chain;
+extern spin_stat_t spin_stat_end;
+extern stat_p spin_stat_chain;
 
 void spin_stat_val(stat_p, int);
 
