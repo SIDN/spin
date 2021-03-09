@@ -146,6 +146,14 @@ When installed locally, a few manual steps are required:
 5. Start the spinweb daemon `(cd ./src/build/spinweb/; ./spinweb`
 5. Load the spin bubble app by visiting `http://127.0.0.1:13026/spin_graph/graph.html`
 
+# SPIN configuration
+
+Both the collector (spind) and the web API (spinweb) can be configured through a single configuration file; by default this is `/etc/spin/spind.conf`. A subset of the options can be provided on the command-line as well. For an overview of the command-line options, call either `spind -h` or `spinweb -h`. Command-line arguments take precedence over configuration file values.
+
+The configuration options are documented [here](./doc/user/spin_configuration.md)
+
+When compiled with UCI/UBUS support in OpenWRT, the configuration is provided through UCI and the static configuration file is ignored. The configurable items are the same as with a static configuration file.
+
 
 # High-level technical overview
 
