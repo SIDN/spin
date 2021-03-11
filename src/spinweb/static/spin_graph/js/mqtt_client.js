@@ -1,5 +1,9 @@
 var client = 0;// = new Paho.MQTT.Client("valibox.", 1884, "Web-" + Math.random().toString(16).slice(-5));
 var showWsErrorDialog = null;
+var showLoginDialog = null;
+var username = null;
+var password = null;
+
 //var client = new Paho.MQTT.Client("127.0.0.1", 1884, "clientId");
 var last_traffic = 0 // Last received traffic trace
 var time_sync = 0; // Time difference (seconds) between server and client
@@ -77,6 +81,10 @@ function init() {
 
     client = new Paho.MQTT.Client(server_data.mqtt_host, server_data.mqtt_port, "Web-" + Math.random().toString(16).slice(-5));
     initGraphs();
+    connect();
+}
+
+function connect() {
 
     client.onConnectionLost = onTrafficClose;
     client.onMessageArrived = onMessageArrived;
@@ -85,6 +93,13 @@ function init() {
         useSSL: server_data.useSSL,
         onSuccess: onTrafficOpen,
         onFailure: onConnectFailed
+    }
+
+    if (username) {
+        options.userName = username;
+    }
+    if (password) {
+        options.password = password;
     }
 
     try {
@@ -330,11 +345,26 @@ function onConnectFailed(evt) {
             //alert(getWsURL());
             showWsErrorDialog(getWsURL(), getWsURLasHTTP());
         }
+    } else if (evt.errorCode == 6) {
+        if (showLoginDialog) {
+            showLoginDialog();
+        }
     }
 }
 
 function setWsErrorDialog(callback) {
     showWsErrorDialog = callback;
+}
+
+function setLoginDialog(callback) {
+    showLoginDialog = callback;
+}
+
+function setLoginData(user, pass) {
+    username = user;
+    pass = pass;
+    // automatically try reconnect
+    connect();
 }
 
 function onTrafficClose(evt) {
