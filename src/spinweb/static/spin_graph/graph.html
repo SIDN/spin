@@ -68,7 +68,7 @@
   </form>
 </div>
 
-<div id="wserror" title="Websocket connection error" class="">
+<div id="wserror" title="Websocket connection error" class="initiallyHidden">
     <p>
         Error connecting to the MQTT server at
     </p>
@@ -81,6 +81,24 @@
     <p>
     Then reload <b>this</b> page.
     </p>
+</div>
+
+<div id="logindialog" title="Login required" class="initiallyHidden">
+    <p>
+        Please enter your username and password
+    </p>
+    <span id="logindialog_error"></span>
+    <form>
+        <fieldset>
+            <label for="username">Username</label>
+            <input type="text" name="username" id="login_username" value="" class="text ui-widget-content ui-corner-all">
+            <label for="password">Password</label>
+            <input type="password" name="password" id="login_password" value="" class="text ui-widget-content ui-corner-all">
+
+            <!-- Allow form submission with keyboard without duplicating the dialog button -->
+            <!--<input type="submit" tabindex="-1" style="position:absolute; top:-1000px" />-->
+        </fieldset>
+    </form>
 </div>
 
 <div id="nodeinfo" title="Node information" class="initiallyHidden">

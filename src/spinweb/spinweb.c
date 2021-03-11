@@ -278,7 +278,6 @@ send_page_from_file(struct MHD_Connection *connection,
     web_file.gzipped = 0;
 
     find_static_file(url, &web_file);
-    fprintf(stderr, "[XX] find_static_file %s: %p\n", url, web_file.fp);
     if (web_file.fp) {
     //fp = try_static_files(url);
     //if(fp) {
@@ -297,9 +296,7 @@ send_page_from_file(struct MHD_Connection *connection,
                                                     (void*) page,
                                                     MHD_RESPMEM_MUST_FREE);
 
-        fprintf(stderr, "[XX] Gzipped file? %d\n", web_file.gzipped);
         if (web_file.gzipped) {
-            fprintf(stderr, "[XX] Gzipped file! %s(.gz)\n", url);
             MHD_add_response_header(response, "Content-Encoding", "gzip");
         }
 
@@ -609,19 +606,14 @@ start_daemon(char* address, int port, char* tls_cert_pem, char* tls_key_pem, str
     struct sockaddr_in addr1;
     addr1.sin_family = AF_INET;
     addr1.sin_port = htons(port);
-    fprintf(stderr, "[XX] Binding to '%s' port %d\n", address, port);
     if (inet_aton(address, &addr1.sin_addr) == 0) {
         fprintf(stderr, "Invalid IP address: %s\n", address);
         return 1;
     }
 
-    fprintf(stderr, "[XX] tls_cert_pem p: %p\n", tls_cert_pem);
-    fprintf(stderr, "[XX] tls_key_pem p: %p\n", tls_key_pem);
     unsigned int daemon_flags = MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD;
     if (tls_key_pem != NULL && tls_cert_pem != NULL) {
-        fprintf(stderr, "[XX] Enable TLS mode (MHD_USE_SSL)\n");
-        fprintf(stderr, "[XX] X509 certificate:\n%s\n", tls_cert_pem);
-        fprintf(stderr, "[XX] X509 key:\n%s\n", tls_key_pem);
+        fprintf(stderr, "Enable TLS mode (MHD_USE_SSL)\n");
         daemon_flags = daemon_flags | MHD_USE_SSL;
 
         daemons[daemon_count] = MHD_start_daemon(daemon_flags,
@@ -641,13 +633,12 @@ start_daemon(char* address, int port, char* tls_cert_pem, char* tls_key_pem, str
                                   MHD_OPTION_END);
     }
 
-    fprintf(stderr, "[XX] Daemon %d pointer %p\n", daemon_count, daemons[daemon_count]);
     if (NULL == daemons[daemon_count]) {
         fprintf (stderr,
-                 "Failed to start daemon: %s\n", strerror(errno));
+                 "failed to start daemon: %s\n", strerror(errno));
         return 1;
     }
-    fprintf(stderr, "[XX] Listening on %s port %d\n", address, port);
+    fprintf(stderr, "spinweb listening on %s port %d\n", address, port);
     return 0;
 }
 

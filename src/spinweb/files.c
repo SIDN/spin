@@ -18,7 +18,7 @@ try_file(const char* path) {
     FILE* fp;
     int rc;
 
-    fprintf(stderr, "[XX] trying file: %s\n", path);
+    //fprintf(stderr, "[XX] trying file: %s\n", path);
     rc = stat(path, &path_stat);
     if (rc != 0) {
         return NULL;
@@ -26,7 +26,7 @@ try_file(const char* path) {
     if S_ISREG(path_stat.st_mode) {
         fp = fopen(path, "r");
         if (fp != NULL) {
-            fprintf(stderr, "[XX] found!\n");
+            //fprintf(stderr, "[XX] found!\n");
             return fp;
         }
     }
@@ -170,6 +170,8 @@ int check_password(const char* password_file_name, const char* username, const c
     FILE* password_file = fopen(password_file_name, "r");
     if (password_file == NULL) {
         fprintf(stderr, "Error: unable to read passwords file %s: %s\n", password_file_name, strerror(errno));
+        fflush(stdout);
+        fflush(stderr);
         return 0;
     }
     
@@ -187,12 +189,13 @@ int check_password(const char* password_file_name, const char* username, const c
             }
 
             char* crypted = crypt(password, saltbuf);
-            if (strncmp(passbuf, crypted, strlen(crypted)) == 0) {
+            if (crypted == NULL) {
+                fprintf(stderr, "Unsupported algorithm in password file for user %s\n", username);
+            } else if (strncmp(passbuf, crypted, strlen(crypted)) == 0) {
                 return 1;
             }
         }
     }
-
     return 0;
 }
 
