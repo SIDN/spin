@@ -118,6 +118,19 @@ function initGraphs() {
         "label": "Lock view"
     }).click(toggleZoomLock);
 
+    // create the login dialog
+
+    // create the ws error dialog
+    $("#wserror").dialog({
+        autoOpen: false,
+        position: {
+            my: "center",
+            at: "center",
+            of: "#mynetwork"
+        }
+    });
+    setWsErrorDialog(showWsError);
+
     // create the node information dialog
     $("#nodeinfo").dialog({
         autoOpen: false,
@@ -660,6 +673,13 @@ function showNetwork() {
     network.on("selectEdge", edgeSelected);
     network.on("deselectEdge", edgeDeselected);
     network.on("zoom", enableZoomLock);
+}
+
+function showWsError(wsURL, httpsURL) {
+    $("#wserror_url").text(wsURL);
+    $("#wserror_http_url").attr("href", httpsURL);
+    $("#wserror_http_url").text(httpsURL);
+    $("#wserror").dialog('open');
 }
 
 function updateNodeInfo(nodeId) {

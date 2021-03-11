@@ -210,6 +210,12 @@ window.addEventListener('beforeunload', evt => {
     }
 })
 
+function escapeHTML(unsafeText) {
+    let div = document.createElement('div');
+    div.innerText = unsafeText;
+    return div.innerHTML;
+}
+
 $capture_close.onclick = () => {
     if (statusRunning) {
         if (confirm("You have an active capture, closing this window will remove the captured data, are you sure?")) {
@@ -702,7 +708,7 @@ function updateSuggestions(field, items) {
     let select = $('#' + field + '_suggestions');
     $.each(items, function (i, item) {
         console.log("[XX] appending " + item + " to " + select);
-        select.append('<li class="suggestion-select" onclick="suggestionSelected(\''+field+'\', \''+item+'\')">' + item + '</li');
+        select.append('<li class="suggestion-select" onclick="suggestionSelected(\''+field+'\', \''+escapeHTML(item)+'\')">' + escapeHTML(item) + '</li');
     });
 }
 
