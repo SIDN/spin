@@ -109,6 +109,8 @@ function updateAllowedList() {
 
 
 function initGraphs() {
+    $("#wserror").hide();
+    $("#logindialog").hide();
     $("#new-filter-dialog").hide();
     $("#rename-dialog").hide();
     $("#autozoom-button").button({
@@ -117,8 +119,6 @@ function initGraphs() {
         },
         "label": "Lock view"
     }).click(toggleZoomLock);
-
-    // create the login dialog
 
     // create the ws error dialog
     $("#wserror").dialog({
@@ -130,6 +130,31 @@ function initGraphs() {
         }
     });
     setWsErrorDialog(showWsError);
+
+    // create the login dialog
+    $(function() {
+        var dialog = $("#logindialog").dialog({
+            autoOpen: false,
+            position: {
+                my: "center",
+                at: "center",
+                of: "#mynetwork"
+            },
+            modal: true,
+            buttons: {
+                "Do login": function() {
+                    submitted();
+                    $(this).dialog("close");
+                }
+            }
+        });
+        setLoginDialog(showLoginDialog);
+        function submitted() {
+            setLoginData($("#login_username").val(), $("#login_password").val());
+            dialog.dialog("close");
+            //connect();
+        }
+    });
 
     // create the node information dialog
     $("#nodeinfo").dialog({
@@ -680,6 +705,10 @@ function showWsError(wsURL, httpsURL) {
     $("#wserror_http_url").attr("href", httpsURL);
     $("#wserror_http_url").text(httpsURL);
     $("#wserror").dialog('open');
+}
+
+function showLoginDialog() {
+    $("#logindialog").dialog('open');
 }
 
 function updateNodeInfo(nodeId) {
