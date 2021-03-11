@@ -1,4 +1,5 @@
 var client = 0;// = new Paho.MQTT.Client("valibox.", 1884, "Web-" + Math.random().toString(16).slice(-5));
+var showWsErrorDialog = null;
 //var client = new Paho.MQTT.Client("127.0.0.1", 1884, "clientId");
 var last_traffic = 0 // Last received traffic trace
 var time_sync = 0; // Time difference (seconds) between server and client
@@ -49,7 +50,26 @@ function setServerData() {
 
     // TODO: do we want to add query params for api url/port too?
     server_data.api_base_url = protocol + "//" + hostname + portstr
+
     //alert("API HOST: " + server_data.api_base_url);
+}
+
+// Returns the websockets url
+function getWsURL() {
+    let protocol = "ws://";
+    if (server_data.useSSL) {
+        protocol = "wss://";
+    }
+    return protocol + server_data.mqtt_host + ":" + server_data.mqtt_port;
+}
+
+// Returns the websockets url as if it is an https url
+function getWsURLasHTTP() {
+    let protocol = "http://";
+    if (server_data.useSSL) {
+        protocol = "https://";
+    }
+    return protocol + server_data.mqtt_host + ":" + server_data.mqtt_port;
 }
 
 function init() {
@@ -296,7 +316,25 @@ function onTrafficOpen(evt) {
 }
 
 function onConnectFailed(evt) {
-    console.error("error connecting: " + evt);
+    console.error("Error connecting to MQTT websockets server: " + JSON.stringify(evt));
+    // If the server is using wss with a self-signed certificate, the browser
+    // may need explicit permission to access it; browsers tend to reject
+    // rather than ask for permission if it's a 'secondary' connection like
+    // this. So unfortunately we'll have to get the user to jump through a
+    // hoop a little bit. Unfortunately 2: the error itself isn't clear
+    // on what the problem is.
+    if (evt.errorCode == 7) {
+        //alert(JSON.stringify(server_data));
+        // open a dialog
+        if (showWsErrorDialog) {
+            //alert(getWsURL());
+            showWsErrorDialog(getWsURL(), getWsURLasHTTP());
+        }
+    }
+}
+
+function setWsErrorDialog(callback) {
+    showWsErrorDialog = callback;
 }
 
 function onTrafficClose(evt) {
