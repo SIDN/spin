@@ -254,7 +254,14 @@ mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const cha
         }
 
         fprintf(mosq_conf, "protocol websockets\n");
-        fprintf(mosq_conf, "allow_anonymous true\n");
+
+        char* password_file = spinconfig_spinweb_password_file();
+        if (password_file != NULL && strlen(password_file) > 0) {
+            fprintf(mosq_conf, "allow_anonymous false\n");
+            fprintf(mosq_conf, "password_file %s\n", password_file);
+        } else {
+            fprintf(mosq_conf, "allow_anonymous true\n");
+        }
 
         if (tls_cert_file != NULL && strlen(tls_cert_file) > 0) {
             fprintf(mosq_conf, "certfile %s\n", tls_cert_file);
