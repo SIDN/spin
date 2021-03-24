@@ -63,6 +63,7 @@
 /* spind/lib includes */
 #include "dns.h"
 #include "extsrc.h"
+#include "node_cache.h"
 #include "pkt_info.h"
 #include "spinhook.h"
 
@@ -96,6 +97,8 @@ static struct handle_dns_ctx *handle_dns_ctx;
 static int fd;
 
 static node_cache_t *node_cache;
+
+static flow_list_t *flow_list;
 
 static void
 sig_handler(int sig)
@@ -138,6 +141,30 @@ write_pkt_info_to_socket(pkt_info_t *pkt)
 	socket_writemsg(fd, msg->data, msg->length);
 
 	extsrc_msg_free(msg);
+}
+
+static void
+send_flows(flow_list_t *flows)
+{
+	tree_entry_t *cur;
+	pkt_info_t pkt_info;
+	flow_data_t *flow_data;
+	
+	cur = tree_first(flows->flows);
+	while (cur != NULL) {
+		// XXX borrowed from spindata.c:flow_list2json(). Can't say I
+		// like the memcpy().
+		memcpy(&pkt_info, cur->key, 38);
+		flow_data = (flow_data_t*)cur->data;
+		pkt_info.payload_size = flow_data->payload_size;
+		pkt_info.packet_count = flow_data->packet_count;
+		
+		write_pkt_info_to_socket(&pkt_info);
+
+		cur = tree_next(cur);
+	}
+
+	flow_list_clear(flows, time(NULL));
 }
 
 static void
@@ -248,7 +275,7 @@ handle_l4(const struct ether_header *ep, const u_char *l4, u_int len,
 		break;
 	}
 
-	write_pkt_info_to_socket(pkt_info);
+	flow_list_add_pktinfo(flow_list, pkt_info);
 
 	if (pkt_info->src_port == 53 || pkt_info->dest_port == 53) {
 		if (truncated) {
@@ -460,6 +487,10 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 		DPRINTF("unknown ether type");
 		break;
 	}
+
+	if (flow_list_should_send(flow_list, time(NULL))) {
+		send_flows(flow_list);
+	}
 }
 
 int
@@ -479,6 +510,8 @@ main(int argc, char *argv[])
 #endif /* __OpenBSD__ */
 
 	node_cache = node_cache_create(ARP_TABLE_VIRTUAL);
+
+	flow_list = flow_list_create(time(NULL));
 
 	while ((ch = getopt(argc, argv, "e:f:hi:Rr:")) != -1) {
 		switch(ch) {
@@ -573,6 +606,7 @@ main(int argc, char *argv[])
 
 	close(fd);
 	node_cache_destroy(node_cache);
+	flow_list_destroy(flow_list);
 
 	return 0;
 }
