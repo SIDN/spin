@@ -76,7 +76,7 @@ handle_dns_answer(const struct handle_dns_ctx *ctx, const u_char *bp, u_int leng
 
     status = ldns_wire2pkt(&p, bp, length);
     if (status != LDNS_STATUS_OK) {
-        spin_log(LOG_WARNING, "DNS: could not parse packet: %s\n",
+        spin_log(LOG_WARNING, "DNS: could not parse answer packet: %s\n",
                  ldns_get_errorstr_by_id(status));
         phexdump(bp, length);
         goto out;
