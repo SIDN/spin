@@ -176,8 +176,8 @@ int spinconfig_pubsub_run_mosquitto() {
     return(spi_int(PUBSUB_RUN_MOSQUITTO));
 }
 
-int spinconfig_pubsub_run_password_file() {
-    return(spi_int(PUBSUB_RUN_PASSWORD_FILE));
+char *spinconfig_pubsub_run_password_file() {
+    return(spi_str(PUBSUB_RUN_PASSWORD_FILE));
 }
 
 int spinconfig_iptable_nflog_dns_group() {
