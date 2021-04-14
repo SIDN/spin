@@ -255,7 +255,7 @@ mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const cha
 
         fprintf(mosq_conf, "protocol websockets\n");
 
-        char* password_file = spinconfig_spinweb_password_file();
+        char* password_file = spinconfig_pubsub_run_password_file();
         if (password_file != NULL && strlen(password_file) > 0) {
             fprintf(mosq_conf, "allow_anonymous false\n");
             fprintf(mosq_conf, "password_file %s\n", password_file);

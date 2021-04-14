@@ -15,6 +15,7 @@ enum configs {
     PUBSUB_CHANNEL_TRAFFIC,
     PUBSUB_TIMEOUT,
     PUBSUB_RUN_MOSQUITTO,
+    PUBSUB_RUN_PASSWORD_FILE,
     IPTABLE_QUEUE_DNS,
     IPTABLE_QUEUE_BLOCK,
     IPTABLE_PLACE_DNS,
@@ -53,6 +54,8 @@ struct conf_item {
             { "pubsub_timeout",             "60",               0   },
     [PUBSUB_RUN_MOSQUITTO] =
             { "pubsub_run_mosquitto",       "1",                0   },
+    [PUBSUB_RUN_PASSWORD_FILE] =
+            { "pubsub_run_password_file",   "",                 0   },
     [IPTABLE_QUEUE_DNS] =
             { "iptable_queue_dns",          "1",                0   },
     [IPTABLE_QUEUE_BLOCK] =
@@ -171,6 +174,10 @@ int spinconfig_pubsub_timeout() {
 
 int spinconfig_pubsub_run_mosquitto() {
     return(spi_int(PUBSUB_RUN_MOSQUITTO));
+}
+
+int spinconfig_pubsub_run_password_file() {
+    return(spi_int(PUBSUB_RUN_PASSWORD_FILE));
 }
 
 int spinconfig_iptable_nflog_dns_group() {
