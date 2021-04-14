@@ -8,6 +8,7 @@
 enum configs {
     LOG_USESYSLOG,
     LOG_LOGLEVEL,
+    PID_FILE,
     PUBSUB_HOST,
     PUBSUB_PORT,
     PUBSUB_WEBSOCKET_HOST,
@@ -24,11 +25,12 @@ enum configs {
     NODE_CACHE_RETAIN_TIME,
     DOTS_ENABLED,   // Enable DOTS handler functionality
     DOTS_LOG_ONLY, // Only LOG DOTS mitigation request matches (do not block them)
+    SPINWEB_PID_FILE,
     SPINWEB_INTERFACES,
     SPINWEB_PORT,
     SPINWEB_TLS_CERTIFICATE_FILE,
     SPINWEB_TLS_KEY_FILE,
-    SPINWEB_PASSWORD_FILE
+    SPINWEB_PASSWORD_FILE,
 };
 
 struct conf_item {
@@ -40,6 +42,8 @@ struct conf_item {
             { "log_usesyslog",              "1",                0   },
     [LOG_LOGLEVEL] =
             { "log_loglevel",               "6",                0   },
+    [PID_FILE] =
+            { "pid_file",                   "",                 0   },
     [PUBSUB_HOST] =
             { "pubsub_host",                "127.0.0.1",        0   },
     [PUBSUB_PORT] =
@@ -72,6 +76,8 @@ struct conf_item {
             { "dots_enabled",               "0",                0   },
     [DOTS_LOG_ONLY] =
             { "dots_log_only",              "0",                0   },
+    [SPINWEB_PID_FILE] =
+            { "spinweb_pid_file",           "",                 0   },
     [SPINWEB_INTERFACES] =
             { "spinweb_interfaces",          "127.0.0.1",       0   },
     [SPINWEB_PORT] =
@@ -142,6 +148,10 @@ int spinconfig_log_usesyslog() {
 int spinconfig_log_loglevel() {
 
     return (spi_int(LOG_LOGLEVEL));
+}
+
+char* spinconfig_pid_file() {
+    return (spi_str(PID_FILE));
 }
 
 char *spinconfig_pubsub_host() {
@@ -215,6 +225,11 @@ int spinconfig_dots_enabled() {
 
 int spinconfig_dots_log_only() {
     return(spi_int(DOTS_LOG_ONLY));
+}
+
+
+char* spinconfig_spinweb_pid_file() {
+    return (spi_str(SPINWEB_PID_FILE));
 }
 
 char* spinconfig_spinweb_interfaces() {

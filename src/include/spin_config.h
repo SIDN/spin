@@ -17,6 +17,7 @@ void spinconfig_print_defaults();
 
 int spinconfig_log_usesyslog();
 int spinconfig_log_loglevel();
+char *spinconfig_pid_file();
 char *spinconfig_pubsub_host();
 int spinconfig_pubsub_port();
 char *spinconfig_pubsub_websocket_host();
@@ -36,6 +37,7 @@ char *spinconfig_iptable_debug();
 int spinconfig_node_cache_retain_time();
 int spinconfig_dots_enabled();
 int spinconfig_dots_log_only();
+char *spinconfig_spinweb_pid_file();
 char* spinconfig_spinweb_interfaces();
 int spinconfig_spinweb_port();
 char* spinconfig_spinweb_tls_certificate_file();

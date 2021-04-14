@@ -25,6 +25,7 @@ For the UCI interface the package will be *spin* and the section *spind*. For th
 |--|--|--|--|
 |log_use_syslog| Use syslog instead of standard output logging | 0 or 1 | 1 |
 |log_loglevel| The loglevel for logging | Integer | 6 |
+|pid_file | Filename to store the process id of spind in | String ||
 |pubsub_host| The host name or IP address of the MQTT server (for spind to send traffic data, mqtt protocol) | String | 127.0.0.1 |
 |pubsub_port| The port of the MQTT server (for spind to send traffic data, mqtt protocol) | Integer | 1883 |
 |pubsub_websocket_host | The hostname of the MQTT server (for clients to read traffic data, websockets protocol) | String | 127.0.0.1 |
@@ -39,6 +40,7 @@ For the UCI interface the package will be *spin* and the section *spind*. For th
 |node_cache_retain_time|The time (in seconds) to keep nodes (devices, remote addresses) in memory after they were last seen to send or receive traffic|Integer|1800|
 |dots_enabled|Enable the experimental DOTS implementation|0 or 1|0|
 |dots_log_only|Only log DOTS notifications, do not act on them|0 or 1|0|
+|spinweb_pid_file | Filename to store the process id of spinweb in | String ||
 |spinweb_interfaces|A comma-separated list of IP addresses on which spinweb listens for requests|String|127.0.0.1|
 |spinweb_port|The port that spinweb listens on for requests|Integer|13026|
 |spinweb_tls_certificate_file|The PEM-formatted certificate file for spinweb TLS connections. If this (and spinweb_tls_key_file) is specified, spinweb uses https instead of http to serve requests. When TLS is configured, mqtt websockets connections are automatically assumed to use wss:// instead of ws://, so when an MQTT server is run independently from SPIN, it should be configured with TLS support as well.|String||
