@@ -31,6 +31,7 @@ For the UCI interface the package will be *spin* and the section *spind*. For th
 |pubsub_websocket_port | The port of the MQTT server (for clients to read traffic data, websockets protocol) | Integer | 1884 |
 |pubsub_timeout | The time-out value for MQTT connections in seconds | Integer | 60 |
 |pubsub_run_mosquitto | If set to 1, spind will start a mosquitto instance with the settings as used in the SPIN configuration, instead of connecting to an existing one | 0 or 1 | 1 |
+|pubsub_run_password_file | Filename of a standard password file to use for the mosquitto instance that is started if pubsub_run_mosquitto is set to 1. This requires users to authenticate to mosquitto in order to be able to read traffic data | String ||
 |OBSOLETE? iptable_queue_dns|The Iptables queue number for DNS data, change this if the queue number is already used by some other program|Integer|1|
 |iptable_queue_block|The Iptables queue number for block rule data, change this if the queue number is already used by some other program|Integer|2|
 |OBSOLETE?iptable_place_dns|
@@ -42,6 +43,7 @@ For the UCI interface the package will be *spin* and the section *spind*. For th
 |spinweb_port|The port that spinweb listens on for requests|Integer|13026|
 |spinweb_tls_certificate_file|The PEM-formatted certificate file for spinweb TLS connections. If this (and spinweb_tls_key_file) is specified, spinweb uses https instead of http to serve requests. When TLS is configured, mqtt websockets connections are automatically assumed to use wss:// instead of ws://, so when an MQTT server is run independently from SPIN, it should be configured with TLS support as well.|String||
 |spinweb_tls_certificate_file|The private key file for spinweb TLS connections. See _spinweb_tls_certificate_file_|String||
+|spinweb_password_file| Filename of a standard password file to use to access the spinweb HTTP pages. Setting a value here enables HTTP authentication. Note that if pubsub_run_password_file is set, users will have to authenticate twice (once to get to the page, once to access traffic data), so if mosquitto is protected by a password file, it may not be necessary to set one here as well | String ||
 
 ## Example configuration file (default)
 
@@ -54,6 +56,7 @@ For the UCI interface the package will be *spin* and the section *spind*. For th
 	pubsub_channel_traffic = SPIN/traffic
 	pubsub_timeout = 60
 	pubsub_run_mosquitto = 1
+	pubsub_run_password_file = 
 	iptable_queue_dns = 1
 	iptable_queue_block = 2
 	iptable_place_dns = 0
