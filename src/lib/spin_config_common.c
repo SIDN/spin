@@ -17,6 +17,7 @@ enum configs {
     PUBSUB_TIMEOUT,
     PUBSUB_RUN_MOSQUITTO,
     PUBSUB_RUN_PASSWORD_FILE,
+    PUBSUB_RUN_PID_FILE,
     IPTABLE_QUEUE_DNS,
     IPTABLE_QUEUE_BLOCK,
     IPTABLE_PLACE_DNS,
@@ -60,6 +61,8 @@ struct conf_item {
             { "pubsub_run_mosquitto",       "1",                0   },
     [PUBSUB_RUN_PASSWORD_FILE] =
             { "pubsub_run_password_file",   "",                 0   },
+    [PUBSUB_RUN_PID_FILE] =
+            { "pubsub_run_pid_file",        "",                 0   },
     [IPTABLE_QUEUE_DNS] =
             { "iptable_queue_dns",          "1",                0   },
     [IPTABLE_QUEUE_BLOCK] =
@@ -186,32 +189,31 @@ int spinconfig_pubsub_run_mosquitto() {
     return(spi_int(PUBSUB_RUN_MOSQUITTO));
 }
 
-char *spinconfig_pubsub_run_password_file() {
+char* spinconfig_pubsub_run_password_file() {
     return(spi_str(PUBSUB_RUN_PASSWORD_FILE));
 }
 
-int spinconfig_iptable_nflog_dns_group() {
+char* spinconfig_pubsub_run_pid_file() {
+    return(spi_str(PUBSUB_RUN_PID_FILE));
+}
 
+int spinconfig_iptable_nflog_dns_group() {
     return(spi_int(IPTABLE_QUEUE_DNS));
 }
 
 int spinconfig_iptable_queue_block() {
-
     return(spi_int(IPTABLE_QUEUE_BLOCK));
 }
 
 int spinconfig_iptable_place_dns() {
-
     return(spi_int(IPTABLE_PLACE_DNS));
 }
 
 int spinconfig_iptable_place_block() {
-
     return(spi_int(IPTABLE_PLACE_BLOCK));
 }
 
 char *spinconfig_iptable_debug() {
-
     return(spi_str(IPTABLE_DEBUG));
 }
 
@@ -263,4 +265,3 @@ void spinconfig_print_defaults() {
         }
     }
 }
-

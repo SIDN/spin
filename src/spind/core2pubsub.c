@@ -212,6 +212,11 @@ mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const cha
         spin_log(LOG_ERR, "fopen %s: %s\n", mosq_conf_filename, strerror(errno));
         return 1;
     }
+    char* pid_file = spinconfig_pubsub_run_pid_file();
+    if (pid_file != NULL && strlen(pid_file) > 0) {
+        fprintf(mosq_conf, "pid_file %s\n", pid_file);
+    }
+
     // Enable per-listener settings
     fprintf(mosq_conf, "per_listener_settings true\n");
 
@@ -287,15 +292,31 @@ int mosquitto_start_server(const char* host, int port, const char* websocket_hos
         return 1;
     }
     fflush(stdout);
-    // TODO: use posix_spawn?
     int pid = fork();
     result = 1234;
     if(pid == 0) {
-        snprintf(commandline, 255, "mosquitto -c %s", mosq_conf_filename);
+        // mosquitto only writes a pid file when in daemon mode
+        // but if there is no pid file configure we do NOT want daemon
+        // mode (we want to send TERM to this fork in that case)
+        char* pid_file = spinconfig_pubsub_run_pid_file();
+        if (pid_file && strlen(pid_file) > 0) {
+            signal(SIGCHLD,SIG_IGN);
+            snprintf(commandline, 255, "mosquitto -d -c %s", mosq_conf_filename);
+        } else {
+            snprintf(commandline, 255, "mosquitto -c %s", mosq_conf_filename);
+        }
         result = system(commandline);
         exit(result);
     }
+    // Prevent the child process from going defunct when it exits
+    signal(SIGCHLD,SIG_IGN);
+
+    // As a fallback case if spin is not configured to store the mosquitto
+    // pid in a file, store the fork() pid and use that to stop mosquitto
+    // note that this should be a fallback only, as it does not always
+    // work when spin itself receives a SIGTERM
     mosq_pid = pid;
+    spin_log(LOG_INFO, "Mosquitto server started with pid %d\n", mosq_pid);
 
     //result = 1;
     fflush(stdout);
@@ -304,12 +325,35 @@ int mosquitto_start_server(const char* host, int port, const char* websocket_hos
     return 0;
 }
 
+
+int read_pid (char *pidfile)
+{
+  FILE *f;
+  int pid;
+
+  if (!(f=fopen(pidfile,"r")))
+    return 0;
+  fscanf(f,"%d", &pid);
+  fclose(f);
+  return pid;
+}
+
 void mosquitto_stop_server() {
-    spin_log(LOG_INFO, "Stopping mosquitto server");
+    // if we have a pid file for mosquitto, use that to kill it
+    // Otherwise, use the fallback option (our fork() sibling)
+    char* pid_file = spinconfig_pubsub_run_pid_file();
+    if (pid_file != NULL && strlen(pid_file) > 0) {
+        spin_log(LOG_INFO, "Reading pid from file %s\n", pid_file);
+        int file_pid = read_pid(pid_file);
+        if (file_pid != 0) {
+            mosq_pid = file_pid;
+        }
+    }
+    spin_log(LOG_INFO, "Stopping mosquitto server with pid %d\n", mosq_pid);
     kill(mosq_pid, SIGTERM);
     sleep(2);
     kill(mosq_pid, SIGKILL);
-    spin_log(LOG_INFO, "Mosquitto server has been stopped");
+    spin_log(LOG_INFO, "Mosquitto server has been stopped\n");
 
     // Remove the temporary file, doublecheck
     // /tmp/spin_mosq_conf_

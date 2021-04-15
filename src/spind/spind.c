@@ -243,6 +243,12 @@ void spin_register(char *name, spinfunc wf, void *arg, int list[N_IPLIST]) {
 }
 
 void int_handler(int signal) {
+    spin_log(LOG_INFO, "SIGINT received, shutting down SPIN daemon\n");
+    mainloop_end();
+}
+
+void term_handler(int signal) {
+    spin_log(LOG_INFO, "SIGTERM received, shutting down SPIN daemon\n");
     mainloop_end();
 }
 
@@ -316,8 +322,8 @@ int main(int argc, char** argv) {
 #ifndef USE_UBUS
     char *json_rpc_socket_path = JSON_RPC_SOCKET_PATH;
 #endif
-    int passive_mode = 0;
     enum arp_table_backend arp_backend = ARP_TABLE_LINUX;
+    int passive_mode = 0;
 
     while ((c = getopt (argc, argv, "c:Cde:hj:lm:oPp:v")) != -1) {
         switch (c) {
@@ -454,6 +460,7 @@ int main(int argc, char** argv) {
 
     init_mosquitto(spinconfig_pubsub_run_mosquitto(), mosq_host, mosq_port, mosq_websocket_host, mosq_websocket_port);
     signal(SIGINT, int_handler);
+    signal(SIGTERM, term_handler);
 
 #ifdef USE_UBUS
     ubus_main();
