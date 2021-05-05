@@ -41,7 +41,7 @@ send_jsonrpc_message_raw(const char* request) {
     size_t data_size;
 
     if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1){
-        fprintf(stderr, "Error connecting to domain socket %s", domain_socket_path);
+        fprintf(stderr, "Error connecting to domain socket %s: %s\n", domain_socket_path, strerror(errno));
         return NULL;
     }
 
@@ -55,7 +55,7 @@ send_jsonrpc_message_raw(const char* request) {
     }
 
     if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        fprintf(stderr, "Error connecting to JSONRPC socket!\n");
+        fprintf(stderr, "Error connecting to JSONRPC socket %s: %s\n", domain_socket_path, strerror(errno));
         return NULL;
     }
 
@@ -64,7 +64,7 @@ send_jsonrpc_message_raw(const char* request) {
     while (data_read < data_size) {
         rc = write(fd, request, data_size - data_read);
         if (rc < 0) {
-            fprintf(stderr, "Error while writing");
+            fprintf(stderr, "Error while writing: %s\n", strerror(errno));
             return NULL;
         }
         data_read += rc;
@@ -79,7 +79,7 @@ send_jsonrpc_message_raw(const char* request) {
     while(rc != 0) {
         rc = read(fd, response + data_read, response_size - data_read);
         if (rc < 0) {
-            fprintf(stderr, "Error while reading\n");
+            fprintf(stderr, "Error while reading: %s\n", strerror(errno));
             free(response);
             return NULL;
         } else if (rc > 0) {

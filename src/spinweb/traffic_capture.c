@@ -362,7 +362,7 @@ tc_start_mqtt_capture_for(const char* device_mac) {
 
     // make a thread to read and send its data
     if(pthread_create(&capture_thread, NULL, process_mqtt_capture, cp)) {
-        fprintf(stderr, "Error creating thread\n");
+        fprintf(stderr, "Error creating thread: %s\n", strerror(errno));
         ct_remove_capture_process(cp);
         return -4;
     }
