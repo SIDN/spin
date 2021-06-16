@@ -19,7 +19,9 @@ static char *extsrc_socket_path;
 
 static flow_list_t *flow_list;
 
-static int fd;
+struct wf_extsrc_arg {
+    int fd;
+};
 
 /* #define EXTSRC_DEBUG */
 
@@ -106,6 +108,7 @@ wf_extsrc(void *arg, int data, int timeout)
 {
     struct extsrc_msg_hdr hdr;
     void *msg = NULL;
+    int fd = ((struct wf_extsrc_arg *)arg)->fd;
 
     spin_log(LOG_DEBUG, "wf_extsrc\n");
 
@@ -208,8 +211,10 @@ removesocket(void)
 void
 init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, trafficfunc th, char *sp)
 {
+    struct wf_extsrc_arg *wf_arg;
     struct sockaddr_un s_un;
     mode_t old_umask;
+    int fd;
 
     spin_log(LOG_DEBUG, "registering external source\n");
 
@@ -252,7 +257,14 @@ init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, trafficfunc th, char *sp)
 
     atexit(removesocket);
 
-    mainloop_register("external-source", wf_extsrc, (void *) 0, fd, 0);
+    wf_arg = malloc(sizeof(struct wf_extsrc_arg));
+    if (!wf_arg) {
+        spin_log(LOG_ERR, "malloc: %s", strerror(errno));
+        exit(1);
+    }
+    wf_arg->fd = fd;
+
+    mainloop_register("external-source", wf_extsrc, (void *) wf_arg, fd, 0);
 
     spin_log(LOG_DEBUG, "registered external source\n");
 }
