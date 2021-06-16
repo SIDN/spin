@@ -32,6 +32,8 @@ struct mnreg {
     struct timeval      mnr_nxttime;    /* Time of next end-of-period */
 } mnr[MAXMNR];
 static int n_mnr = 0;
+static struct pollfd fds[MAXMNR];
+static int nfds = 0;
 
 STAT_MODULE(mainloop)
 
@@ -64,6 +66,16 @@ void mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval) {
     /* Convert millisecs to secs and microsecs */
     mnr[n_mnr].mnr_toval.tv_sec = toval/1000;
     mnr[n_mnr].mnr_toval.tv_usec = 1000*(toval%1000);
+
+    if (fd) {
+        mnr[n_mnr].mnr_pollnumber = nfds;
+        fds[nfds].fd = fd;
+        fds[nfds].events = POLLIN;
+        nfds++;
+    } else {
+        mnr[n_mnr].mnr_pollnumber = -1;
+    }
+
     n_mnr++;
 }
 
@@ -134,8 +146,6 @@ wf_mainloop(void *arg, int data, int timeout) {
 }
 
 void mainloop_run() {
-    struct pollfd fds[MAXMNR];
-    int nfds = 0;
     int i, pollnum;
     int rs;
     struct timeval time_now, time_interesting;
@@ -147,16 +157,6 @@ void mainloop_run() {
 
     mainloop_register("mainloop", wf_mainloop, (void *) 0, 0, 60000);
     init_mltime();
-    for (i=0; i<n_mnr; i++) {
-        if (mnr[i].mnr_fd) {
-            mnr[i].mnr_pollnumber = nfds;
-            fds[nfds].fd = mnr[i].mnr_fd;
-            fds[nfds].events = POLLIN;
-            nfds++;
-        } else {
-            mnr[i].mnr_pollnumber = -1;
-        }
-    }
 
     memboundary = sbrk(0);
 
