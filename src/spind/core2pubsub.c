@@ -195,10 +195,14 @@ int
 mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const char* pubsub_websocket_host, int pubsub_websocket_port) {
     FILE* mosq_conf;
     sprintf(mosq_conf_filename, MOSQ_CONF_TEMPLATE);
-    mkstemp(mosq_conf_filename);
+    if (mkstemp(mosq_conf_filename) == -1) {
+        spin_log(LOG_ERR, "mkstemp %s: %s\n", mosq_conf_filename, strerror(errno));
+        return 1;
+    }
     printf("Tempname #1: %s\n", mosq_conf_filename);
     mosq_conf = fopen(mosq_conf_filename, "w");
     if (mosq_conf == NULL) {
+        spin_log(LOG_ERR, "fopen %s: %s\n", mosq_conf_filename, strerror(errno));
         return 1;
     }
     // Always listen on localhost 1883
