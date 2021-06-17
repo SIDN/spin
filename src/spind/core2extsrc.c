@@ -227,6 +227,7 @@ init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, trafficfunc th, char *sp)
         exit(1);
     }
 
+    memset(&s_un, 0, sizeof(s_un));
     s_un.sun_family = AF_UNIX;
     if (snprintf(s_un.sun_path, sizeof(s_un.sun_path), "%s",
         extsrc_socket_path) >= (ssize_t)sizeof(s_un.sun_path)) {

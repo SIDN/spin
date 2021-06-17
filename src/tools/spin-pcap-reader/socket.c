@@ -19,6 +19,7 @@ socket_open(const char *sockpath)
 		err(1, "socket");
 	}
 
+	memset(&s_un, 0, sizeof(s_un));
 	s_un.sun_family = AF_UNIX;
 	if (snprintf(s_un.sun_path, sizeof(s_un.sun_path), "%s",
 	    sockpath) >= (ssize_t)sizeof(s_un.sun_path)) {
