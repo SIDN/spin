@@ -113,8 +113,7 @@ wf_extsrc(void *arg, int data, int timeout)
     spin_log(LOG_DEBUG, "wf_extsrc\n");
 
     if (recv(fd, &hdr, sizeof(hdr), MSG_PEEK) != sizeof(hdr)) {
-        // XXX interesting errno?
-        spin_log(LOG_WARNING, "%s: recv: short read\n", __func__);
+        spin_log(LOG_WARNING, "%s: recv: %s\n", __func__, strerror(errno));
         goto fail;
     }
 
@@ -132,8 +131,7 @@ wf_extsrc(void *arg, int data, int timeout)
     }
 
     if (read(fd, msg, len) != len) {
-        // XXX interesting errno?
-        spin_log(LOG_WARNING, "%s: read: short read\n", __func__);
+        spin_log(LOG_WARNING, "%s: read: %s\n", __func__, strerror(errno));
         goto fail;
     }
 
