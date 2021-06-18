@@ -262,7 +262,7 @@ init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, trafficfunc th, char *sp)
     }
     wf_arg->fd = fd;
 
-    mainloop_register("external-source", wf_extsrc, (void *) wf_arg, fd, 0);
+    mainloop_register("external-source", wf_extsrc, (void *) wf_arg, fd, 0, 1);
 
     spin_log(LOG_DEBUG, "registered external source\n");
 }

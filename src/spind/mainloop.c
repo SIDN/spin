@@ -55,12 +55,21 @@ static void mnreg_deactivate(struct mnreg *reg) {
     timerclear(&reg->mnr_nxttime);
 }
 
-// Register work function:  timeout in millisec
-void mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval) {
+/*
+ * Register work function:  timeout in millisec
+ *
+ * If mustsucceed equals 1, this function guarantees that it will succeed
+ * in registering the work OR exit() the program if that's not possible. In
+ * other words, there's no need to check the return value.
+ *
+ * If mustsucceed equals 0, this function returns 0 if the work was registered,
+ * and returns 1 if that was not possible.
+ */
+int mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval, int mustsucceed) {
     int i;
     int cur_mnr;
 
-    spin_log(LOG_DEBUG, "Mainloop registered %s(..., %d, %d)\n", name, fd, toval);
+    spin_log(LOG_DEBUG, "Mainloop registering %s(..., %d, %d)\n", name, fd, toval);
 
     /*
      * Look for MNR struct that is not active and can be reused. If not found,
@@ -75,7 +84,12 @@ void mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval) {
     }
 
     if (cur_mnr >= MAXMNR) {
-        panic("Ran out of MNR structs");
+        if (mustsucceed) {
+            panic("Ran out of MNR structs");
+        } else {
+            spin_log(LOG_DEBUG, "Mainloop registering %s FAILED\n", name);
+            return 1;
+        }
     }
 
     if (fd  != 0) {
@@ -108,6 +122,8 @@ void mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval) {
     if (cur_mnr == n_mnr) {
         n_mnr++;
     }
+
+    return 0;
 }
 
 static void init_mltime() {
@@ -186,7 +202,7 @@ void mainloop_run() {
     STAT_COUNTER(polltime, polltime, STAT_TOTAL);
     STAT_COUNTER(mem, memextra, STAT_MAX);
 
-    mainloop_register("mainloop", wf_mainloop, (void *) 0, 0, 60000);
+    mainloop_register("mainloop", wf_mainloop, (void *) 0, 0, 60000, 1);
     init_mltime();
 
     memboundary = sbrk(0);

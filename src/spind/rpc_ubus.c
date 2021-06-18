@@ -103,7 +103,7 @@ int ubus_main()
     }
 
     fd_set_blocking(ctx->sock.fd, 0);
-    mainloop_register("ubus", wf_ubus, NULL, ctx->sock.fd, 0);
+    mainloop_register("ubus", wf_ubus, NULL, ctx->sock.fd, 0, 1);
 
     ret = ubus_add_object(ctx, &spin_object);
     if (ret) {

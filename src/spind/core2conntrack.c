@@ -195,7 +195,7 @@ void init_core2conntrack(node_cache_t* node_cache, int local_mode, trafficfunc h
     // Register in the main loop
     // In this case, we do not need a callback on data; we just want to be
     // called every timeout
-    mainloop_register("core2conntrack", core2conntrack_callback, (void *) 0, 0, 1000);
+    mainloop_register("core2conntrack", core2conntrack_callback, (void *) 0, 0, 1000, 1);
 
     spin_log(LOG_DEBUG, "core2conntrack initialized\n");
 }

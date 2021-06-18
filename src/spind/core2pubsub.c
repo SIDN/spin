@@ -274,7 +274,7 @@ void init_mosquitto(int start_own_instance, const char* host, int port, const ch
     connect_mosquitto(host, port);
 
     mainloop_register("mosq", &wf_mosquitto, (void *) 0,
-            mosquitto_socket(mosq), mosquitto_keepalive_time*1000/2);
+            mosquitto_socket(mosq), mosquitto_keepalive_time*1000/2, 1);
     mosquitto_socket(mosq);
 
     send_command_restart();

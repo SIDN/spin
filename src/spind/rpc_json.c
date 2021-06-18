@@ -282,7 +282,7 @@ init_json_rpc(char *json_rpc_socket_path) {
         exit(errno);
     }
     spin_log(LOG_INFO, "Listening for JSON-RPC commands on %s\n", json_rpc_socket_path);
-    mainloop_register("jsonrpc", wf_jsonrpc, (void *) 0, rpc_fd, 0);
+    mainloop_register("jsonrpc", wf_jsonrpc, (void *) 0, rpc_fd, 0, 1);
 }
 
 void

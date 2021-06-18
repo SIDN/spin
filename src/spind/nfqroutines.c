@@ -314,7 +314,7 @@ void nfqroutine_register(char *name, nfqrfunc wf, void *arg, int queue) {
         }
         library_fd = nfq_fd(library_handle);
         fd_set_blocking(library_fd, 0);
-        mainloop_register("nfq", wf_nfq, (void *) 0, library_fd, 0);
+        mainloop_register("nfq", wf_nfq, (void *) 0, library_fd, 0, 1);
     }
 
     spin_log(LOG_DEBUG, "binding this socket to queue '%d'\n", queue);

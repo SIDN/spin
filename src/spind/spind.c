@@ -215,7 +215,7 @@ init_ipl_list_ar() {
     init_all_ipl(get_spin_iplists());
 
     // Sync trees to files every 2.5 seconds for now
-    mainloop_register("IP list sync", wf_ipl, (void *) 0, 0, 2500);
+    mainloop_register("IP list sync", wf_ipl, (void *) 0, 0, 2500, 1);
 }
 
 #define MAXSR 3 /* More than this would be excessive */
@@ -296,7 +296,7 @@ void init_cache(enum arp_table_backend backend) {
     dns_cache = dns_cache_create();
     node_cache = node_cache_create(backend);
 
-    mainloop_register("node_cache_clean", node_cache_clean_wf, (void *) 0, 0, CLEAN_TIMEOUT);
+    mainloop_register("node_cache_clean", node_cache_clean_wf, (void *) 0, 0, CLEAN_TIMEOUT, 1);
 }
 
 void cleanup_cache() {

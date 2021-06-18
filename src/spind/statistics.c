@@ -52,7 +52,7 @@ wf_stat(void * arg, int data, int timeout) {
 void
 spin_stat_start() {
 
-    mainloop_register("Statistics", wf_stat, (void *) 0, 0, 30000);
+    mainloop_register("Statistics", wf_stat, (void *) 0, 0, 30000, 1);
 }
 
 void

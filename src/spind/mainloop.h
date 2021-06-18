@@ -3,7 +3,7 @@
 
 typedef void (*workfunc)(void*, int, int);
 
-void mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval);
+int mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval, int mustsucceed);
 void mainloop_run();
 void mainloop_end();
 #endif

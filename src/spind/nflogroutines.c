@@ -220,7 +220,7 @@ void nflogroutine_register(char *name, nflogfunc wf, void *arg, int group_number
         }
         library_fd = nflog_fd(library_handle);
         fd_set_blocking(library_fd, 0);
-        mainloop_register("nfq", wf_nfq, (void *) 0, library_fd, 0);
+        mainloop_register("nfq", wf_nfq, (void *) 0, library_fd, 0, 1);
     }
 
     spin_log(LOG_DEBUG, "binding this socket to group '%d'\n", group_number);
