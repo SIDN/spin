@@ -1,6 +1,9 @@
 
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#include <netdb.h>
 #include <time.h>
 
 #include "core2extsrc.h"
@@ -28,6 +31,12 @@ struct wf_extsrc_arg {
 /* #define EXTSRC_DEBUG */
 
 /*
+ * If not using UNIX domain sockets, use TCP for communication between
+ * an extsrc client and spind if defined; UDP otherwise.
+ */
+#define EXTSRC_TCP
+
+/*
  * Note: when processing a message received from the socket, it is important
  * to:
  * (1) verify that the payload has the expected size. This is done in
@@ -44,6 +53,11 @@ process_pkt_info_extsrc(pkt_info_t *pkt_info)
     /*
      * Sanitize input: not necessary.
      */
+
+     /*
+      * XXX
+      */
+    pkt_info->family = extsrc_af_from_wire(pkt_info->family);
 
     /*
      * We could potentially send a timestamp through the socket and use
@@ -207,29 +221,132 @@ out:
     free(msg);
 }
 
+#ifdef EXTSRC_TCP
+static void
+wf_extsrc_accept(void *arg, int data, int timeout)
+{
+    struct wf_extsrc_arg *wf_arg = NULL;
+    struct sockaddr addr;
+    socklen_t addrlen = sizeof(addr);
+    int fd = ((struct wf_extsrc_arg *)arg)->fd;
+
+    int cfd = accept(fd, &addr, &addrlen);
+    if (cfd == -1) {
+        spin_log(LOG_WARNING, "accept: %s\n", strerror(errno));
+        goto bad;
+    }
+
+    wf_arg = malloc(sizeof(struct wf_extsrc_arg));
+    if (!wf_arg) {
+        spin_log(LOG_WARNING, "malloc: %s", strerror(errno));
+        goto bad;
+    }
+    wf_arg->fd = cfd;
+
+    if (mainloop_register("external-source-tcp", wf_extsrc, (void *) wf_arg, cfd,
+        0, 0) == 1) {
+        spin_log(LOG_WARNING, "mainloop_register returned failure\n");
+        goto bad;
+    }
+
+    return;
+
+ bad:
+    close(cfd);
+    free(wf_arg);
+    spin_log(LOG_WARNING, "%s: can't serve extsrc client\n", __func__);
+}
+#endif /* EXTSRC_TCP */
+
 static void
 removesocket(void)
 {
     remove(extsrc_socket_path);
 }
 
-void
-init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, trafficfunc th, char *sp)
+static void
+socket_open_inet(const char *addr)
+{
+    struct wf_extsrc_arg *wf_arg;
+    struct addrinfo hints, *res;
+    char port[sizeof("65535")];
+    int error;
+    int fd;
+    int opt = 1;
+
+    spin_log(LOG_DEBUG, "registering external source (%s)\n", addr);
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+#ifdef EXTSRC_TCP
+    hints.ai_socktype = SOCK_STREAM;
+#else
+    hints.ai_socktype = SOCK_DGRAM;
+#endif
+    snprintf(port, sizeof(port), "%d", EXTSRC_PORT);
+    /*
+     * XXX should we loop through the results? don't want to spend too many
+     * fds.
+     */
+    error = getaddrinfo(addr, port, &hints, &res);
+    if (error) {
+        spin_log(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+        exit(1);
+    }
+
+    fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (fd == -1) {
+        spin_log(LOG_ERR, "socket: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
+        spin_log(LOG_ERR, "setsockopt SO_REUSEADDR: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    if (bind(fd, res->ai_addr, res->ai_addrlen) == -1) {
+        spin_log(LOG_ERR, "bind: %s\n", strerror(errno));
+        exit(1);
+    }
+
+    freeaddrinfo(res);
+
+#ifdef EXTSRC_TCP
+    if (listen(fd, 2) == -1) {
+        spin_log(LOG_ERR, "listen: %s\n", strerror(errno));
+        exit(1);
+    }
+#endif /* EXTSRC_TCP */
+
+    // XXX is currently never freed
+    wf_arg = malloc(sizeof(struct wf_extsrc_arg));
+    if (!wf_arg) {
+        spin_log(LOG_ERR, "malloc: %s", strerror(errno));
+        exit(1);
+    }
+    wf_arg->fd = fd;
+
+#ifdef EXTSRC_TCP
+    mainloop_register("external-source", wf_extsrc_accept, (void *) wf_arg, fd,
+        0, 1);
+#else
+    mainloop_register("external-source", wf_extsrc, (void *) wf_arg, fd, 0, 1);
+#endif
+
+    spin_log(LOG_INFO, "extsrc: listening on [%s]:%d\n", addr, EXTSRC_PORT);
+}
+
+static void
+socket_open_unix()
 {
     struct wf_extsrc_arg *wf_arg;
     struct sockaddr_un s_un;
     mode_t old_umask;
     int fd;
 
-    spin_log(LOG_DEBUG, "registering external source\n");
-
-    node_cache = nc;
-    dns_cache = dc;
-    traffic_hook = th;
-    extsrc_socket_path = sp;
-
-    // XXX does it matter what timestamp we use? No idea.
-    flow_list = flow_list_create(time(NULL));
+    spin_log(LOG_DEBUG, "registering external source (%s)\n",
+        extsrc_socket_path);
 
     fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0);
     if (fd == -1) {
@@ -262,6 +379,7 @@ init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, trafficfunc th, char *sp)
 
     atexit(removesocket);
 
+    // XXX is currently never freed
     wf_arg = malloc(sizeof(struct wf_extsrc_arg));
     if (!wf_arg) {
         spin_log(LOG_ERR, "malloc: %s", strerror(errno));
@@ -270,6 +388,29 @@ init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, trafficfunc th, char *sp)
     wf_arg->fd = fd;
 
     mainloop_register("external-source", wf_extsrc, (void *) wf_arg, fd, 0, 1);
+}
+
+void
+init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, trafficfunc th, char *sp, char *la)
+{
+    node_cache = nc;
+    dns_cache = dc;
+    traffic_hook = th;
+
+    if (sp) {
+        extsrc_socket_path = sp;
+    } else {
+        extsrc_socket_path = EXTSRC_SOCKET_PATH;
+    }
+
+    // XXX does it matter what timestamp we use? No idea.
+    flow_list = flow_list_create(time(NULL));
+
+    if (la) {
+        socket_open_inet(la);
+    } else {
+        socket_open_unix();
+    }
 
     spin_log(LOG_DEBUG, "registered external source\n");
 }

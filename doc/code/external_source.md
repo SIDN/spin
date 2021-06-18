@@ -7,8 +7,9 @@ an external program to feed information to spind through a socket.
 The idea is that this facility can be used for simulating network traffic
 or for testing spind, for example.
 
-spind opens a socket on `EXTSRC_SOCKET_PATH`
-(currently defined as `/var/run/spin-extsrc.sock`).
+spind either opens a UNIX domain socket on `EXTSRC_SOCKET_PATH`
+(currently defined as `/var/run/spin-extsrc.sock`)
+or an Internet socket on port `EXTSRC_PORT`.
 Applications can send messages through this socket;
 see `src/include/extsrc.h` for more details.
 Applications can use the `extsrc_msg_create_*` functions to create messages

@@ -8,6 +8,18 @@
 
 #define EXTSRC_SOCKET_PATH "/var/run/spin-extsrc.sock"
 
+#define EXTSRC_PORT 20867
+
+/*
+ * Before sending an extsrc_msg over the network, convert any address family
+ * values to these defines and convert them back when receiving them.
+ */
+#define EXTSRC_AF_INET 4
+#define EXTSRC_AF_INET6 6
+
+uint8_t extsrc_af_to_wire(uint8_t);
+uint8_t extsrc_af_from_wire(uint8_t);
+
 /******************************************************************************/
 
 /*
