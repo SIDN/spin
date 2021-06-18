@@ -23,6 +23,7 @@
 #define MAXMNR 10       /* More than this would be excessive */
 static
 struct mnreg {
+    int                 mnr_active;     /* Active if 1, can be reused if 0 */
     char *              mnr_name;       /* Name of module for debugging */
     workfunc            mnr_wf;         /* The to-be-called work function */
     void *              mnr_wfarg;      /* Call back argument */
@@ -43,15 +44,41 @@ static void panic(char *s) {
     exit(-1);
 }
 
+static void mnreg_deactivate(struct mnreg *reg) {
+    reg->mnr_active = 0;
+    reg->mnr_name = "inactive";
+    reg->mnr_wf = NULL;
+    reg->mnr_wfarg = NULL;
+    reg->mnr_fd = -1;
+    reg->mnr_pollnumber = -1;
+    timerclear(&reg->mnr_toval);
+    timerclear(&reg->mnr_nxttime);
+}
+
 // Register work function:  timeout in millisec
 void mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval) {
+    int i;
+    int cur_mnr;
 
     spin_log(LOG_DEBUG, "Mainloop registered %s(..., %d, %d)\n", name, fd, toval);
-    if (n_mnr >= MAXMNR) {
+
+    /*
+     * Look for MNR struct that is not active and can be reused. If not found,
+     * use mnr[n_nmr].
+     */
+    cur_mnr = n_mnr;
+    for (i = 0; i < n_mnr; i++) {
+        if (!mnr[i].mnr_active) {
+            cur_mnr = i;
+            break;
+        }
+    }
+
+    if (cur_mnr >= MAXMNR) {
         panic("Ran out of MNR structs");
     }
+
     if (fd  != 0) {
-        int i;
         /* File descriptors if non-zero must be unique */
         for (i=0; i<n_mnr; i++) {
             if (mnr[i].mnr_fd == fd) {
@@ -59,24 +86,28 @@ void mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval) {
             }
         }
     }
-    mnr[n_mnr].mnr_name = name;
-    mnr[n_mnr].mnr_wf = wf;
-    mnr[n_mnr].mnr_wfarg = arg;
-    mnr[n_mnr].mnr_fd = fd;
+
+    mnr[cur_mnr].mnr_active = 1;
+    mnr[cur_mnr].mnr_name = name;
+    mnr[cur_mnr].mnr_wf = wf;
+    mnr[cur_mnr].mnr_wfarg = arg;
+    mnr[cur_mnr].mnr_fd = fd;
     /* Convert millisecs to secs and microsecs */
-    mnr[n_mnr].mnr_toval.tv_sec = toval/1000;
-    mnr[n_mnr].mnr_toval.tv_usec = 1000*(toval%1000);
+    mnr[cur_mnr].mnr_toval.tv_sec = toval/1000;
+    mnr[cur_mnr].mnr_toval.tv_usec = 1000*(toval%1000);
 
     if (fd) {
-        mnr[n_mnr].mnr_pollnumber = nfds;
+        mnr[cur_mnr].mnr_pollnumber = nfds;
         fds[nfds].fd = fd;
         fds[nfds].events = POLLIN;
         nfds++;
     } else {
-        mnr[n_mnr].mnr_pollnumber = -1;
+        mnr[cur_mnr].mnr_pollnumber = -1;
     }
 
-    n_mnr++;
+    if (cur_mnr == n_mnr) {
+        n_mnr++;
+    }
 }
 
 static void init_mltime() {
@@ -177,6 +208,9 @@ void mainloop_run() {
 
         gettimeofday(&time_now, 0);
         for (i=0; i<n_mnr; i++) {
+            if (!mnr[i].mnr_active) {
+                continue;
+            }
             argdata = 0;
             argtmout = 0;
             if ( timerisset(&mnr[i].mnr_nxttime) && timercmp(&time_now, &mnr[i].mnr_nxttime, >)) {
@@ -191,10 +225,11 @@ void mainloop_run() {
             if ( pollnum >= 0) {
                 if (fds[pollnum].revents & (POLLERR|POLLNVAL)) {
                     spin_log(LOG_ERR, "Error on fd %d from %s\n", mnr[i].mnr_fd, mnr[i].mnr_name);
-                    // Now what ??
-                    // Negate FD to prevent further errors
-                    // Who knows what is right
+                    // Negate FD to prevent further errors and make MNR struct
+                    // available for reuse.
                     fds[pollnum].fd *= -1;
+                    close(fds[pollnum].fd);
+                    mnreg_deactivate(&mnr[i]);
                 }
 
                 if (fds[pollnum].revents & POLLIN) {
