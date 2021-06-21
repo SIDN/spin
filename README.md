@@ -48,10 +48,11 @@ Library dependencies:
 - libnfnetlink0
 - libmnl
 
-    `apt-get install libnfnetlink0 libmnl0`
+    `apt-get install libnetfilter-log1 libnetfilter-queue1 libnfnetlink0 libmnl0`
 
 
 Runtime dependencies:
+- ipset
 - mosquitto (or any MQTT software that supports websockets as well)
 - kernel modules for conntrack and netfilter
 
@@ -76,7 +77,7 @@ To run SPIN, you need to run two daemons; spind to collect data, and spinweb to 
 The SPIN system is most useful when run on a gateway; there are several instructions on the web on how to set up a Debian system as a gateway. One example is [https://gridscale.io/en/community/tutorials/debian-router-gateway/](https://gridscale.io/en/community/tutorials/debian-router-gateway/).
 
 To run spind from the source tree, with stdout output and debug logging, use:
-    `(sudo) (cd ./src/build/spind/; spind -o -d)`
+    `(sudo) (cd ./src/build/spind/; ./spind -o -d)`
 
 To run the webserver, use:
     `(cd ./src/build/spinweb; ./spinweb)`
