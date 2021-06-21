@@ -37,7 +37,7 @@ function setServerData() {
     }
     let qp_mqtt_port = url.searchParams.get("mqtt_port")
     if (qp_mqtt_port) {
-        server_data.mqtt_port = qp_mqtt_port
+        server_data.mqtt_port = parseInt(qp_mqtt_port)
     } else {
         server_data.mqtt_port = 1884
     }
