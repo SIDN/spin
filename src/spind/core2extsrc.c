@@ -23,6 +23,8 @@ struct wf_extsrc_arg {
     int fd;
 };
 
+#define EXTSRC_MAX 1024 /* XXX */
+
 /* #define EXTSRC_DEBUG */
 
 /*
@@ -117,6 +119,11 @@ wf_extsrc(void *arg, int data, int timeout)
         goto fail;
     }
 
+    if (hdr.length < 0 || hdr.length > EXTSRC_MAX) {
+        spin_log(LOG_WARNING, "%s: hdr.length %d invalid\n", __func__,
+            hdr.length);
+        goto fail;
+    }
     ssize_t len = sizeof(hdr) + hdr.length;
     msg = malloc(len);
     if (msg == NULL) {
