@@ -486,10 +486,19 @@ function onMQTTClientMessage(message) {
 function connectToMQTT() {
     var url = new URL(window.location);
     var mqtt_port = url.searchParams.get("mqtt_port");
-    var server_host = window.location.hostname
-    if (!server_host) {
-        server_host = "localhost"
+    var protocol = window.location.protocol;
+    var server_host = window.location.hostname;
+
+    let wsUseSSL = false;
+    if (protocol == "https:") {
+        wsUseSSL = true;
     }
+
+    if (!server_host) {
+        server_host = "localhost";
+    }
+
+
     if (mqtt_port) {
         mqtt_port = parseInt(mqtt_port);
     } else {
@@ -500,7 +509,7 @@ function connectToMQTT() {
     mqttClient = new Paho.MQTT.Client(server_host, mqtt_port, identifier);
     mqttClient.onConnectionLost = onMQTTClientStop;
     mqttClient.onMessageArrived = onMQTTClientMessage;
-    mqttClient.connect({onSuccess:onMQTTClientOpen});
+    mqttClient.connect({onSuccess:onMQTTClientOpen, useSSL:wsUseSSL});
 }
 
     </script>

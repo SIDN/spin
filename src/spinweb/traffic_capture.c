@@ -208,7 +208,7 @@ ssize_t direct_capture_callback(void* ld_v, uint64_t pos, char* buf, size_t max)
     } else {
         /* This should go elsewhere */
         char cmdline[256];
-        snprintf(cmdline, 255, "tcpdump --immediate-mode -s 1600 -w - ether host %s", ld->mac);
+        snprintf(cmdline, 255, "tcpdump --immediate-mode -s 1600 -w - ether host %s 2>/dev/null", ld->mac);
         if (ld->process == NULL) {
             ld->process = popen(cmdline, "r");
         }
@@ -346,7 +346,7 @@ tc_start_mqtt_capture_for(const char* device_mac) {
     }
 
     char cmdline[256];
-    snprintf(cmdline, 255, "tcpdump --immediate-mode -s 1600 -w - ether host %s 2>&1 /dev/null", device_mac);
+    snprintf(cmdline, 255, "tcpdump --immediate-mode -s 1600 -w - ether host %s 2>/dev/null", device_mac);
     if (cp->process == NULL) {
         cp->process = popen(cmdline, "r");
     }
