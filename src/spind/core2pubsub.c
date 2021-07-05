@@ -1,5 +1,7 @@
 #include <mosquitto.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
 
 #include "ipl.h"
 #include "mainloop.h"
@@ -30,6 +32,62 @@ pubsub_publish(char *channel, int payloadlen, const void* payload, int retain) {
      * There is a result from command, but for now ignored
      */
     mosquitto_publish(mosq, NULL, channel, payloadlen, payload, 0, retain);
+}
+
+// We always need a pid file, even when hard-set to empty
+const char*
+get_mosquitto_pid_file() {
+    char* pid_file = spinconfig_pubsub_run_pid_file();
+    if (pid_file != NULL && strlen(pid_file) > 0) {
+        return pid_file;
+    } else {
+        return "/var/run/spind_mosquitto.pid";
+    }
+}
+
+int
+remove_mosquitto_pid_file() {
+    const char* pid_file = get_mosquitto_pid_file();
+    struct stat pf_st;
+
+    if (!stat(pid_file, &pf_st)) {
+        if (S_ISDIR(pf_st.st_mode)) {
+            return rmdir(pid_file);
+        } else {
+            return unlink(pid_file);
+        }
+    } else {
+        return 0;
+    }
+}
+
+int
+read_mosquitto_pid_file(int wait_time) {
+    int i;
+    const char* pid_file = get_mosquitto_pid_file();
+    struct stat pf_st;
+    FILE* in;
+    int result;
+
+    for (i = 0; i < wait_time; i++) {
+        spin_log(LOG_DEBUG, "[XX] wait for pid file\n");
+        if (!stat(pid_file, &pf_st)) {
+            spin_log(LOG_DEBUG, "[XX] pid file found\n");
+            in = fopen(pid_file, "r");
+            if (in != NULL) {
+                spin_log(LOG_DEBUG, "[XX] pid file opened\n");
+                if (fscanf(in, "%d", &result) == 1) {
+                    fclose(in);
+                    spin_log(LOG_DEBUG, "[XX] read pid %d\n", result);
+                    return result;
+                }
+                fclose(in);
+            }
+        }
+
+        sleep(1);
+    }
+    return -1;
 }
 
 void core2pubsub_publish_chan(char *channel, spin_data sd, int retain) {
@@ -131,6 +189,7 @@ void do_mosq_message(struct mosquitto* mosq, void* user_data, const struct mosqu
 void connect_mosquitto(const char* host, int port) {
     const char* client_name = "SPIN Daemon";
     int result;
+    int i;
 
     if (mosq != NULL) {
         mosquitto_disconnect(mosq);
@@ -142,22 +201,26 @@ void connect_mosquitto(const char* host, int port) {
         spin_log(LOG_ERR, "Error creating mqtt client instance: %s\n", strerror(errno));
         exit(1);
     }
-    spin_log(LOG_INFO, "Connecting to mqtt server on %s:%d\n", host, port);
-    result = mosquitto_connect(mosq, host, port, mosquitto_keepalive_time);
-    if (result != 0) {
-        spin_log(LOG_ERR, "Error connecting to mqtt server on %s:%d, %s\n", host, port, mosquitto_strerror(result));
-        exit(1);
+
+    // try a few times in case it is still starting up
+    for (i=0; i<60; i++) {
+        spin_log(LOG_INFO, "Connecting to mqtt server on %s:%d\n", host, port);
+        result = mosquitto_connect(mosq, host, port, mosquitto_keepalive_time);
+        if (result == 0) {
+            spin_log(LOG_INFO, "Connected to mqtt server on %s:%d with keepalive value %d\n", host, port, mosquitto_keepalive_time);
+
+            result = mosquitto_subscribe(mosq, NULL, mqtt_channel_jsonrpc_q, 0);
+            if (result != 0) {
+                spin_log(LOG_ERR, "Error subscribing to topic %s: %s\n", mqtt_channel_jsonrpc_q, mosquitto_strerror(result));
+                exit(1);
+            }
+            mosquitto_message_callback_set(mosq, do_mosq_message);
+            return;
+        }
+        sleep(1);
     }
-    spin_log(LOG_INFO, "Connected to mqtt server on %s:%d with keepalive value %d\n", host, port, mosquitto_keepalive_time);
-
-    result = mosquitto_subscribe(mosq, NULL, mqtt_channel_jsonrpc_q, 0);
-    if (result != 0) {
-        spin_log(LOG_ERR, "Error subscribing to topic %s: %s\n", mqtt_channel_jsonrpc_q, mosquitto_strerror(result));
-        exit(1);
-    }
-
-    mosquitto_message_callback_set(mosq, do_mosq_message);
-
+    spin_log(LOG_ERR, "Error connecting to mqtt server on %s:%d, %s\n", host, port, mosquitto_strerror(result));
+    exit(1);
 }
 
 void wf_mosquitto(void* arg, int data, int timeout) {
@@ -200,7 +263,6 @@ mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const cha
         spin_log(LOG_ERR, "mkstemp %s: %s\n", mosq_conf_filename, strerror(errno));
         return 1;
     }
-    printf("Tempname #1: %s\n", mosq_conf_filename);
     mosq_conf = fopen(mosq_conf_filename, "w");
     char* tls_cert_file = NULL;
     char* tls_key_file = NULL;
@@ -212,10 +274,8 @@ mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const cha
         spin_log(LOG_ERR, "fopen %s: %s\n", mosq_conf_filename, strerror(errno));
         return 1;
     }
-    char* pid_file = spinconfig_pubsub_run_pid_file();
-    if (pid_file != NULL && strlen(pid_file) > 0) {
-        fprintf(mosq_conf, "pid_file %s\n", pid_file);
-    }
+
+    fprintf(mosq_conf, "pid_file %s\n", get_mosquitto_pid_file());
 
     // Enable per-listener settings
     fprintf(mosq_conf, "per_listener_settings true\n");
@@ -241,13 +301,13 @@ mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const cha
     // anyway
     // Loop over the list of interfaces (dup), tokenize into p
     dup = strdup(spinconfig_spinweb_interfaces());
-    fprintf(stderr, "[XX] spinweb_interfaces: '%s'\n", dup);
+    spin_log(LOG_DEBUG, "[XX] spinweb_interfaces: '%s'\n", dup);
     p = strtok (dup,",");
     while (p != NULL) {
         while (*p == ' ') {
             p++;
         }
-        fprintf(stderr, "[XX] adding websockets listener: '%s' port %d\n", p, pubsub_websocket_port);
+        spin_log(LOG_DEBUG, "[XX] adding websockets listener: '%s' port %d\n", p, pubsub_websocket_port);
         fprintf(mosq_conf, "listener %d %s\n", pubsub_websocket_port, p);
         // Mosquitto will try to default to some IPv6 addresses if we give
         // an IPv4 address, which will fail if we do this multiple times,
@@ -284,11 +344,77 @@ mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const cha
     return 0;
 }
 
-int mosquitto_start_server(const char* host, int port, const char* websocket_host, int websocket_port) {
+
+int
+mosquitto_start_server(const char* host, int port, const char* websocket_host, int websocket_port) {
+    if (mosquitto_create_config_file(host, port, websocket_host, websocket_port) != 0) {
+        spin_log(LOG_ERR, "Error creating temporary configuration file for mosquitto\n");
+        return 1;
+    }
+    if (remove_mosquitto_pid_file() != 0) {
+        spin_log(LOG_ERR, "Error removing existing pid file for mosquitto: %s\n", strerror(errno));
+        return 1;
+    }
+    // Run mosquitto in daemonized mode, so we don't need to deal with
+    // fork and file descriptor issues
+    //spin_log(LOG_INFO, "[XX] calling fork()\n");
+    //int pid = fork();
+    //if(pid == 0) {
+        //int result;
+        char commandline[256];
+        spin_log(LOG_INFO, "[XX] at child, closing fds\n");
+        //fclose(stdin);
+        //fclose(stdout);
+        //fclose(stderr);
+        signal(SIGCHLD,SIG_IGN);
+        snprintf(commandline, 255, "mosquitto -d -c %s", mosq_conf_filename);
+        system(commandline);
+        //result = system(commandline);
+        //if (result != 0) {
+        //    spin_log(LOG_ERR, "Error starting mosquitto\n");
+        //}
+        //exit(result);
+        
+        /*
+        fprintf(stderr, "[XX] i am child\n");
+        fclose(stdin);
+        fclose(stdout);
+        fclose(stderr);
+        char** argv = malloc(5*sizeof(char*));
+
+        argv[0] = strdup("mosquitto");
+        argv[1] = strdup("-d");
+        argv[2] = strdup("-c");
+        argv[3] = strdup(mosq_conf_filename);
+        argv[4] = NULL;
+        execvp("mosquitto", argv);
+        exit(0);
+        */
+    //} else {
+        spin_log(LOG_INFO, "[XX] at parent\n");
+        // Prevent the child process from going defunct when it exits
+        //signal(SIGCHLD,SIG_IGN);
+        //wait(NULL);
+        mosq_pid = read_mosquitto_pid_file(5);
+        if (mosq_pid < 1) {
+            spin_log(LOG_ERR, "Unable to read mosquitto pid file, mosquitto will probably keep running when spin stops\n");
+        } else {
+            spin_log(LOG_INFO, "Mosquitto server started with pid %d\n", mosq_pid);
+        }
+
+        // Remember child PID so that we can stop the mosquitto server
+        // when spind itself stops
+        //mosq_pid = pid;
+        //sleep(5);
+        return 0;
+    //}
+}
+
+int old_mosquitto_start_server(const char* host, int port, const char* websocket_host, int websocket_port) {
     char commandline[256];
     int result;
     if (mosquitto_create_config_file(host, port, websocket_host, websocket_port) != 0) {
-        fprintf(stderr, "Error creating temporary configuration file for mosquitto\n");
+        spin_log(LOG_ERR, "Error creating temporary configuration file for mosquitto\n");
         return 1;
     }
     fflush(stdout);
@@ -367,8 +493,11 @@ void init_mosquitto(int start_own_instance, const char* host, int port, const ch
     int object;
 
     if (start_own_instance) {
-        spin_log(LOG_INFO, "Starting mosquitto server");
-        mosquitto_start_server(host, port, websocket_host, websocket_port);
+        spin_log(LOG_INFO, "Starting mosquitto server\n");
+        if (mosquitto_start_server(host, port, websocket_host, websocket_port) != 0) {
+            spin_log(LOG_ERR, "Error starting mosquitto server, aborting\n");
+            exit(1);
+        }
     }
 
     mosquitto_lib_init();

@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <netinet/in.h>
 #include <linux/udp.h>
 #include <linux/tcp.h>
@@ -7,6 +8,7 @@
 #include <linux/ipv6.h>
 #include <libnetfilter_log/libnetfilter_log.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include <assert.h>
 
@@ -204,6 +206,7 @@ wf_nfq(void *arg, int data, int timeout) {
 // Register work function:  timeout in millisec
 void nflogroutine_register(char *name, nflogfunc wf, void *arg, int group_number) {
     struct nflog_g_handle *qh;
+    int i;
 
     spin_log(LOG_DEBUG, "nflogroutine registered %s(..., %d)\n", name, group_number);
     assert (n_nfr < MAXNFR) ;
@@ -223,10 +226,17 @@ void nflogroutine_register(char *name, nflogfunc wf, void *arg, int group_number
         mainloop_register("nfq", wf_nfq, (void *) 0, library_fd, 0, 1);
     }
 
-    spin_log(LOG_DEBUG, "binding this socket to group '%d'\n", group_number);
-    qh = nflog_bind_group(library_handle, group_number);
+    for (i=0; i<30; i++) {
+        spin_log(LOG_DEBUG, "binding this socket to group '%d'\n", group_number);
+        qh = nflog_bind_group(library_handle, group_number);
+        if (qh) {
+            break;
+        } else {
+            spin_log(LOG_ERR, "error during nflog_bind_group(): %s\n", strerror(errno));
+            sleep(1);
+        }
+    }
     if (!qh) {
-        spin_log(LOG_ERR, "error during nflog_bind_group()\n");
         exit(1);
     }
 
