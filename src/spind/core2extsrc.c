@@ -119,7 +119,7 @@ wf_extsrc(void *arg, int data, int timeout)
         goto fail;
     }
 
-    if (hdr.length > EXTSRC_MAX) {
+    if (hdr.length == 0 || hdr.length > EXTSRC_MAX) {
         spin_log(LOG_WARNING, "%s: hdr.length %d invalid\n", __func__,
             hdr.length);
         goto fail;
