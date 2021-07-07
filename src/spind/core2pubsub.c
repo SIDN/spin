@@ -186,7 +186,7 @@ void do_mosq_message(struct mosquitto* mosq, void* user_data, const struct mosqu
     // TODO, what if other channel?
 }
 
-void connect_mosquitto(const char* host, int port) {
+int connect_mosquitto(const char* host, int port) {
     const char* client_name = "SPIN Daemon";
     int result;
     int i;
@@ -199,7 +199,7 @@ void connect_mosquitto(const char* host, int port) {
     mosq = mosquitto_new(client_name, 1, NULL);
     if (mosq == NULL) {
         spin_log(LOG_ERR, "Error creating mqtt client instance: %s\n", strerror(errno));
-        exit(1);
+        return 1;
     }
 
     // try a few times in case it is still starting up
@@ -212,15 +212,15 @@ void connect_mosquitto(const char* host, int port) {
             result = mosquitto_subscribe(mosq, NULL, mqtt_channel_jsonrpc_q, 0);
             if (result != 0) {
                 spin_log(LOG_ERR, "Error subscribing to topic %s: %s\n", mqtt_channel_jsonrpc_q, mosquitto_strerror(result));
-                exit(1);
+                return 1;
             }
             mosquitto_message_callback_set(mosq, do_mosq_message);
-            return;
+            return 0;
         }
         sleep(1);
     }
     spin_log(LOG_ERR, "Error connecting to mqtt server on %s:%d, %s\n", host, port, mosquitto_strerror(result));
-    exit(1);
+    return 1;
 }
 
 void wf_mosquitto(void* arg, int data, int timeout) {
@@ -489,14 +489,14 @@ void mosquitto_stop_server() {
     }
 }
 
-void init_mosquitto(int start_own_instance, const char* host, int port, const char* websocket_host, int websocket_port) {
+int init_mosquitto(int start_own_instance, const char* host, int port, const char* websocket_host, int websocket_port) {
     int object;
 
     if (start_own_instance) {
         spin_log(LOG_INFO, "Starting mosquitto server\n");
         if (mosquitto_start_server(host, port, websocket_host, websocket_port) != 0) {
             spin_log(LOG_ERR, "Error starting mosquitto server, aborting\n");
-            exit(1);
+            return 1;
         }
     }
 
@@ -516,6 +516,7 @@ void init_mosquitto(int start_own_instance, const char* host, int port, const ch
     for (object = 0; object < N_IPLIST; object++) {
         broadcast_iplist(object, getnames[object]);
     }
+    return 0;
 }
 
 void finish_mosquitto(int started_own_instance) {

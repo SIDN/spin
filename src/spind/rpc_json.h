@@ -13,6 +13,6 @@ char *call_string_jsonrpc(char *args);
 
 typedef spin_data (*rpcfunc)(spin_data);
 
-void init_json_rpc();
+int init_json_rpc();
 
 #endif // SPIN_RPC_JSON_HS

@@ -11,7 +11,7 @@
 //
 // We may want to add some options here (such as a configurable queue number)
 
-void init_core2conntrack(node_cache_t* node_cache, int local_mode, trafficfunc);
+int init_core2conntrack(node_cache_t* node_cache, int local_mode, trafficfunc);
 void cleanup_core2conntrack();
 
 #endif

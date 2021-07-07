@@ -23,17 +23,22 @@ static void nflog_dns_callback(void* arg, int family, int protocol,
     }
 }
 
-void init_core2nflog_dns(node_cache_t* node_cache, dns_cache_t* dns_cache) {
+int init_core2nflog_dns(node_cache_t* node_cache, dns_cache_t* dns_cache) {
     int nflog_dns_group;
+    int result;
 
     handle_dns_ctx = handle_dns_init(&dns_query_hook, &dns_answer_hook);
     if (handle_dns_ctx == NULL) {
         spin_log(LOG_ERR, "handle_dns_init failure");
-        exit(1);
+        return 1;
     }
 
     nflog_dns_group = spinconfig_iptable_nflog_dns_group();
-    nflogroutine_register("core2nflog_dns", nflog_dns_callback, (void *) 0, nflog_dns_group);
+    result = nflogroutine_register("core2nflog_dns", nflog_dns_callback, (void *) 0, nflog_dns_group);
+    if (result != 0) {
+        spin_log(LOG_ERR, "core2nflog_dns initialization failed");
+    }
+    return result;
 }
 
 void cleanup_core2nflog_dns() {

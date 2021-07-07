@@ -204,29 +204,38 @@ wf_nfq(void *arg, int data, int timeout) {
 
 
 // Register work function:  timeout in millisec
-void nflogroutine_register(char *name, nflogfunc wf, void *arg, int group_number) {
+int nflogroutine_register(char *name, nflogfunc wf, void *arg, int group_number) {
     struct nflog_g_handle *qh;
     int i;
+    int registered = 0;
 
     spin_log(LOG_DEBUG, "nflogroutine registered %s(..., %d)\n", name, group_number);
     assert (n_nfr < MAXNFR) ;
 
-    /*
-     * At first call open library and call mainloop_register
-     */
-    if (n_nfr == 0) {
-        spin_log(LOG_DEBUG, "opening library handle\n");
-        library_handle = nflog_open();
-        if (!library_handle) {
-            spin_log(LOG_ERR, "error during nflog_open()\n");
-            exit(1);
-        }
-        library_fd = nflog_fd(library_handle);
-        fd_set_blocking(library_fd, 0);
-        mainloop_register("nfq", wf_nfq, (void *) 0, library_fd, 0, 1);
-    }
-
     for (i=0; i<30; i++) {
+        /*
+         * At first call open library and call mainloop_register
+         * We attempt this a number of times, as during boot we
+         * might get errors
+         */
+        if (n_nfr == 0) {
+            spin_log(LOG_DEBUG, "opening library handle\n");
+            if (library_handle) {
+                nflog_close(library_handle);
+            }
+            library_handle = nflog_open();
+            if (!library_handle) {
+                spin_log(LOG_ERR, "error during nflog_open()\n");
+                return 1;
+            }
+            library_fd = nflog_fd(library_handle);
+            fd_set_blocking(library_fd, 0);
+            if (!registered) {
+                mainloop_register("nfq", wf_nfq, (void *) 0, library_fd, 0, 1);
+                registered = 1;
+            }
+        }
+
         spin_log(LOG_DEBUG, "binding this socket to group '%d'\n", group_number);
         qh = nflog_bind_group(library_handle, group_number);
         if (qh) {
@@ -237,7 +246,8 @@ void nflogroutine_register(char *name, nflogfunc wf, void *arg, int group_number
         }
     }
     if (!qh) {
-        exit(1);
+        spin_log(LOG_ERR, "maximum number of attempts reached, aborting\n");
+        return 1;
     }
 
     nflog_callback_register(qh, &nflog_cb, NULL);
@@ -245,7 +255,7 @@ void nflogroutine_register(char *name, nflogfunc wf, void *arg, int group_number
     spin_log(LOG_DEBUG, "setting copy_packet mode\n");
     if (nflog_set_mode(qh, NFULNL_COPY_PACKET, 0xffff) < 0) {
         spin_log(LOG_ERR, "can't set packet_copy mode\n");
-        exit(1);
+        return 1;
     }
 
     nfr[n_nfr].nfr_name = name;
@@ -253,6 +263,8 @@ void nflogroutine_register(char *name, nflogfunc wf, void *arg, int group_number
     nfr[n_nfr].nfr_wfarg = arg;
     nfr[n_nfr].nfr_qh = qh;
     n_nfr++;
+
+    return 0;
 }
 
 void nflogroutine_close(char* name) {

@@ -312,7 +312,7 @@ void cleanup_cache() {
     node_cache_destroy(node_cache);
 }
 
-void ubus_main();
+int ubus_main();
 
 int main(int argc, char** argv) {
     int c;
@@ -320,9 +320,9 @@ int main(int argc, char** argv) {
     int use_syslog;
     char* log_filename = NULL;
     int debug_mode = 0;
-    int cmdline_console_output = 0;
-    char *extsrc_socket_path = NULL;
     char *extsrc_listen_addr = NULL;
+    char *extsrc_socket_path = EXTSRC_SOCKET_PATH;
+    int log_stdout = 0;
 #ifndef USE_UBUS
     char *json_rpc_socket_path = JSON_RPC_SOCKET_PATH;
 #endif
@@ -374,7 +374,7 @@ int main(int argc, char** argv) {
         case 'o':
             printf("Logging to stdout instead of syslog or file\n");
             use_syslog = 0;
-            cmdline_console_output = 1;
+            log_stdout = 1;
             // Set up logging directly, so even config reading goes to
             // console
             if (!debug_mode) {
@@ -410,7 +410,7 @@ int main(int argc, char** argv) {
 
     // Set up logging based on defaults and command line, reinitialize
     // after reading config file
-    spin_log_init(use_syslog, log_filename, log_verbosity, "spind");
+    spin_log_init(use_syslog, log_stdout, log_filename, log_verbosity, "spind");
 
     if (config_file) {
         init_config(config_file, 1);
@@ -422,14 +422,12 @@ int main(int argc, char** argv) {
     if (!log_filename) {
         log_filename = spinconfig_log_file();
     }
-    if (!cmdline_console_output) {
-        use_syslog = spinconfig_log_usesyslog();
-    }
+    use_syslog = spinconfig_log_usesyslog();
     if (!debug_mode) {
         log_verbosity = spinconfig_log_loglevel();
     }
 
-    spin_log_init(use_syslog, log_filename, log_verbosity, "spind");
+    spin_log_init(use_syslog, log_stdout, log_filename, log_verbosity, "spind");
 
 
     if (!mosq_host) {
@@ -468,31 +466,45 @@ int main(int argc, char** argv) {
     dns_hooks_init(node_cache, dns_cache);
 #ifndef PASSIVE_MODE_ONLY
     if (!passive_mode) {
-        init_core2conntrack(node_cache, local_mode, spinhook_traffic);
-        init_core2nflog_dns(node_cache, dns_cache);
+        if (init_core2conntrack(node_cache, local_mode, spinhook_traffic)) {
+            goto stop;
+        }
+        if (init_core2nflog_dns(node_cache, dns_cache)) {
+            goto stop;
+        }
     }
 #endif
 
-    init_core2block(passive_mode);
+    if (init_core2block(passive_mode)) {
+        goto stop;
+    }
 
-    init_core2extsrc(node_cache, dns_cache, spinhook_traffic, extsrc_socket_path, extsrc_listen_addr);
+    if (init_core2extsrc(node_cache, dns_cache, spinhook_traffic, extsrc_socket_path, extsrc_listen_addr)) {
+        goto stop;
+    }
 
     init_ipl_list_ar();
 
     init_rpcs(node_cache);
 
-    init_mosquitto(spinconfig_pubsub_run_mosquitto(), mosq_host, mosq_port, mosq_websocket_host, mosq_websocket_port);
+    if (init_mosquitto(spinconfig_pubsub_run_mosquitto(), mosq_host, mosq_port, mosq_websocket_host, mosq_websocket_port)) {
+        goto stop;
+    }
+
     signal(SIGINT, int_handler);
     signal(SIGTERM, term_handler);
 
 #ifdef USE_UBUS
-    ubus_main();
+    if (ubus_main()) {
+        goto stop;
+    }
 #else
     init_json_rpc(json_rpc_socket_path);
 #endif
 
     mainloop_run();
 
+    stop:
     cleanup_cache();
     cleanup_core2block();
 #ifndef PASSIVE_MODE_ONLY

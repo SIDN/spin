@@ -337,7 +337,7 @@ setup_catch(int queue) {
 #endif
 }
 
-void init_core2block(int passive_mode) {
+int init_core2block(int passive_mode) {
     static int all_lists[N_IPLIST] = { 1, 1, 1 };
     int nflog_dns_group, queue_block;
     int place_dns, place_block;
@@ -360,6 +360,7 @@ void init_core2block(int passive_mode) {
     setup_tables(nflog_dns_group, queue_block, place_block);
 
     spin_register("core2block", c2b_changelist, (void *) 0, all_lists);
+    return 0;
 }
 
 void cleanup_core2block() {

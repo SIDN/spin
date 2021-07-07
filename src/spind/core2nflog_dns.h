@@ -9,7 +9,7 @@
 // node_cache_t* the global spin dns cache
 //
 // We may want to add some options here (such as a configurable queue number)
-void init_core2nflog_dns(node_cache_t*, dns_cache_t*);
+int init_core2nflog_dns(node_cache_t*, dns_cache_t*);
 void cleanup_core2nflog_dns();
 
 #endif

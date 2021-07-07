@@ -6,7 +6,7 @@
 
 // Initialize logging; set logger to level,
 // and choose between syslog (default) or logging to stdout
-void spin_log_init(int use_syslog, const char* filename, int verbosity, const char* ident);
+void spin_log_init(int use_syslog, int log_stdout, const char* log_filename, int verbosity, const char* ident);
 
 void spin_log_close();
 

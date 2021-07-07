@@ -4,7 +4,7 @@
 #include "node_cache.h"
 #include "spinhook.h"
 
-void init_core2extsrc(node_cache_t *, dns_cache_t *, trafficfunc, char *, char *);
+int init_core2extsrc(node_cache_t *, dns_cache_t *, trafficfunc, char *, char *);
 void cleanup_core2extsrc();
 
 #endif

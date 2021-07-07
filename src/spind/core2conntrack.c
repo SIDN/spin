@@ -185,7 +185,7 @@ static void core2conntrack_callback(void *arg, int data, int timeout) {
     }
 }
 
-void init_core2conntrack(node_cache_t* node_cache, int local_mode, trafficfunc hook) {
+int init_core2conntrack(node_cache_t* node_cache, int local_mode, trafficfunc hook) {
     cb_data_g = (cb_data_t*)malloc(sizeof(cb_data_t));
     cb_data_g->flow_list = flow_list_create(time(NULL));
     cb_data_g->node_cache = node_cache;
@@ -198,6 +198,7 @@ void init_core2conntrack(node_cache_t* node_cache, int local_mode, trafficfunc h
     mainloop_register("core2conntrack", core2conntrack_callback, (void *) 0, 0, 1000, 1);
 
     spin_log(LOG_DEBUG, "core2conntrack initialized\n");
+    return 0;
 }
 
 void cleanup_core2conntrack() {

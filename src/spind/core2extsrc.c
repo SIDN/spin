@@ -264,7 +264,7 @@ removesocket(void)
     remove(extsrc_socket_path);
 }
 
-static void
+static int
 socket_open_inet(const char *addr)
 {
     struct wf_extsrc_arg *wf_arg;
@@ -291,23 +291,23 @@ socket_open_inet(const char *addr)
     error = getaddrinfo(addr, port, &hints, &res);
     if (error) {
         spin_log(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
-        exit(1);
+        return 1;
     }
 
     fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (fd == -1) {
         spin_log(LOG_ERR, "socket: %s\n", strerror(errno));
-        exit(1);
+        return 1;
     }
 
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
         spin_log(LOG_ERR, "setsockopt SO_REUSEADDR: %s\n", strerror(errno));
-        exit(1);
+        return 1;
     }
 
     if (bind(fd, res->ai_addr, res->ai_addrlen) == -1) {
         spin_log(LOG_ERR, "bind: %s\n", strerror(errno));
-        exit(1);
+        return 1;
     }
 
     freeaddrinfo(res);
@@ -315,7 +315,7 @@ socket_open_inet(const char *addr)
 #ifdef EXTSRC_TCP
     if (listen(fd, 2) == -1) {
         spin_log(LOG_ERR, "listen: %s\n", strerror(errno));
-        exit(1);
+        return 1;
     }
 #endif /* EXTSRC_TCP */
 
@@ -323,7 +323,7 @@ socket_open_inet(const char *addr)
     wf_arg = malloc(sizeof(struct wf_extsrc_arg));
     if (!wf_arg) {
         spin_log(LOG_ERR, "malloc: %s", strerror(errno));
-        exit(1);
+        return 1;
     }
     wf_arg->fd = fd;
 
@@ -335,9 +335,10 @@ socket_open_inet(const char *addr)
 #endif
 
     spin_log(LOG_INFO, "extsrc: listening on [%s]:%d\n", addr, EXTSRC_PORT);
+    return 0;
 }
 
-static void
+static int
 socket_open_unix()
 {
     struct wf_extsrc_arg *wf_arg;
@@ -351,7 +352,7 @@ socket_open_unix()
     fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0);
     if (fd == -1) {
         spin_log(LOG_ERR, "socket: %s\n", strerror(errno));
-        exit(1);
+        return 1;
     }
 
     memset(&s_un, 0, sizeof(s_un));
@@ -359,7 +360,7 @@ socket_open_unix()
     if (snprintf(s_un.sun_path, sizeof(s_un.sun_path), "%s",
         extsrc_socket_path) >= (ssize_t)sizeof(s_un.sun_path)) {
         spin_log(LOG_ERR, "%s: socket path too long\n", extsrc_socket_path);
-        exit(1);
+        return 1;
     }
 
     remove(extsrc_socket_path);
@@ -368,13 +369,13 @@ socket_open_unix()
     if (bind(fd, (struct sockaddr *)&s_un, sizeof(s_un)) == -1) {
         spin_log(LOG_ERR, "bind: %s: %s\n", extsrc_socket_path,
             strerror(errno));
-        exit(1);
+        return 1;
     }
     umask(old_umask);
     if (chmod(extsrc_socket_path, 0600) == -1) {
         spin_log(LOG_ERR, "chmod: %s: %s\n", extsrc_socket_path,
             strerror(errno));
-        exit(1);
+        return 1;
     }
 
     atexit(removesocket);
@@ -383,14 +384,16 @@ socket_open_unix()
     wf_arg = malloc(sizeof(struct wf_extsrc_arg));
     if (!wf_arg) {
         spin_log(LOG_ERR, "malloc: %s", strerror(errno));
-        exit(1);
+        return 1;
     }
     wf_arg->fd = fd;
 
     mainloop_register("external-source", wf_extsrc, (void *) wf_arg, fd, 0, 1);
+
+    return 0;
 }
 
-void
+int
 init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, trafficfunc th, char *sp, char *la)
 {
     node_cache = nc;
@@ -407,12 +410,19 @@ init_core2extsrc(node_cache_t *nc, dns_cache_t *dc, trafficfunc th, char *sp, ch
     flow_list = flow_list_create(time(NULL));
 
     if (la) {
-        socket_open_inet(la);
+        if (socket_open_inet(la)) {
+            spin_log(LOG_ERR, "socket_open_inet() failed\n");
+            return 1;
+        }
     } else {
-        socket_open_unix();
+        if (socket_open_unix()) {
+            spin_log(LOG_ERR, "socket_open_unix() failed\n");
+            return 1;
+        }
     }
 
     spin_log(LOG_DEBUG, "registered external source\n");
+    return 0;
 }
 
 void

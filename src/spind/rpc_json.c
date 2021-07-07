@@ -252,7 +252,7 @@ wf_jsonrpc(void *arg, int data, int timeout) {
 }
 
 
-void
+int
 init_json_rpc(char *json_rpc_socket_path) {
     mode_t old_umask;
 
@@ -267,22 +267,23 @@ init_json_rpc(char *json_rpc_socket_path) {
     if (!access(json_rpc_socket_path, F_OK )) {
         if (unlink(json_rpc_socket_path) != 0) {
             spin_log(LOG_ERR, "Error unlinking domain socket %s: %s\n", json_rpc_socket_path, strerror(errno));
-            exit(errno);
+            return errno;
         }
     }
     // Any process on the local system may talk to SPIN
     old_umask = umask(0);
     if (bind(rpc_fd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
         spin_log(LOG_ERR, "Error opening domain socket %s: %s\n", json_rpc_socket_path, strerror(errno));
-        exit(errno);
+        return errno;
     }
     umask(old_umask);
     if (listen(rpc_fd, 100) != 0) {
         spin_log(LOG_ERR, "Error listening on domain socket %s: %s\n", json_rpc_socket_path, strerror(errno));
-        exit(errno);
+        return errno;
     }
     spin_log(LOG_INFO, "Listening for JSON-RPC commands on %s\n", json_rpc_socket_path);
     mainloop_register("jsonrpc", wf_jsonrpc, (void *) 0, rpc_fd, 0, 1);
+    return 0;
 }
 
 void

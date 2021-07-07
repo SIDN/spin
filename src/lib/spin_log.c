@@ -6,23 +6,24 @@
 #include "spin_log.h"
 
 int use_syslog_ = 1;
+int log_stdout = 0;
 int log_verbosity = 6;
 FILE* logfile = NULL;
 
-void spin_log_init(int use_syslog, const char* filename, int verbosity, const char* ident) {
+void spin_log_init(int use_syslog, int log_stdout, const char* log_filename, int verbosity, const char* ident) {
     log_verbosity = verbosity;
-    if (!use_syslog) {
-        if (filename) {
-            if (logfile) {
-                fclose(logfile);
-                logfile = NULL;
-            }
-            logfile = fopen(filename, "a");
-            if (!logfile) {
-                fprintf(stderr, "Error opening logfile %s: %s\n", filename, strerror(errno));
-            }
+    if (log_filename && strlen(log_filename) > 0) {
+        if (logfile) {
+            fclose(logfile);
+            logfile = NULL;
         }
-        use_syslog_ = 0;
+        logfile = fopen(log_filename, "a");
+        if (!logfile) {
+            fprintf(stderr, "Error opening logfile %s: %s\n", log_filename, strerror(errno));
+        }
+    }
+    if (use_syslog) {
+        use_syslog_ = use_syslog;
         openlog(ident, 0, LOG_DAEMON);
     }
 }
@@ -45,11 +46,13 @@ void spin_log(int level, const char* format, ...) {
     va_start(arg, format);
     if (use_syslog_) {
         vsyslog(level, format, arg);
-    } else if (logfile) {
+    }
+    if (log_stdout) {
+        vprintf(format, arg);
+    }
+    if (logfile) {
         vfprintf(logfile, format, arg);
         fflush(logfile);
-    } else {
-        vprintf(format, arg);
     }
     va_end(arg);
 }
