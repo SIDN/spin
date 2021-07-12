@@ -73,6 +73,8 @@
 #define IPV6_VERSION_MASK	0xf0
 #endif /* IPV6_VERSION */
 
+/* #define DEBUG 1 */
+
 #if DEBUG
 #define DPRINTF(x...) warnx(x)
 #define DASSERT(x) assert(x)
@@ -125,9 +127,9 @@ usage(const char *error)
 
 	if (error)
 		fprintf(stderr, "%s\n", error);
-	fprintf(stderr, "Usage: %s [-R] [-e extsrc-socket-path] [-f filter]\n",
+	fprintf(stderr, "Usage: %s [-R] [-e extsrc-socket-path] [-E extsrc-host]\n",
 	    __progname);
-	fprintf(stderr, "\t[-i interface] [-r file]\n");
+	fprintf(stderr, "\t[-f filter] [-i interface] [-r file]\n");
 	exit(1);
 }
 
@@ -150,6 +152,7 @@ send_flows(flow_list_t *flows)
 	pkt_info_t pkt_info;
 	flow_data_t *flow_data;
 	
+	DPRINTF("sending flows");
 	cur = tree_first(flows->flows);
 	while (cur != NULL) {
 		// XXX borrowed from spindata.c:flow_list2json(). Can't say I
@@ -158,6 +161,7 @@ send_flows(flow_list_t *flows)
 		flow_data = (flow_data_t*)cur->data;
 		pkt_info.payload_size = flow_data->payload_size;
 		pkt_info.packet_count = flow_data->packet_count;
+		DPRINTF("%4llu packets; %8llu bytes", pkt_info.packet_count, pkt_info.payload_size);
 		
 		write_pkt_info_to_socket(&pkt_info);
 
@@ -497,7 +501,8 @@ int
 main(int argc, char *argv[])
 {
 	int ch;
-	char *extsrc_socket_path = EXTSRC_SOCKET_PATH;
+	char *extsrc_host = NULL;
+	char *extsrc_socket_path = NULL;
 	char *device = NULL;
 	char *file = NULL;
 	char *pcap_errbuf;
@@ -513,10 +518,13 @@ main(int argc, char *argv[])
 
 	flow_list = flow_list_create(time(NULL));
 
-	while ((ch = getopt(argc, argv, "e:f:hi:Rr:")) != -1) {
+	while ((ch = getopt(argc, argv, "e:E:f:hi:Rr:")) != -1) {
 		switch(ch) {
 		case 'e':
 			extsrc_socket_path = optarg;
+			break;
+		case 'E':
+			extsrc_host = optarg;
 			break;
 		case 'f':
 			filter = optarg;
@@ -541,8 +549,12 @@ main(int argc, char *argv[])
 		usage("cannot specify both an interface and a file");
 	if (!device && !file)
 		device = "eth0";
+	if (extsrc_host && extsrc_socket_path)
+		usage("cannot specify both an extsrc host and socket path");
+	if (!extsrc_host && !extsrc_socket_path)
+		extsrc_socket_path = EXTSRC_SOCKET_PATH;
 
-	fd = socket_open(extsrc_socket_path);
+	fd = socket_open(extsrc_socket_path, extsrc_host);
 
 	if ((pcap_errbuf = malloc(PCAP_ERRBUF_SIZE)) == NULL)
 		err(1, "malloc");

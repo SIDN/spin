@@ -35,10 +35,20 @@ When `spind` does not run as root,
 the default socket paths must be adjusted.
 That can be done by specifying the `-e` and `-j` flags.
 
+Communication between the SPIN daemon and the SPIN PCAP reader
+can happen either through a UNIX domain socket or
+an (unencrypted) Internet socket.
+The UNIX domain socket path can be specified with `-e`
+while the Internet address can be specified with `-E`.
+
 With the above in mind,
 you could start `spind` like this:
 ```
 $ ./src/build/spind/spind -doP -e /tmp/spin-extsrc.sock -j /tmp/spin-rpc.sock
+```
+or
+```
+$ ./src/build/spind/spind -doP -E 192.0.2.3 -j /tmp/spin-rpc.sock
 ```
 
 ### Running `spin-pcap-reader`
@@ -48,7 +58,8 @@ you can feed a PCAP to `spind` as follows:
 
 ```
 $ cd src/build/tools/spin-pcap-reader
-$ ./spin-pcap-reader -e /tmp/spin-extsrc.sock -r /path/to/file.pcap
+$ ./spin-pcap-reader -e /tmp/spin-extsrc.sock -r /file.pcap # UNIX domain socket
+$ ./spin-pcap-reader -E 192.0.2.3 -r /path/to/file.pcap     # or Internet socket
 ```
 
 By default,
@@ -70,6 +81,8 @@ The SPIN PCAP reader is not perfect.
 For instance:
  * Determining which devices are devices on the local network
    is not yet implemented properly.
+ * Communication between the SPIN daemon and the SPIN PCAP reader
+   through an Internet socket is not protected with TLS yet.
  * It would be nice to implement sandboxing for other platforms
    besides OpenBSD.
 

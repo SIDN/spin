@@ -271,6 +271,7 @@ void print_help() {
     printf("-C <file>\t\tprint default configuration values and exit\n");
     printf("-d\t\t\tlog debug messages (set log level to LOG_DEBUG)\n");
     printf("-e <path>\t\textsrc socket path (default: %s)\n", EXTSRC_SOCKET_PATH);
+    printf("-E <addr>\t\textsrc listen address\n");
     printf("-h\t\t\tshow this help\n");
     printf("-j <path>\t\tJSON RPC socket path (default: %s)\n", JSON_RPC_SOCKET_PATH);
     printf("-l\t\t\trun in local mode (do not check for ARP cache entries)\n");
@@ -318,14 +319,15 @@ int main(int argc, char** argv) {
     int use_syslog;
     int debug_mode = 0;
     int cmdline_console_output = 0;
-    char *extsrc_socket_path = EXTSRC_SOCKET_PATH;
+    char *extsrc_socket_path = NULL;
+    char *extsrc_listen_addr = NULL;
 #ifndef USE_UBUS
     char *json_rpc_socket_path = JSON_RPC_SOCKET_PATH;
 #endif
     enum arp_table_backend arp_backend = ARP_TABLE_LINUX;
     int passive_mode = 0;
 
-    while ((c = getopt (argc, argv, "c:Cde:hj:lm:oPp:v")) != -1) {
+    while ((c = getopt (argc, argv, "c:Cde:E:hj:lm:oPp:v")) != -1) {
         switch (c) {
         case 'c':
             config_file = optarg;
@@ -342,6 +344,9 @@ int main(int argc, char** argv) {
             break;
         case 'e':
             extsrc_socket_path = optarg;
+            break;
+        case 'E':
+            extsrc_listen_addr = optarg;
             break;
         case 'h':
             print_help();
@@ -393,6 +398,12 @@ int main(int argc, char** argv) {
             print_help();
             exit(1);
         }
+    }
+
+    if (extsrc_listen_addr && extsrc_socket_path) {
+        fprintf(stderr, "Error: cannot specify both an extsrc listen address and socket path\n");
+        print_help();
+        exit(1);
     }
 
     if (config_file) {
@@ -452,7 +463,7 @@ int main(int argc, char** argv) {
 
     init_core2block(passive_mode);
 
-    init_core2extsrc(node_cache, dns_cache, spinhook_traffic, extsrc_socket_path);
+    init_core2extsrc(node_cache, dns_cache, spinhook_traffic, extsrc_socket_path, extsrc_listen_addr);
 
     init_ipl_list_ar();
 

@@ -1,6 +1,43 @@
 #include <err.h>
 
 #include "extsrc.h"
+#include "spin_log.h"
+
+uint8_t
+extsrc_af_to_wire(uint8_t af)
+{
+    switch (af) {
+    case AF_INET:
+        return EXTSRC_AF_INET;
+    case AF_INET6:
+        return EXTSRC_AF_INET6;
+    default:
+        spin_log(LOG_WARNING, "%s: unknown value %d\n", __func__, af);
+        return af; // XXX
+    }
+}
+
+uint8_t
+extsrc_af_from_wire(uint8_t x)
+{
+    switch (x) {
+    case EXTSRC_AF_INET:
+        return AF_INET;
+    case EXTSRC_AF_INET6:
+        return AF_INET6;
+    default:
+        spin_log(LOG_WARNING, "%s: unknown value %d\n", __func__, x);
+        return x; // XXX
+    }
+}
+
+static void *
+extsrc_msg_payload(struct extsrc_msg *msg)
+{
+    return msg->data + sizeof(struct extsrc_msg_hdr);
+}
+
+/******************************************************************************/
 
 struct extsrc_msg *
 extsrc_msg_create(char *payload, uint32_t payload_len, uint32_t msg_type)
@@ -31,8 +68,12 @@ extsrc_msg_create(char *payload, uint32_t payload_len, uint32_t msg_type)
 struct extsrc_msg *
 extsrc_msg_create_pkt_info(pkt_info_t *pkt)
 {
-    return extsrc_msg_create((char *)pkt, sizeof(*pkt),
+    struct extsrc_msg *res = extsrc_msg_create((char *)pkt, sizeof(*pkt),
         EXTSRC_MSG_TYPE_PKT_INFO);
+
+    ((pkt_info_t *)extsrc_msg_payload(res))->family = extsrc_af_to_wire(pkt->family);
+
+    return res;
 }
 
 struct extsrc_msg *
