@@ -272,6 +272,7 @@ void print_help() {
     printf("-d\t\t\tlog debug messages (set log level to LOG_DEBUG)\n");
     printf("-e <path>\t\textsrc socket path (default: %s)\n", EXTSRC_SOCKET_PATH);
     printf("-E <addr>\t\textsrc listen address\n");
+    printf("-f <logfile>\t\t\tlog to file\n");
     printf("-h\t\t\tshow this help\n");
     printf("-j <path>\t\tJSON RPC socket path (default: %s)\n", JSON_RPC_SOCKET_PATH);
     printf("-l\t\t\trun in local mode (do not check for ARP cache entries)\n");
@@ -317,6 +318,7 @@ int main(int argc, char** argv) {
     int c;
     int log_verbosity = 1;
     int use_syslog;
+    char* log_filename = NULL;
     int debug_mode = 0;
     int cmdline_console_output = 0;
     char *extsrc_socket_path = NULL;
@@ -327,7 +329,7 @@ int main(int argc, char** argv) {
     enum arp_table_backend arp_backend = ARP_TABLE_LINUX;
     int passive_mode = 0;
 
-    while ((c = getopt (argc, argv, "c:Cde:E:hj:lm:oPp:v")) != -1) {
+    while ((c = getopt (argc, argv, "c:Cde:E:f:hj:lm:oPp:v")) != -1) {
         switch (c) {
         case 'c':
             config_file = optarg;
@@ -336,11 +338,12 @@ int main(int argc, char** argv) {
             spinconfig_print_defaults();
             exit(0);
             break;
+        case 'f':
+            log_filename = optarg;
+            break;
         case 'd':
-            // Set up logging directly, do not wait until we read config
             log_verbosity = 7;
             debug_mode = 1;
-            spin_log_init(use_syslog, log_verbosity, "spind");
             break;
         case 'e':
             extsrc_socket_path = optarg;
@@ -369,15 +372,14 @@ int main(int argc, char** argv) {
             mosq_websocket_host = optarg;
             break;
         case 'o':
-            printf("Logging to stdout instead of syslog\n");
+            printf("Logging to stdout instead of syslog or file\n");
             use_syslog = 0;
             cmdline_console_output = 1;
-            // Again, set up logging directly, so even config reading goes to
+            // Set up logging directly, so even config reading goes to
             // console
             if (!debug_mode) {
                 log_verbosity = 1;
             }
-            spin_log_init(0, log_verbosity, "spind");
             break;
         case 'P':
             passive_mode = 1;
@@ -406,19 +408,29 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
+    // Set up logging based on defaults and command line, reinitialize
+    // after reading config file
+    spin_log_init(use_syslog, log_filename, log_verbosity, "spind");
+
     if (config_file) {
         init_config(config_file, 1);
     } else {
         // Don't error if default config file doesn't exist
         init_config(CONFIG_FILE, 0);
     }
+
+    if (!log_filename) {
+        log_filename = spinconfig_log_file();
+    }
     if (!cmdline_console_output) {
         use_syslog = spinconfig_log_usesyslog();
     }
     if (!debug_mode) {
         log_verbosity = spinconfig_log_loglevel();
-        spin_log_init(use_syslog, log_verbosity, "spind");
     }
+
+    spin_log_init(use_syslog, log_filename, log_verbosity, "spind");
+
 
     if (!mosq_host) {
         mosq_host = spinconfig_pubsub_host();

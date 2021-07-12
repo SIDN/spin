@@ -17,6 +17,7 @@ void spinconfig_print_defaults();
 
 int spinconfig_log_usesyslog();
 int spinconfig_log_loglevel();
+char *spinconfig_log_file();
 char *spinconfig_pid_file();
 char *spinconfig_pubsub_host();
 int spinconfig_pubsub_port();

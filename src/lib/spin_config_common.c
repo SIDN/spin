@@ -8,6 +8,7 @@
 enum configs {
     LOG_USESYSLOG,
     LOG_LOGLEVEL,
+    LOG_FILE,
     PID_FILE,
     PUBSUB_HOST,
     PUBSUB_PORT,
@@ -43,6 +44,8 @@ struct conf_item {
             { "log_usesyslog",              "1",                0   },
     [LOG_LOGLEVEL] =
             { "log_loglevel",               "6",                0   },
+    [LOG_FILE] =
+            { "log_file",                   "",                 0   },
     [PID_FILE] =
             { "pid_file",                   "",                 0   },
     [PUBSUB_HOST] =
@@ -151,6 +154,11 @@ int spinconfig_log_usesyslog() {
 int spinconfig_log_loglevel() {
 
     return (spi_int(LOG_LOGLEVEL));
+}
+
+char* spinconfig_log_file() {
+
+    return (spi_str(LOG_FILE));
 }
 
 char* spinconfig_pid_file() {
