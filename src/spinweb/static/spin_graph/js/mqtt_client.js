@@ -454,8 +454,9 @@ function handleTrafficMessage(data) {
         }
     }
     traffic_dataset.add(elements.concat(elements_cnt));
+    //alert(traffic_dataset.add(elements.concat(elements_cnt)));
     // console.log("Graph updated")
-    // var ids = traffic_dataset.getIds();
+    //traffic_dataset.getIds();
 
     var graph_end = Date.parse(graph2d_1.options.end);
     if (Date.now() + 10000 >= graph_end) {

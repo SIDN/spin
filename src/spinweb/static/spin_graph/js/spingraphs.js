@@ -599,10 +599,11 @@ function showGraph(dataset) {
         options: {
             shaded: {
                 orientation: 'bottom' // top, bottom
-            }
+            },
+            yAxisOrientation: 'right'
         }
     });
-
+/*
     groups.add({
         id: 1,
         content: names[1],
@@ -610,10 +611,10 @@ function showGraph(dataset) {
             shaded: {
                 orientation: 'bottom' // top, bottom
             },
-            yAxisOrientation: 'right'
+            yAxisOrientation: 'left'
         }
     });
-
+*/
     // Graph options
     var options = {
         start: new Date(Date.now()),
@@ -623,6 +624,7 @@ function showGraph(dataset) {
         zoomable: false,
         moveable: false,
         showCurrentTime: true,
+        sampling: false
         //clickToUse: true
     };
 
