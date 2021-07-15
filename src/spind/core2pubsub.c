@@ -70,15 +70,14 @@ read_mosquitto_pid_file(int wait_time) {
     int result;
 
     for (i = 0; i < wait_time; i++) {
-        spin_log(LOG_DEBUG, "[XX] wait for pid file\n");
+        spin_log(LOG_DEBUG, "waiting for mosquitto pid file\n");
         if (!stat(pid_file, &pf_st)) {
-            spin_log(LOG_DEBUG, "[XX] pid file found\n");
+            spin_log(LOG_DEBUG, "mosquitto pid file found\n");
             in = fopen(pid_file, "r");
             if (in != NULL) {
-                spin_log(LOG_DEBUG, "[XX] pid file opened\n");
                 if (fscanf(in, "%d", &result) == 1) {
                     fclose(in);
-                    spin_log(LOG_DEBUG, "[XX] read pid %d\n", result);
+                    spin_log(LOG_DEBUG, "read mosquitto pid %d\n", result);
                     return result;
                 }
                 fclose(in);
