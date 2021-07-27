@@ -338,16 +338,14 @@ function onConnectFailed(evt) {
     // this. So unfortunately we'll have to get the user to jump through a
     // hoop a little bit. Unfortunately 2: the error itself isn't clear
     // on what the problem is.
-    if (evt.errorCode == 7) {
-        //alert(JSON.stringify(server_data));
-        // open a dialog
-        if (showWsErrorDialog) {
-            //alert(getWsURL());
-            showWsErrorDialog(getWsURL(), getWsURLasHTTP());
-        }
-    } else if (evt.errorCode == 6) {
+    if (evt.errorCode == 6 || evt.errorCode == 7) {
         if (showLoginDialog) {
             showLoginDialog();
+        }
+    } else {
+        // open a dialog
+        if (showWsErrorDialog) {
+            showWsErrorDialog(getWsURL(), getWsURLasHTTP());
         }
     }
 }
