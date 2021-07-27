@@ -362,7 +362,7 @@ function setLoginDialog(callback) {
 
 function setLoginData(user, pass) {
     username = user;
-    pass = pass;
+    password = pass;
     // automatically try reconnect
     connect();
 }
