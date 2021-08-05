@@ -31,7 +31,6 @@ char *spinconfig_pubsub_run_password_file();
 char* spinconfig_pubsub_run_pid_file();
 int spinconfig_iptable_nflog_dns_group();
 int spinconfig_iptable_queue_block();
-int spinconfig_iptable_place_dns();
 int spinconfig_iptable_place_block();
 char *spinconfig_iptable_debug();
 // The time (in seconds) that node_cache entries

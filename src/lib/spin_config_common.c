@@ -21,7 +21,6 @@ enum configs {
     PUBSUB_RUN_PID_FILE,
     IPTABLE_QUEUE_DNS,
     IPTABLE_QUEUE_BLOCK,
-    IPTABLE_PLACE_DNS,
     IPTABLE_PLACE_BLOCK,
     IPTABLE_DEBUG,
     NODE_CACHE_RETAIN_TIME,
@@ -209,10 +208,6 @@ int spinconfig_iptable_nflog_dns_group() {
 
 int spinconfig_iptable_queue_block() {
     return(spi_int(IPTABLE_QUEUE_BLOCK));
-}
-
-int spinconfig_iptable_place_dns() {
-    return(spi_int(IPTABLE_PLACE_DNS));
 }
 
 int spinconfig_iptable_place_block() {

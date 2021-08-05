@@ -340,18 +340,13 @@ setup_catch(int queue) {
 int init_core2block(int passive_mode) {
     static int all_lists[N_IPLIST] = { 1, 1, 1 };
     int nflog_dns_group, queue_block;
-    int place_dns, place_block;
+    int place_block;
 
     g_passive_mode = passive_mode;
 
     nflog_dns_group = spinconfig_iptable_nflog_dns_group();
     queue_block = spinconfig_iptable_queue_block();
-    place_dns = spinconfig_iptable_place_dns();
     place_block = spinconfig_iptable_place_block();
-
-    // TODO: is place_dns necessary? unused at this moment
-    // silence unused warning:
-    (void)place_dns;
 
     spin_log(LOG_DEBUG, "NFQ's %d and %d\n", nflog_dns_group, queue_block);
 
