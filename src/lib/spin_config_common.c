@@ -70,8 +70,6 @@ struct conf_item {
             { "iptable_queue_dns",          "1",                0   },
     [IPTABLE_QUEUE_BLOCK] =
             { "iptable_queue_block",        "2",                0   },
-    [IPTABLE_PLACE_DNS] =
-            { "iptable_place_dns",          "0",                0   },
     [IPTABLE_PLACE_BLOCK] =
             { "iptable_place_block",        "0",                0   },
     [IPTABLE_DEBUG] =

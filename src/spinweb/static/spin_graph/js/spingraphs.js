@@ -142,10 +142,16 @@ function initGraphs() {
             },
             modal: true,
             buttons: {
-                "Do login": function() {
+                "Login": function() {
                     submitted();
                     $(this).dialog("close");
                 }
+            }
+        });
+        dialog.keypress(function(e) {
+            if (e.keyCode == $.ui.keyCode.ENTER) {
+                submitted();
+                $(this).dialog("close");
             }
         });
         setLoginDialog(showLoginDialog);
