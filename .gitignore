@@ -10,8 +10,8 @@ libtool
 Makefile
 Makefile.in
 .deps
-src/tools/spin_config/spin_config
-src/tools/spin_print/spin_print
+tools/spin_config/spin_config
+tools/spin_print/spin_print
 stamp-h1
 *.ko
 *.ko.cmd
@@ -21,12 +21,12 @@ stamp-h1
 *.o.cmd
 *.mod.c
 publish.sh
-src/tests/*_test
+tests/*_test
 *.gcov
 *.gcda
 *.gcno
-src/lib/version.c
-src/lib/.deps
-src/m4/
+lib/version.c
+lib/.deps
+m4/
 .idea/
 tags

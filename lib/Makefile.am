@@ -39,6 +39,6 @@ libspin_a_SOURCES = pkt_info.c \
 #libspin_a_LIBADD =
 
 version.c:
-	$(top_srcdir)/../scripts/create_version_c.sh $(top_srcdir)/../VERSION
+	$(top_srcdir)/scripts/create_version_c.sh $(top_srcdir)/../VERSION
 
 .PHONY: version.c
