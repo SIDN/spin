@@ -478,6 +478,9 @@ void mosquitto_stop_server() {
             mosq_pid = file_pid;
         }
     }
+    if (mosq_pid == 0) {
+        return;
+    }
     spin_log(LOG_INFO, "Stopping mosquitto server with pid %d\n", mosq_pid);
     kill(mosq_pid, SIGTERM);
     sleep(2);

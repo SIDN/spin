@@ -43,18 +43,22 @@ void spin_log(int level, const char* format, ...) {
         return;
     }
 
-    va_start(arg, format);
     if (use_syslog_) {
+        va_start(arg, format);
         vsyslog(level, format, arg);
+        va_end(arg);
     }
     if (log_stdout) {
+        va_start(arg, format);
         vprintf(format, arg);
+        va_end(arg);
     }
     if (logfile) {
+        va_start(arg, format);
         vfprintf(logfile, format, arg);
         fflush(logfile);
+        va_end(arg);
     }
-    va_end(arg);
 }
 
 void spin_vlog(int level, const char* format, va_list arg) {
