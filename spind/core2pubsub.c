@@ -367,7 +367,10 @@ mosquitto_start_server(const char* host, int port, const char* websocket_host, i
         //fclose(stderr);
         signal(SIGCHLD,SIG_IGN);
         snprintf(commandline, 255, "mosquitto -d -c %s", mosq_conf_filename);
-        system(commandline);
+        if (system(commandline) != 0) {
+            spin_log(LOG_ERR, "Error starting mosquitto\n");
+            return 1;
+        }
         //result = system(commandline);
         //if (result != 0) {
         //    spin_log(LOG_ERR, "Error starting mosquitto\n");

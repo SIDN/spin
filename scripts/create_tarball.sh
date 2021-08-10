@@ -21,10 +21,10 @@ echo "cp -r * ${OUTDIR}${BNAME}/"
 mkdir -p ${OUTDIR}${BNAME} &&\
 cp -r . ${OUTDIR}${BNAME}/ &&\
 (cd ${OUTDIR}${BNAME}; git clean -fxd) &&\
-(cd ${OUTDIR}${BNAME}/src/; autoreconf --install && ./configure && rm -rf lua/tests && rm -rf src/tests) &&\
+(cd ${OUTDIR}${BNAME}; autoreconf --install && ./configure && rm -rf lua/tests && rm -rf tests) &&\
 (cd ${OUTDIR}${BNAME} && rm -rf .git .gitignore && rm -rf build) &&\
 if [ $CHECK -eq 1 ]; then
-    (cd ${OUTDIR}${BNAME}/src/; make && make distclean)
+    (cd ${OUTDIR}${BNAME}/; make && make distclean)
 fi &&\
 (cd ${OUTDIR}; tar -czvf ${BNAME}.tar.gz ${BNAME}) &&\
 echo "Created ${OUTDIR}${BNAME}.tar.gz" &&\
