@@ -22,7 +22,7 @@ MYDIR = ${srcdir}
 EXTRA_DIST = $(MYDIR)/templates $(MYDIR)/static
 
 install-data-local:
-	test -z $(pkgdatadir)/templates || $(MKDIR_P) $(pkgdatadir)/spinweb/templates
-	cp -r "$(MYDIR)/templates" "$(pkgdatadir)/spinweb/"
-	test -z $(pkgdatadir)/templates || $(MKDIR_P) $(pkgdatadir)/spinweb/static
-	cp -r "$(MYDIR)/static" "$(pkgdatadir)/spinweb/"
+	test -z $(DESTDIR)$(pkgdatadir)/templates || $(MKDIR_P) $(DESTDIR)$(pkgdatadir)/spinweb/templates
+	cp -r "$(MYDIR)/templates" "$(DESTDIR)$(pkgdatadir)/spinweb/"
+	test -z $(DESTDIR)$(pkgdatadir)/templates || $(MKDIR_P) $(DESTDIR)$(pkgdatadir)/spinweb/static
+	cp -r "$(MYDIR)/static" "$(DESTDIR)$(pkgdatadir)/spinweb/"
