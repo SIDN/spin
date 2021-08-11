@@ -317,7 +317,7 @@ int ubus_main();
 int main(int argc, char** argv) {
     int c;
     int log_verbosity = 1;
-    int use_syslog;
+    int use_syslog = 0;
     char* log_filename = NULL;
     int debug_mode = 0;
     char *extsrc_listen_addr = NULL;
@@ -372,8 +372,6 @@ int main(int argc, char** argv) {
             mosq_websocket_host = optarg;
             break;
         case 'o':
-            printf("Logging to stdout instead of syslog or file\n");
-            use_syslog = 0;
             log_stdout = 1;
             // Set up logging directly, so even config reading goes to
             // console

@@ -49,6 +49,7 @@ iptab_system(char *s) {
 
     STAT_VALUE(ctr, 1);
     // stat_val(&ctr, 1);
+    //fprintf(stderr, "[XX] executing: %s\n", s);
     result = system(s);
     if (dolog) {
         char *resstr = result ? " -> ERROR" : " -> OK";
