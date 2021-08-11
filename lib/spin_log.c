@@ -10,7 +10,7 @@ int log_stdout = 0;
 int log_verbosity = 6;
 FILE* logfile = NULL;
 
-void spin_log_init(int use_syslog, int log_stdout, const char* log_filename, int verbosity, const char* ident) {
+void spin_log_init(int use_syslog, int log_stdout_a, const char* log_filename, int verbosity, const char* ident) {
     log_verbosity = verbosity;
     if (log_filename && strlen(log_filename) > 0) {
         if (logfile) {
@@ -26,6 +26,7 @@ void spin_log_init(int use_syslog, int log_stdout, const char* log_filename, int
         use_syslog_ = use_syslog;
         openlog(ident, 0, LOG_DAEMON);
     }
+    log_stdout = log_stdout_a;
 }
 
 void spin_log_close() {
