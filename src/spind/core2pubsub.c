@@ -280,8 +280,7 @@ mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const cha
     fprintf(mosq_conf, "per_listener_settings true\n");
 
     // Always listen on localhost 1883
-    //fprintf(mosq_conf, "port 1883 127.0.0.1\n");
-    fprintf(mosq_conf, "port %d %s\n", pubsub_port, pubsub_host);
+    fprintf(mosq_conf, "listener %d %s\n", pubsub_port, pubsub_host);
     fprintf(mosq_conf, "allow_anonymous true\n");
 
     // Configure the websockets listener(s).
