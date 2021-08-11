@@ -36,25 +36,48 @@ void spin_log_close() {
 }
 
 void spin_log(int level, const char* format, ...) {
-    va_list arg;
+    va_list arg[3];
+    int arg_count = 0;
+    int arg_current = 0;
 
     /* Write the error message */
     if (level > log_verbosity) {
         return;
     }
 
-    va_start(arg, format);
     if (use_syslog_) {
-        vsyslog(level, format, arg);
+        arg_count++;
     }
     if (log_stdout) {
-        vprintf(format, arg);
+        arg_count++;
     }
     if (logfile) {
-        vfprintf(logfile, format, arg);
+        arg_count++;
+    }
+
+    va_start(arg[0], format);
+    for (int i = 1; i < arg_count; ++i) {
+        va_copy(arg[i], arg[0]);
+    }
+
+    if (use_syslog_) {
+        vsyslog(level, format, arg[arg_current]);
+        arg_current++;
+    }
+    if (log_stdout) {
+        vprintf(format, arg[arg_current]);
+        arg_current++;
+    }
+    if (logfile) {
+        vfprintf(logfile, format, arg[arg_current]);
+        arg_current++;
         fflush(logfile);
     }
-    va_end(arg);
+
+    va_end(arg[0]);
+    for (int i = 1; i < arg_count; ++i) {
+        va_end(arg[i]);
+    }
 }
 
 void spin_vlog(int level, const char* format, va_list arg) {
