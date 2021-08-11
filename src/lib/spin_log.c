@@ -6,7 +6,7 @@
 #include "spin_log.h"
 
 int use_syslog_ = 1;
-int log_stdout = 0;
+int log_stdout_ = 0;
 int log_verbosity = 6;
 FILE* logfile = NULL;
 
@@ -26,6 +26,7 @@ void spin_log_init(int use_syslog, int log_stdout, const char* log_filename, int
         use_syslog_ = use_syslog;
         openlog(ident, 0, LOG_DAEMON);
     }
+    log_stdout_ = log_stdout;
 }
 
 void spin_log_close() {
@@ -48,7 +49,7 @@ void spin_log(int level, const char* format, ...) {
     if (use_syslog_) {
         arg_count++;
     }
-    if (log_stdout) {
+    if (log_stdout_) {
         arg_count++;
     }
     if (logfile) {
@@ -64,7 +65,7 @@ void spin_log(int level, const char* format, ...) {
         vsyslog(level, format, arg[arg_current]);
         arg_current++;
     }
-    if (log_stdout) {
+    if (log_stdout_) {
         vprintf(format, arg[arg_current]);
         arg_current++;
     }
