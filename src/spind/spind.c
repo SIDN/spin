@@ -272,7 +272,7 @@ void print_help() {
     printf("-d\t\t\tlog debug messages (set log level to LOG_DEBUG)\n");
     printf("-e <path>\t\textsrc socket path (default: %s)\n", EXTSRC_SOCKET_PATH);
     printf("-E <addr>\t\textsrc listen address\n");
-    printf("-f <logfile>\t\t\tlog to file\n");
+    printf("-f <logfile>\t\tlog to file\n");
     printf("-h\t\t\tshow this help\n");
     printf("-j <path>\t\tJSON RPC socket path (default: %s)\n", JSON_RPC_SOCKET_PATH);
     printf("-l\t\t\trun in local mode (do not check for ARP cache entries)\n");
