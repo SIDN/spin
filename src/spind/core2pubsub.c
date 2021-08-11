@@ -360,13 +360,19 @@ mosquitto_start_server(const char* host, int port, const char* websocket_host, i
     //if(pid == 0) {
         //int result;
         char commandline[256];
+        int rcode;
         spin_log(LOG_INFO, "[XX] at child, closing fds\n");
         //fclose(stdin);
         //fclose(stdout);
         //fclose(stderr);
         signal(SIGCHLD,SIG_IGN);
         snprintf(commandline, 255, "mosquitto -d -c %s", mosq_conf_filename);
-        system(commandline);
+        spin_log(LOG_DEBUG, "Mosquitto command line: %s\n", commandline);
+        rcode = system(commandline);
+        if (rcode != 0 && rcode != -1) {
+            spin_log(LOG_ERR, "Error starting mosquitto, call returned: %d\n", rcode);
+            return 1;
+        }
         //result = system(commandline);
         //if (result != 0) {
         //    spin_log(LOG_ERR, "Error starting mosquitto\n");
