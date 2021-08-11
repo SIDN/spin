@@ -355,63 +355,26 @@ mosquitto_start_server(const char* host, int port, const char* websocket_host, i
     }
     // Run mosquitto in daemonized mode, so we don't need to deal with
     // fork and file descriptor issues
-    //spin_log(LOG_INFO, "[XX] calling fork()\n");
-    //int pid = fork();
-    //if(pid == 0) {
-        //int result;
-        char commandline[256];
-        int rcode;
-        spin_log(LOG_INFO, "[XX] at child, closing fds\n");
-        //fclose(stdin);
-        //fclose(stdout);
-        //fclose(stderr);
-        signal(SIGCHLD,SIG_IGN);
-        snprintf(commandline, 255, "mosquitto -d -c %s", mosq_conf_filename);
-        spin_log(LOG_DEBUG, "Mosquitto command line: %s\n", commandline);
-        rcode = system(commandline);
-        if (rcode != 0 && rcode != -1) {
-            spin_log(LOG_ERR, "Error starting mosquitto, call returned: %d\n", rcode);
-            return 1;
-        }
-        //result = system(commandline);
-        //if (result != 0) {
-        //    spin_log(LOG_ERR, "Error starting mosquitto\n");
-        //}
-        //exit(result);
-        
-        /*
-        fprintf(stderr, "[XX] i am child\n");
-        fclose(stdin);
-        fclose(stdout);
-        fclose(stderr);
-        char** argv = malloc(5*sizeof(char*));
+    char commandline[256];
+    int rcode;
+    signal(SIGCHLD,SIG_IGN);
+    snprintf(commandline, 255, "mosquitto -d -c %s", mosq_conf_filename);
+    spin_log(LOG_DEBUG, "Mosquitto command line: %s\n", commandline);
+    rcode = system(commandline);
+    // Looks like -1 can be returned for daemonized processes
+    if (rcode != 0 && rcode != -1) {
+        spin_log(LOG_ERR, "Error starting mosquitto, call returned: %d\n", rcode);
+        return 1;
+    }
 
-        argv[0] = strdup("mosquitto");
-        argv[1] = strdup("-d");
-        argv[2] = strdup("-c");
-        argv[3] = strdup(mosq_conf_filename);
-        argv[4] = NULL;
-        execvp("mosquitto", argv);
-        exit(0);
-        */
-    //} else {
-        spin_log(LOG_INFO, "[XX] at parent\n");
-        // Prevent the child process from going defunct when it exits
-        //signal(SIGCHLD,SIG_IGN);
-        //wait(NULL);
-        mosq_pid = read_mosquitto_pid_file(5);
-        if (mosq_pid < 1) {
-            spin_log(LOG_ERR, "Unable to read mosquitto pid file, mosquitto will probably keep running when spin stops\n");
-        } else {
-            spin_log(LOG_INFO, "Mosquitto server started with pid %d\n", mosq_pid);
-        }
+    mosq_pid = read_mosquitto_pid_file(5);
+    if (mosq_pid < 1) {
+        spin_log(LOG_ERR, "Unable to read mosquitto pid file, mosquitto will probably keep running when spin stops\n");
+    } else {
+        spin_log(LOG_INFO, "Mosquitto server started with pid %d\n", mosq_pid);
+    }
 
-        // Remember child PID so that we can stop the mosquitto server
-        // when spind itself stops
-        //mosq_pid = pid;
-        //sleep(5);
-        return 0;
-    //}
+    return 0;
 }
 
 int old_mosquitto_start_server(const char* host, int port, const char* websocket_host, int websocket_port) {
