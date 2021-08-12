@@ -41,7 +41,7 @@ static inline int readline(char* dest, FILE* in, size_t max) {
         }
 
         if (read >= max - 1) {
-            dest[++read] = '\0';
+            dest[read] = '\0';
             return read;
         }
     }
