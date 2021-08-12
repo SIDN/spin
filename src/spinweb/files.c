@@ -142,33 +142,10 @@ static int find_password_data_length(const char* password_data_start) {
     return s;
 }
 
-static int find_password_salt_length(const char* password_data_start) {
-    // first should be $, and we are looking for the 3rd $
-    char* e = strchr(password_data_start, '$');
-    if (e != password_data_start) {
-        printf("Error, password data does not start with $\n");
-        return -1;
-    }
-    e = strchr(e+1, '$');
-    if (e == NULL) {
-        printf("Error, password data does contain second $\n");
-        return -1;
-    }
-    e = strchr(e+1, '$');
-    if (e == NULL) {
-        printf("Error, password data does contain third $\n");
-        return -1;
-    }
-    
-    int s = e - password_data_start;
-    return s;
-}
-
 int check_password(const char* password_file_name, const char* username, const char* password) {
     size_t BUFLEN = 1024;
     char buf[BUFLEN];
     char passbuf[BUFLEN];
-    char saltbuf[BUFLEN];
     
     FILE* password_file = fopen(password_file_name, "r");
     if (password_file == NULL) {
@@ -186,12 +163,7 @@ int check_password(const char* password_file_name, const char* username, const c
                 strncpy(passbuf, password_data_start, password_data_length);
             }
 
-            int password_salt_length = find_password_salt_length(password_data_start);
-            if (password_salt_length > 0) {
-                strncpy(saltbuf, password_data_start, password_salt_length);
-            }
-
-            char* crypted = crypt(password, saltbuf);
+            char* crypted = crypt(password, passbuf);
             if (crypted == NULL) {
                 fprintf(stderr, "Unsupported algorithm in password file for user %s\n", username);
             } else if (strncmp(passbuf, crypted, strlen(crypted)) == 0) {
