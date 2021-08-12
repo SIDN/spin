@@ -443,7 +443,7 @@ void mosquitto_stop_server() {
             mosq_pid = file_pid;
         }
     }
-    if (mosq_pid == 0) {
+    if (mosq_pid < 1) {
         return;
     }
     spin_log(LOG_INFO, "Stopping mosquitto server with pid %d\n", mosq_pid);
