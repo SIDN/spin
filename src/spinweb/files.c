@@ -135,6 +135,9 @@ static char* find_password_data_start(const char* password_line) {
 
 static int find_password_data_length(const char* password_data_start) {
     char* e = strchr(password_data_start, ':');
+    if (e == NULL) {
+        return strlen(password_data_start);
+    }
     int s = e - password_data_start;
     return s;
 }
