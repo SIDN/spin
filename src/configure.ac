@@ -18,7 +18,7 @@ AC_PROG_INSTALL
 dnl Checks for header files.
 AC_HEADER_DIRENT
 AC_HEADER_STDC
-AC_CHECK_HEADERS(fcntl.h net/ethernet.h unistd.h)
+AC_CHECK_HEADERS(crypt.h fcntl.h net/ethernet.h unistd.h)
 AC_CHECK_HEADERS(netinet/if_ether.h, [], [],
 [
 #include <sys/types.h>
@@ -40,7 +40,7 @@ AC_CHECK_HEADER([net/bpf.h], AC_CHECK_TYPE([struct bpf_timeval],
 
 dnl Checks for library functions.
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS(pledge socket strerror)
+AC_CHECK_FUNCS(crypt_checkpass pledge socket strerror)
 
 AC_PROG_RANLIB
 

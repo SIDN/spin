@@ -1,3 +1,7 @@
+#include "config.h"
+#ifdef HAVE_CRYPT_H
+#include <crypt.h>
+#endif
 #include <errno.h>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -162,13 +166,22 @@ int check_password(const char* password_file_name, const char* username, const c
             if (password_data_length > 0) {
                 strncpy(passbuf, password_data_start, password_data_length);
             }
-
-            char* crypted = crypt(password, passbuf);
+    
+#if defined(HAVE_CRYPT_CHECKPASS)
+            if (crypt_checkpass(password, password_data_start) == 0) {
+                return 1;
+            }
+            fprintf(stderr, "crypt_checkpass failed for user %s: %s", username, strerror(errno));
+#else
+            struct crypt_data data;
+            memset(&data, 0, sizeof(data));
+            char* crypted = crypt_r(password, passbuf, &data);
             if (crypted == NULL) {
                 fprintf(stderr, "Unsupported algorithm in password file for user %s\n", username);
             } else if (strncmp(passbuf, crypted, strlen(crypted)) == 0) {
                 return 1;
             }
+#endif
         }
     }
     return 0;
