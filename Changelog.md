@@ -1,5 +1,21 @@
 # Changelog
 
+## [upcoming]
+* Added support for bridge mode, where SPIN is not running on an access point,
+  but as a bump in the wire.
+* Added support for TLS in spinweb
+* Added option to enable HTTP authentication in spinweb
+* Added support for mosquitto user authentication in spinweb
+* Updated the vis library in the bubble app
+* Improved logging options, spind can now log to syslog, file, and standard out, and log to multiple targets simultaneously.
+* Bugfixes
+  - Fixed issue in call to mkstemp() (https://github.com/SIDN/spin/issues/77)
+  - Fixed several small issues in the pcap reader connection code core2ext
+  - Fixed issue with spinweb query parameter mqtt_port (https://github.com/SIDN/spin/issues/79)
+  - Fixed a number of issues with the generated mosquitto configuration when spind runs its own instance of mosquitto
+  - Fixed the issue where tcpdump could fail until router was rebooted
+
+
 ## [0.12] (2020-01-11)
 * SPIN is now, by default, directly reachable on port 13026, rather that
   needing a reverse proxy for handling web traffic. It is still advisable
