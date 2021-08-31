@@ -42,7 +42,17 @@ dnl Checks for library functions.
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS(pledge socket strerror)
 # Need either crypt_checkpass or crypt_r
-AC_CHECK_FUNC(crypt_checkpass, [AC_DEFINE(HAVE_CRYPT_CHECKPASS, [], [crypt_checkpass is available])], [AC_CHECK_LIB([crypt], [crypt_r], [AC_DEFINE(_GNU_SOURCE, [], [crypt.h needs _GNU_SOURCE to add crypt_r()])])])
+AC_CHECK_FUNC(crypt_checkpass,
+              [AC_DEFINE(HAVE_CRYPT_CHECKPASS, [], [Define to 1 if you have the crypt_checkpass() function.])],
+              [AC_CHECK_LIB([crypt],
+                            [crypt_r],
+                            [
+                              AC_DEFINE(_GNU_SOURCE, [], [crypt.h needs _GNU_SOURCE to enable crypt_r()])
+                              LIBS="-lcrypt $LIBS"
+                            ]
+                           )
+              ]
+             )
 AC_PROG_RANLIB
 
 regular_CFLAGS="-Wall -Wextra -Wno-unused-parameter -Werror -O0"
