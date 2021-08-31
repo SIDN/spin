@@ -41,8 +41,8 @@ AC_CHECK_HEADER([net/bpf.h], AC_CHECK_TYPE([struct bpf_timeval],
 dnl Checks for library functions.
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS(pledge socket strerror)
-# Need either crypt_check_pass or crypt_r
-AC_CHECK_FUNC(crypt_checkpass, [], [AC_CHECK_LIB([crypt], [crypt_r], [AC_DEFINE(_GNU_SOURCE, [], [crypt.h needs _GNU_SOURCE to add crypt_r()])])])
+# Need either crypt_checkpass or crypt_r
+AC_CHECK_FUNC(crypt_checkpass, [AC_DEFINE(HAVE_CRYPT_CHECKPASS, [], [crypt_checkpass is available])], [AC_CHECK_LIB([crypt], [crypt_r], [AC_DEFINE(_GNU_SOURCE, [], [crypt.h needs _GNU_SOURCE to add crypt_r()])])])
 AC_PROG_RANLIB
 
 regular_CFLAGS="-Wall -Wextra -Wno-unused-parameter -Werror -O0"
