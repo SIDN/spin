@@ -40,8 +40,19 @@ AC_CHECK_HEADER([net/bpf.h], AC_CHECK_TYPE([struct bpf_timeval],
 
 dnl Checks for library functions.
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS(crypt_checkpass pledge socket strerror)
-
+AC_CHECK_FUNCS(pledge socket strerror)
+# Need either crypt_checkpass or crypt_r
+AC_CHECK_FUNC(crypt_checkpass,
+              [AC_DEFINE(HAVE_CRYPT_CHECKPASS, [], [Define to 1 if you have the crypt_checkpass() function.])],
+              [AC_CHECK_LIB([crypt],
+                            [crypt_r],
+                            [
+                              AC_DEFINE(_GNU_SOURCE, [], [crypt.h needs _GNU_SOURCE to enable crypt_r()])
+                              LIBS="-lcrypt $LIBS"
+                            ]
+                           )
+              ]
+             )
 AC_PROG_RANLIB
 
 regular_CFLAGS="-Wall -Wextra -Wno-unused-parameter -Werror -O0"
@@ -49,7 +60,7 @@ AC_SUBST([regular_CFLAGS])
 
 AC_CHECK_LIB([mosquitto], [mosquitto_lib_version], [], [AC_MSG_ERROR([libmosquitto not found])])
 AC_CHECK_LIB([microhttpd], [MHD_start_daemon], [], [AC_MSG_ERROR([libmicrohttpd not found])])
-AC_CHECK_LIB([c], [crypt], [], AC_CHECK_LIB([crypt], [crypt], [], [AC_MSG_ERROR([libcrypt not found])]))
+#AC_CHECK_LIB([c], [crypt_r], [], AC_CHECK_LIB([crypt], [crypt_r], [AC_DEFINE(_GNU_SOURCE, [], [crypt.h needs _GNU_SOURCE to add crypt_r()])], [AC_MSG_ERROR([libcrypt not found])]))
 
 passivemodeonly=0
 AC_ARG_ENABLE([passive-mode-only],
