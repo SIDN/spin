@@ -10,7 +10,7 @@ spinweb_SOURCES = spinweb.c \
 
 
 spinweb_CFLAGS = -DDATADIR='"$(datadir)"' -DSRCDIR='"$(srcdir)"'
-spinweb_LDADD = -lpthread $(top_builddir)/lib/libspin.a
+spinweb_LDADD = -lpthread -lcrypt $(top_builddir)/lib/libspin.a
 
 if USE_UBUS
     spinweb_SOURCES += rpc_ubus_client.c
