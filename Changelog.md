@@ -9,6 +9,9 @@
 * Updated the vis library in the bubble app
 * Improved logging options, spind can now log to syslog, file, and standard out,
   and log to multiple targets simultaneously
+* Reduced traffic exchanged between PCAP reader and spind by aggregating
+  information before sending it
+* Added support for network communication between PCAP reader and spind
 * Bugfixes
   - Fixed issue in call to mkstemp() (https://github.com/SIDN/spin/issues/77)
   - Fixed several small issues in the PCAP reader connection code core2ext
