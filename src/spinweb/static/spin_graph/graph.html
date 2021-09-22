@@ -14,7 +14,7 @@
     <link rel="stylesheet" type="text/css" href="./js/vis/vis-timeline-graph2d.min.css" />
 
     <!-- load SpinJS scripts and stylesheet -->
-    <script src="./js/mqttws31.js"></script>
+    <script src="./js/paho-mqtt.js"></script>
     <script src="./js/mqtt_client.js"></script>
     <script src="./js/port_services.js"></script>
     <script src="./js/spingraphs.js"></script>
@@ -70,24 +70,54 @@
 
 <div id="wserror" title="Websocket connection error" class="initiallyHidden">
     <p>
-        Error connecting to the MQTT server at
+        Error connecting to the MQTT server at <span id="wserror_url"></span>.
+        <br />
+        There are three possible solutions that you can explore.
     </p>
-    <span id="wserror_url"></span>
-    <p>
-        If this is a wss:// URL with a self-signed certificate, you may need
-        to add an exception to trust it manually. Please visit this link and accept the certificate:
-    </p>
-    <span><a id="wserror_http_url" target="_blank" href=""></a></span>
-    <p>
-    Then reload <b>this</b> page.
-    </p>
+    
+    <div id="accordion-websocket">
+      <h3>Invalid certificate</h3>
+      <div>
+        <p>
+            If this is a wss:// URL with a self-signed certificate, you may need
+            to add an exception to trust it manually. Please visit this link and accept the certificate:
+        </p>
+        <span><a id="wserror_http_url" target="_blank" href=""></a></span>
+        <p>
+        Then reload <b>this</b> page.
+        </p>
+      </div>
+      <h3>MQTT server not running</h3>
+      <div>
+        <p>
+            Is the MQTT server working properly? Maybe it is not running at this moment.
+        </p>
+        <p>
+            Try reloading this page to see if you are still connected to the network.
+        </p>
+        <p>
+            Alternatively, if things worked before, try to establish whether the MQTT server is currently active. If you are using a Valibox, try restarting the device.
+        </p>
+      </div>
+      <h3>Firefox and http2</h3>
+      <div>
+        <p>
+            If you are using Firefox, your browser may have tried to connect to the mqtt server using http2.
+        </p>
+        <p>Open <a href="about:config">about:config</a> and set the following flag to <code>false</code>:<br />
+            <code>network.http.spdy.websockets</code>
+        </p>
+        <p>Then, reload this page.</p>
+        <p><a href="https://github.com/eclipse/paho.mqtt.javascript/issues/231">Bug report</a></p>
+      </div>
+    </div>
 </div>
 
 <div id="logindialog" title="Login required" class="initiallyHidden">
+    <span id="logindialog_error" class="initiallyHidden" style="color:red">Invalid credentials were provided.</span>
     <p>
         Please enter your username and password
     </p>
-    <span id="logindialog_error"></span>
     <form>
         <fieldset>
             <label for="username">Username</label>

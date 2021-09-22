@@ -712,10 +712,18 @@ function showWsError(wsURL, httpsURL) {
     $("#wserror_url").text(wsURL);
     $("#wserror_http_url").attr("href", httpsURL);
     $("#wserror_http_url").text(httpsURL);
+    $("#accordion-websocket").accordion({
+      heightStyle: "content",
+      collapsible: true,
+      active: false
+    });
     $("#wserror").dialog('open');
 }
 
-function showLoginDialog() {
+function showLoginDialog(first = true) {
+    if (!first) {
+        $("#logindialog_error").show();
+    }
     $("#logindialog").dialog('open');
 }
 

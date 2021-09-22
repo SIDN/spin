@@ -12,6 +12,8 @@ var active = false; // Determines whether we are active or not
 var datacache = []; // array of all data items to be added on the next iteration.
 var nodeinfo = []; // caching array with all node information
 
+var firstLoginPrompt = true; // indicates first time login prompt is shown
+
 // We create and maintain connections to two servers;
 // the MQTT server and the web API / RPC server.
 // Connection details can in most cases be derived, but they can be
@@ -79,7 +81,7 @@ function getWsURLasHTTP() {
 function init() {
     setServerData();
 
-    client = new Paho.MQTT.Client(server_data.mqtt_host, server_data.mqtt_port, "Web-" + Math.random().toString(16).slice(-5));
+    client = new Paho.Client(server_data.mqtt_host, server_data.mqtt_port, "Web-" + Math.random().toString(16).slice(-5));
     initGraphs();
     connect();
 }
@@ -92,7 +94,9 @@ function connect() {
     let options = {
         useSSL: server_data.useSSL,
         onSuccess: onTrafficOpen,
-        onFailure: onConnectFailed
+        onFailure: onConnectFailed,
+        mqttVersion: 4,           // this is needed to get a proper error message on failure
+        mqttVersionExplicit: true // this is needed to get a proper error message on failure
     }
 
     if (username) {
@@ -106,7 +110,7 @@ function connect() {
         client.connect(options);
     } catch (err) {
         // TODO: Ask for username/password here?
-        console.error(err);
+        console.error("err109 " + err);
     }
 
     // Make smooth traffic graph when no data is received
@@ -127,7 +131,7 @@ function sendCommand(command, argument) {
     //console.log("sending command: '" + command + "' with argument: '" + JSON.stringify(argument) + "'");
 
     var json_cmd = JSON.stringify(cmd);
-    var message = new Paho.MQTT.Message(json_cmd);
+    var message = new Paho.Message(json_cmd);
     message.destinationName = "SPIN/commands";
     client.send(message);
     console.log("Sent to SPIN/commands: " + json_cmd)
@@ -331,19 +335,33 @@ function onTrafficOpen(evt) {
 }
 
 function onConnectFailed(evt) {
-    console.error("Error connecting to MQTT websockets server: " + JSON.stringify(evt));
+    console.error("Error connecting to MQTT websockets server: " + JSON.stringify(evt)); // FIXME tmp
     // If the server is using wss with a self-signed certificate, the browser
     // may need explicit permission to access it; browsers tend to reject
     // rather than ask for permission if it's a 'secondary' connection like
     // this. So unfortunately we'll have to get the user to jump through a
     // hoop a little bit. Unfortunately 2: the error itself isn't clear
     // on what the problem is.
-    if (evt.errorCode == 6 || evt.errorCode == 7) {
+    
+    // We distinguish four common scenario's of failure here
+    // 1) no or incorrect password
+    // 2) invalid (self signed) certificate
+    // 3) mqtt server not running
+    // 4) http2 being used in Firefox (bug)
+    //      See: https://github.com/eclipse/paho.mqtt.javascript/issues/231
+
+    if (evt.errorCode == 6 && evt.errorMessage.includes("not authorized")) {
+        // ConnAck failure, unauthorized
+        // ConnAck code 4 ("bad user name or password") also applies, but seems unused
+        // CONNACK RC code: 5 No credentials provided
         if (showLoginDialog) {
-            showLoginDialog();
+            showLoginDialog(firstLoginPrompt);
+            if (firstLoginPrompt) {
+                firstLoginPrompt = false; // switch boolean to False
+            }
         }
     } else {
-        // open a dialog
+        // open a dialog with tips
         if (showWsErrorDialog) {
             showWsErrorDialog(getWsURL(), getWsURLasHTTP());
         }
