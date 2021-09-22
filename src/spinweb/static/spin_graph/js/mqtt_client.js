@@ -110,7 +110,7 @@ function connect() {
         client.connect(options);
     } catch (err) {
         // TODO: Ask for username/password here?
-        console.error("err109 " + err);
+        console.error(err);
     }
 
     // Make smooth traffic graph when no data is received
