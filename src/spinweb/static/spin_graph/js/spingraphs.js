@@ -554,6 +554,9 @@ function initGraphs() {
         var url = window.location.protocol + "//" + window.location.hostname + portstr +
         "/spin_api/capture?device="+name;
         var w = window.open(url, name, "width=444,  height=534, scrollbars=yes");
+        w.addEventListener('load', function() {
+            w.setUser($("#login_username").val(), $("#login_password").val());
+        });
     });
 
     $("#block-flow-button").button().on("click", function (evt) {
@@ -583,7 +586,7 @@ function initGraphs() {
 
     // clean up every X seconds
     setInterval(cleanNetwork, 5000);
-    
+
     // Refresh peak information every 30 seconds
     setInterval(getPeakInformation, 30000);
 }
@@ -734,7 +737,7 @@ function updateNodeInfo(nodeId) {
     if (node.size > 0) {
         sizeblabel = ['B','KiB', 'MiB', 'GiB', 'TiB'][Math.floor(Math.log2(node.size)/10)]
         sizeb = Math.floor(node.size / ([1,1024, 1024**2, 1024**3, 1024**4][Math.floor(Math.log2(node.size)/10)]))
-    } 
+    }
 
     writeToScreen("trafficcount", "<b>Packets seen</b>: " + node.count);
     writeToScreen("trafficsize", "<b>Traffic size</b>: " + sizeb + " " + sizeblabel);
@@ -812,7 +815,7 @@ function nodeSelected(event) {
             graph_peak_bytes.destroy();
             graph_peak_bytes = null;
         }
-        
+
         $("#nodeinfo-peakdet").hide(); // Always hide peak detection, show when active.
         if (node.mac) {
             // Obtain peak information from server.
@@ -965,7 +968,7 @@ function addNode(timestamp, node, scale, count, size, lwith, type) {
             let curn = nodesArray[ni]
             for (let di = 0; di < curn.domains.length; di++) {
                 for (let dj = 0; dj < node.domains.length; dj++) {
-                    //alert("try " + dj + " and " + 
+                    //alert("try " + dj + " and " +
                     if (node.domains[dj] == curn.domains[di]) {
                         enode = curn
                     }
@@ -1321,7 +1324,7 @@ function cleanNetwork() {
 }
 
 
-/* 
+/*
  On close of NodeInfo window
  */
 function nodeInfoClosed(event, ui) {
@@ -1344,7 +1347,7 @@ function flowInfoClosed(event, ui) {
     selectedEdgeId = 0;
 }
 
-/* 
+/*
  * Request peak information for a particular nodeId.
  * Uses MQTT to query any running peak detection.
  */
@@ -1419,7 +1422,7 @@ function handlePeakInformation(result) {
         });
         graph_peak_packets.setGroups(groups);
     }
-    
+
     // Clear dataset, re-add changed values.
     graph_peak_bytes.itemsData.clear();
     graph_peak_packets.itemsData.clear();
@@ -1471,13 +1474,13 @@ function handlePeakInformation(result) {
             group: 1
         });
     }
-    
+
     if (result["maxbytes"] == 0 || result["maxpackets"] == 0) {
         $("#nodeinfo-notenoughdata:hidden").show();
     } else {
         $("#nodeinfo-notenoughdata:visible").hide();
     }
-    
+
     if (!result["enforcing"]) {
         $("#nodeinfo-training:hidden").show();
     } else {

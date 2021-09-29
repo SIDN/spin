@@ -196,6 +196,8 @@ var statusRunning = false;
 var statusDownloaded = false;
 var statusStartedAt = "not started";
 var statusByteCount = 0;
+var username = null;
+var password = null;
 
 var fileStream
 var mqttClient
@@ -203,6 +205,10 @@ var encode = TextEncoder.prototype.encode.bind(new TextEncoder)
 var receivedBytes = []
 updateUIAll();
 
+function setUser(user, pass) {
+  username = user;
+  password = pass;
+}
 // Abort the download stream when leaving the page
 window.addEventListener('beforeunload', evt => {
     if (statusRunning) {
@@ -489,27 +495,38 @@ function connectToMQTT() {
     var protocol = window.location.protocol;
     var server_host = window.location.hostname;
 
-    let wsUseSSL = false;
+    let options = {
+        onSuccess: onMQTTClientOpen
+    }
+
     if (protocol == "https:") {
-        wsUseSSL = true;
+        options.useSSL = true;
+    } else {
+        options.useSSL = false;
     }
 
     if (!server_host) {
         server_host = "localhost";
     }
 
-
     if (mqtt_port) {
         mqtt_port = parseInt(mqtt_port);
     } else {
         mqtt_port = 1884;
+    }
+
+    if (username) {
+        options.userName = username;
+    }
+    if (password) {
+        options.password = password;
     }
     var identifier = "Web-" + Math.random().toString(16).slice(-5)
 
     mqttClient = new Paho.MQTT.Client(server_host, mqtt_port, identifier);
     mqttClient.onConnectionLost = onMQTTClientStop;
     mqttClient.onMessageArrived = onMQTTClientMessage;
-    mqttClient.connect({onSuccess:onMQTTClientOpen, useSSL:wsUseSSL});
+    mqttClient.connect(options);
 }
 
     </script>
