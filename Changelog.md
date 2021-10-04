@@ -1,9 +1,13 @@
 # Changelog
 
 ## [upcoming]
+
+## [1.0] (2021-10-05)
 * Added support for bridge mode, where SPIN is not running on an access point,
   but as a bump in the wire
-* Added support for TLS in spinweb
+* Spinweb now shows some suggestions on what could be wrong when it is
+  unable to connect to the MQTT server
+* Added support for TLS (and wss) in spinweb
 * Added option to enable HTTP authentication in spinweb
 * Added support for mosquitto user authentication in spinweb
 * Updated the vis library in the bubble app
@@ -20,6 +24,7 @@
   - Fixed a number of issues with the generated mosquitto configuration when
     spind runs its own instance of mosquitto
   - Fixed the issue where tcpdump could fail until router was rebooted
+  - Improved cleanup routines when SPIN fails to start
 
 
 ## [0.12] (2020-01-11)
