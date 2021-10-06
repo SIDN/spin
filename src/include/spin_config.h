@@ -29,6 +29,7 @@ int spinconfig_pubsub_omitnode();
 int spinconfig_pubsub_run_mosquitto();
 char *spinconfig_pubsub_run_password_file();
 char* spinconfig_pubsub_run_pid_file();
+char* spinconfig_pubsub_run_user();
 int spinconfig_iptable_nflog_dns_group();
 int spinconfig_iptable_queue_block();
 int spinconfig_iptable_place_block();
