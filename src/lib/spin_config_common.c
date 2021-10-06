@@ -19,6 +19,7 @@ enum configs {
     PUBSUB_RUN_MOSQUITTO,
     PUBSUB_RUN_PASSWORD_FILE,
     PUBSUB_RUN_PID_FILE,
+    PUBSUB_RUN_USER,
     IPTABLE_QUEUE_DNS,
     IPTABLE_QUEUE_BLOCK,
     IPTABLE_PLACE_BLOCK,
@@ -64,7 +65,9 @@ struct conf_item {
     [PUBSUB_RUN_PASSWORD_FILE] =
             { "pubsub_run_password_file",   "",                 0   },
     [PUBSUB_RUN_PID_FILE] =
-            { "pubsub_run_pid_file",        "",                 0   },
+            { "pubsub_run_pid_file",      "/tmp/mosquitto.pid", 0   },
+    [PUBSUB_RUN_USER] =
+            { "pubsub_run_user",            "",                 0   },
     [IPTABLE_QUEUE_DNS] =
             { "iptable_queue_dns",          "1",                0   },
     [IPTABLE_QUEUE_BLOCK] =
@@ -200,6 +203,10 @@ char* spinconfig_pubsub_run_password_file() {
 
 char* spinconfig_pubsub_run_pid_file() {
     return(spi_str(PUBSUB_RUN_PID_FILE));
+}
+
+char* spinconfig_pubsub_run_user() {
+    return(spi_str(PUBSUB_RUN_USER));
 }
 
 int spinconfig_iptable_nflog_dns_group() {

@@ -257,6 +257,8 @@ static int mosq_pid = 0;
 int
 mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const char* pubsub_websocket_host, int pubsub_websocket_port) {
     FILE* mosq_conf;
+    char* pubsub_user;
+
     sprintf(mosq_conf_filename, MOSQ_CONF_TEMPLATE);
     if (mkstemp(mosq_conf_filename) == -1) {
         spin_log(LOG_ERR, "mkstemp %s: %s\n", mosq_conf_filename, strerror(errno));
@@ -275,6 +277,17 @@ mosquitto_create_config_file(const char* pubsub_host, int pubsub_port, const cha
     }
 
     fprintf(mosq_conf, "pid_file %s\n", get_mosquitto_pid_file());
+
+    // Set mosquitto user to the value of PUBSUB_RUN_USER
+    // If no value is set, we want to use the current user
+    // Since mosquitto will ignore the setting if it is not run as
+    // root, we can safely set it to root to reach that effect
+    pubsub_user = spinconfig_pubsub_run_user();
+    if (pubsub_user != NULL && strlen(pubsub_user) > 0) {
+        fprintf(mosq_conf, "user %s\n", pubsub_user);
+    } else {
+        fprintf(mosq_conf, "user root\n");
+    }
 
     // Enable per-listener settings
     fprintf(mosq_conf, "per_listener_settings true\n");
