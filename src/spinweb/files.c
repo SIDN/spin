@@ -171,7 +171,7 @@ int check_password(const char* password_file_name, const char* username, const c
             if (crypt_checkpass(password, password_data_start) == 0) {
                 return 1;
             }
-            fprintf(stderr, "crypt_checkpass failed for user %s: %s", username, strerror(errno));
+            fprintf(stderr, "crypt_checkpass failed for user %s: %s\n", username, strerror(errno));
 #else
             struct crypt_data data;
             memset(&data, 0, sizeof(data));
