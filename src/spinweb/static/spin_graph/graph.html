@@ -45,7 +45,7 @@
 
 <div id="mynetwork" class="ui-corner-all body-item"><noscript> [JavaScript Required!]</noscript></div>
 
-<div id="footer" class="body-item">Beta-release by SIDN Labs.</div>
+<div id="footer" class="body-item">SPIN by SIDN Labs.</div>
 
 <!-- dialogs -->
 
@@ -84,7 +84,8 @@
         </p>
         <span><a id="wserror_http_url" target="_blank" href=""></a></span>
         <p>
-        Then reload <b>this</b> page.
+        Then reload <b>this</b> page. Note that it's not necessary to wait for the page to load once you've
+accepted the certificate, the page will appear to keep loading.
         </p>
       </div>
       <h3>MQTT server not running</h3>
@@ -116,21 +117,20 @@
 <div id="logindialog" title="Login required" class="initiallyHidden">
     <span id="logindialog_error" class="initiallyHidden" style="color:red">Invalid credentials were provided.</span>
     <p>
-        Please enter your username and password
+        Please enter your username (default: root) and password.
     </p>
     <form>
         <fieldset>
             <label for="username">Username</label>
-            <input type="text" name="username" id="login_username" value="" class="text ui-widget-content ui-corner-all">
+            <input type="text" name="username" id="login_username" value="" class="text ui-widget-content ui-corner-all" autocomplete="username" autofocus>
             <label for="password">Password</label>
-            <input type="password" name="password" id="login_password" value="" class="text ui-widget-content ui-corner-all">
+            <input type="password" name="password" id="login_password" value="" class="text ui-widget-content ui-corner-all" autocomplete="current-password">
 
             <!-- Allow form submission with keyboard without duplicating the dialog button -->
             <!--<input type="submit" tabindex="-1" style="position:absolute; top:-1000px" />-->
         </fieldset>
     </form>
 </div>
-
 <div id="nodeinfo" title="Node information" class="initiallyHidden">
     <div>
         <div id="options">
