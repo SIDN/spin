@@ -141,7 +141,7 @@ When installed locally, a few manual steps are required:
 
 (0. Configure your system to be a gateway, example instructions: [https://gridscale.io/en/community/tutorials/debian-router-gateway/](https://gridscale.io/en/community/tutorials/debian-router-gateway/))
 1. Configure and start an MQTT service; this needs to listen to port 1883 (mqtt) and 1884 (websockets protocol).
-2. Load the relevant kernel modules: `modprobe nf_conntrack nfnetlink_log nfnetlink_queue`. On some systems, the conntrack modules are split into several separate modules, in which case you'll need to run modprobe on `nf_conntrack_ipv4` and `nf_conntrack_ipv6` as well.
+2. Load the relevant kernel modules: `modprobe nf_conntrack nfnetlink_log nfnetlink_queue`. On some systems, the conntrack modules are split into several separate modules, in which case you'll need to run modprobe on `nf_conntrack_ipv4` and `nf_conntrack_ipv6` as well. When you use SPIN in a bridge setting, load `br_netfilter` as well.
 3. Enable conntrack accounting: `sysctl net.netfilter.nf_conntrack_acct=1`
 4. Start the spin daemon `(sudo) (cd ./src/build/spind/; spind -o -d)`
 5. Start the spinweb daemon `(cd ./src/build/spinweb/; ./spinweb`
