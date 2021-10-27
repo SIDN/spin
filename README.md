@@ -39,7 +39,7 @@ Pi 3. See the [Valibox website](https://valibox.sidnlabs.nl)
 - libldns-dev
 - libmicrohttpd-dev
 
-    `apt-get install gcc make autoconf libnfnetlink-dev libmnl-dev libnetfilter-queue-dev libldns-dev libmicrohttpd-dev`
+    `apt-get install gcc make autoconf libnfnetlink-dev libmnl-dev libnetfilter-queue-dev libldns-dev libmicrohttpd-dev libnetfilter-log-dev libnetfilter-conntrack-dev`
 
 Library dependencies:
 
