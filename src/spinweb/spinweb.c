@@ -10,6 +10,13 @@
 #include "files.h"
 #include "version.h"
 
+/* Deal with changed libmicrohttpd API */
+#if MHD_VERSION >= 0x00097002
+#define MHD_RESULT enum MHD_Result
+#else
+#define MHD_RESULT int
+#endif
+
 #define POSTBUFFERSIZE  512
 #define MAXCLIENTS      64
 
@@ -401,7 +408,7 @@ request_completed(void *cls,
     *con_cls = NULL;
 }
 
-static int
+static MHD_RESULT
 answer_to_connection(void *cls,
                      struct MHD_Connection *connection,
                      const char *url,
