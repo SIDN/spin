@@ -618,7 +618,12 @@ start_daemon(char* address, int port, char* tls_cert_pem, char* tls_key_pem, str
         return 1;
     }
 
-    unsigned int daemon_flags = MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD;
+    unsigned int daemon_flags = MHD_USE_THREAD_PER_CONNECTION
+#if MHD_VERSION >= 0x00095300
+        | MHD_USE_INTERNAL_POLLING_THREAD;
+#else
+        | MHD_USE_SELECT_INTERNALLY;
+#endif
     if (tls_key_pem != NULL && tls_cert_pem != NULL) {
         fprintf(stderr, "Enable TLS mode (MHD_USE_SSL)\n");
         daemon_flags = daemon_flags | MHD_USE_SSL;
