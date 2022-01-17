@@ -321,7 +321,7 @@ int main(int argc, char** argv) {
     char* log_filename = NULL;
     int debug_mode = 0;
     char *extsrc_listen_addr = NULL;
-    char *extsrc_socket_path = EXTSRC_SOCKET_PATH;
+    char *extsrc_socket_path = NULL;
     int log_stdout = 0;
 #ifndef USE_UBUS
     char *json_rpc_socket_path = JSON_RPC_SOCKET_PATH;
