@@ -130,7 +130,7 @@ usage(const char *error)
 		fprintf(stderr, "%s\n", error);
 	fprintf(stderr, "Usage: %s [-R] [-e extsrc-socket-path] [-E extsrc-host]\n",
 	    __progname);
-	fprintf(stderr, "\t[-f filter] [-i interface] [-r file]\n");
+	fprintf(stderr, "\t[-f filter] [-i interface] [-r file] [-s snaplen]\n");
 	exit(1);
 }
 
@@ -508,6 +508,7 @@ main(int argc, char *argv[])
 	char *file = NULL;
 	char *pcap_errbuf;
 	char *filter = "";
+	int snaplen = 1514;
 	struct bpf_program fp;
 
 #ifdef __OpenBSD__
@@ -519,7 +520,7 @@ main(int argc, char *argv[])
 
 	flow_list = flow_list_create(time(NULL));
 
-	while ((ch = getopt(argc, argv, "e:E:f:hi:Rr:")) != -1) {
+	while ((ch = getopt(argc, argv, "e:E:f:hi:Rr:s:")) != -1) {
 		switch(ch) {
 		case 'e':
 			extsrc_socket_path = optarg;
@@ -540,6 +541,10 @@ main(int argc, char *argv[])
 			break;
 		case 'r':
 			file = optarg;
+			break;
+		case 's':
+			if (sscanf(optarg, "%d", &snaplen) != 1 || snaplen < 0)
+				usage("incorrect snaplen");
 			break;
 		default:
 			usage(NULL);
@@ -567,7 +572,7 @@ main(int argc, char *argv[])
 		if (!pd)
 			errx(1, "pcap_create: %s", pcap_errbuf);
 
-		if (pcap_set_snaplen(pd, 1514) != 0)
+		if (pcap_set_snaplen(pd, snaplen) != 0)
 			errx(1, "pcap_set_snaplen");
 
 		if (pcap_set_promisc(pd, 1) != 0)
