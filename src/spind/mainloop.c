@@ -73,7 +73,7 @@ int mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval, int
 
     /*
      * Look for MNR struct that is not active and can be reused. If not found,
-     * use mnr[n_nmr].
+     * use mnr[n_mnr].
      */
     cur_mnr = n_mnr;
     for (i = 0; i < n_mnr; i++) {
