@@ -75,6 +75,11 @@ required to gather information about network activity,
 but of course it can be used on Linux systems as well.
 Use `-i` to specify the network interface.
 
+By default,
+`spin-pcap-reader` captures and analyzes 1514 bytes for each packet.
+If that's not enough (for instance, because you're using VLANs),
+you can use the `-s` flag (e.g. `-s 1518`).
+
 ## Caveats
 
 The SPIN PCAP reader is not perfect.
