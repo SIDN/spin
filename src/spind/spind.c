@@ -453,6 +453,8 @@ int main(int argc, char** argv) {
         spin_log(LOG_INFO, "Passive mode enabled\n");
     }
 
+    init_mainloop();
+
     SPIN_STAT_START();
 
     if (passive_mode) {

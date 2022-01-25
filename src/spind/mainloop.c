@@ -38,6 +38,16 @@ static int nfds = 0;
 
 STAT_MODULE(mainloop)
 
+int init_mainloop() {
+    int i;
+
+    for (i = 0; i < MAXMNR; i++) {
+        fds[i].fd = -1;
+    }
+
+    return 0;
+}
+
 static void panic(char *s) {
 
     spin_log(LOG_ERR, "Fatal error: %s\n", s);
@@ -45,6 +55,10 @@ static void panic(char *s) {
 }
 
 static void mnreg_deactivate(struct mnreg *reg) {
+    if (reg->mnr_pollnumber >= 0) {
+        fds[reg->mnr_pollnumber].fd = -1;
+    }
+
     reg->mnr_active = 0;
     reg->mnr_name = "inactive";
     reg->mnr_wf = NULL;
@@ -68,6 +82,7 @@ static void mnreg_deactivate(struct mnreg *reg) {
 int mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval, int mustsucceed) {
     int i;
     int cur_mnr;
+    int pollnum = -1;
 
     spin_log(LOG_DEBUG, "Mainloop registering %s(..., %d, %d)\n", name, fd, toval);
 
@@ -111,10 +126,27 @@ int mainloop_register(char *name, workfunc wf, void *arg, int fd, int toval, int
     mnr[cur_mnr].mnr_toval.tv_usec = 1000*(toval%1000);
 
     if (fd) {
-        mnr[cur_mnr].mnr_pollnumber = nfds;
-        fds[nfds].fd = fd;
-        fds[nfds].events = POLLIN;
-        nfds++;
+        /*
+         * Look for pollfd struct that is not active and can be used. Note that
+         * mnr and fds are not the same array but the number of fds <= n_mnr
+         * so it's OK to look for n_mnr entries in the fds array.
+         */
+        for (i = 0; i < n_mnr; i++) {
+            if (fds[i].fd == -1) {
+                pollnum = i;
+                break;
+            }
+        }
+        if (pollnum == -1) {
+            panic("wasn't able to find a pollfd struct; this is an accounting bug");
+        }
+
+        mnr[cur_mnr].mnr_pollnumber = pollnum;
+        fds[pollnum].fd = fd;
+        fds[pollnum].events = POLLIN;
+        if (pollnum + 1 > nfds) {
+            nfds = pollnum + 1;
+        }
     } else {
         mnr[cur_mnr].mnr_pollnumber = -1;
     }
