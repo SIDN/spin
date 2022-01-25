@@ -475,6 +475,8 @@ int main(int argc, char** argv) {
     }
 #endif
 
+    init_ipl_list_ar();
+
     if (init_core2block(passive_mode)) {
         goto stop;
     }
@@ -482,8 +484,6 @@ int main(int argc, char** argv) {
     if (init_core2extsrc(node_cache, dns_cache, spinhook_traffic, extsrc_socket_path, extsrc_listen_addr)) {
         goto stop;
     }
-
-    init_ipl_list_ar();
 
     init_rpcs(node_cache);
 
