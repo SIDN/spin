@@ -475,6 +475,7 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 #endif
 }
 
+recurse:
 	switch (ether_type) {
 	case ETHERTYPE_IP:
 		handle_ip(p, caplen, ep);
@@ -488,6 +489,18 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 		handle_arp(p, caplen);
 		break;
 
+	case ETHERTYPE_QINQ:
+	case ETHERTYPE_VLAN:
+		TCHECK2(*p, 4);
+
+		ether_type = ntohs(*(unsigned short*)(p + 2));
+
+		p += 4;
+		caplen -= 4;
+
+		goto recurse;
+		break;
+
 	default:
 		DPRINTF("unknown ether type");
 		break;
@@ -496,6 +509,11 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 	if (flow_list_should_send(flow_list, time(NULL))) {
 		send_flows(flow_list);
 	}
+
+	return;
+
+ trunc:
+	warnx("TRUNCATED");
 }
 
 int
