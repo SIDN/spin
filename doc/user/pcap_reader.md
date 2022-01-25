@@ -78,7 +78,10 @@ Use `-i` to specify the network interface.
 By default,
 `spin-pcap-reader` captures and analyzes 1514 bytes for each packet.
 If that's not enough (for instance, because you're using VLANs),
-you can use the `-s` flag (e.g. `-s 1518`).
+use the `-s` flag (e.g. `-s 1518`).
+`spin-pcap-reader` printing messages like
+`spin-pcap-reader: caplen 1514 != len 1518,`
+indicates that you need to use this flag.
 
 ## Caveats
 
