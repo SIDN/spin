@@ -73,6 +73,9 @@
 #define IPV6_VERSION		0x60
 #define IPV6_VERSION_MASK	0xf0
 #endif /* IPV6_VERSION */
+#ifndef ETHERTYPE_QINQ
+#define ETHERTYPE_QINQ		0x88A8
+#endif /* ETHERTYPE_QINQ */
 
 /* #define DEBUG 1 */
 
