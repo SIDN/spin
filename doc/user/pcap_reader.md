@@ -83,6 +83,10 @@ use the `-s` flag (e.g. `-s 1518`).
 `spin-pcap-reader: caplen 1514 != len 1518,`
 indicates that you need to use this flag.
 
+`spin-pcap-reader` prints almost no messages to the console.
+Specifying the `-v` flag enables verbose mode,
+which shows messages about truncated packets, for example.
+
 ## Caveats
 
 The SPIN PCAP reader is not perfect.

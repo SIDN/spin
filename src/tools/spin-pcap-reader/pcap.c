@@ -92,6 +92,7 @@ extern char *malloc_options;
 #endif /* __OpenBSD__ */
 
 int Rflag;	/* replay as fast as possible rather than at recorded speed */
+int vflag;	/* verbose */
 
 const u_char *packetp;
 const u_char *snapend;
@@ -131,10 +132,22 @@ usage(const char *error)
 
 	if (error)
 		fprintf(stderr, "%s\n", error);
-	fprintf(stderr, "Usage: %s [-R] [-e extsrc-socket-path] [-E extsrc-host]\n",
+	fprintf(stderr, "Usage: %s [-Rv] [-e extsrc-socket-path] [-E extsrc-host]\n",
 	    __progname);
 	fprintf(stderr, "\t[-f filter] [-i interface] [-r file] [-s snaplen]\n");
 	exit(1);
+}
+
+static void
+verbose(const char *fmt, ...)
+{
+	va_list ap;
+
+	if (vflag) {
+		va_start(ap, fmt);
+		vwarnx(fmt, ap);
+		va_end(ap);
+	}
 }
 
 static void
@@ -225,7 +238,7 @@ handle_icmp6(const u_char *bp, const struct ether_header *ep)
 	return;
 
  trunc:
-	warnx("TRUNCATED");
+	verbose("TRUNCATED");
 }
 
 static void
@@ -287,7 +300,7 @@ handle_l4(const struct ether_header *ep, const u_char *l4, u_int len,
 
 	if (pkt_info->src_port == 53 || pkt_info->dest_port == 53) {
 		if (truncated) {
-			warnx("not attempting to parse DNS packet");
+			verbose("not attempting to parse DNS packet");
 		} else {
 			if (up) {
 				cp = (const u_char *)(up + 1);
@@ -306,7 +319,7 @@ handle_l4(const struct ether_header *ep, const u_char *l4, u_int len,
 	return;
 
 trunc:
-	warnx("TRUNCATED");
+	verbose("TRUNCATED");
 }
 
 static void
@@ -331,13 +344,13 @@ handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep)
 	TCHECK(*ip);
 	len = ntohs(ip->ip_len);
 	if (caplen < len) {
-		warnx("Truncated IP packet: %d bytes missing", len - caplen);
+		verbose("Truncated IP packet: %d bytes missing", len - caplen);
 		len = caplen; // XXX
 		truncated = 1;
 	}
 	hlen = ip->ip_hl * 4;
 	if (hlen < sizeof(struct ip) || hlen > len) {
-		warnx("Bad header length: %d", hlen);
+		verbose("Bad header length: %d", hlen);
 		return;
 	}
 	len -= hlen;
@@ -356,7 +369,7 @@ handle_ip(const u_char *p, u_int caplen, const struct ether_header *ep)
 	return;
 
  trunc:
-	warnx("TRUNCATED");
+	verbose("TRUNCATED");
 }
 
 static void
@@ -379,18 +392,18 @@ handle_ip6(const u_char *p, u_int caplen, const struct ether_header *ep)
 	pkt_info.family = AF_INET6;
 
 	if (caplen < sizeof(struct ip6_hdr)) {
-		warnx("Truncated IPv6 packet: %d", caplen);
+		verbose("Truncated IPv6 packet: %d", caplen);
 		return;
 	}
 	if ((ip6->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
-		warnx("Bad IPv6 version: %u", ip6->ip6_vfc >> 4);
+		verbose("Bad IPv6 version: %u", ip6->ip6_vfc >> 4);
 		return;
 	}
 	hlen = sizeof(struct ip6_hdr);
 
 	len = ntohs(ip6->ip6_plen);
 	if (caplen < len + hlen) {
-		warnx("Truncated IP6 packet: %d bytes missing",
+		verbose("Truncated IP6 packet: %d bytes missing",
 		    len + hlen - caplen);
 		truncated = 1;
 	}
@@ -414,11 +427,11 @@ handle_arp(const u_char *bp, u_int length)
 
 	ap = (struct ether_arp *)bp;
 	if ((u_char *)(ap + 1) > snapend) {
-		warnx("[|arp]");
+		verbose("[|arp]");
 		return;
 	}
 	if (length < sizeof(struct ether_arp)) {
-		warnx("truncated arp");
+		verbose("truncated arp");
 		return;
 	}
 
@@ -448,7 +461,7 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 #endif
 
 	if (h->caplen != h->len) {
-		warnx("caplen %d != len %d, ", h->caplen, h->len);
+		verbose("caplen %d != len %d, ", h->caplen, h->len);
 	}
 
 	packetp = sp;
@@ -457,7 +470,7 @@ callback(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 	p = sp;
 
 	if ((snapend - p) < sizeof(struct ether_header)) {
-		warnx("[|ether]");
+		verbose("[|ether]");
 		return;
 	}
 
@@ -516,7 +529,7 @@ recurse:
 	return;
 
  trunc:
-	warnx("TRUNCATED");
+	verbose("TRUNCATED");
 }
 
 int
@@ -541,7 +554,7 @@ main(int argc, char *argv[])
 
 	flow_list = flow_list_create(time(NULL));
 
-	while ((ch = getopt(argc, argv, "e:E:f:hi:Rr:s:")) != -1) {
+	while ((ch = getopt(argc, argv, "e:E:f:hi:Rr:s:v")) != -1) {
 		switch(ch) {
 		case 'e':
 			extsrc_socket_path = optarg;
@@ -566,6 +579,9 @@ main(int argc, char *argv[])
 		case 's':
 			if (sscanf(optarg, "%d", &snaplen) != 1 || snaplen < 0)
 				usage("incorrect snaplen");
+			break;
+		case 'v':
+			vflag = 1;
 			break;
 		default:
 			usage(NULL);
