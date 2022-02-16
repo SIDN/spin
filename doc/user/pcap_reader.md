@@ -76,12 +76,16 @@ but of course it can be used on Linux systems as well.
 Use `-i` to specify the network interface.
 
 By default,
-`spin-pcap-reader` captures and analyzes 1514 bytes for each packet.
-If that's not enough (for instance, because you're using VLANs),
+`spin-pcap-reader` captures and analyzes 1232 bytes for each packet.
+For all packets,
+`spin-pcap-reader` just analyzes packet headers,
+except for DNS packets.
+Most DNS software attempts to send responses that fit in 1232 bytes
+([more info](https://dnsflagday.net/2020/)).
+This way,
+we hope to capture most DNS packets.
+This default may be changed by
 use the `-s` flag (e.g. `-s 1518`).
-`spin-pcap-reader` printing messages like
-`spin-pcap-reader: caplen 1514 != len 1518,`
-indicates that you need to use this flag.
 
 `spin-pcap-reader` prints almost no messages to the console.
 Specifying the `-v` flag enables verbose mode,
@@ -97,4 +101,5 @@ For instance:
    through an Internet socket is not protected with TLS yet.
  * It would be nice to implement sandboxing for other platforms
    besides OpenBSD.
+ * Fragmented DNS packets are not handled properly.
 

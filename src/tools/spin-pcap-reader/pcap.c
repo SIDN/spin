@@ -542,7 +542,7 @@ main(int argc, char *argv[])
 	char *file = NULL;
 	char *pcap_errbuf;
 	char *filter = "";
-	int snaplen = 1514;
+	int snaplen = 1232;
 	struct bpf_program fp;
 
 #ifdef __OpenBSD__
