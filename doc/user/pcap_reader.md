@@ -75,6 +75,12 @@ required to gather information about network activity,
 but of course it can be used on Linux systems as well.
 Use `-i` to specify the network interface.
 
+You can limit the packets analyzed by `spin-pcap-reader` by
+specifying a filter expression with `-f`.
+See pcap-filter(7) ([web version](https://linux.die.net/man/7/pcap-filter))
+for more info.
+For example, to ignore packets in VLAN 27, specify `-f '! vlan 27'`.
+
 By default,
 `spin-pcap-reader` captures and analyzes 1232 bytes for each packet.
 For all packets,
