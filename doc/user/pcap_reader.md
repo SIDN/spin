@@ -59,7 +59,7 @@ you can feed a PCAP to `spind` as follows:
 ```
 $ cd src/build/tools/spin-pcap-reader
 $ ./spin-pcap-reader -e /tmp/spin-extsrc.sock -r /file.pcap # UNIX domain socket
-$ ./spin-pcap-reader -E 192.0.2.3 -r /path/to/file.pcap     # or Internet socket
+$ ./spin-pcap-reader -E 192.0.2.3 -r /file.pcap             # or Internet socket
 ```
 
 By default,
